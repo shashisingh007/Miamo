@@ -1,0 +1,55 @@
+# ─── Miamo K8s Dev Overlay ────────────────────────────
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: miamo
+
+resources:
+  - ../base
+
+patches:
+  # Reduce replicas for dev
+  - target:
+      kind: Deployment
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 1
+  # Reduce HPA min for dev
+  - target:
+      kind: HorizontalPodAutoscaler
+    patch: |
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 2
+  # Override ConfigMap to dev settings
+  - target:
+      kind: ConfigMap
+      name: miamo-config
+    patch: |
+      - op: replace
+        path: /data/NODE_ENV
+        value: "development"
+  # Override Secrets for dev
+  - target:
+      kind: Secret
+      name: miamo-secrets
+    patch: |
+      - op: replace
+        path: /stringData/DATABASE_URL
+        value: "postgresql://miamo:miamo_dev_pass@miamo-postgres:5432/miamo_dev"
+      - op: replace
+        path: /stringData/JWT_SECRET
+        value: "miamo-dev-jwt-secret"
+      - op: replace
+        path: /stringData/JWT_REFRESH_SECRET
+        value: "miamo-dev-refresh-secret"
+      - op: replace
+        path: /stringData/POSTGRES_PASSWORD
+        value: "miamo_dev_pass"
+      - op: replace
+        path: /stringData/INTERNAL_SERVICE_KEY
+        value: "miamo-internal-dev-key"

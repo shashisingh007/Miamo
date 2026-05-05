@@ -1,0 +1,281 @@
+# ─── Miamo Microservices — Docker Compose ─────────────
+# Production-grade microservices architecture
+# Instagram-inspired: API Gateway → Microservices → Shared DB
+version: '3.9'
+
+x-service-env: &service-env
+  NODE_ENV: development
+  DATABASE_URL: postgresql://miamo:miamo_dev_pass@postgres:5432/miamo_dev
+  REDIS_URL: redis://redis:6379
+  INTERNAL_SERVICE_KEY: miamo-internal-dev-key
+  JWT_SECRET: miamo-dev-jwt-secret-change-in-production-2026
+  JWT_REFRESH_SECRET: miamo-dev-refresh-secret-change-in-production-2026
+  FRONTEND_URL: http://localhost:3100
+
+x-service-depends: &service-depends
+  postgres:
+    condition: service_healthy
+  redis:
+    condition: service_healthy
+
+services:
+  # ═══ INFRASTRUCTURE ═════════════════════════════════
+  postgres:
+    image: postgres:16-alpine
+    container_name: miamo-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: miamo
+      POSTGRES_PASSWORD: miamo_dev_pass
+      POSTGRES_DB: miamo_dev
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init.sh:/docker-entrypoint-initdb.d/init.sh
+    command: postgres -c 'max_connections=200' -c 'shared_buffers=256MB' -c 'effective_cache_size=768MB' -c 'work_mem=4MB'
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U miamo -d miamo_dev"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
+
+  redis:
+    image: redis:7-alpine
+    container_name: miamo-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+          cpus: '0.5'
+
+  # ═══ DATABASE MIGRATIONS ════════════════════════════
+  migrate:
+    build:
+      context: ./services/auth
+      dockerfile: Dockerfile
+      target: build
+    container_name: miamo-migrate
+    working_dir: /app
+    command: npx prisma migrate deploy
+    environment:
+      DATABASE_URL: postgresql://miamo:miamo_dev_pass@postgres:5432/miamo_dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  seed:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: miamo-seed
+    command: npx tsx prisma/seed.ts
+    environment:
+      DATABASE_URL: postgresql://miamo:miamo_dev_pass@postgres:5432/miamo_dev
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # ═══ API GATEWAY ════════════════════════════════════
+  gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
+    container_name: miamo-gateway
+    restart: unless-stopped
+    ports:
+      - "3200:3200"
+    environment:
+      PORT: "3200"
+      NODE_ENV: development
+      JWT_SECRET: miamo-dev-jwt-secret-change-in-production-2026
+      INTERNAL_SERVICE_KEY: miamo-internal-dev-key
+      FRONTEND_URL: http://localhost:3100
+      AUTH_SERVICE_URL: http://auth:3201
+      USER_SERVICE_URL: http://users:3202
+      SOCIAL_SERVICE_URL: http://social:3203
+      MESSAGING_SERVICE_URL: http://messaging:3204
+      CONTENT_SERVICE_URL: http://content:3205
+      NOTIFICATION_SERVICE_URL: http://notifications:3206
+    depends_on:
+      - auth
+      - users
+      - social
+      - messaging
+      - content
+      - notifications
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3200/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ═══ MICROSERVICES ══════════════════════════════════
+  auth:
+    build:
+      context: ./services/auth
+      dockerfile: Dockerfile
+    container_name: miamo-auth
+    restart: unless-stopped
+    ports:
+      - "3201:3201"
+    environment:
+      <<: *service-env
+      PORT: "3201"
+    depends_on:
+      <<: *service-depends
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3201/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  users:
+    build:
+      context: ./services/users
+      dockerfile: Dockerfile
+    container_name: miamo-users
+    restart: unless-stopped
+    ports:
+      - "3202:3202"
+    environment:
+      <<: *service-env
+      PORT: "3202"
+    depends_on:
+      <<: *service-depends
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3202/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  social:
+    build:
+      context: ./services/social
+      dockerfile: Dockerfile
+    container_name: miamo-social
+    restart: unless-stopped
+    ports:
+      - "3203:3203"
+    environment:
+      <<: *service-env
+      PORT: "3203"
+    depends_on:
+      <<: *service-depends
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3203/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  messaging:
+    build:
+      context: ./services/messaging
+      dockerfile: Dockerfile
+    container_name: miamo-messaging
+    restart: unless-stopped
+    ports:
+      - "3204:3204"
+    environment:
+      <<: *service-env
+      PORT: "3204"
+    depends_on:
+      <<: *service-depends
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3204/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  content:
+    build:
+      context: ./services/content
+      dockerfile: Dockerfile
+    container_name: miamo-content
+    restart: unless-stopped
+    ports:
+      - "3205:3205"
+    environment:
+      <<: *service-env
+      PORT: "3205"
+    depends_on:
+      <<: *service-depends
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3205/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  notifications:
+    build:
+      context: ./services/notifications
+      dockerfile: Dockerfile
+    container_name: miamo-notifications
+    restart: unless-stopped
+    ports:
+      - "3206:3206"
+    environment:
+      <<: *service-env
+      PORT: "3206"
+    depends_on:
+      <<: *service-depends
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3206/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ═══ WEB FRONTEND ══════════════════════════════════
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+    container_name: miamo-web
+    restart: unless-stopped
+    ports:
+      - "3100:3100"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3200
+    depends_on:
+      - gateway
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  default:
+    name: miamo-network
+    driver: bridge

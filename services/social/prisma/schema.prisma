@@ -1,0 +1,600 @@
+// ─── Miamo Database Schema ─────────────────────────────
+// PostgreSQL + Prisma ORM — Full MVP Schema
+// Shared across all microservices
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users & Auth ─────────────────────────────────────
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String
+  displayName   String
+  username      String    @unique
+  miamoId       String    @unique
+  verified      Boolean   @default(false)
+  active        Boolean   @default(true)
+  deactivated   Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  profile       Profile?
+  settings      Settings?
+  privacySettings PrivacySettings?
+  photos        ProfilePhoto[]
+  prompts       ProfilePrompt[]
+  interests     ProfileInterest[]
+
+  sentLikes       Like[]          @relation("SentLikes")
+  receivedLikes   Like[]          @relation("ReceivedLikes")
+  sentRequests    MatchRequest[]  @relation("SentRequests")
+  receivedRequests MatchRequest[] @relation("ReceivedRequests")
+  matchesAsUser1  Match[]         @relation("MatchUser1")
+  matchesAsUser2  Match[]         @relation("MatchUser2")
+  sentMessages    Message[]       @relation("SentMessages")
+  chatsAsUser1    Chat[]          @relation("ChatUser1")
+  chatsAsUser2    Chat[]          @relation("ChatUser2")
+
+  beatsAsUser1    Beat[]          @relation("BeatUser1")
+  beatsAsUser2    Beat[]          @relation("BeatUser2")
+  beatEvents      BeatEvent[]
+
+  feedPosts       FeedPost[]
+  feedComments    FeedComment[]
+  feedReactions   FeedReaction[]
+
+  stories         Story[]
+  storyViews      StoryView[]
+
+  videos          Video[]
+  videoComments   VideoComment[]
+  videoReactions  VideoReaction[]
+
+  creativityItems  CreativityItem[]
+  creativityViews  CreativityView[]
+  creativityReactions CreativityReaction[]
+  creativityComments  CreativityComment[]
+
+  searchLogs      SearchLog[]
+  sentReports     Report[]        @relation("Reporter")
+  receivedReports Report[]        @relation("Reported")
+  sentBlocks      Block[]         @relation("Blocker")
+  receivedBlocks  Block[]         @relation("Blocked")
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+
+  @@index([email])
+  @@index([username])
+  @@index([miamoId])
+}
+
+model Profile {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  age             Int
+  gender          String
+  city            String
+  profession      String
+  bio             String   @default("")
+  datingIntent    String   @default("casual")
+  seriousMode     Boolean  @default(false)
+  profileScore    Int      @default(30)
+  online          Boolean  @default(false)
+  lastActive      DateTime @default(now())
+  avatarGradient  String   @default("from-lavender-400 to-violet-deep")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([city])
+  @@index([gender])
+  @@index([datingIntent])
+  @@index([seriousMode])
+}
+
+model ProfilePhoto {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url       String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model ProfilePrompt {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question  String
+  answer    String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model ProfileInterest {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([name])
+}
+
+// ─── Settings ─────────────────────────────────────────
+model Settings {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme            String   @default("dark")
+  accentColor      String   @default("#A78BFA")
+  reduceMotion     Boolean  @default(false)
+  highContrast     Boolean  @default(false)
+  readReceipts     Boolean  @default(true)
+  typingIndicator  Boolean  @default(true)
+  onlineStatus     Boolean  @default(true)
+  lastActiveVisible Boolean @default(true)
+  whoCanMessage    String   @default("matches")
+  whoCanSendMedia  String   @default("matches")
+  whoCanStartBeat  String   @default("matches")
+  whoCanBroadcast  String   @default("matches")
+  whoCanVoiceCall  String   @default("matches")
+  whoCanVideoCall  String   @default("matches")
+  storyVisibility  String   @default("everyone")
+  feedVisibility   String   @default("everyone")
+  videoVisibility  String   @default("everyone")
+  creativityVisibility String @default("everyone")
+  notificationsEnabled Boolean @default(true)
+  beatReminders    Boolean  @default(true)
+  messageNotifications Boolean @default(true)
+  storyNotifications Boolean @default(true)
+  privacyMode      Boolean  @default(false)
+  invisibleMode    Boolean  @default(false)
+  seriousModeEnabled Boolean @default(false)
+  aiPersonalization Boolean @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model PrivacySettings {
+  id               String   @id @default(uuid())
+  userId           String   @unique
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profileVisible   Boolean  @default(true)
+  searchable       Boolean  @default(true)
+  miamoIdSearchable Boolean @default(true)
+  nameSearchable   Boolean  @default(true)
+  citySearchable   Boolean  @default(true)
+  hideExactCity    Boolean  @default(false)
+  showApproxCity   Boolean  @default(true)
+  disableSearch    Boolean  @default(false)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+// ─── Likes & Matching ────────────────────────────────
+model Like {
+  id         String   @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  fromUser   User     @relation("SentLikes", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("ReceivedLikes", fields: [toUserId], references: [id], onDelete: Cascade)
+  targetType String   @default("profile")
+  targetId   String?
+  createdAt  DateTime @default(now())
+
+  @@unique([fromUserId, toUserId, targetType, targetId])
+  @@index([toUserId])
+}
+
+model MatchRequest {
+  id           String   @id @default(uuid())
+  fromUserId   String
+  toUserId     String
+  fromUser     User     @relation("SentRequests", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser       User     @relation("ReceivedRequests", fields: [toUserId], references: [id], onDelete: Cascade)
+  type         String   @default("comment")
+  message      String   @default("")
+  targetType   String   @default("profile")
+  targetId     String?
+  status       String   @default("pending")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([fromUserId, toUserId])
+  @@index([toUserId, status])
+}
+
+model Match {
+  id        String   @id @default(uuid())
+  user1Id   String
+  user2Id   String
+  user1     User     @relation("MatchUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2     User     @relation("MatchUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  chat      Chat?
+
+  @@unique([user1Id, user2Id])
+  @@index([user1Id])
+  @@index([user2Id])
+}
+
+// ─── Messages & Chats ────────────────────────────────
+model Chat {
+  id          String    @id @default(uuid())
+  matchId     String    @unique
+  match       Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user1Id     String
+  user2Id     String
+  user1       User      @relation("ChatUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2       User      @relation("ChatUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+  pinned1     Boolean   @default(false)
+  pinned2     Boolean   @default(false)
+  muted1      Boolean   @default(false)
+  muted2      Boolean   @default(false)
+  archived1   Boolean   @default(false)
+  archived2   Boolean   @default(false)
+  background  String    @default("default")
+  theme       String    @default("default")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  messages    Message[]
+
+  @@index([user1Id])
+  @@index([user2Id])
+}
+
+model Message {
+  id            String    @id @default(uuid())
+  chatId        String
+  chat          Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId      String
+  sender        User      @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  content       String
+  type          String    @default("text")
+  replyToId     String?
+  replyTo       Message?  @relation("Replies", fields: [replyToId], references: [id])
+  replies       Message[] @relation("Replies")
+  reactions     String    @default("")
+  read          Boolean   @default(false)
+  deletedForAll Boolean   @default(false)
+  deletedFor    String    @default("")
+  editedAt      DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([chatId, createdAt])
+  @@index([senderId])
+}
+
+// ─── Beats (Streaks) ─────────────────────────────────
+model Beat {
+  id         String     @id @default(uuid())
+  user1Id    String
+  user2Id    String
+  user1      User       @relation("BeatUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2      User       @relation("BeatUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+  count      Int        @default(0)
+  state      String     @default("active")
+  lastUser1  DateTime?
+  lastUser2  DateTime?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  events     BeatEvent[]
+
+  @@unique([user1Id, user2Id])
+  @@index([state])
+}
+
+model BeatEvent {
+  id        String   @id @default(uuid())
+  beatId    String
+  beat      Beat     @relation(fields: [beatId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   @default("snap")
+  content   String   @default("")
+  createdAt DateTime @default(now())
+
+  @@index([beatId, createdAt])
+}
+
+// ─── Feed ────────────────────────────────────────────
+model FeedPost {
+  id         String   @id @default(uuid())
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  type       String   @default("thought")
+  content    String
+  mediaUrl   String?
+  visibility String   @default("everyone")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  comments   FeedComment[]
+  reactions  FeedReaction[]
+
+  @@index([authorId, createdAt])
+  @@index([visibility])
+}
+
+model FeedComment {
+  id        String   @id @default(uuid())
+  postId    String
+  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([postId, createdAt])
+}
+
+model FeedReaction {
+  id        String   @id @default(uuid())
+  postId    String
+  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   @default("like")
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+  @@index([postId])
+}
+
+// ─── Stories ─────────────────────────────────────────
+model Story {
+  id         String   @id @default(uuid())
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  type       String   @default("photo")
+  content    String   @default("")
+  mediaUrl   String?
+  visibility String   @default("everyone")
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  views      StoryView[]
+
+  @@index([authorId, createdAt])
+  @@index([expiresAt])
+}
+
+model StoryView {
+  id        String   @id @default(uuid())
+  storyId   String
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  viewerId  String
+  viewer    User     @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  reaction  String?
+  createdAt DateTime @default(now())
+
+  @@unique([storyId, viewerId])
+  @@index([storyId])
+}
+
+// ─── Videos ──────────────────────────────────────────
+model Video {
+  id          String   @id @default(uuid())
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  title       String
+  description String   @default("")
+  url         String   @default("")
+  thumbnailUrl String  @default("")
+  category    String   @default("general")
+  visibility  String   @default("everyone")
+  views       Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  comments    VideoComment[]
+  reactions   VideoReaction[]
+
+  @@index([authorId])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model VideoComment {
+  id        String   @id @default(uuid())
+  videoId   String
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([videoId, createdAt])
+}
+
+model VideoReaction {
+  id        String   @id @default(uuid())
+  videoId   String
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   @default("like")
+  createdAt DateTime @default(now())
+
+  @@unique([videoId, userId])
+}
+
+// ─── Creativity ──────────────────────────────────────
+model CreativityCategory {
+  id    String @id @default(uuid())
+  name  String @unique
+  icon  String @default("sparkles")
+  color String @default("#A78BFA")
+  items CreativityItem[]
+}
+
+model CreativityItem {
+  id          String   @id @default(uuid())
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  categoryId  String
+  category    CreativityCategory @relation(fields: [categoryId], references: [id])
+  type        String   @default("text")
+  title       String
+  content     String
+  mediaUrl    String?
+  visibility  String   @default("everyone")
+  featured    Boolean  @default(false)
+  views       Int      @default(0)
+  trendScore  Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  reactions   CreativityReaction[]
+  comments    CreativityComment[]
+  viewRecords CreativityView[]
+
+  @@index([authorId])
+  @@index([categoryId])
+  @@index([trendScore(sort: Desc)])
+  @@index([createdAt])
+}
+
+model CreativityView {
+  id        String         @id @default(uuid())
+  itemId    String
+  item      CreativityItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  viewerId  String
+  viewer    User           @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
+
+  @@unique([itemId, viewerId])
+}
+
+model CreativityReaction {
+  id        String         @id @default(uuid())
+  itemId    String
+  item      CreativityItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String         @default("like")
+  createdAt DateTime       @default(now())
+
+  @@unique([itemId, userId])
+}
+
+model CreativityComment {
+  id        String         @id @default(uuid())
+  itemId    String
+  item      CreativityItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime       @default(now())
+
+  @@index([itemId, createdAt])
+}
+
+// ─── Trends ──────────────────────────────────────────
+model Trend {
+  id           String   @id @default(uuid())
+  itemId       String
+  itemType     String
+  category     String
+  score        Float    @default(0)
+  views        Int      @default(0)
+  likes        Int      @default(0)
+  comments     Int      @default(0)
+  saves        Int      @default(0)
+  shares       Int      @default(0)
+  matchRequests Int     @default(0)
+  rank         Int      @default(0)
+  categoryRank Int      @default(0)
+  calculatedAt DateTime @default(now())
+
+  @@unique([itemId, itemType])
+  @@index([score(sort: Desc)])
+  @@index([category, categoryRank])
+}
+
+// ─── Search ──────────────────────────────────────────
+model SearchLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  query     String
+  type      String   @default("general")
+  results   Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ─── Safety ──────────────────────────────────────────
+model Report {
+  id           String   @id @default(uuid())
+  reporterId   String
+  reportedId   String
+  reporter     User     @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported     User     @relation("Reported", fields: [reportedId], references: [id], onDelete: Cascade)
+  reason       String
+  details      String   @default("")
+  targetType   String   @default("user")
+  targetId     String?
+  status       String   @default("pending")
+  createdAt    DateTime @default(now())
+
+  @@index([reportedId])
+  @@index([status])
+}
+
+model Block {
+  id         String   @id @default(uuid())
+  blockerId  String
+  blockedId  String
+  blocker    User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked    User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+}
+
+// ─── Notifications ───────────────────────────────────
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String
+  data      String   @default("{}")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, read, createdAt])
+}
+
+// ─── Audit Log ───────────────────────────────────────
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  details   String   @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}

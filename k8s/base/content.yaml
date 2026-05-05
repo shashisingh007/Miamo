@@ -1,0 +1,90 @@
+# ─── Miamo Content Service K8s ────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: miamo-content
+  namespace: miamo
+  labels:
+    app: miamo-content
+    tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: miamo-content
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: miamo-content
+        tier: backend
+    spec:
+      containers:
+        - name: content
+          image: miamo-content:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3205
+          env:
+            - name: PORT
+              value: "3205"
+          envFrom:
+            - configMapRef:
+                name: miamo-config
+            - secretRef:
+                name: miamo-secrets
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3205
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3205
+            initialDelaySeconds: 10
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: miamo-content
+  namespace: miamo
+spec:
+  selector:
+    app: miamo-content
+  ports:
+    - port: 3205
+      targetPort: 3205
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: miamo-content-hpa
+  namespace: miamo
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: miamo-content
+  minReplicas: 2
+  maxReplicas: 12
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

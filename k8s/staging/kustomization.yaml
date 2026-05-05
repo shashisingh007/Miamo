@@ -1,0 +1,42 @@
+# ─── Miamo K8s Staging Overlay ────────────────────────
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: miamo-staging
+
+resources:
+  - ../base
+
+patches:
+  - target:
+      kind: Deployment
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2
+  - target:
+      kind: ConfigMap
+      name: miamo-config
+    patch: |
+      - op: replace
+        path: /data/NODE_ENV
+        value: "staging"
+  - target:
+      kind: Secret
+      name: miamo-secrets
+    patch: |
+      - op: replace
+        path: /stringData/DATABASE_URL
+        value: "postgresql://miamo:miamo_staging_pass@miamo-postgres:5432/miamo_staging"
+      - op: replace
+        path: /stringData/JWT_SECRET
+        value: "CHANGE-THIS-STAGING-JWT-SECRET"
+      - op: replace
+        path: /stringData/JWT_REFRESH_SECRET
+        value: "CHANGE-THIS-STAGING-REFRESH-SECRET"
+      - op: replace
+        path: /stringData/POSTGRES_PASSWORD
+        value: "miamo_staging_pass"
+      - op: replace
+        path: /stringData/INTERNAL_SERVICE_KEY
+        value: "CHANGE-THIS-STAGING-INTERNAL-KEY"

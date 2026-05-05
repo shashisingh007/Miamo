@@ -1,0 +1,171 @@
+# ─── Miamo K8s Production Overlay ─────────────────────
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: miamo-prod
+
+resources:
+  - ../base
+
+patches:
+  # Gateway – 3 replicas, more resources
+  - target:
+      kind: Deployment
+      name: miamo-gateway
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 3
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "250m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "256Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "1000m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "512Mi"
+
+  # Auth – 3 replicas
+  - target:
+      kind: Deployment
+      name: miamo-auth
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 3
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "200m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "256Mi"
+
+  # Users – 3 replicas
+  - target:
+      kind: Deployment
+      name: miamo-users
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 3
+
+  # Social – 3 replicas
+  - target:
+      kind: Deployment
+      name: miamo-social
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 3
+
+  # Messaging – 4 replicas (high traffic)
+  - target:
+      kind: Deployment
+      name: miamo-messaging
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 4
+
+  # Content – 3 replicas
+  - target:
+      kind: Deployment
+      name: miamo-content
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 3
+
+  # Notifications – 2 replicas
+  - target:
+      kind: Deployment
+      name: miamo-notifications
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 2
+
+  # Web frontend – 3 replicas
+  - target:
+      kind: Deployment
+      name: miamo-web
+    patch: |
+      - op: replace
+        path: /spec/replicas
+        value: 3
+
+  # PostgreSQL – prod resources
+  - target:
+      kind: Deployment
+      name: miamo-postgres
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: "500m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: "1Gi"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/cpu
+        value: "2000m"
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/limits/memory
+        value: "4Gi"
+
+  # HPA – scale up production limits
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: miamo-gateway-hpa
+    patch: |
+      - op: replace
+        path: /spec/maxReplicas
+        value: 20
+
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: miamo-auth-hpa
+    patch: |
+      - op: replace
+        path: /spec/maxReplicas
+        value: 15
+
+  - target:
+      kind: HorizontalPodAutoscaler
+      name: miamo-messaging-hpa
+    patch: |
+      - op: replace
+        path: /spec/maxReplicas
+        value: 25
+
+  # Override ConfigMap for production
+  - target:
+      kind: ConfigMap
+      name: miamo-config
+    patch: |
+      - op: replace
+        path: /data/NODE_ENV
+        value: "production"
+  # Override Secrets for production
+  - target:
+      kind: Secret
+      name: miamo-secrets
+    patch: |
+      - op: replace
+        path: /stringData/DATABASE_URL
+        value: "postgresql://miamo:CHANGE_ME_PROD@miamo-postgres:5432/miamo_prod"
+      - op: replace
+        path: /stringData/JWT_SECRET
+        value: "CHANGE-THIS-PRODUCTION-JWT-SECRET-USE-RANDOM-256BIT"
+      - op: replace
+        path: /stringData/JWT_REFRESH_SECRET
+        value: "CHANGE-THIS-PRODUCTION-REFRESH-SECRET-USE-RANDOM-256BIT"
+      - op: replace
+        path: /stringData/POSTGRES_PASSWORD
+        value: "CHANGE_ME_PROD"
+      - op: replace
+        path: /stringData/INTERNAL_SERVICE_KEY
+        value: "CHANGE-THIS-PRODUCTION-INTERNAL-KEY"

@@ -1,0 +1,68 @@
+# ─── Miamo Redis K8s ──────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: miamo-redis
+  namespace: miamo
+  labels:
+    app: miamo-redis
+    tier: cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: miamo-redis
+  template:
+    metadata:
+      labels:
+        app: miamo-redis
+        tier: cache
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          ports:
+            - containerPort: 6379
+          command:
+            - redis-server
+            - --appendonly
+            - "yes"
+            - --maxmemory
+            - "128mb"
+            - --maxmemory-policy
+            - allkeys-lru
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: redis-data
+              mountPath: /data
+      volumes:
+        - name: redis-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: miamo-redis
+  namespace: miamo
+spec:
+  selector:
+    app: miamo-redis
+  ports:
+    - port: 6379
+      targetPort: 6379

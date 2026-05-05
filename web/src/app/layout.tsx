@@ -1,0 +1,35 @@
+import type { Metadata, Viewport } from 'next';
+import { Inter } from 'next/font/google';
+import './globals.css';
+import { Providers } from '@/components/providers';
+
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+
+export const metadata: Metadata = {
+  title: 'Miamo — Where connections become something real',
+  description: 'A premium dating and social platform for meaningful connections, thoughtful matching, and authentic relationships.',
+  keywords: ['dating', 'social', 'meaningful connections', 'relationships', 'AI matching'],
+  openGraph: {
+    title: 'Miamo — Where connections become something real',
+    description: 'Premium dating and social platform',
+    type: 'website',
+    siteName: 'Miamo',
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#050506',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+};
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <body className={`${inter.variable} font-sans`}>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}

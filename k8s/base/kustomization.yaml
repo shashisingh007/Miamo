@@ -1,0 +1,26 @@
+# ─── Miamo K8s Base Kustomization ─────────────────────
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: miamo
+
+resources:
+  - namespace.yaml
+  - config.yaml
+  - postgres.yaml
+  - redis.yaml
+  - gateway.yaml
+  - auth.yaml
+  - users.yaml
+  - social.yaml
+  - messaging.yaml
+  - content.yaml
+  - notifications.yaml
+  - web.yaml
+  - ingress.yaml
+  - jobs.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: miamo
+      app.kubernetes.io/managed-by: kustomize

@@ -1,0 +1,53 @@
+# ─── Migration Job ────────────────────────────────────
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: miamo-migrate
+  namespace: miamo
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      containers:
+        - name: migrate
+          image: miamo-auth:latest
+          command: ["npx", "prisma", "migrate", "deploy"]
+          envFrom:
+            - secretRef:
+                name: miamo-secrets
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+      restartPolicy: OnFailure
+  backoffLimit: 5
+---
+# ─── Seed Job (dev/staging only) ─────────────────────
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: miamo-seed
+  namespace: miamo
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      containers:
+        - name: seed
+          image: miamo-auth:latest
+          command: ["npx", "tsx", "prisma/seed.ts"]
+          envFrom:
+            - secretRef:
+                name: miamo-secrets
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+      restartPolicy: OnFailure
+  backoffLimit: 1
