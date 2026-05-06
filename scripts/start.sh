@@ -156,12 +156,12 @@ kubectl wait --for=condition=ready pod -l service=gateway -n ${NAMESPACE} --time
 kubectl wait --for=condition=ready pod -l service=web -n ${NAMESPACE} --timeout=90s
 echo -e "  ${G}✓${NC} All services deployed"
 
-# ─── Port-forward (maps config port to k8s service) ───────────────
+# ─── Port-forward (local_ports → k8s service port 443) ────────────
 echo -e "\n${Y}Starting port-forwards...${NC}"
 pkill -f "port-forward.*-n ${NAMESPACE}" 2>/dev/null || true
 sleep 1
-kubectl port-forward svc/gateway ${SERVICE_PORT}:${SERVICE_PORT} -n ${NAMESPACE} &>/dev/null &
-kubectl port-forward svc/web ${SERVICE_PORT}:${SERVICE_PORT} -n ${NAMESPACE} &>/dev/null &
+kubectl port-forward svc/web ${LOCAL_WEB_PORT}:${SERVICE_PORT} -n ${NAMESPACE} &>/dev/null &
+kubectl port-forward svc/gateway ${LOCAL_GATEWAY_PORT}:${SERVICE_PORT} -n ${NAMESPACE} &>/dev/null &
 sleep 2
 
 # ─── Status ───────────────────────────────────────────────────────
@@ -170,7 +170,7 @@ echo ""
 kubectl get pods -n ${NAMESPACE} --no-headers | awk '{printf "  %-40s %s\n", $1, $3}'
 echo -e "\n${B}═══════════════════════════════════════════════${NC}"
 echo -e "  Host:    ${G}${CLUSTER_HOST}${NC}"
-echo -e "  Web:     ${G}https://${CLUSTER_HOST}:${SERVICE_PORT}${NC}  (NodePort: ${WEB_NODEPORT})"
-echo -e "  API:     ${G}https://${CLUSTER_HOST}:${SERVICE_PORT}${NC}  (NodePort: ${GATEWAY_NODEPORT})"
+echo -e "  Web:     ${G}http://${CLUSTER_HOST}:${LOCAL_WEB_PORT}${NC}"
+echo -e "  API:     ${G}http://${CLUSTER_HOST}:${LOCAL_GATEWAY_PORT}${NC}"
 echo -e "  Config:  ${Y}configuration/${ENV}/values.yaml${NC}"
 echo -e "${B}═══════════════════════════════════════════════${NC}\n"

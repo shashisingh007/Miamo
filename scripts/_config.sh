@@ -55,6 +55,9 @@ WEB_PORT=$(val "container_ports" "web")
 GATEWAY_NODEPORT=$(val "node_ports" "gateway")
 WEB_NODEPORT=$(val "node_ports" "web")
 
+LOCAL_WEB_PORT=$(val "local_ports" "web")
+LOCAL_GATEWAY_PORT=$(val "local_ports" "gateway")
+
 IMAGE_REGISTRY=$(val "images" "registry")
 IMAGE_TAG=$(val "images" "tag")
 PULL_POLICY=$(val "images" "pull_policy")

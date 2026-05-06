@@ -23,7 +23,12 @@ container_ports:
   gateway: 3200
   web: 3100
 
-# ─── NodePorts (host-accessible, 30000-32767 range) ──────────────
+# ─── Local Ports (for port-forwarding to your machine) ───────────
+local_ports:
+  web: 3100
+  gateway: 3200
+
+# ─── NodePorts (host-accessible via minikube IP, 30000-32767) ─────
 node_ports:
   gateway: 30082
   web: 30445

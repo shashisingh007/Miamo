@@ -22,8 +22,8 @@ kubectl get pods -n ${NAMESPACE} --no-headers | awk '{printf "  %-40s %s\n", $1,
 echo -e "\n${Y}Re-establishing port-forwards...${NC}"
 pkill -f "port-forward.*-n ${NAMESPACE}" 2>/dev/null || true
 sleep 1
-kubectl port-forward svc/gateway ${SERVICE_PORT}:${SERVICE_PORT} -n ${NAMESPACE} &>/dev/null &
-kubectl port-forward svc/web ${SERVICE_PORT}:${SERVICE_PORT} -n ${NAMESPACE} &>/dev/null &
+kubectl port-forward svc/web ${LOCAL_WEB_PORT}:${SERVICE_PORT} -n ${NAMESPACE} &>/dev/null &
+kubectl port-forward svc/gateway ${LOCAL_GATEWAY_PORT}:${SERVICE_PORT} -n ${NAMESPACE} &>/dev/null &
 sleep 2
 
 echo -e "\n${G}✓ Restart complete.${NC}\n"
