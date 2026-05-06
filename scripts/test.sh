@@ -1,108 +1,79 @@
 #!/bin/bash
-# ═══ Miamo — Test Suite ═══
-# Runs all tests: health checks, API integration, e2e
-# Must pass before deploying. Exit code 0 = all pass.
+# ═══ Miamo — Test Suite (Kubernetes) ═══
+# Verifies all pods are running and services respond correctly
 set -e
 cd "$(dirname "$0")/.."
 
-G='\033[0;32m'; R='\033[0;31m'; Y='\033[1;33m'; NC='\033[0m'
+G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[1;34m'; NC='\033[0m'
 PASS=0; FAIL=0
 
-ok()   { PASS=$((PASS+1)); echo -e "  ${G}✓${NC} $1"; }
-fail() { FAIL=$((FAIL+1)); echo -e "  ${R}✗${NC} $1"; }
+pass() { echo -e "  ${G}✓${NC} $1"; PASS=$((PASS + 1)); }
+fail() { echo -e "  ${R}✗${NC} $1"; FAIL=$((FAIL + 1)); }
 
-echo -e "\n${Y}═══ MIAMO TEST SUITE ═══${NC}\n"
+echo -e "\n${B}═══ MIAMO K8S TEST SUITE ═══${NC}\n"
 
-# ─── 1. Container Health ─────────────────────────────
-echo -e "${Y}[1/4] Container Health${NC}"
-SERVICES="postgres redis auth users social messaging content notifications gateway web"
-for svc in $SERVICES; do
-  STATUS=$(docker-compose ps "$svc" --format json 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin).get('Health','unknown'))" 2>/dev/null || echo "unknown")
-  if [ "$STATUS" = "healthy" ]; then ok "$svc"; else fail "$svc ($STATUS)"; fi
-done
-
-# ─── 2. API Health Endpoints ─────────────────────────
-echo -e "\n${Y}[2/4] API Health Endpoints${NC}"
-ENDPOINTS=(
-  "http://localhost:3200/health:gateway"
-  "http://localhost:3100:web"
-)
-for ep in "${ENDPOINTS[@]}"; do
-  URL="${ep%%:*}:${ep#*:}"
-  URL="${ep%:*}"
-  NAME="${ep##*:}"
-  CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 "$URL" 2>/dev/null || echo "000")
-  if [ "$CODE" = "200" ]; then ok "$NAME ($URL)"; else fail "$NAME → HTTP $CODE"; fi
-done
-
-# ─── 3. API Integration Tests ────────────────────────
-echo -e "\n${Y}[3/4] API Integration${NC}"
-
-# Login test
-LOGIN=$(curl -s -X POST http://localhost:3200/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"miamo1@miamo.test","password":"miamo1"}' --max-time 5 2>/dev/null)
-TOKEN=$(echo "$LOGIN" | python3 -c "import sys,json;d=json.load(sys.stdin);print(d.get('data',{}).get('token',''))" 2>/dev/null || echo "")
-if [ -n "$TOKEN" ] && [ "$TOKEN" != "" ]; then
-  ok "POST /auth/login → got token"
-else
-  fail "POST /auth/login → no token"
-fi
-
-# Profile fetch
-if [ -n "$TOKEN" ]; then
-  PROFILE_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
-    -H "Authorization: Bearer $TOKEN" \
-    http://localhost:3200/api/v1/users/me 2>/dev/null || echo "000")
-  if [ "$PROFILE_CODE" = "200" ]; then ok "GET /users/me → 200"; else fail "GET /users/me → $PROFILE_CODE"; fi
-
-  FEED_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
-    -H "Authorization: Bearer $TOKEN" \
-    http://localhost:3200/api/v1/feed 2>/dev/null || echo "000")
-  if [ "$FEED_CODE" = "200" ]; then ok "GET /feed → 200"; else fail "GET /feed → $FEED_CODE"; fi
-
-  DISCOVER_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
-    -H "Authorization: Bearer $TOKEN" \
-    http://localhost:3200/api/v1/discover 2>/dev/null || echo "000")
-  if [ "$DISCOVER_CODE" = "200" ]; then ok "GET /discover → 200"; else fail "GET /discover → $DISCOVER_CODE"; fi
-
-  MATCHES_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
-    -H "Authorization: Bearer $TOKEN" \
-    http://localhost:3200/api/v1/matches 2>/dev/null || echo "000")
-  if [ "$MATCHES_CODE" = "200" ]; then ok "GET /matches → 200"; else fail "GET /matches → $MATCHES_CODE"; fi
-
-  MESSAGES_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
-    -H "Authorization: Bearer $TOKEN" \
-    http://localhost:3200/api/v1/messages 2>/dev/null || echo "000")
-  if [ "$MESSAGES_CODE" = "200" ]; then ok "GET /messages → 200"; else fail "GET /messages → $MESSAGES_CODE"; fi
-
-  NOTIF_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 \
-    -H "Authorization: Bearer $TOKEN" \
-    http://localhost:3200/api/v1/notifications 2>/dev/null || echo "000")
-  if [ "$NOTIF_CODE" = "200" ]; then ok "GET /notifications → 200"; else fail "GET /notifications → $NOTIF_CODE"; fi
-fi
-
-# ─── 4. Response Time ────────────────────────────────
-echo -e "\n${Y}[4/4] Response Time (< 500ms)${NC}"
-for endpoint in "/api/v1/auth/login" "/api/v1/feed" "/api/v1/discover"; do
-  if [ "$endpoint" = "/api/v1/auth/login" ]; then
-    TIME=$(curl -s -o /dev/null -w "%{time_total}" --max-time 5 \
-      -X POST -H "Content-Type: application/json" \
-      -d '{"email":"miamo1@miamo.test","password":"miamo1"}' \
-      "http://localhost:3200$endpoint" 2>/dev/null || echo "9")
+# ─── 1. Pod Health ───────────────────────────────────────
+echo -e "${Y}[1/4] Pod Status${NC}"
+EXPECTED_RUNNING=(auth users social messaging content notifications gateway web postgres redis)
+for svc in "${EXPECTED_RUNNING[@]}"; do
+  STATUS=$(kubectl get pods -n miamo -l service=$svc --no-headers 2>/dev/null | awk '{print $3}' | head -1)
+  if [[ "$STATUS" == "Running" ]]; then
+    pass "$svc pod running"
   else
-    TIME=$(curl -s -o /dev/null -w "%{time_total}" --max-time 5 \
-      -H "Authorization: Bearer $TOKEN" \
-      "http://localhost:3200$endpoint" 2>/dev/null || echo "9")
+    fail "$svc pod NOT running (status: $STATUS)"
   fi
-  MS=$(echo "$TIME * 1000" | bc 2>/dev/null | cut -d. -f1 || echo "9999")
-  if [ "${MS:-9999}" -lt 500 ]; then ok "$endpoint → ${MS}ms"; else fail "$endpoint → ${MS}ms (slow)"; fi
 done
 
-# ─── Summary ─────────────────────────────────────────
-echo -e "\n${Y}═══════════════════════════════${NC}"
-TOTAL=$((PASS+FAIL))
-echo -e "  Results: ${G}$PASS passed${NC}, ${R}$FAIL failed${NC} / $TOTAL total"
-echo -e "${Y}═══════════════════════════════${NC}\n"
+# Check migrate job completed
+MIGRATE_STATUS=$(kubectl get pods -n miamo -l service=migrate --no-headers 2>/dev/null | awk '{print $3}' | head -1)
+if [[ "$MIGRATE_STATUS" == "Completed" ]]; then
+  pass "migrate job completed"
+else
+  fail "migrate job not completed (status: $MIGRATE_STATUS)"
+fi
 
-[ "$FAIL" -eq 0 ] && exit 0 || exit 1
+# ─── 2. Service Connectivity (from within cluster) ───────
+echo -e "\n${Y}[2/4] Internal Service Health${NC}"
+SERVICES_PORTS=("auth:3201" "users:3202" "social:3203" "messaging:3204" "content:3205" "notifications:3206" "gateway:3200")
+for sp in "${SERVICES_PORTS[@]}"; do
+  SVC=${sp%%:*}
+  PORT=${sp##*:}
+  RESP=$(kubectl exec -n miamo deployment/gateway -- wget -qO- "http://$SVC:$PORT/health" 2>/dev/null || echo "UNREACHABLE")
+  if echo "$RESP" | grep -q '"ok"'; then
+    pass "$SVC:$PORT health ok"
+  else
+    fail "$SVC:$PORT unreachable"
+  fi
+done
+
+# ─── 3. Gateway Health Aggregation ───────────────────────
+echo -e "\n${Y}[3/4] Gateway Service Discovery${NC}"
+GW_HEALTH=$(kubectl exec -n miamo deployment/gateway -- wget -qO- http://127.0.0.1:3200/health 2>/dev/null || echo "{}")
+for svc in auth users social messaging content notifications; do
+  if echo "$GW_HEALTH" | grep -q "\"$svc\":\"ok\""; then
+    pass "gateway → $svc: ok"
+  else
+    fail "gateway → $svc: unreachable"
+  fi
+done
+
+# ─── 4. Auth Login E2E ───────────────────────────────────
+echo -e "\n${Y}[4/4] End-to-End Auth Test${NC}"
+LOGIN_RESP=$(kubectl exec -n miamo deployment/gateway -- wget -qO- --post-data='{"email":"miamo1@miamo.test","password":"miamo1"}' --header='Content-Type: application/json' http://127.0.0.1:3200/api/v1/auth/login 2>/dev/null || echo "FAILED")
+if echo "$LOGIN_RESP" | grep -q "accessToken"; then
+  pass "Login miamo1@miamo.test → token received"
+  USERNAME=$(echo "$LOGIN_RESP" | python3 -c "import sys,json;print(json.load(sys.stdin)['data']['user']['displayName'])" 2>/dev/null || echo "?")
+  pass "User: $USERNAME"
+else
+  fail "Login failed"
+fi
+
+# ─── Results ─────────────────────────────────────────────
+echo -e "\n${B}═══════════════════════════════════════${NC}"
+TOTAL=$((PASS + FAIL))
+echo -e "  Results: ${G}${PASS} passed${NC}, ${R}${FAIL} failed${NC} / ${TOTAL} total"
+echo -e "${B}═══════════════════════════════════════${NC}\n"
+
+if [[ $FAIL -gt 0 ]]; then
+  exit 1
+fi

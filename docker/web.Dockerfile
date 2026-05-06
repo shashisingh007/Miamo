@@ -35,6 +35,7 @@ WORKDIR /app
 
 ENV NODE_ENV=production
 ENV PORT=3100
+ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN addgroup -g 1001 -S miamo && adduser -u 1001 -S miamo -G miamo

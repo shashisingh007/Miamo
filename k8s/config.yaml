@@ -6,9 +6,17 @@ metadata:
   labels:
     app: miamo
 data:
-  DATABASE_URL: "postgresql://miamo:miamo@postgres.miamo.svc.cluster.local:5432/miamo?schema=public"
-  REDIS_URL: "redis://redis.miamo.svc.cluster.local:6379"
+  DATABASE_URL: "postgresql://miamo:miamo@postgres:5432/miamo?schema=public"
+  REDIS_URL: "redis://redis:6379"
   JWT_SECRET: "miamo-jwt-secret-change-in-production"
   INTERNAL_SERVICE_KEY: "miamo-internal-key-change-in-production"
-  FRONTEND_URL: "http://web.miamo.svc.cluster.local:3100"
+  FRONTEND_URL: "http://web:3100"
   NODE_ENV: "production"
+  AUTH_PORT: "3201"
+  USERS_PORT: "3202"
+  SOCIAL_PORT: "3203"
+  MESSAGING_PORT: "3204"
+  CONTENT_PORT: "3205"
+  NOTIFICATIONS_PORT: "3206"
+  GATEWAY_PORT: "3200"
+  WEB_PORT: "3100"
