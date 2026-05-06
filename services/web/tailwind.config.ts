@@ -6,40 +6,40 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Miamo brand palette — Rose-Gold Premium
+        // Miamo brand palette — Soft Pink & Magenta
         miamo: {
-          bg: '#050506',
-          surface: '#0B0A0F',
-          card: '#12111A',
-          elevated: '#1A1620',
-          soft: '#221C2A',
+          bg: '#FDF2F5',
+          surface: '#FFF5F8',
+          card: '#FFFFFF',
+          elevated: '#FFF0F4',
+          soft: '#FCE4EC',
         },
         lavender: {
-          50: '#FDF8F3',
-          100: '#FAEEE4',
-          200: '#F5D9C4',
-          300: '#E8B89A',
-          400: '#D4A574',
-          500: '#C9956B',
-          600: '#B8804A',
-          700: '#9A6837',
-          800: '#7D5229',
-          900: '#5E3D1E',
+          50: '#FFF0F5',
+          100: '#FCE4EC',
+          200: '#F8BBD0',
+          300: '#F48FB1',
+          400: '#EC407A',
+          500: '#E91E63',
+          600: '#D81B60',
+          700: '#C2185B',
+          800: '#AD1457',
+          900: '#880E4F',
         },
         violet: {
-          deep: '#B8804A',
+          deep: '#AD1457',
         },
         accent: {
-          glow: '#E8C9A8',
+          glow: '#FF80AB',
         },
         text: {
-          primary: '#F8F6F4',
-          secondary: '#D4CEC8',
-          muted: '#9A948E',
+          primary: '#2D1B2E',
+          secondary: '#5C3D5E',
+          muted: '#9C7B9E',
         },
         border: {
-          DEFAULT: '#2A2420',
-          light: '#3D3530',
+          DEFAULT: '#F3D4DE',
+          light: '#F8E1EA',
         },
       },
       fontFamily: {
@@ -47,17 +47,17 @@ const config: Config = {
         display: ['Inter', 'system-ui', 'sans-serif'],
       },
       backgroundImage: {
-        'gradient-lavender': 'linear-gradient(135deg, #D4A574 0%, #B8804A 100%)',
-        'gradient-glow': 'linear-gradient(135deg, #E8C9A8 0%, #D4A574 50%, #B8804A 100%)',
-        'gradient-card': 'linear-gradient(180deg, #1A1620 0%, #12111A 100%)',
-        'gradient-surface': 'linear-gradient(180deg, #0B0A0F 0%, #050506 100%)',
+        'gradient-lavender': 'linear-gradient(135deg, #EC407A 0%, #D81B60 100%)',
+        'gradient-glow': 'linear-gradient(135deg, #FF80AB 0%, #EC407A 50%, #D81B60 100%)',
+        'gradient-card': 'linear-gradient(180deg, #FFFFFF 0%, #FFF5F8 100%)',
+        'gradient-surface': 'linear-gradient(180deg, #FFF5F8 0%, #FDF2F5 100%)',
       },
       boxShadow: {
-        'glow-sm': '0 0 15px rgba(212,165,116,0.15)',
-        'glow-md': '0 0 30px rgba(212,165,116,0.2)',
-        'glow-lg': '0 0 60px rgba(212,165,116,0.25)',
-        'card': '0 4px 24px rgba(0,0,0,0.3), 0 0 0 1px rgba(42,36,32,0.5)',
-        'elevated': '0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(42,36,32,0.6)',
+        'glow-sm': '0 0 15px rgba(236,64,122,0.15)',
+        'glow-md': '0 0 30px rgba(236,64,122,0.2)',
+        'glow-lg': '0 0 60px rgba(236,64,122,0.25)',
+        'card': '0 4px 24px rgba(173,20,87,0.08), 0 0 0 1px rgba(243,212,222,0.5)',
+        'elevated': '0 8px 32px rgba(173,20,87,0.12), 0 0 0 1px rgba(243,212,222,0.6)',
       },
       borderRadius: {
         '2xl': '1rem',
@@ -73,8 +73,8 @@ const config: Config = {
       },
       keyframes: {
         glow: {
-          '0%': { boxShadow: '0 0 15px rgba(212,165,116,0.1)' },
-          '100%': { boxShadow: '0 0 30px rgba(212,165,116,0.3)' },
+          '0%': { boxShadow: '0 0 15px rgba(236,64,122,0.1)' },
+          '100%': { boxShadow: '0 0 30px rgba(236,64,122,0.3)' },
         },
         slideUp: {
           '0%': { transform: 'translateY(10px)', opacity: '0' },

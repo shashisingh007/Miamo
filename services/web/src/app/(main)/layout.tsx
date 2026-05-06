@@ -110,7 +110,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 <div className="relative">
                   <Icon className="w-[18px] h-[18px]" />
                   {isMessages && unreadMsgCount > 0 && (
-                    <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] bg-lavender-400 rounded-full text-[9px] font-bold text-white flex items-center justify-center px-0.5">
+                    <span className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] bg-lavender-400 rounded-full text-[9px] font-bold text-gray-900 flex items-center justify-center px-0.5">
                       {unreadMsgCount > 99 ? '99+' : unreadMsgCount}
                     </span>
                   )}
@@ -164,7 +164,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <Link href="/notifications" className="relative btn-ghost p-2 rounded-xl">
               <Bell className="w-5 h-5" />
               {notifCount > 0 && (
-                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-lavender-400 rounded-full text-[10px] font-bold text-white flex items-center justify-center px-1 border-2 border-miamo-surface">
+                <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] bg-lavender-400 rounded-full text-[10px] font-bold text-gray-900 flex items-center justify-center px-1 border-2 border-miamo-surface">
                   {notifCount > 99 ? '99+' : notifCount}
                 </span>
               )}
@@ -200,7 +200,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                 <div className="relative">
                   <Icon className="w-5 h-5" />
                   {isMessages && unreadMsgCount > 0 && (
-                    <span className="absolute -top-1 -right-2 min-w-[16px] h-[16px] bg-lavender-400 rounded-full text-[9px] font-bold text-white flex items-center justify-center px-0.5">
+                    <span className="absolute -top-1 -right-2 min-w-[16px] h-[16px] bg-lavender-400 rounded-full text-[9px] font-bold text-gray-900 flex items-center justify-center px-0.5">
                       {unreadMsgCount > 99 ? '99+' : unreadMsgCount}
                     </span>
                   )}

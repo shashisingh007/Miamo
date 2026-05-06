@@ -123,7 +123,7 @@ function FeedPost({ post, onDelete }: { post: any; onDelete?: () => void }) {
         <p className="text-sm text-text-primary leading-relaxed">{post.content}</p>
         {post.mediaUrl && (
           <div className="mt-3 rounded-xl overflow-hidden bg-miamo-elevated aspect-video">
-            <img src={post.mediaUrl} alt="" className="w-full h-full object-cover" />
+            <img src={post.mediaUrl} alt="" className="w-full h-full object-contain" />
           </div>
         )}
       </div>
@@ -152,7 +152,7 @@ function FeedPost({ post, onDelete }: { post: any; onDelete?: () => void }) {
             <Button size="sm" onClick={submitComment} disabled={!commentText.trim()}>Post</Button>
           </div>
           {loadingComments ? (
-            <div className="flex justify-center py-3"><img src="/logo.jpg" alt="" className="w-5 h-5 rounded animate-pulse" /></div>
+            <div className="flex justify-center py-3"><img src="/logo.svg" alt="" className="w-5 h-5 rounded animate-pulse" /></div>
           ) : comments.length === 0 ? (
             <p className="text-xs text-text-muted text-center py-2">No comments yet. Be the first!</p>
           ) : (

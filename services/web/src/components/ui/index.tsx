@@ -42,7 +42,7 @@ export function Avatar({ src, name, size = 'md', online, verified, className, ri
       )}
       {verified && (
         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-lavender-400 rounded-full flex items-center justify-center">
-          <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          <svg className="w-2.5 h-2.5 text-gray-900" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
         </div>
       )}
     </div>

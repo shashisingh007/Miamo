@@ -4,13 +4,13 @@
 
 @layer base {
   :root {
-    --miamo-bg: 5 5 6;
-    --miamo-surface: 11 10 15;
-    --miamo-card: 18 17 26;
-    --miamo-elevated: 26 22 32;
-    --lavender-400: 212 165 116;
-    --lavender-500: 201 149 107;
-    --lavender-600: 184 128 74;
+    --miamo-bg: 253 242 245;
+    --miamo-surface: 255 245 248;
+    --miamo-card: 255 255 255;
+    --miamo-elevated: 255 240 244;
+    --lavender-400: 236 64 122;
+    --lavender-500: 233 30 99;
+    --lavender-600: 216 27 96;
   }
 
   * {
@@ -30,11 +30,11 @@
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(212, 165, 116, 0.2);
+    background: rgba(236, 64, 122, 0.2);
     border-radius: 3px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: rgba(212, 165, 116, 0.4);
+    background: rgba(236, 64, 122, 0.4);
   }
 }
 

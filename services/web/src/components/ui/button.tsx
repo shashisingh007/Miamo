@@ -8,7 +8,7 @@ const buttonVariants = cva(
   {
     variants: {
       variant: {
-        default: 'bg-gradient-to-r from-lavender-400 to-violet-deep text-white shadow-glow-sm hover:shadow-glow-md',
+        default: 'bg-gradient-to-r from-lavender-400 to-violet-deep text-gray-900 shadow-glow-sm hover:shadow-glow-md',
         secondary: 'bg-miamo-elevated text-text-primary border border-border hover:border-lavender-400/30 hover:bg-miamo-soft',
         ghost: 'text-text-secondary hover:text-text-primary hover:bg-lavender-400/10',
         outline: 'border border-border text-text-secondary hover:border-lavender-400/50 hover:text-lavender-400',

@@ -48,7 +48,7 @@ export default function LoginPage() {
       <div className="card-premium p-8">
         <div className="text-center mb-8">
           <div className="w-12 h-12 rounded-xl overflow-hidden mx-auto mb-4">
-            <Image src="/logo.jpg" alt="Miamo" width={48} height={48} className="w-full h-full object-cover" priority />
+            <Image src="/logo.svg" alt="Miamo" width={48} height={48} className="w-full h-full object-contain" priority />
           </div>
           <h1 className="text-2xl font-bold">Welcome back</h1>
           <p className="text-sm text-text-muted mt-1">Sign in to your {APP_NAME} account</p>

@@ -80,13 +80,13 @@ export default function ProfilePage() {
         <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
         <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
         <div className="h-32 bg-gradient-to-br from-lavender-400/20 via-miamo-elevated to-violet-deep/20 relative">
-          <button onClick={() => coverInputRef.current?.click()} className="absolute top-3 right-3 bg-black/30 backdrop-blur-sm text-white p-2 rounded-lg hover:bg-black/50 transition-colors"><Camera className="w-4 h-4" /></button>
+          <button onClick={() => coverInputRef.current?.click()} className="absolute top-3 right-3 bg-black/30 backdrop-blur-sm text-gray-900 p-2 rounded-lg hover:bg-black/50 transition-colors"><Camera className="w-4 h-4" /></button>
         </div>
         <div className="px-6 pb-6 -mt-12">
           <div className="flex items-end gap-4">
             <div className="relative">
               <Avatar src={photos[0]?.url} name={user.displayName || 'User'} size="xl" className="w-24 h-24 text-2xl border-4 border-miamo-card" />
-              <button onClick={() => photoInputRef.current?.click()} className="absolute bottom-0 right-0 w-8 h-8 bg-lavender-400 rounded-full flex items-center justify-center border-2 border-miamo-card hover:bg-lavender-300 transition-colors"><Camera className="w-3.5 h-3.5 text-white" /></button>
+              <button onClick={() => photoInputRef.current?.click()} className="absolute bottom-0 right-0 w-8 h-8 bg-lavender-400 rounded-full flex items-center justify-center border-2 border-miamo-card hover:bg-lavender-300 transition-colors"><Camera className="w-3.5 h-3.5 text-gray-900" /></button>
             </div>
             <div className="flex-1 mb-1">
               <div className="flex items-center gap-2">

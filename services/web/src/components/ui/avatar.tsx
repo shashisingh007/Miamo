@@ -45,7 +45,7 @@ export function Avatar({ src, name, size = 'md', online, verified, className }: 
       )}
       {verified && (
         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-lavender-400 rounded-full flex items-center justify-center border border-miamo-bg">
-          <Shield className="w-2.5 h-2.5 text-white" />
+          <Shield className="w-2.5 h-2.5 text-gray-900" />
         </div>
       )}
     </div>

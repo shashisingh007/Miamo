@@ -31,13 +31,13 @@ function StoryViewer({ story, onClose }: { story: any; onClose: () => void }) {
       <div className="relative w-full max-w-md h-[80vh] mx-4">
         <div className="absolute top-4 inset-x-4 z-10 flex items-center gap-3">
           <Avatar src={photo} name={author.displayName || 'User'} size="sm" />
-          <div><p className="text-sm font-semibold text-white">{author.displayName || 'User'}</p><p className="text-[10px] text-white/60">Story</p></div>
-          <button onClick={onClose} className="ml-auto text-white/70 hover:text-white"><X className="w-6 h-6" /></button>
+          <div><p className="text-sm font-semibold text-gray-900">{author.displayName || 'User'}</p><p className="text-[10px] text-gray-600">Story</p></div>
+          <button onClick={onClose} className="ml-auto text-gray-700 hover:text-gray-900"><X className="w-6 h-6" /></button>
         </div>
         <div className="w-full h-full rounded-2xl overflow-hidden bg-miamo-elevated">
           {story.mediaUrl ? <img src={story.mediaUrl} alt="" className="w-full h-full object-cover" /> :
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-lavender-400/20 to-violet-deep/20">
-              <p className="text-white text-lg px-8 text-center">{story.content || 'Story'}</p>
+              <p className="text-gray-900 text-lg px-8 text-center">{story.content || 'Story'}</p>
             </div>}
         </div>
         <div className="absolute bottom-4 inset-x-4 space-y-2">
@@ -49,7 +49,7 @@ function StoryViewer({ story, onClose }: { story: any; onClose: () => void }) {
           </div>
           <div className="flex gap-2">
             <input value={reply} onChange={e => setReply(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleReply()}
-              placeholder="Reply to story…" className="input-premium flex-1 text-sm bg-black/50 border-white/20 text-white placeholder:text-white/40" />
+              placeholder="Reply to story…" className="input-premium flex-1 text-sm bg-black/50 border-white/20 text-gray-900 placeholder:text-gray-400" />
             <Button size="sm" onClick={handleReply} disabled={!reply.trim()}>Send</Button>
           </div>
         </div>
@@ -115,7 +115,7 @@ export default function StoriesPage() {
         <button className="flex flex-col items-center gap-2 shrink-0">
           <div className="relative">
             <div className="rounded-full bg-miamo-elevated p-[3px]"><Avatar name="You" size="xl" className="border-[3px] border-miamo-bg" /></div>
-            <div className="absolute bottom-0 right-0 w-6 h-6 bg-lavender-400 rounded-full flex items-center justify-center border-2 border-miamo-bg"><Plus className="w-3 h-3 text-white" /></div>
+            <div className="absolute bottom-0 right-0 w-6 h-6 bg-lavender-400 rounded-full flex items-center justify-center border-2 border-miamo-bg"><Plus className="w-3 h-3 text-gray-900" /></div>
           </div>
           <span className="text-xs text-text-secondary">Your story</span>
         </button>
@@ -161,7 +161,7 @@ export default function StoriesPage() {
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                   <div className="absolute bottom-3 left-3 flex items-center gap-2">
                     <Avatar src={photo} name={author.displayName || 'User'} size="xs" />
-                    <span className="text-xs text-white font-medium">{(author.displayName || 'User').split(' ')[0]}</span>
+                    <span className="text-xs text-gray-900 font-medium">{(author.displayName || 'User').split(' ')[0]}</span>
                   </div>
                 </button>
               );

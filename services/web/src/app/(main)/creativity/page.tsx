@@ -85,13 +85,13 @@ function CommentSheet({
           <motion.div
             initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed bottom-0 inset-x-0 max-h-[70vh] bg-[#111118] border-t border-white/[0.08] rounded-t-[20px] z-50 flex flex-col"
+            className="fixed bottom-0 inset-x-0 max-h-[70vh] bg-white border-t border-gray-200 rounded-t-[20px] z-50 flex flex-col"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
-              <h3 className="text-[14px] font-bold text-white">{commentCount} Comments</h3>
-              <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/[0.06] flex items-center justify-center hover:bg-white/[0.1]">
-                <X className="w-4 h-4 text-white/50" />
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <h3 className="text-[14px] font-bold text-gray-900">{commentCount} Comments</h3>
+              <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center hover:bg-white/[0.1]">
+                <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
 
@@ -99,23 +99,23 @@ function CommentSheet({
             <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4">
               {loading ? (
                 <div className="flex justify-center py-8">
-                  <img src="/logo.jpg" alt="" className="w-6 h-6 rounded animate-pulse" />
+                  <img src="/logo.svg" alt="" className="w-6 h-6 rounded animate-pulse" />
                 </div>
               ) : comments.length === 0 ? (
                 <p className="text-center text-[12px] text-white/25 py-8">No comments yet — be the first!</p>
               ) : (
                 comments.map((c: any) => (
                   <div key={c.id} className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-white/[0.06] flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-white/30">
+                    <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-gray-400">
                       {(c.author?.displayName || 'U')[0]}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-bold text-white/70">{c.author?.displayName || 'User'}</span>
-                        {c.author?.verified && <Shield className="w-3 h-3 text-white/40" />}
-                        <span className="text-[10px] text-white/20">{timeAgo(c.createdAt)}</span>
+                        <span className="text-[11px] font-bold text-gray-700">{c.author?.displayName || 'User'}</span>
+                        {c.author?.verified && <Shield className="w-3 h-3 text-gray-400" />}
+                        <span className="text-[10px] text-gray-300">{timeAgo(c.createdAt)}</span>
                       </div>
-                      <p className="text-[12px] text-white/60 leading-relaxed mt-0.5">{c.content}</p>
+                      <p className="text-[12px] text-gray-600 leading-relaxed mt-0.5">{c.content}</p>
                     </div>
                   </div>
                 ))
@@ -123,13 +123,13 @@ function CommentSheet({
             </div>
 
             {/* Input */}
-            <div className="flex items-center gap-3 px-5 py-4 border-t border-white/[0.06]">
+            <div className="flex items-center gap-3 px-5 py-4 border-t border-gray-200">
               <input
                 value={text}
                 onChange={e => setText(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSend()}
                 placeholder="Add a comment..."
-                className="flex-1 h-10 rounded-xl bg-white/[0.04] border border-white/[0.06] text-white text-[13px] px-4 focus:border-white/[0.15] focus:outline-none placeholder:text-white/15"
+                className="flex-1 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 focus:border-white/[0.15] focus:outline-none placeholder:text-white/15"
               />
               <motion.button
                 whileTap={{ scale: 0.9 }}
@@ -137,7 +137,7 @@ function CommentSheet({
                 disabled={!text.trim() || sending}
                 className={cn(
                   'w-10 h-10 rounded-xl flex items-center justify-center transition-all',
-                  text.trim() ? 'bg-white text-[#0d0d12]' : 'bg-white/[0.06] text-white/20',
+                  text.trim() ? 'bg-white text-[#0d0d12]' : 'bg-gray-50 text-gray-300',
                 )}
               >
                 <Send className="w-4 h-4" />
@@ -183,15 +183,15 @@ function MoveModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed inset-x-4 bottom-8 max-w-sm mx-auto bg-[#151522] border border-white/[0.08] rounded-[20px] shadow-[0_8px_60px_rgba(0,0,0,0.6)] z-50 overflow-hidden"
+            className="fixed inset-x-4 bottom-8 max-w-sm mx-auto bg-[#151522] border border-gray-200 rounded-[20px] shadow-[0_8px_60px_rgba(0,0,0,0.6)] z-50 overflow-hidden"
           >
             {sent ? (
               <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="p-8 text-center">
                 <div className="w-14 h-14 rounded-full bg-emerald-400/10 flex items-center justify-center mx-auto mb-4">
                   <Check className="w-7 h-7 text-emerald-400" />
                 </div>
-                <p className="text-[14px] font-semibold text-white">Miamo Move sent!</p>
-                <p className="text-[12px] text-white/30 mt-1">They'll see your interest</p>
+                <p className="text-[14px] font-semibold text-gray-900">Miamo Move sent!</p>
+                <p className="text-[12px] text-gray-400 mt-1">They'll see your interest</p>
               </motion.div>
             ) : (
               <div className="p-5">
@@ -200,26 +200,26 @@ function MoveModal({
                     <Heart className="w-5 h-5 text-[#151522]" fill="#151522" />
                   </div>
                   <div>
-                    <h4 className="text-[13px] font-bold text-white">Miamo Move</h4>
-                    <p className="text-[11px] text-white/30">
+                    <h4 className="text-[13px] font-bold text-gray-900">Miamo Move</h4>
+                    <p className="text-[11px] text-gray-400">
                       Interested in {item?.author?.displayName || 'this person'}?
                     </p>
                   </div>
-                  <button onClick={onClose} className="ml-auto w-8 h-8 rounded-full bg-white/[0.06] flex items-center justify-center">
-                    <X className="w-4 h-4 text-white/50" />
+                  <button onClick={onClose} className="ml-auto w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
+                    <X className="w-4 h-4 text-gray-500" />
                   </button>
                 </div>
 
-                <div className="rounded-xl bg-white/[0.03] border border-white/[0.06] p-3 mb-4">
+                <div className="rounded-xl bg-gray-50 border border-gray-200 p-3 mb-4">
                   <p className="text-[10px] text-white/25 font-semibold uppercase tracking-wider mb-1">Reacting to</p>
-                  <p className="text-[13px] text-white/70 font-medium">{item?.title || 'Content'}</p>
+                  <p className="text-[13px] text-gray-700 font-medium">{item?.title || 'Content'}</p>
                 </div>
 
                 <textarea
                   value={message}
                   onChange={e => setMessage(e.target.value)}
                   placeholder="Write a message (optional)..."
-                  className="w-full h-20 rounded-xl bg-white/[0.04] border border-white/[0.06] text-white text-[13px] px-4 py-3 resize-none focus:border-white/[0.15] focus:outline-none placeholder:text-white/20 mb-4"
+                  className="w-full h-20 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 py-3 resize-none focus:border-white/[0.15] focus:outline-none placeholder:text-gray-300 mb-4"
                 />
 
                 <button
@@ -227,7 +227,7 @@ function MoveModal({
                   disabled={sending}
                   className="w-full h-11 rounded-xl bg-white text-[#0d0d12] text-[13px] font-bold hover:bg-white/90 transition-all flex items-center justify-center gap-2"
                 >
-                  {sending ? <img src="/logo.jpg" alt="" className="w-4 h-4 rounded animate-pulse" /> : <>
+                  {sending ? <img src="/logo.svg" alt="" className="w-4 h-4 rounded animate-pulse" /> : <>
                     <Send className="w-4 h-4" /> Send Move
                   </>}
                 </button>
@@ -252,8 +252,8 @@ function MoreMenu({
   if (!isOpen) return null;
 
   const menuItems = [
-    { label: 'View Profile', icon: ExternalLink, color: 'text-white/60', onClick: () => { router.push(`/profile?id=${item.authorId}`); onClose(); } },
-    { label: "Don't show this", icon: EyeOff, color: 'text-white/60', onClick: () => { onHide(); onClose(); } },
+    { label: 'View Profile', icon: ExternalLink, color: 'text-gray-600', onClick: () => { router.push(`/profile?id=${item.authorId}`); onClose(); } },
+    { label: "Don't show this", icon: EyeOff, color: 'text-gray-600', onClick: () => { onHide(); onClose(); } },
     { divider: true },
     { label: 'Report Content', icon: Flag, color: 'text-orange-400', onClick: () => { api.reportUser({ reportedId: item.authorId, reason: 'inappropriate', targetType: 'creativity', targetId: item.id }); onClose(); } },
     { label: 'Block Creator', icon: Ban, color: 'text-red-400', onClick: () => { api.blockUser(item.authorId); onClose(); } },
@@ -266,16 +266,16 @@ function MoreMenu({
       <motion.div
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="fixed bottom-0 inset-x-0 bg-[#151522] border-t border-white/[0.08] rounded-t-[20px] z-50 px-4 py-3 pb-8"
+        className="fixed bottom-0 inset-x-0 bg-[#151522] border-t border-gray-200 rounded-t-[20px] z-50 px-4 py-3 pb-8"
       >
         <div className="w-10 h-1 rounded-full bg-white/10 mx-auto mb-4" />
         <div className="space-y-0.5">
           {menuItems.map((item, i) => {
-            if ('divider' in item) return <div key={i} className="my-2 h-px bg-white/[0.06]" />;
+            if ('divider' in item) return <div key={i} className="my-2 h-px bg-gray-50" />;
             const Icon = item.icon;
             return (
               <button key={i} onClick={item.onClick}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-white/[0.04] transition-colors">
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 transition-colors">
                 <Icon className={cn('w-5 h-5', item.color)} />
                 <span className={cn('text-[14px] font-medium', item.color)}>{item.label}</span>
               </button>
@@ -317,9 +317,9 @@ function ReelCard({
       {/* Background */}
       <div className="absolute inset-0">
         {hasImage ? (
-          <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
+          <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-contain" />
         ) : isVideo ? (
-          <video src={item.mediaUrl} className="w-full h-full object-cover" loop muted={!isActive} playsInline autoPlay={isActive} />
+          <video src={item.mediaUrl} className="w-full h-full object-contain" loop muted={!isActive} playsInline autoPlay={isActive} />
         ) : (
           <div className="w-full h-full" style={{ background: catGradient(catColor) }}>
             <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/90" />
@@ -331,9 +331,9 @@ function ReelCard({
 
       {/* ── Top: Category badge ── */}
       <div className="absolute top-6 left-5 z-10">
-        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-xl border border-white/[0.1]">
+        <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur-xl border border-gray-200">
           <span className="w-2 h-2 rounded-full" style={{ backgroundColor: catColor }} />
-          <span className="text-[11px] font-bold text-white/80">{catName}</span>
+          <span className="text-[11px] font-bold text-gray-800">{catName}</span>
         </div>
       </div>
 
@@ -341,11 +341,11 @@ function ReelCard({
       <div className="absolute right-4 bottom-36 z-10 flex flex-col items-center gap-5">
         {/* Profile avatar */}
         <button onClick={onProfileClick} className="relative mb-2">
-          <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white/30 shadow-lg">
+          <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-gray-300 shadow-lg">
             {photo ? (
-              <img src={photo} alt={author.displayName} className="w-full h-full object-cover" />
+              <img src={photo} alt={author.displayName} className="w-full h-full object-contain" />
             ) : (
-              <div className="w-full h-full bg-white/10 flex items-center justify-center text-sm font-bold text-white/50">
+              <div className="w-full h-full bg-white/10 flex items-center justify-center text-sm font-bold text-gray-500">
                 {(author.displayName || 'U')[0]}
               </div>
             )}
@@ -360,19 +360,19 @@ function ReelCard({
           <motion.div whileTap={{ scale: 1.3 }}>
             <Heart className={cn('w-7 h-7', item.liked ? 'text-red-500 fill-red-500' : 'text-white')} />
           </motion.div>
-          <span className="text-[11px] font-semibold text-white/80">{fmt(item.likeCount || 0)}</span>
+          <span className="text-[11px] font-semibold text-gray-800">{fmt(item.likeCount || 0)}</span>
         </button>
 
         {/* Comment */}
         <button onClick={onComment} className="flex flex-col items-center gap-1">
-          <MessageCircle className="w-7 h-7 text-white" />
-          <span className="text-[11px] font-semibold text-white/80">{fmt(item.commentCount || 0)}</span>
+          <MessageCircle className="w-7 h-7 text-gray-900" />
+          <span className="text-[11px] font-semibold text-gray-800">{fmt(item.commentCount || 0)}</span>
         </button>
 
         {/* Share */}
         <button onClick={onShare} className="flex flex-col items-center gap-1">
-          <Share2 className="w-6 h-6 text-white" />
-          <span className="text-[11px] font-semibold text-white/80">Share</span>
+          <Share2 className="w-6 h-6 text-gray-900" />
+          <span className="text-[11px] font-semibold text-gray-800">Share</span>
         </button>
 
         {/* Miamo Move */}
@@ -380,14 +380,14 @@ function ReelCard({
           <motion.div whileTap={{ scale: 1.2 }}
             className="w-10 h-10 rounded-full bg-white/[0.15] backdrop-blur-md border border-white/20 flex items-center justify-center"
           >
-            <span className="text-[18px] font-black text-white italic" style={{ fontFamily: 'system-ui' }}>M</span>
+            <span className="text-[18px] font-black text-gray-900 italic" style={{ fontFamily: 'system-ui' }}>M</span>
           </motion.div>
-          <span className="text-[10px] font-bold text-white/80">Move</span>
+          <span className="text-[10px] font-bold text-gray-800">Move</span>
         </button>
 
         {/* More */}
         <button onClick={onMore}>
-          <MoreHorizontal className="w-6 h-6 text-white/70" />
+          <MoreHorizontal className="w-6 h-6 text-gray-700" />
         </button>
       </div>
 
@@ -397,23 +397,23 @@ function ReelCard({
         <button onClick={onProfileClick} className="flex items-center gap-2.5 mb-3">
           <div className="w-9 h-9 rounded-full overflow-hidden border border-white/20">
             {photo ? (
-              <img src={photo} alt={author.displayName} className="w-full h-full object-cover" />
+              <img src={photo} alt={author.displayName} className="w-full h-full object-contain" />
             ) : (
-              <div className="w-full h-full bg-white/10 flex items-center justify-center text-xs font-bold text-white/50">
+              <div className="w-full h-full bg-white/10 flex items-center justify-center text-xs font-bold text-gray-500">
                 {(author.displayName || 'U')[0]}
               </div>
             )}
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-[13px] font-bold text-white">@{author.username || author.displayName || 'user'}</span>
+              <span className="text-[13px] font-bold text-gray-900">@{author.username || author.displayName || 'user'}</span>
               {author.verified && (
                 <div className="w-4 h-4 rounded-full bg-white/20 flex items-center justify-center">
-                  <Shield className="w-2.5 h-2.5 text-white" />
+                  <Shield className="w-2.5 h-2.5 text-gray-900" />
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-2 text-[10px] text-white/40">
+            <div className="flex items-center gap-2 text-[10px] text-gray-400">
               {author.profile?.city && <span className="flex items-center gap-0.5"><MapPin className="w-2.5 h-2.5" />{author.profile.city}</span>}
               {author.profile?.age && <span>{author.profile.age}</span>}
             </div>
@@ -421,13 +421,13 @@ function ReelCard({
         </button>
 
         {/* Title & content */}
-        <h3 className="text-[15px] font-bold text-white leading-snug mb-1">{item.title}</h3>
+        <h3 className="text-[15px] font-bold text-gray-900 leading-snug mb-1">{item.title}</h3>
         {item.content && (
-          <p className="text-[12px] text-white/60 leading-relaxed line-clamp-2">{item.content}</p>
+          <p className="text-[12px] text-gray-600 leading-relaxed line-clamp-2">{item.content}</p>
         )}
 
         {/* Stats bar */}
-        <div className="flex items-center gap-4 mt-3 text-[10px] text-white/30 font-medium">
+        <div className="flex items-center gap-4 mt-3 text-[10px] text-gray-400 font-medium">
           <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{fmt(item.views || item.viewCount || 0)} views</span>
           <span>{timeAgo(item.createdAt)}</span>
           {item.featured && <span className="flex items-center gap-0.5 text-amber-400/60"><Flame className="w-3 h-3" />Featured</span>}
@@ -540,17 +540,17 @@ function UploadModal({
           <motion.div
             initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed bottom-0 inset-x-0 max-h-[90vh] bg-[#111118] border-t border-white/[0.08] rounded-t-[20px] z-50 flex flex-col"
+            className="fixed bottom-0 inset-x-0 max-h-[90vh] bg-white border-t border-gray-200 rounded-t-[20px] z-50 flex flex-col"
           >
             {/* Hidden file input */}
             <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
 
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
-              <h3 className="text-[14px] font-bold text-white flex items-center gap-2">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <h3 className="text-[14px] font-bold text-gray-900 flex items-center gap-2">
                 <Upload className="w-4 h-4 text-lavender-400" /> Share Your Creativity
               </h3>
-              <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/[0.06] flex items-center justify-center">
-                <X className="w-4 h-4 text-white/50" />
+              <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
+                <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
 
@@ -560,54 +560,54 @@ function UploadModal({
                   <div className="w-14 h-14 rounded-full bg-emerald-400/10 flex items-center justify-center mx-auto mb-4">
                     <Check className="w-7 h-7 text-emerald-400" />
                   </div>
-                  <p className="text-[14px] font-semibold text-white">Published!</p>
+                  <p className="text-[14px] font-semibold text-gray-900">Published!</p>
                 </div>
               </motion.div>
             ) : (
               <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
                 {/* Media Upload */}
                 <div>
-                  <label className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em] mb-2 block">Media</label>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-2 block">Media</label>
                   {mediaFile ? (
-                    <div className="relative rounded-xl overflow-hidden border border-white/[0.08] bg-white/[0.02]">
+                    <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-white/[0.02]">
                       {mediaPreview && type === 'image' ? (
-                        <img src={mediaPreview} alt="Upload preview" className="w-full h-40 object-cover" />
+                        <img src={mediaPreview} alt="Upload preview" className="w-full h-40 object-contain" />
                       ) : mediaPreview && (type === 'video' || type === 'performance') ? (
-                        <video src={mediaPreview} className="w-full h-40 object-cover" controls />
+                        <video src={mediaPreview} className="w-full h-40 object-contain" controls />
                       ) : (
                         <div className="w-full h-28 flex items-center justify-center">
                           <div className="text-center">
-                            <Paperclip className="w-8 h-8 text-white/20 mx-auto mb-2" />
-                            <p className="text-xs text-white/40">{mediaFile.name}</p>
-                            <p className="text-[10px] text-white/20">{(mediaFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                            <Paperclip className="w-8 h-8 text-gray-300 mx-auto mb-2" />
+                            <p className="text-xs text-gray-400">{mediaFile.name}</p>
+                            <p className="text-[10px] text-gray-300">{(mediaFile.size / 1024 / 1024).toFixed(2)} MB</p>
                           </div>
                         </div>
                       )}
                       <button onClick={() => { setMediaFile(null); setMediaPreview(''); }}
                         className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80">
-                        <X className="w-3.5 h-3.5 text-white" />
+                        <X className="w-3.5 h-3.5 text-gray-900" />
                       </button>
                     </div>
                   ) : (
                     <button onClick={handleFileSelect}
-                      className="w-full h-28 rounded-xl border-2 border-dashed border-white/[0.08] hover:border-white/[0.15] bg-white/[0.02] hover:bg-white/[0.04] flex flex-col items-center justify-center gap-2 transition-all">
-                      <Upload className="w-6 h-6 text-white/20" />
-                      <span className="text-[11px] text-white/30">Tap to select photo, video, or file</span>
+                      className="w-full h-28 rounded-xl border-2 border-dashed border-gray-200 hover:border-white/[0.15] bg-white/[0.02] hover:bg-gray-50 flex flex-col items-center justify-center gap-2 transition-all">
+                      <Upload className="w-6 h-6 text-gray-300" />
+                      <span className="text-[11px] text-gray-400">Tap to select photo, video, or file</span>
                     </button>
                   )}
                 </div>
 
                 {/* Title */}
                 <div>
-                  <label className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em] mb-2 block">Title *</label>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-2 block">Title *</label>
                   <input value={title} onChange={e => setTitle(e.target.value)}
                     placeholder="What did you create?"
-                    className="w-full h-11 rounded-xl bg-white/[0.04] border border-white/[0.06] text-white text-[13px] px-4 focus:border-white/[0.15] focus:outline-none placeholder:text-white/15" />
+                    className="w-full h-11 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 focus:border-white/[0.15] focus:outline-none placeholder:text-white/15" />
                 </div>
 
                 {/* Category — REQUIRED */}
                 <div>
-                  <label className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em] mb-2 block">Category *</label>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-2 block">Category *</label>
                   <div className="flex flex-wrap gap-2">
                     {categories.filter(c => c.name !== 'general').map(c => {
                       const CatIcon = CATEGORIES.find(cc => cc.name === c.name)?.icon || Sparkles;
@@ -618,7 +618,7 @@ function UploadModal({
                             'flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold transition-all border',
                             isActive
                               ? 'bg-white/[0.1] border-white/[0.15] text-white'
-                              : 'bg-white/[0.02] border-white/[0.05] text-white/30 hover:text-white/50',
+                              : 'bg-white/[0.02] border-gray-100 text-gray-400 hover:text-gray-500',
                           )}
                         >
                           <CatIcon className="w-3 h-3" /> {c.name}
@@ -630,13 +630,13 @@ function UploadModal({
 
                 {/* Type */}
                 <div>
-                  <label className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em] mb-2 block">Content Type</label>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-2 block">Content Type</label>
                   <div className="flex gap-2">
                     {['image', 'video', 'text', 'project', 'performance'].map(t => (
                       <button key={t} onClick={() => setType(t)}
                         className={cn(
                           'px-3 py-2 rounded-xl text-[11px] font-semibold border transition-all capitalize',
-                          type === t ? 'bg-white/[0.1] border-white/[0.15] text-white' : 'bg-white/[0.02] border-white/[0.05] text-white/30',
+                          type === t ? 'bg-white/[0.1] border-white/[0.15] text-white' : 'bg-white/[0.02] border-gray-100 text-gray-400',
                         )}
                       >
                         {t}
@@ -647,16 +647,16 @@ function UploadModal({
 
                 {/* Caption/Description */}
                 <div>
-                  <label className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em] mb-2 block">Caption</label>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-2 block">Caption</label>
                   <textarea value={content} onChange={e => setContent(e.target.value)}
                     placeholder="Write a caption for your post…"
-                    className="w-full h-20 rounded-xl bg-white/[0.04] border border-white/[0.06] text-white text-[13px] px-4 py-3 resize-none focus:border-white/[0.15] focus:outline-none placeholder:text-white/15" />
+                    className="w-full h-20 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 py-3 resize-none focus:border-white/[0.15] focus:outline-none placeholder:text-white/15" />
                 </div>
 
                 {/* Hashtags */}
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em]">Hashtags</label>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em]">Hashtags</label>
                     <button onClick={generateHashtags} disabled={loadingAi}
                       className="flex items-center gap-1 px-2 py-1 rounded-lg bg-lavender-400/10 text-lavender-400 text-[10px] font-semibold hover:bg-lavender-400/20 transition-all disabled:opacity-50">
                       <Sparkles className="w-3 h-3" /> {loadingAi ? 'Thinking…' : 'AI Suggest'}
@@ -678,11 +678,11 @@ function UploadModal({
                   {/* AI suggested hashtags */}
                   {aiHashtags.length > 0 && (
                     <div className="mb-2">
-                      <p className="text-[9px] text-white/20 uppercase tracking-wider mb-1.5">Suggested</p>
+                      <p className="text-[9px] text-gray-300 uppercase tracking-wider mb-1.5">Suggested</p>
                       <div className="flex flex-wrap gap-1.5">
                         {aiHashtags.filter(t => !hashtags.includes(t)).map(tag => (
                           <button key={tag} onClick={() => addHashtag(tag)}
-                            className="px-2.5 py-1 rounded-lg bg-white/[0.04] border border-white/[0.06] text-white/40 text-[11px] font-medium hover:bg-lavender-400/10 hover:text-lavender-400 hover:border-lavender-400/20 transition-all">
+                            className="px-2.5 py-1 rounded-lg bg-gray-50 border border-gray-200 text-gray-400 text-[11px] font-medium hover:bg-lavender-400/10 hover:text-lavender-400 hover:border-lavender-400/20 transition-all">
                             + {tag}
                           </button>
                         ))}
@@ -695,9 +695,9 @@ function UploadModal({
                     <input value={hashtagInput} onChange={e => setHashtagInput(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && hashtagInput.trim()) { addHashtag(hashtagInput.trim()); setHashtagInput(''); } }}
                       placeholder="Add custom hashtag…"
-                      className="flex-1 h-9 rounded-xl bg-white/[0.04] border border-white/[0.06] text-white text-[12px] px-3 focus:border-white/[0.15] focus:outline-none placeholder:text-white/15" />
+                      className="flex-1 h-9 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] px-3 focus:border-white/[0.15] focus:outline-none placeholder:text-white/15" />
                     <button onClick={() => { if (hashtagInput.trim()) { addHashtag(hashtagInput.trim()); setHashtagInput(''); } }}
-                      className="px-3 h-9 rounded-xl bg-white/[0.06] text-white/50 text-[11px] font-semibold hover:bg-white/[0.1] transition-all">Add</button>
+                      className="px-3 h-9 rounded-xl bg-gray-50 text-gray-500 text-[11px] font-semibold hover:bg-white/[0.1] transition-all">Add</button>
                   </div>
                 </div>
 
@@ -709,10 +709,10 @@ function UploadModal({
                     'w-full h-12 rounded-xl text-[14px] font-bold transition-all flex items-center justify-center gap-2',
                     title.trim() && selectedCat
                       ? 'bg-white text-[#0d0d12] hover:bg-white/90'
-                      : 'bg-white/[0.06] text-white/20 cursor-not-allowed',
+                      : 'bg-gray-50 text-gray-300 cursor-not-allowed',
                   )}
                 >
-                  {creating ? <img src="/logo.jpg" alt="" className="w-5 h-5 rounded animate-pulse" /> : <>
+                  {creating ? <img src="/logo.svg" alt="" className="w-5 h-5 rounded animate-pulse" /> : <>
                     <Sparkles className="w-4 h-4" /> Publish
                   </>}
                 </button>
@@ -884,11 +884,11 @@ export default function CreativityPage() {
         />
         <div className="flex-1 flex items-center justify-center">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center px-8">
-            <div className="w-20 h-20 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mx-auto mb-5">
+            <div className="w-20 h-20 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-5">
               <Sparkles className="w-8 h-8 text-white/15" />
             </div>
-            <h3 className="text-lg font-bold text-white mb-2">No content yet</h3>
-            <p className="text-[13px] text-white/30 mb-6 leading-relaxed">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">No content yet</h3>
+            <p className="text-[13px] text-gray-400 mb-6 leading-relaxed">
               {activeCategory === 'general'
                 ? 'Be the first to share something creative!'
                 : `No ${activeCategory} content yet — be the pioneer!`}
@@ -1036,7 +1036,7 @@ function CategoryBar({
               'flex items-center gap-1.5 h-8 px-3.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all border flex-shrink-0',
               isActive
                 ? 'bg-white text-[#0d0d12] border-white shadow-[0_0_12px_rgba(236,64,122,0.15)]'
-                : 'bg-white/[0.04] border-white/[0.06] text-white/40 hover:text-white/60 hover:bg-white/[0.08]',
+                : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-100',
             )}
           >
             <Icon className="w-3 h-3" />
@@ -1045,7 +1045,7 @@ function CategoryBar({
         );
       })}
       <button onClick={onShowAll}
-        className="flex items-center gap-1 h-8 px-3 rounded-full bg-white/[0.02] border border-white/[0.04] text-white/25 text-[11px] font-semibold whitespace-nowrap hover:text-white/40 flex-shrink-0">
+        className="flex items-center gap-1 h-8 px-3 rounded-full bg-white/[0.02] border border-white/[0.04] text-white/25 text-[11px] font-semibold whitespace-nowrap hover:text-gray-400 flex-shrink-0">
         All <ChevronDown className="w-3 h-3" />
       </button>
     </div>
@@ -1072,12 +1072,12 @@ function CategoryPickerSheet({
           <motion.div
             initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed bottom-0 inset-x-0 max-h-[75vh] bg-[#111118] border-t border-white/[0.08] rounded-t-[20px] z-50 flex flex-col"
+            className="fixed bottom-0 inset-x-0 max-h-[75vh] bg-white border-t border-gray-200 rounded-t-[20px] z-50 flex flex-col"
           >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/[0.06]">
-              <h3 className="text-[14px] font-bold text-white">Browse Categories</h3>
-              <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/[0.06] flex items-center justify-center">
-                <X className="w-4 h-4 text-white/50" />
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
+              <h3 className="text-[14px] font-bold text-gray-900">Browse Categories</h3>
+              <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
+                <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -1090,8 +1090,8 @@ function CategoryPickerSheet({
                       className={cn(
                         'flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all text-left',
                         isActive
-                          ? 'bg-white/[0.08] border-white/[0.15] shadow-[0_0_12px_rgba(255,255,255,0.03)]'
-                          : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.05]',
+                          ? 'bg-gray-100 border-white/[0.15] shadow-[0_0_12px_rgba(255,255,255,0.03)]'
+                          : 'bg-white/[0.02] border-gray-100 hover:bg-white/[0.05]',
                       )}
                     >
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -1099,9 +1099,9 @@ function CategoryPickerSheet({
                         <Icon className="w-4 h-4" style={{ color: cat.color }} />
                       </div>
                       <div className="min-w-0">
-                        <p className={cn('text-[12px] font-semibold truncate', isActive ? 'text-white' : 'text-white/50')}>{cat.label}</p>
+                        <p className={cn('text-[12px] font-semibold truncate', isActive ? 'text-white' : 'text-gray-500')}>{cat.label}</p>
                         {cat.count !== undefined && cat.count > 0 && (
-                          <p className="text-[10px] text-white/20">{cat.count} items</p>
+                          <p className="text-[10px] text-gray-300">{cat.count} items</p>
                         )}
                       </div>
                       {isActive && (

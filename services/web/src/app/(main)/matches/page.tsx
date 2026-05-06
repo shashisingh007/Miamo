@@ -81,7 +81,7 @@ function TooltipButton({
     <div className="relative" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
       <button onClick={onClick} className={cn(
         'w-8 h-8 rounded-lg flex items-center justify-center transition-all',
-        active ? 'bg-white/[0.12] text-white' : 'bg-transparent text-white/30 hover:text-white/60 hover:bg-white/[0.06]',
+        active ? 'bg-white/[0.12] text-white' : 'bg-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50',
         className,
       )}>
         <Icon style={{ width: size, height: size }} />
@@ -160,18 +160,18 @@ function ProfileModal({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 40, scale: 0.95 }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        className="fixed inset-x-3 top-[2%] bottom-[2%] max-w-lg mx-auto bg-[#13131f] border border-white/[0.08] rounded-[24px] shadow-[0_16px_80px_rgba(0,0,0,0.8)] z-50 overflow-hidden flex flex-col"
+        className="fixed inset-x-3 top-[2%] bottom-[2%] max-w-lg mx-auto bg-[#13131f] border border-gray-200 rounded-[24px] shadow-[0_16px_80px_rgba(0,0,0,0.8)] z-50 overflow-hidden flex flex-col"
       >
         {/* Header bar */}
-        <div className="flex items-center justify-between px-5 py-3 border-b border-white/[0.05] flex-shrink-0">
+        <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
           <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white/[0.05] flex items-center justify-center hover:bg-white/[0.1] transition">
-            <ArrowLeft className="w-4 h-4 text-white/60" />
+            <ArrowLeft className="w-4 h-4 text-gray-600" />
           </button>
-          <span className="text-[11px] font-bold text-white/30 uppercase tracking-wider">
+          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
             {incoming.type === 'move' ? '💫 Miamo Move' : incoming.type === 'like' ? '❤️ Liked You' : '💬 Sent a thought'}
           </span>
           <button onClick={() => setShowActions(!showActions)} className="w-9 h-9 rounded-xl bg-white/[0.05] flex items-center justify-center hover:bg-white/[0.1] transition">
-            <MoreHorizontal className="w-4 h-4 text-white/60" />
+            <MoreHorizontal className="w-4 h-4 text-gray-600" />
           </button>
         </div>
 
@@ -182,7 +182,7 @@ function ProfileModal({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: 'auto' }}
               exit={{ opacity: 0, height: 0 }}
-              className="border-b border-white/[0.05] overflow-hidden"
+              className="border-b border-gray-100 overflow-hidden"
             >
               <div className="px-4 py-3 flex gap-2 flex-wrap">
                 <button onClick={() => { onReport(); onClose(); }}
@@ -194,7 +194,7 @@ function ProfileModal({
                   <Ban className="w-3 h-3" /> Block
                 </button>
                 <button onClick={() => { onHide(); onClose(); }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/[0.04] border border-white/[0.08] text-white/40 text-[11px] font-semibold hover:bg-white/[0.08] transition">
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-400 text-[11px] font-semibold hover:bg-gray-100 transition">
                   <EyeOff className="w-3 h-3" /> Hide
                 </button>
               </div>
@@ -208,11 +208,11 @@ function ProfileModal({
           <div className="relative">
             {photos.length > 0 ? (
               <div className="aspect-[3/4] max-h-[320px] overflow-hidden">
-                <img src={photos[0]?.url || photos[0]} alt={name} className="w-full h-full object-cover" />
+                <img src={photos[0]?.url || photos[0]} alt={name} className="w-full h-full object-contain" />
               </div>
             ) : (
               <div className="aspect-[3/4] max-h-[260px] bg-gradient-to-b from-white/[0.04] to-transparent flex items-center justify-center">
-                <div className="w-20 h-20 rounded-full bg-white/[0.06] flex items-center justify-center text-3xl font-black text-white/20">
+                <div className="w-20 h-20 rounded-full bg-gray-50 flex items-center justify-center text-3xl font-black text-gray-300">
                   {name[0]}
                 </div>
               </div>
@@ -223,8 +223,8 @@ function ProfileModal({
           <div className="px-5 -mt-6 relative z-10">
             {/* Name & basics */}
             <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-xl font-extrabold text-white">{name}</h2>
-              {age && <span className="text-[14px] text-white/50 font-medium">{age}</span>}
+              <h2 className="text-xl font-extrabold text-gray-900">{name}</h2>
+              {age && <span className="text-[14px] text-gray-500 font-medium">{age}</span>}
               {verified && (
                 <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center">
                   <Shield className="w-3 h-3 text-blue-400" />
@@ -242,12 +242,12 @@ function ProfileModal({
                 <p className="text-[10px] font-bold text-purple-300/60 uppercase tracking-wider mb-1.5">
                   {incoming.type === 'move' ? '💫 Their Miamo Move' : '💬 Their Message'}
                 </p>
-                <p className="text-[13px] text-white/80 leading-relaxed">&ldquo;{incoming.message}&rdquo;</p>
+                <p className="text-[13px] text-gray-800 leading-relaxed">&ldquo;{incoming.message}&rdquo;</p>
               </div>
             )}
 
             {/* Bio */}
-            {bio && <div className="mb-4"><p className="text-[13px] text-white/50 leading-relaxed">{bio}</p></div>}
+            {bio && <div className="mb-4"><p className="text-[13px] text-gray-500 leading-relaxed">{bio}</p></div>}
 
             {/* Interests */}
             {interests.length > 0 && (
@@ -255,7 +255,7 @@ function ProfileModal({
                 <p className="text-[10px] font-bold text-white/25 uppercase tracking-wider mb-2">Interests</p>
                 <div className="flex flex-wrap gap-1.5">
                   {interests.map((i: any) => (
-                    <span key={i.id || i.name} className="px-2.5 py-1 rounded-lg bg-white/[0.05] border border-white/[0.06] text-[11px] text-white/50 font-medium">
+                    <span key={i.id || i.name} className="px-2.5 py-1 rounded-lg bg-white/[0.05] border border-gray-200 text-[11px] text-gray-500 font-medium">
                       {i.name}
                     </span>
                   ))}
@@ -267,9 +267,9 @@ function ProfileModal({
             {prompts.length > 0 && (
               <div className="mb-4 space-y-3">
                 {prompts.slice(0, 2).map((p: any) => (
-                  <div key={p.id} className="p-3 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+                  <div key={p.id} className="p-3 rounded-xl bg-white/[0.02] border border-gray-100">
                     <p className="text-[10px] font-bold text-white/25 uppercase tracking-wider mb-1">{p.question}</p>
-                    <p className="text-[12px] text-white/60">{p.answer}</p>
+                    <p className="text-[12px] text-gray-600">{p.answer}</p>
                   </div>
                 ))}
               </div>
@@ -279,8 +279,8 @@ function ProfileModal({
             {photos.length > 1 && (
               <div className="mb-4 grid grid-cols-3 gap-2">
                 {photos.slice(1, 4).map((p: any, idx: number) => (
-                  <div key={idx} className="aspect-square rounded-xl overflow-hidden bg-white/[0.04]">
-                    <img src={p.url || p} alt="" className="w-full h-full object-cover" />
+                  <div key={idx} className="aspect-square rounded-xl overflow-hidden bg-gray-50">
+                    <img src={p.url || p} alt="" className="w-full h-full object-contain" />
                   </div>
                 ))}
               </div>
@@ -289,28 +289,28 @@ function ProfileModal({
         </div>
 
         {/* Action bar */}
-        <div className="flex-shrink-0 border-t border-white/[0.06] p-4">
+        <div className="flex-shrink-0 border-t border-gray-200 p-4">
           {!showMoveInput ? (
             <div className="space-y-3">
               {/* Primary actions */}
               <div className="flex gap-2">
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={onMatchBack}
-                  className="flex-1 h-12 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-white text-[13px] font-bold flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(236,72,153,0.3)] hover:shadow-[0_4px_30px_rgba(236,72,153,0.4)] transition-all">
+                  className="flex-1 h-12 rounded-xl bg-gradient-to-r from-pink-500 to-rose-500 text-gray-900 text-[13px] font-bold flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(236,72,153,0.3)] hover:shadow-[0_4px_30px_rgba(236,72,153,0.4)] transition-all">
                   <Heart className="w-4 h-4 fill-white" /> Match Back
                 </motion.button>
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setShowMoveInput(true)}
-                  className="flex-1 h-12 rounded-xl bg-gradient-to-r from-[#EC407A] to-[#D81B60] text-white text-[13px] font-bold flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(236,64,122,0.3)] hover:shadow-[0_4px_30px_rgba(236,64,122,0.4)] transition-all">
+                  className="flex-1 h-12 rounded-xl bg-gradient-to-r from-[#EC407A] to-[#D81B60] text-gray-900 text-[13px] font-bold flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(236,64,122,0.3)] hover:shadow-[0_4px_30px_rgba(236,64,122,0.4)] transition-all">
                   <Sparkles className="w-4 h-4" /> Miamo Move
                 </motion.button>
               </div>
               {/* Secondary actions */}
               <div className="flex gap-2">
                 <button onClick={onHold}
-                  className="flex-1 h-10 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/40 text-[12px] font-semibold flex items-center justify-center gap-1.5 hover:bg-white/[0.07] hover:text-white/60 transition-all">
+                  className="flex-1 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-400 text-[12px] font-semibold flex items-center justify-center gap-1.5 hover:bg-white/[0.07] hover:text-gray-600 transition-all">
                   <Pause className="w-3.5 h-3.5" /> Hold for Now
                 </button>
                 <button onClick={() => { onHide(); onClose(); }}
-                  className="flex-1 h-10 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white/40 text-[12px] font-semibold flex items-center justify-center gap-1.5 hover:bg-white/[0.07] hover:text-white/60 transition-all">
+                  className="flex-1 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-400 text-[12px] font-semibold flex items-center justify-center gap-1.5 hover:bg-white/[0.07] hover:text-gray-600 transition-all">
                   <EyeOff className="w-3.5 h-3.5" /> Not Interested
                 </button>
               </div>
@@ -319,12 +319,12 @@ function ProfileModal({
             <div className="space-y-3">
               {/* AI Suggestion chips */}
               {loadingSuggestions ? (
-                <div className="flex items-center gap-2 text-white/20 text-[11px]">
+                <div className="flex items-center gap-2 text-gray-300 text-[11px]">
                   <Wand2 className="w-3.5 h-3.5 animate-pulse" /> Loading AI suggestions...
                 </div>
               ) : suggestions.length > 0 && (
                 <div>
-                  <p className="text-[10px] font-bold text-white/20 uppercase tracking-wider mb-2 flex items-center gap-1">
+                  <p className="text-[10px] font-bold text-gray-300 uppercase tracking-wider mb-2 flex items-center gap-1">
                     <Wand2 className="w-3 h-3 text-purple-400" /> AI Suggestions
                   </p>
                   <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
@@ -341,7 +341,7 @@ function ProfileModal({
               <div className="flex gap-2">
                 <button onClick={() => setShowMoveInput(false)}
                   className="w-10 h-10 rounded-xl bg-white/[0.05] flex items-center justify-center hover:bg-white/[0.1] transition flex-shrink-0">
-                  <ArrowLeft className="w-4 h-4 text-white/40" />
+                  <ArrowLeft className="w-4 h-4 text-gray-400" />
                 </button>
                 <input
                   value={moveMessage}
@@ -349,20 +349,20 @@ function ProfileModal({
                   onKeyDown={e => { if (e.key === 'Enter' && moveMessage.trim()) onMatchMove(moveMessage.trim()); }}
                   placeholder="Write your Miamo Move..."
                   autoFocus
-                  className="flex-1 h-10 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-[12px] px-4 focus:border-purple-500/30 focus:outline-none placeholder:text-white/15 transition"
+                  className="flex-1 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] px-4 focus:border-purple-500/30 focus:outline-none placeholder:text-white/15 transition"
                 />
                 <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                   onClick={() => { if (moveMessage.trim()) onMatchMove(moveMessage.trim()); }}
                   disabled={!moveMessage.trim()}
                   className={cn(
                     'w-10 h-10 rounded-xl flex items-center justify-center transition flex-shrink-0',
-                    moveMessage.trim() ? 'bg-purple-500 text-white' : 'bg-white/[0.04] text-white/15',
+                    moveMessage.trim() ? 'bg-purple-500 text-white' : 'bg-gray-50 text-white/15',
                   )}>
                   <Send className="w-4 h-4" />
                 </motion.button>
               </div>
               {!moveMessage.trim() && (
-                <p className="text-[10px] text-white/20 text-center">Pick a suggestion or write your own opener</p>
+                <p className="text-[10px] text-gray-300 text-center">Pick a suggestion or write your own opener</p>
               )}
             </div>
           )}
@@ -410,20 +410,20 @@ function FeedbackModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed inset-x-4 top-[5%] max-w-md mx-auto bg-[#151522] border border-white/[0.08] rounded-[20px] shadow-[0_8px_60px_rgba(0,0,0,0.6)] z-[60] overflow-hidden max-h-[90vh] flex flex-col"
+            className="fixed inset-x-4 top-[5%] max-w-md mx-auto bg-[#151522] border border-gray-200 rounded-[20px] shadow-[0_8px_60px_rgba(0,0,0,0.6)] z-[60] overflow-hidden max-h-[90vh] flex flex-col"
           >
-            <div className="px-6 py-5 border-b border-white/[0.05] flex items-center justify-between flex-shrink-0">
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">
                 <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', type === 'unmatch' ? 'bg-amber-400/10' : 'bg-red-400/10')}>
                   {type === 'unmatch' ? <UserMinus className="w-5 h-5 text-amber-400" /> : type === 'block' ? <Ban className="w-5 h-5 text-red-400" /> : <Flag className="w-5 h-5 text-red-400" />}
                 </div>
                 <div>
-                  <h3 className="text-[15px] font-bold text-white">{type === 'unmatch' ? 'Unmatch' : type === 'block' ? 'Block' : 'Report'} {matchName}</h3>
-                  <p className="text-[11px] text-white/30 mt-0.5">{type === 'unmatch' ? 'Help us improve your matches' : type === 'block' ? 'They won\'t be able to contact you' : 'Help keep Miamo safe'}</p>
+                  <h3 className="text-[15px] font-bold text-gray-900">{type === 'unmatch' ? 'Unmatch' : type === 'block' ? 'Block' : 'Report'} {matchName}</h3>
+                  <p className="text-[11px] text-gray-400 mt-0.5">{type === 'unmatch' ? 'Help us improve your matches' : type === 'block' ? 'They won\'t be able to contact you' : 'Help keep Miamo safe'}</p>
                 </div>
               </div>
               <button onClick={onClose} className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center hover:bg-white/[0.1] transition-colors">
-                <X className="w-4 h-4 text-white/50" />
+                <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
             {done ? (
@@ -432,13 +432,13 @@ function FeedbackModal({
                   <div className="w-14 h-14 rounded-full bg-emerald-400/10 flex items-center justify-center mx-auto mb-4">
                     <Check className="w-7 h-7 text-emerald-400" />
                   </div>
-                  <p className="text-[14px] font-semibold text-white">Thank you for your feedback</p>
+                  <p className="text-[14px] font-semibold text-gray-900">Thank you for your feedback</p>
                 </div>
               </motion.div>
             ) : (
               <>
                 <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1.5">
-                  <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em] mb-3 px-1">Select a reason</p>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-3 px-1">Select a reason</p>
                   {reasons.map((r) => {
                     const Icon = r.icon;
                     const isActive = selectedReason === r.code;
@@ -446,12 +446,12 @@ function FeedbackModal({
                       <button key={r.code} onClick={() => setSelectedReason(r.code)}
                         className={cn(
                           'w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all',
-                          isActive ? 'bg-white/[0.08] border-white/[0.15]' : 'bg-transparent border-white/[0.04] hover:bg-white/[0.03]',
+                          isActive ? 'bg-gray-100 border-white/[0.15]' : 'bg-transparent border-white/[0.04] hover:bg-gray-50',
                         )}>
-                        <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0', isActive ? 'bg-white/[0.1]' : 'bg-white/[0.04]')}>
-                          <Icon className={cn('w-4 h-4', isActive ? 'text-white/80' : 'text-white/30')} />
+                        <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0', isActive ? 'bg-white/[0.1]' : 'bg-gray-50')}>
+                          <Icon className={cn('w-4 h-4', isActive ? 'text-gray-800' : 'text-gray-400')} />
                         </div>
-                        <span className={cn('text-[13px] font-medium', isActive ? 'text-white' : 'text-white/50')}>{r.label}</span>
+                        <span className={cn('text-[13px] font-medium', isActive ? 'text-white' : 'text-gray-500')}>{r.label}</span>
                         {isActive && (
                           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="ml-auto w-5 h-5 rounded-full bg-white flex items-center justify-center">
                             <Check className="w-3 h-3 text-[#151522]" />
@@ -462,17 +462,17 @@ function FeedbackModal({
                   })}
                   <div className="pt-3">
                     <textarea value={details} onChange={e => setDetails(e.target.value)} placeholder="Additional details (optional)"
-                      className="w-full h-20 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-[12px] px-4 py-3 resize-none focus:border-white/[0.15] focus:outline-none placeholder:text-white/15 transition-colors" />
+                      className="w-full h-20 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] px-4 py-3 resize-none focus:border-white/[0.15] focus:outline-none placeholder:text-white/15 transition-colors" />
                   </div>
                 </div>
-                <div className="flex-shrink-0 px-5 py-4 border-t border-white/[0.05] flex gap-3">
-                  <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-white/[0.08] text-white/50 text-[13px] font-semibold hover:bg-white/[0.03] transition-all">Cancel</button>
+                <div className="flex-shrink-0 px-5 py-4 border-t border-gray-100 flex gap-3">
+                  <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-gray-200 text-gray-500 text-[13px] font-semibold hover:bg-gray-50 transition-all">Cancel</button>
                   <button onClick={handleSubmit} disabled={!selectedReason || submitting}
                     className={cn(
                       'flex-1 h-11 rounded-xl text-[13px] font-bold transition-all flex items-center justify-center gap-2',
-                      selectedReason ? (type === 'report' || type === 'block') ? 'bg-red-500 text-white' : 'bg-white text-[#0d0d12]' : 'bg-white/[0.06] text-white/20 cursor-not-allowed',
+                      selectedReason ? (type === 'report' || type === 'block') ? 'bg-red-500 text-white' : 'bg-white text-[#0d0d12]' : 'bg-gray-50 text-gray-300 cursor-not-allowed',
                     )}>
-                    {submitting ? <img src="/logo.jpg" alt="" className="w-4 h-4 rounded animate-pulse" /> : type === 'unmatch' ? 'Unmatch' : type === 'block' ? 'Block' : 'Report'}
+                    {submitting ? <img src="/logo.svg" alt="" className="w-4 h-4 rounded animate-pulse" /> : type === 'unmatch' ? 'Unmatch' : type === 'block' ? 'Block' : 'Report'}
                   </button>
                 </div>
               </>
@@ -502,7 +502,7 @@ function HeldItemMenu({ userId, onResume, onReport, onBlock, onUnmatch }: { user
 
   return (
     <>
-      <button ref={btnRef} onClick={handleOpen} className="p-2 rounded-lg hover:bg-white/[0.08] text-white/40 hover:text-white/70 transition">
+      <button ref={btnRef} onClick={handleOpen} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition">
         <MoreVertical className="w-4 h-4" />
       </button>
       <AnimatePresence>
@@ -511,12 +511,12 @@ function HeldItemMenu({ userId, onResume, onReport, onBlock, onUnmatch }: { user
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
             <motion.div initial={{ opacity: 0, scale: 0.9, y: -5 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: -5 }}
               style={{ top: pos.top, right: pos.right }}
-              className="fixed z-[70] w-52 py-1 rounded-xl bg-[#1a1a2e] border border-white/[0.08] shadow-[0_8px_40px_rgba(0,0,0,0.7)]"
+              className="fixed z-[70] w-52 py-1 rounded-xl bg-white border border-gray-200 shadow-[0_8px_40px_rgba(0,0,0,0.7)]"
             >
               <button onClick={() => { setOpen(false); onResume(); }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[12px] font-medium text-emerald-400 hover:bg-emerald-400/10 transition">
                 <Play className="w-3.5 h-3.5" /> Resume
               </button>
-              <div className="h-px bg-white/[0.06] my-0.5" />
+              <div className="h-px bg-gray-50 my-0.5" />
               <button onClick={() => { setOpen(false); onReport(); }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[12px] font-medium text-amber-400/70 hover:bg-amber-400/5 transition">
                 <Flag className="w-3.5 h-3.5" /> Report
               </button>
@@ -562,16 +562,16 @@ function IncomingCard({ item, onClick }: { item: any; onClick: () => void }) {
       whileHover={{ scale: 1.01, y: -2 }}
       whileTap={{ scale: 0.99 }}
       onClick={onClick}
-      className="w-full text-left rounded-2xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/[0.12] transition-all overflow-hidden"
+      className="w-full text-left rounded-2xl border border-gray-200 bg-white/[0.02] hover:bg-gray-50 hover:border-gray-200 transition-all overflow-hidden"
     >
       <div className="flex items-center gap-4 p-4">
         {/* Avatar */}
         <div className="relative flex-shrink-0">
-          <div className="w-16 h-16 rounded-2xl overflow-hidden bg-white/[0.06]">
+          <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gray-50">
             {photo ? (
-              <img src={photo} alt={name} className="w-full h-full object-cover" />
+              <img src={photo} alt={name} className="w-full h-full object-contain" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-xl font-black text-white/20">{name[0]}</div>
+              <div className="w-full h-full flex items-center justify-center text-xl font-black text-gray-300">{name[0]}</div>
             )}
           </div>
           <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#13131f] flex items-center justify-center">
@@ -582,22 +582,22 @@ function IncomingCard({ item, onClick }: { item: any; onClick: () => void }) {
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
-            <h3 className="text-[14px] font-bold text-white truncate">{name}</h3>
-            {age && <span className="text-[12px] text-white/30">{age}</span>}
+            <h3 className="text-[14px] font-bold text-gray-900 truncate">{name}</h3>
+            {age && <span className="text-[12px] text-gray-400">{age}</span>}
             {user.verified && <Shield className="w-3.5 h-3.5 text-blue-400/60 flex-shrink-0" />}
           </div>
-          {city && <p className="text-[11px] text-white/30 flex items-center gap-1 mb-1"><MapPin className="w-2.5 h-2.5" />{city}</p>}
+          {city && <p className="text-[11px] text-gray-400 flex items-center gap-1 mb-1"><MapPin className="w-2.5 h-2.5" />{city}</p>}
           {item.message && <p className="text-[11px] text-purple-300/70 truncate italic">&ldquo;{item.message}&rdquo;</p>}
           {!item.message && interests.length > 0 && (
             <div className="flex gap-1 mt-1">
-              {interests.map((i: any) => <span key={i.name} className="px-1.5 py-0.5 rounded bg-white/[0.04] text-[9px] text-white/30">{i.name}</span>)}
+              {interests.map((i: any) => <span key={i.name} className="px-1.5 py-0.5 rounded bg-gray-50 text-[9px] text-gray-400">{i.name}</span>)}
             </div>
           )}
         </div>
 
         {/* Time & CTA */}
         <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
-          <span className="text-[10px] text-white/20 font-medium">{timeAgo()}</span>
+          <span className="text-[10px] text-gray-300 font-medium">{timeAgo()}</span>
           <div className="w-7 h-7 rounded-lg bg-pink-500/10 flex items-center justify-center">
             <Eye className="w-3.5 h-3.5 text-pink-400/60" />
           </div>
@@ -629,19 +629,19 @@ function MatchCard({ match, onOpenMenu, onChat }: { match: any; onOpenMenu: (id:
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-      className={cn('group rounded-2xl border transition-all cursor-pointer', isPinned ? 'bg-white/[0.04] border-white/[0.1]' : 'bg-white/[0.02] border-white/[0.05] hover:bg-white/[0.04] hover:border-white/[0.1]')}
+      className={cn('group rounded-2xl border transition-all cursor-pointer', isPinned ? 'bg-gray-50 border-gray-200' : 'bg-white/[0.02] border-gray-100 hover:bg-gray-50 hover:border-gray-200')}
       onClick={() => onChat(match)}>
       <div className="flex items-center gap-4 p-4">
         <div className="relative flex-shrink-0">
-          <div className="w-14 h-14 rounded-2xl overflow-hidden bg-white/[0.06]">
-            {photo ? <img src={photo} alt={name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg font-black text-white/20">{name[0]}</div>}
+          <div className="w-14 h-14 rounded-2xl overflow-hidden bg-gray-50">
+            {photo ? <img src={photo} alt={name} className="w-full h-full object-contain" /> : <div className="w-full h-full flex items-center justify-center text-lg font-black text-gray-300">{name[0]}</div>}
           </div>
           {online && <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-miamo-bg flex items-center justify-center"><div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" /></div>}
           {isPinned && <div className="absolute -top-1 -left-1 w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-md"><Pin className="w-2.5 h-2.5 text-[#0d0d12]" /></div>}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
-            <h3 className="text-[14px] font-bold text-white truncate">{name}</h3>
+            <h3 className="text-[14px] font-bold text-gray-900 truncate">{name}</h3>
             {verified && <Shield className="w-3.5 h-3.5 text-blue-400/40 flex-shrink-0" />}
             {isNew && <span className="px-2 py-0.5 rounded-md bg-purple-400/15 text-purple-300 text-[9px] font-bold uppercase">New</span>}
             {isFavorite && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 flex-shrink-0" />}
@@ -653,7 +653,7 @@ function MatchCard({ match, onOpenMenu, onChat }: { match: any; onOpenMenu: (id:
           {lastMsg ? <p className="text-[11px] text-white/25 mt-1.5 truncate max-w-[260px]">{lastMsg.content}</p> : <p className="text-[11px] text-purple-400/50 mt-1.5 italic">No messages yet — say hi!</p>}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
-          <span className="text-[10px] text-white/20 font-medium mr-2 hidden sm:block">{timeLabel}</span>
+          <span className="text-[10px] text-gray-300 font-medium mr-2 hidden sm:block">{timeLabel}</span>
           <TooltipButton icon={MessageCircle} label="Message" onClick={(e: any) => { e?.stopPropagation(); onChat(match); }} />
           <TooltipButton icon={MoreHorizontal} label="More" onClick={(e: any) => { e?.stopPropagation(); onOpenMenu(match.id, e); }} />
         </div>
@@ -684,7 +684,7 @@ function ContextMenu({
   if (!isOpen) return null;
   const menuItems = [
     { label: isFavorite ? 'Remove Favorite' : 'Add to Favorites', icon: isFavorite ? StarOff : Star, onClick: onFavorite, color: 'text-amber-400' },
-    { label: isPinned ? 'Unpin' : 'Pin to Top', icon: isPinned ? PinOff : Pin, onClick: onPin, color: 'text-white/60' },
+    { label: isPinned ? 'Unpin' : 'Pin to Top', icon: isPinned ? PinOff : Pin, onClick: onPin, color: 'text-gray-600' },
     { label: 'Put on Hold', icon: Pause, onClick: onHold, color: 'text-amber-400/70' },
     { divider: true },
     { label: 'Report', icon: Flag, onClick: onReport, color: 'text-orange-400' },
@@ -696,10 +696,10 @@ function ContextMenu({
     <>
       <div className="fixed inset-0 z-40" onClick={onClose} />
       <motion.div ref={ref} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.12 }}
-        className="fixed z-50 bg-[#1a1a2e] border border-white/[0.1] rounded-xl shadow-[0_8px_40px_rgba(0,0,0,0.5)] py-1.5 w-48"
+        className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-[0_8px_40px_rgba(0,0,0,0.5)] py-1.5 w-48"
         style={{ top: position.y, left: Math.min(position.x, typeof window !== 'undefined' ? window.innerWidth - 210 : 200) }}>
         {menuItems.map((item, i) => {
-          if ('divider' in item) return <div key={i} className="my-1.5 h-px bg-white/[0.06]" />;
+          if ('divider' in item) return <div key={i} className="my-1.5 h-px bg-gray-50" />;
           const Icon = item.icon;
           return (
             <button key={i} onClick={(e) => { e.stopPropagation(); item.onClick(); onClose(); }}
@@ -999,7 +999,7 @@ export default function MatchesPage() {
         {/* ─── Header ─── */}
         <div className="flex items-center justify-between mb-5">
           <div>
-            <h1 className="text-xl font-extrabold text-white tracking-tight">Matches</h1>
+            <h1 className="text-xl font-extrabold text-gray-900 tracking-tight">Matches</h1>
             <p className="text-[12px] text-white/25 mt-0.5 font-medium">
               {incoming.length > 0 && <span className="text-pink-400">{incoming.length} incoming</span>}
               {incoming.length > 0 && matches.length > 0 && <span> · </span>}
@@ -1012,18 +1012,18 @@ export default function MatchesPage() {
 
 
         {/* ─── Main Tabs ─── */}
-        <div className="flex gap-1 mb-5 p-1 rounded-xl bg-white/[0.02] border border-white/[0.05]">
+        <div className="flex gap-1 mb-5 p-1 rounded-xl bg-white/[0.02] border border-gray-100">
           {mainTabs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             const count = tab.id === 'incoming' ? incoming.length : tab.id === 'matches' ? matches.length : heldItems.length;
             return (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={cn('flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-[12px] font-semibold transition-all', isActive ? 'bg-white/[0.1] text-white shadow-sm' : 'text-white/30 hover:text-white/50')}>
+                className={cn('flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-[12px] font-semibold transition-all', isActive ? 'bg-white/[0.1] text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-500')}>
                 <Icon className="w-3.5 h-3.5" />
                 {tab.label}
                 {count > 0 && (
-                  <span className={cn('w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center', isActive ? 'bg-pink-500 text-white' : 'bg-white/[0.06] text-white/30')}>
+                  <span className={cn('w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center', isActive ? 'bg-pink-500 text-white' : 'bg-gray-50 text-gray-400')}>
                     {count > 99 ? '99+' : count}
                   </span>
                 )}
@@ -1037,15 +1037,15 @@ export default function MatchesPage() {
           <div>
             {incoming.length === 0 ? (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-20">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-b from-lavender-400/10 to-lavender-600/10 border border-white/[0.06] flex items-center justify-center mx-auto mb-5">
+                <div className="w-20 h-20 rounded-full bg-gradient-to-b from-lavender-400/10 to-lavender-600/10 border border-gray-200 flex items-center justify-center mx-auto mb-5">
                   <Heart className="w-8 h-8 text-white/15" />
                 </div>
-                <h3 className="text-[16px] font-bold text-white mb-2">No matches for now</h3>
-                <p className="text-[13px] text-white/30 max-w-[280px] mx-auto leading-relaxed">
+                <h3 className="text-[16px] font-bold text-gray-900 mb-2">No matches for now</h3>
+                <p className="text-[13px] text-gray-400 max-w-[280px] mx-auto leading-relaxed">
                   When someone likes your profile, they&apos;ll appear here. Keep your profile active and engaging!
                 </p>
                 <button onClick={() => router.push('/discover')}
-                  className="mt-6 h-10 px-6 rounded-xl bg-white/[0.06] border border-white/[0.08] text-white/50 text-[12px] font-semibold hover:bg-white/[0.1] transition-all">
+                  className="mt-6 h-10 px-6 rounded-xl bg-gray-50 border border-gray-200 text-gray-500 text-[12px] font-semibold hover:bg-white/[0.1] transition-all">
                   Explore Discover →
                 </button>
               </motion.div>
@@ -1068,15 +1068,15 @@ export default function MatchesPage() {
           <div>
             <div className="flex gap-3 mb-4">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/20" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
                 <input value={searchQuery} onChange={e => handleSearch(e.target.value)} placeholder="Search matches..."
-                  className="w-full h-9 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-[12px] pl-9 pr-4 focus:border-white/[0.15] focus:outline-none placeholder:text-white/15 transition" />
+                  className="w-full h-9 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] pl-9 pr-4 focus:border-white/[0.15] focus:outline-none placeholder:text-white/15 transition" />
               </div>
             </div>
             <div className="flex gap-1.5 mb-4 overflow-x-auto no-scrollbar">
               {matchFilters.map(f => (
                 <button key={f.id} onClick={() => setMatchFilter(f.id)}
-                  className={cn('px-3 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-all border', matchFilter === f.id ? 'bg-white/[0.1] border-white/[0.15] text-white' : 'border-white/[0.04] text-white/25 hover:text-white/40')}>
+                  className={cn('px-3 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-all border', matchFilter === f.id ? 'bg-white/[0.1] border-white/[0.15] text-white' : 'border-white/[0.04] text-white/25 hover:text-gray-400')}>
                   {f.label}
                 </button>
               ))}
@@ -1084,10 +1084,10 @@ export default function MatchesPage() {
 
             {matches.length === 0 ? (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
-                <div className="w-16 h-16 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-4">
                   <Sparkles className="w-7 h-7 text-white/15" />
                 </div>
-                <h3 className="text-[15px] font-bold text-white mb-1.5">
+                <h3 className="text-[15px] font-bold text-gray-900 mb-1.5">
                   {searchQuery ? 'No matches found' : matchFilter !== 'all' ? `No ${matchFilter} matches` : 'No mutual matches yet'}
                 </h3>
                 <p className="text-[12px] text-white/25 max-w-xs mx-auto">
@@ -1114,13 +1114,13 @@ export default function MatchesPage() {
           <div>
             {heldItems.length === 0 ? (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
-                <div className="w-16 h-16 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mx-auto mb-4">
+                <div className="w-16 h-16 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-4">
                   <Pause className="w-7 h-7 text-white/15" />
                 </div>
-                <h3 className="text-[15px] font-bold text-white mb-1.5">Nothing on hold</h3>
+                <h3 className="text-[15px] font-bold text-gray-900 mb-1.5">Nothing on hold</h3>
                 <p className="text-[12px] text-white/25 max-w-xs mx-auto">When you&apos;re not sure about someone, put them on hold to revisit later.</p>
                 {incomingMeta?.heldCount > 0 && (
-                  <button onClick={loadData} className="mt-4 px-4 py-2 rounded-lg bg-white/[0.06] text-white/50 text-[12px] font-medium hover:bg-white/[0.1] transition">
+                  <button onClick={loadData} className="mt-4 px-4 py-2 rounded-lg bg-gray-50 text-gray-500 text-[12px] font-medium hover:bg-white/[0.1] transition">
                     Refresh
                   </button>
                 )}
@@ -1136,7 +1136,7 @@ export default function MatchesPage() {
                     onClick={() => { if (selectMode) clearSelection(); else setSelectMode(true); }}
                     className={cn(
                       "px-2.5 py-1 rounded-md text-[10px] font-semibold transition",
-                      selectMode ? "bg-amber-400/20 text-amber-300 border border-amber-400/30" : "bg-white/[0.04] text-white/40 hover:bg-white/[0.08]"
+                      selectMode ? "bg-amber-400/20 text-amber-300 border border-amber-400/30" : "bg-gray-50 text-gray-400 hover:bg-gray-100"
                     )}
                   >
                     {selectMode ? 'Cancel' : 'Select'}
@@ -1147,11 +1147,11 @@ export default function MatchesPage() {
                 <AnimatePresence>
                   {selectMode && selectedHeldIds.size > 0 && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                      className="mb-3 p-3 rounded-xl bg-white/[0.04] border border-white/[0.06] flex items-center justify-between"
+                      className="mb-3 p-3 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-between"
                     >
-                      <span className="text-[11px] text-white/50 font-medium">{selectedHeldIds.size} selected</span>
+                      <span className="text-[11px] text-gray-500 font-medium">{selectedHeldIds.size} selected</span>
                       <div className="flex items-center gap-2">
-                        <button onClick={selectAllHeld} className="px-2.5 py-1 rounded-md text-[10px] font-medium bg-white/[0.06] text-white/50 hover:bg-white/[0.1] transition">
+                        <button onClick={selectAllHeld} className="px-2.5 py-1 rounded-md text-[10px] font-medium bg-gray-50 text-gray-500 hover:bg-white/[0.1] transition">
                           All
                         </button>
                         <button onClick={handleBulkResume} className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-semibold hover:bg-emerald-500/20 transition flex items-center gap-1">
@@ -1190,8 +1190,8 @@ export default function MatchesPage() {
                           </button>
                         )}
                         <button onClick={() => selectMode ? toggleHeldSelect(userId) : setSelectedIncoming(item)} className="relative flex-shrink-0">
-                          <div className="w-14 h-14 rounded-xl overflow-hidden bg-white/[0.06]">
-                            {photo ? <img src={photo} alt={name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg font-black text-white/20">{name[0]}</div>}
+                          <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-50">
+                            {photo ? <img src={photo} alt={name} className="w-full h-full object-contain" /> : <div className="w-full h-full flex items-center justify-center text-lg font-black text-gray-300">{name[0]}</div>}
                           </div>
                           {!selectMode && (
                             <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-amber-400/20 border border-amber-400/30 flex items-center justify-center">
@@ -1201,10 +1201,10 @@ export default function MatchesPage() {
                         </button>
                         <button onClick={() => selectMode ? toggleHeldSelect(userId) : setSelectedIncoming(item)} className="flex-1 min-w-0 text-left">
                           <div className="flex items-center gap-2 mb-0.5">
-                            <h3 className="text-[14px] font-bold text-white truncate">{name}</h3>
-                            {age && <span className="text-[12px] text-white/30">{age}</span>}
+                            <h3 className="text-[14px] font-bold text-gray-900 truncate">{name}</h3>
+                            {age && <span className="text-[12px] text-gray-400">{age}</span>}
                           </div>
-                          {city && <p className="text-[11px] text-white/30 flex items-center gap-1"><MapPin className="w-2.5 h-2.5" />{city}</p>}
+                          {city && <p className="text-[11px] text-gray-400 flex items-center gap-1"><MapPin className="w-2.5 h-2.5" />{city}</p>}
                         </button>
                         {!selectMode && (
                           <div className="flex items-center gap-2">
@@ -1288,8 +1288,8 @@ export default function MatchesPage() {
       <AnimatePresence>
         {toast && (
           <motion.div initial={{ opacity: 0, y: 30, scale: 0.95 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 30, scale: 0.95 }}
-            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[70] px-5 py-3 rounded-xl bg-[#1a1a2e] border border-white/[0.1] shadow-[0_8px_40px_rgba(0,0,0,0.5)]">
-            <p className="text-[13px] font-semibold text-white whitespace-nowrap">{toast.msg}</p>
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[70] px-5 py-3 rounded-xl bg-white border border-gray-200 shadow-[0_8px_40px_rgba(0,0,0,0.5)]">
+            <p className="text-[13px] font-semibold text-gray-900 whitespace-nowrap">{toast.msg}</p>
           </motion.div>
         )}
       </AnimatePresence>

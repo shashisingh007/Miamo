@@ -44,14 +44,14 @@ function VideoCard({ video }: { video: any }) {
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
           <div className="w-12 h-12 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-            <Play className="w-5 h-5 text-white ml-0.5" fill="white" />
+            <Play className="w-5 h-5 text-gray-900 ml-0.5" fill="white" />
           </div>
         </div>
         <div className="absolute bottom-0 inset-x-0 p-3">
-          <p className="text-xs text-white/90 line-clamp-2 mb-2">{video.title || video.description || ''}</p>
+          <p className="text-xs text-gray-900 line-clamp-2 mb-2">{video.title || video.description || ''}</p>
           <div className="flex items-center gap-2">
             <Avatar src={photo} name={author.displayName || 'User'} size="xs" verified={author.verified} />
-            <span className="text-[11px] text-white/80 font-medium">{author.displayName || 'User'}</span>
+            <span className="text-[11px] text-gray-800 font-medium">{author.displayName || 'User'}</span>
           </div>
         </div>
       </div>

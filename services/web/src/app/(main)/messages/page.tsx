@@ -147,7 +147,7 @@ function ChatListItem({ chat, active, onClick, onAction, selectMode, selected, o
           <div className="flex items-center justify-between mt-0.5">
             <p className="text-xs text-text-muted truncate pr-2">{chat.lastMessagePreview || 'Start a conversation'}</p>
             {chat.unreadCount > 0 && (
-              <span className="shrink-0 w-5 h-5 bg-lavender-400 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{chat.unreadCount}</span>
+              <span className="shrink-0 w-5 h-5 bg-lavender-400 text-gray-900 text-[10px] font-bold rounded-full flex items-center justify-center">{chat.unreadCount}</span>
             )}
           </div>
         </div>
@@ -420,7 +420,7 @@ function BackgroundPicker({ chatId, currentBg, onClose, onSelect }: { chatId: st
                   className={cn('aspect-[3/4] rounded-xl border-2 overflow-hidden flex flex-col items-center justify-end p-2',
                     currentBg === bg.value ? 'border-lavender-400 ring-2 ring-lavender-400/30' : 'border-border/30 hover:border-lavender-400/50'
                   )} style={{ background: bg.value }}>
-                  <span className="text-[10px] text-white/80 font-medium bg-black/30 backdrop-blur-sm px-2 py-0.5 rounded-full">{bg.name}</span>
+                  <span className="text-[10px] text-gray-800 font-medium bg-black/30 backdrop-blur-sm px-2 py-0.5 rounded-full">{bg.name}</span>
                 </button>
               ))}
             </div>
@@ -431,7 +431,7 @@ function BackgroundPicker({ chatId, currentBg, onClose, onSelect }: { chatId: st
                 <input value={customColor} onChange={e => setCustomColor(e.target.value)} className="input-premium flex-1 text-sm font-mono" placeholder="#EC407A" />
               </div>
               <div className="aspect-[4/3] rounded-xl border border-border/30 flex items-end p-3" style={{ background: customColor }}>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-1.5"><span className="text-xs text-white/80">Preview</span></div>
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-1.5"><span className="text-xs text-gray-800">Preview</span></div>
               </div>
               <Button className="w-full" onClick={() => handleSelect(customColor, 'Custom Color')}>Apply Custom Color</Button>
               <div className="flex flex-wrap gap-2">
@@ -511,7 +511,7 @@ function CallOverlay({ type, user, onEnd }: { type: 'voice' | 'video'; user: any
             <button className="w-14 h-14 rounded-full bg-miamo-elevated border border-border flex items-center justify-center text-text-muted hover:text-text-primary"><Video className="w-6 h-6" /></button>
           )}
           <button className="w-14 h-14 rounded-full bg-miamo-elevated border border-border flex items-center justify-center text-text-muted hover:text-text-primary"><Mic className="w-6 h-6" /></button>
-          <button onClick={onEnd} className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-white hover:bg-red-600 shadow-lg shadow-red-500/30"><Phone className="w-7 h-7 rotate-[135deg]" /></button>
+          <button onClick={onEnd} className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-gray-900 hover:bg-red-600 shadow-lg shadow-red-500/30"><Phone className="w-7 h-7 rotate-[135deg]" /></button>
           <button className="w-14 h-14 rounded-full bg-miamo-elevated border border-border flex items-center justify-center text-text-muted hover:text-text-primary"><VolumeX className="w-6 h-6" /></button>
         </div>
         <div className="flex items-center gap-2 mt-4"><Lock className="w-3 h-3 text-emerald-400" /><span className="text-[11px] text-text-muted">End-to-end encrypted</span></div>
@@ -767,7 +767,7 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-8"><img src="/logo.jpg" alt="" className="w-8 h-8 rounded-lg animate-pulse" /></div>
+          <div className="flex justify-center py-8"><img src="/logo.svg" alt="" className="w-8 h-8 rounded-lg animate-pulse" /></div>
         ) : visibleMessages.length === 0 ? (
           <div className="text-center py-8 space-y-4">
             <div className="w-16 h-16 mx-auto rounded-full bg-lavender-400/10 flex items-center justify-center"><MessageCircle className="w-8 h-8 text-lavender-400" /></div>
@@ -894,9 +894,9 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
             <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="mb-2 overflow-hidden">
               <div className="flex items-center gap-3 bg-miamo-elevated/50 border border-border/30 rounded-xl p-3">
                 {attachedFile.preview && attachedFile.type === 'photo' ? (
-                  <img src={attachedFile.preview} alt="Preview" className="w-14 h-14 object-cover rounded-lg" />
+                  <img src={attachedFile.preview} alt="Preview" className="w-14 h-14 object-contain rounded-lg" />
                 ) : attachedFile.preview && attachedFile.type === 'video' ? (
-                  <video src={attachedFile.preview} className="w-14 h-14 object-cover rounded-lg" />
+                  <video src={attachedFile.preview} className="w-14 h-14 object-contain rounded-lg" />
                 ) : (
                   <div className="w-14 h-14 rounded-lg bg-lavender-400/10 flex items-center justify-center">
                     <Paperclip className="w-6 h-6 text-lavender-400" />
@@ -997,20 +997,20 @@ function MessagesFeedbackModal({ type, userName, onClose, onSubmit }: {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="fixed inset-x-4 top-[5%] max-w-md mx-auto bg-[#151522] border border-white/[0.08] rounded-[20px] shadow-[0_8px_60px_rgba(0,0,0,0.6)] z-[60] overflow-hidden max-h-[90vh] flex flex-col"
+        className="fixed inset-x-4 top-[5%] max-w-md mx-auto bg-[#151522] border border-gray-200 rounded-[20px] shadow-[0_8px_60px_rgba(0,0,0,0.6)] z-[60] overflow-hidden max-h-[90vh] flex flex-col"
       >
-        <div className="px-6 py-5 border-b border-white/[0.05] flex items-center justify-between flex-shrink-0">
+        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', iconColor)}>
               {type === 'unmatch' ? <UserMinus className="w-5 h-5" /> : type === 'block' ? <Ban className="w-5 h-5" /> : <Flag className="w-5 h-5" />}
             </div>
             <div>
-              <h3 className="text-[15px] font-bold text-white">{title} {userName}</h3>
-              <p className="text-[11px] text-white/30 mt-0.5">{subtitle}</p>
+              <h3 className="text-[15px] font-bold text-gray-900">{title} {userName}</h3>
+              <p className="text-[11px] text-gray-400 mt-0.5">{subtitle}</p>
             </div>
           </div>
           <button onClick={onClose} className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center hover:bg-white/[0.1] transition-colors">
-            <X className="w-4 h-4 text-white/50" />
+            <X className="w-4 h-4 text-gray-500" />
           </button>
         </div>
         {done ? (
@@ -1019,23 +1019,23 @@ function MessagesFeedbackModal({ type, userName, onClose, onSubmit }: {
               <div className="w-14 h-14 rounded-full bg-emerald-400/10 flex items-center justify-center mx-auto mb-4">
                 <Check className="w-7 h-7 text-emerald-400" />
               </div>
-              <p className="text-[14px] font-semibold text-white">Thank you for your feedback</p>
-              <p className="text-[11px] text-white/30 mt-1">This helps our AI improve your experience</p>
+              <p className="text-[14px] font-semibold text-gray-900">Thank you for your feedback</p>
+              <p className="text-[11px] text-gray-400 mt-1">This helps our AI improve your experience</p>
             </div>
           </motion.div>
         ) : (
           <>
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-1.5">
-              <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em] mb-3 px-1">Select a reason</p>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-3 px-1">Select a reason</p>
               {reasons.map((reason) => {
                 const isActive = selectedReason === reason;
                 return (
                   <button key={reason} onClick={() => setSelectedReason(reason)}
                     className={cn(
                       'w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all',
-                      isActive ? 'bg-white/[0.08] border-white/[0.15]' : 'bg-transparent border-white/[0.04] hover:bg-white/[0.03]',
+                      isActive ? 'bg-gray-100 border-white/[0.15]' : 'bg-transparent border-white/[0.04] hover:bg-gray-50',
                     )}>
-                    <span className={cn('text-[13px] font-medium', isActive ? 'text-white' : 'text-white/50')}>{reason}</span>
+                    <span className={cn('text-[13px] font-medium', isActive ? 'text-white' : 'text-gray-500')}>{reason}</span>
                     {isActive && (
                       <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="ml-auto w-5 h-5 rounded-full bg-white flex items-center justify-center">
                         <Check className="w-3 h-3 text-[#151522]" />
@@ -1046,17 +1046,17 @@ function MessagesFeedbackModal({ type, userName, onClose, onSubmit }: {
               })}
               <div className="pt-3">
                 <textarea value={details} onChange={e => setDetails(e.target.value)} placeholder="Additional details (optional) — helps our AI learn your preferences"
-                  className="w-full h-20 rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-[12px] px-4 py-3 resize-none focus:border-white/[0.15] focus:outline-none placeholder:text-white/15 transition-colors" />
+                  className="w-full h-20 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] px-4 py-3 resize-none focus:border-white/[0.15] focus:outline-none placeholder:text-white/15 transition-colors" />
               </div>
             </div>
-            <div className="flex-shrink-0 px-5 py-4 border-t border-white/[0.05] flex gap-3">
-              <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-white/[0.08] text-white/50 text-[13px] font-semibold hover:bg-white/[0.03] transition-all">Cancel</button>
+            <div className="flex-shrink-0 px-5 py-4 border-t border-gray-100 flex gap-3">
+              <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-gray-200 text-gray-500 text-[13px] font-semibold hover:bg-gray-50 transition-all">Cancel</button>
               <button onClick={handleSubmit} disabled={!selectedReason || submitting}
                 className={cn(
                   'flex-1 h-11 rounded-xl text-[13px] font-bold transition-all flex items-center justify-center gap-2',
-                  selectedReason ? submitColor : 'bg-white/[0.06] text-white/20 cursor-not-allowed',
+                  selectedReason ? submitColor : 'bg-gray-50 text-gray-300 cursor-not-allowed',
                 )}>
-                {submitting ? <img src="/logo.jpg" alt="" className="w-4 h-4 rounded animate-pulse" /> : title}
+                {submitting ? <img src="/logo.svg" alt="" className="w-4 h-4 rounded animate-pulse" /> : title}
               </button>
             </div>
           </>
@@ -1175,7 +1175,7 @@ export default function MessagesPage() {
             <h2 className="text-lg font-bold flex items-center gap-2">
               <MessageCircle className="w-5 h-5 text-lavender-400" /> Messages
               {totalMsgCount > 0 && (
-                <span className="ml-1 min-w-[22px] h-[22px] bg-lavender-400 rounded-full text-[11px] font-bold text-white flex items-center justify-center px-1.5">
+                <span className="ml-1 min-w-[22px] h-[22px] bg-lavender-400 rounded-full text-[11px] font-bold text-gray-900 flex items-center justify-center px-1.5">
                   {totalMsgCount > 99 ? '99+' : totalMsgCount}
                 </span>
               )}
@@ -1205,7 +1205,7 @@ export default function MessagesPage() {
         </div>
         <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
           {loading ? (
-            <div className="flex justify-center py-12"><img src="/logo.jpg" alt="" className="w-8 h-8 rounded-lg animate-pulse" /></div>
+            <div className="flex justify-center py-12"><img src="/logo.svg" alt="" className="w-8 h-8 rounded-lg animate-pulse" /></div>
           ) : filteredChats.length === 0 ? (
             <div className="text-center py-12 space-y-3">
               <MessageCircle className="w-10 h-10 text-text-muted/20 mx-auto" />

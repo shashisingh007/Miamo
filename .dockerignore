@@ -1,0 +1,47 @@
+# Node dependencies (will be installed in Docker)
+**/node_modules
+
+# Build outputs
+**/.next
+**/dist
+**/build
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+**/.DS_Store
+
+# Docker
+docker-compose.yml
+
+# Tests
+tests/
+**/*.test.ts
+**/*.spec.ts
+
+# Docs
+*.md
+
+# Kubernetes (not needed for web build)
+k8s/
+
+# Scripts
+scripts/
+
+# Other services (keep only what's needed)
+api/
+packages/
+
+# Root web folder (duplicate of services/web)
+web/
+
+# Misc
+*.log
+.env*

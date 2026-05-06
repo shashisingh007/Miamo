@@ -94,7 +94,7 @@ function FilterPanel({
       'px-3.5 py-2 rounded-full text-[11px] font-semibold tracking-wide transition-all border',
       active
         ? 'bg-white text-[#0d0d12] border-white shadow-[0_0_12px_rgba(236,64,122,0.15)]'
-        : 'bg-white/[0.04] border-white/[0.08] text-white/50 hover:bg-white/[0.08] hover:text-white/70',
+        : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-700',
     )}>
       {label}
     </button>
@@ -102,7 +102,7 @@ function FilterPanel({
 
   const Section = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
     <div className="space-y-3">
-      <h4 className="text-[10px] font-bold text-white/40 uppercase tracking-[0.15em] flex items-center gap-2">{icon}{title}</h4>
+      <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] flex items-center gap-2">{icon}{title}</h4>
       {children}
     </div>
   );
@@ -116,14 +116,14 @@ function FilterPanel({
           <motion.div
             initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed right-0 top-0 bottom-0 w-[400px] max-w-[92vw] bg-[#111118] border-l border-white/[0.06] z-50 overflow-y-auto"
+            className="fixed right-0 top-0 bottom-0 w-[400px] max-w-[92vw] bg-white border-l border-gray-200 z-50 overflow-y-auto"
           >
-            <div className="sticky top-0 bg-[#111118]/95 backdrop-blur-xl border-b border-white/[0.05] px-6 py-4 flex items-center justify-between z-10">
-              <button onClick={onClose} className="flex items-center gap-1.5 text-sm text-white/50 hover:text-white transition-colors">
+            <div className="sticky top-0 bg-white/95 backdrop-blur-xl border-b border-gray-100 px-6 py-4 flex items-center justify-between z-10">
+              <button onClick={onClose} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors">
                 <ChevronLeft className="w-4 h-4" /> Back
               </button>
-              <h3 className="text-sm font-bold text-white tracking-wide">Filters</h3>
-              <button onClick={() => setLocal(DEFAULT_FILTERS)} className="text-[11px] text-lavender-400 hover:text-white transition-colors font-semibold">Reset</button>
+              <h3 className="text-sm font-bold text-gray-900 tracking-wide">Filters</h3>
+              <button onClick={() => setLocal(DEFAULT_FILTERS)} className="text-[11px] text-lavender-400 hover:text-gray-900 transition-colors font-semibold">Reset</button>
             </div>
             <div className="px-6 py-6 space-y-7">
               <Section title="Quick Filters" icon={<Zap className="w-3 h-3 text-amber-400" />}>
@@ -137,24 +137,24 @@ function FilterPanel({
               <Section title="Age Range" icon={<span className="text-[10px]">🎂</span>}>
                 <div className="flex items-center gap-3">
                   <input type="number" value={local.minAge} onChange={e => set('minAge', parseInt(e.target.value) || 18)}
-                    className="w-20 h-10 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-center text-sm focus:border-white/20 focus:outline-none" min={18} max={99} />
-                  <span className="text-white/30 text-sm font-medium">to</span>
+                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-sm focus:border-white/20 focus:outline-none" min={18} max={99} />
+                  <span className="text-gray-400 text-sm font-medium">to</span>
                   <input type="number" value={local.maxAge} onChange={e => set('maxAge', parseInt(e.target.value) || 99)}
-                    className="w-20 h-10 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-center text-sm focus:border-white/20 focus:outline-none" min={18} max={99} />
+                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-sm focus:border-white/20 focus:outline-none" min={18} max={99} />
                 </div>
               </Section>
               <Section title="Height (cm)" icon={<span className="text-[10px]">📏</span>}>
                 <div className="flex items-center gap-3">
                   <input type="number" value={local.minHeight || ''} onChange={e => set('minHeight', parseInt(e.target.value) || null)}
-                    className="w-20 h-10 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-center text-sm focus:border-white/20 focus:outline-none" placeholder="Min" />
-                  <span className="text-white/30 text-sm font-medium">to</span>
+                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-sm focus:border-white/20 focus:outline-none" placeholder="Min" />
+                  <span className="text-gray-400 text-sm font-medium">to</span>
                   <input type="number" value={local.maxHeight || ''} onChange={e => set('maxHeight', parseInt(e.target.value) || null)}
-                    className="w-20 h-10 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-center text-sm focus:border-white/20 focus:outline-none" placeholder="Max" />
+                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-sm focus:border-white/20 focus:outline-none" placeholder="Max" />
                 </div>
               </Section>
               <Section title="City" icon={<MapPin className="w-3 h-3 text-blue-400" />}>
                 <input value={local.city} onChange={e => set('city', e.target.value)}
-                  className="w-full h-10 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white px-4 text-sm focus:border-white/20 focus:outline-none placeholder:text-white/20" placeholder="Any city..." />
+                  className="w-full h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 px-4 text-sm focus:border-white/20 focus:outline-none placeholder:text-gray-300" placeholder="Any city..." />
               </Section>
               <Section title="Show Me" icon={<span className="text-[10px]">👤</span>}>
                 <div className="flex flex-wrap gap-2">
@@ -228,11 +228,11 @@ function FilterPanel({
               </Section>
               <Section title="Religion" icon={<span className="text-[10px]">🙏</span>}>
                 <input value={local.religion} onChange={e => set('religion', e.target.value)}
-                  className="w-full h-10 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white px-4 text-sm focus:border-white/20 focus:outline-none placeholder:text-white/20" placeholder="Any religion..." />
+                  className="w-full h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 px-4 text-sm focus:border-white/20 focus:outline-none placeholder:text-gray-300" placeholder="Any religion..." />
               </Section>
             </div>
-            <div className="sticky bottom-0 bg-[#111118]/95 backdrop-blur-xl border-t border-white/[0.05] p-5 flex gap-3">
-              <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-white/[0.1] text-white/60 text-sm font-semibold hover:bg-white/[0.04] transition-all">Cancel</button>
+            <div className="sticky bottom-0 bg-white/95 backdrop-blur-xl border-t border-gray-100 p-5 flex gap-3">
+              <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-all">Cancel</button>
               <button onClick={() => { onApply(local); onClose(); }} className="flex-1 h-11 rounded-xl bg-white text-[#0d0d12] text-sm font-bold hover:bg-white/90 transition-all flex items-center justify-center gap-2">
                 <Check className="w-4 h-4" /> Apply
               </button>
@@ -297,7 +297,7 @@ function ProfileCard({
   return (
     <div className="w-full">
       {/* Card container */}
-      <div className="rounded-[20px] overflow-hidden bg-[#131320] border border-white/[0.06] shadow-[0_4px_40px_rgba(0,0,0,0.4)]">
+      <div className="rounded-[20px] overflow-hidden bg-white border border-gray-200 shadow-[0_4px_40px_rgba(0,0,0,0.4)]">
 
         {/* ─── Main Photo ─── */}
         <div className="relative">
@@ -310,7 +310,7 @@ function ProfileCard({
                 <div className="flex items-end justify-between">
                   <div>
                     <div className="flex items-center gap-2.5 mb-1">
-                      <h2 className="text-[28px] font-extrabold text-white tracking-tight leading-none">
+                      <h2 className="text-[28px] font-extrabold text-gray-900 tracking-tight leading-none">
                         {user.displayName}{profile.age ? `, ${profile.age}` : ''}
                       </h2>
                       {user.verified && (
@@ -324,7 +324,7 @@ function ProfileCard({
                         </motion.div>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-[13px] text-white/70">
+                    <div className="flex items-center gap-3 text-[13px] text-gray-700">
                       {profile.city && (
                         <span className="flex items-center gap-1">
                           <MapPin className="w-3 h-3" />{profile.city}
@@ -346,14 +346,14 @@ function ProfileCard({
                 onClick={() => handleLikeContent('photo', photos[0]?.id)}
                 className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-white/[0.12] backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-white/25 transition-all shadow-lg"
               >
-                <Heart className="w-5 h-5 text-white" />
+                <Heart className="w-5 h-5 text-gray-900" />
               </motion.button>
             </div>
           ) : (
             <div className="aspect-[3/4] max-h-[520px] bg-gradient-to-br from-lavender-400/10 to-violet-deep/10 flex items-center justify-center relative">
-              <span className="text-8xl text-white/20 font-black">{user.displayName?.[0]}</span>
+              <span className="text-8xl text-gray-300 font-black">{user.displayName?.[0]}</span>
               <div className="absolute bottom-0 inset-x-0 px-6 pb-6">
-                <h2 className="text-[28px] font-extrabold text-white">{user.displayName}{profile.age ? `, ${profile.age}` : ''}</h2>
+                <h2 className="text-[28px] font-extrabold text-gray-900">{user.displayName}{profile.age ? `, ${profile.age}` : ''}</h2>
               </div>
             </div>
           )}
@@ -378,7 +378,7 @@ function ProfileCard({
               </span>
             )}
             {profile.height && (
-              <span className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-white/[0.06] text-white/60 border border-white/[0.08]">
+              <span className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-gray-50 text-gray-600 border border-gray-200">
                 {profile.height} cm
               </span>
             )}
@@ -388,7 +388,7 @@ function ProfileCard({
         {/* ─── Bio ─── */}
         {profile.bio && (
           <div className="px-6 py-4">
-            <p className="text-[14px] text-white/80 leading-[1.7] font-light">{profile.bio}</p>
+            <p className="text-[14px] text-gray-800 leading-[1.7] font-light">{profile.bio}</p>
           </div>
         )}
 
@@ -400,7 +400,7 @@ function ProfileCard({
               onClick={() => handleLikeContent('photo', photos[1]?.id)}
               className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-white/[0.12] backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-white/25 transition-all"
             >
-              <Heart className="w-4 h-4 text-white" />
+              <Heart className="w-4 h-4 text-gray-900" />
             </motion.button>
           </div>
         )}
@@ -408,18 +408,18 @@ function ProfileCard({
         {/* ─── Prompts ─── */}
         {prompts.map((prompt: any, i: number) => (
           <div key={i} className="mx-6 my-3">
-            <div className="relative rounded-2xl bg-white/[0.03] border border-white/[0.06] p-5 group hover:border-white/[0.12] transition-all">
-              <p className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em] mb-2">
+            <div className="relative rounded-2xl bg-gray-50 border border-gray-200 p-5 group hover:border-gray-200 transition-all">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-2">
                 {prompt.question}
               </p>
-              <p className="text-[15px] text-white leading-[1.65] font-medium">
+              <p className="text-[15px] text-gray-900 leading-[1.65] font-medium">
                 {prompt.answer}
               </p>
               <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
                 onClick={() => handleLikeContent('prompt', prompt.id || `prompt-${i}`)}
-                className="absolute -bottom-3 right-5 w-9 h-9 rounded-full bg-[#131320] border-2 border-white/[0.12] flex items-center justify-center hover:border-white/30 shadow-lg transition-all"
+                className="absolute -bottom-3 right-5 w-9 h-9 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center hover:border-gray-300 shadow-lg transition-all"
               >
-                <Heart className="w-4 h-4 text-white/60 hover:text-white" />
+                <Heart className="w-4 h-4 text-gray-600 hover:text-gray-900" />
               </motion.button>
             </div>
           </div>
@@ -433,7 +433,7 @@ function ProfileCard({
               onClick={() => handleLikeContent('photo', photos[2]?.id)}
               className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-white/[0.12] backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-white/25 transition-all"
             >
-              <Heart className="w-4 h-4 text-white" />
+              <Heart className="w-4 h-4 text-gray-900" />
             </motion.button>
           </div>
         )}
@@ -441,7 +441,7 @@ function ProfileCard({
         {/* ─── Interests ─── */}
         {interests.length > 0 && (
           <div className="px-6 py-5">
-            <h4 className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em] mb-3">Interests</h4>
+            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-3">Interests</h4>
             <div className="flex flex-wrap gap-2">
               {interests.map((int: any) => {
                 const name = int.name || int;
@@ -451,7 +451,7 @@ function ProfileCard({
                     'px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all',
                     isCommon
                       ? 'bg-white text-[#131320] shadow-[0_0_10px_rgba(255,255,255,0.12)]'
-                      : 'bg-white/[0.04] text-white/50 border border-white/[0.06]',
+                      : 'bg-gray-50 text-gray-500 border border-gray-200',
                   )}>
                     {isCommon && <Star className="w-3 h-3 inline mr-1 -mt-0.5" />}{name}
                   </span>
@@ -464,14 +464,14 @@ function ProfileCard({
         {/* ─── Lifestyle Grid ─── */}
         {lifestyleItems.length > 0 && (
           <div className="px-6 pb-5">
-            <h4 className="text-[10px] font-bold text-white/30 uppercase tracking-[0.15em] mb-3">Lifestyle</h4>
+            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-3">Lifestyle</h4>
             <div className="grid grid-cols-2 gap-2">
               {lifestyleItems.map((item, idx) => {
                 const Icon = item.icon;
                 return (
-                  <div key={idx} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-white/[0.03] border border-white/[0.05]">
+                  <div key={idx} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-100">
                     <Icon className={cn('w-3.5 h-3.5', item.color)} />
-                    <span className="text-[12px] text-white/60 font-medium capitalize">{item.label}</span>
+                    <span className="text-[12px] text-gray-600 font-medium capitalize">{item.label}</span>
                   </div>
                 );
               })}
@@ -486,9 +486,9 @@ function ProfileCard({
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.9 }}
               onClick={onPass}
-              className="w-14 h-14 rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center hover:bg-red-500/10 hover:border-red-500/20 transition-all group"
+              className="w-14 h-14 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center hover:bg-red-500/10 hover:border-red-500/20 transition-all group"
             >
-              <X className="w-6 h-6 text-white/40 group-hover:text-red-400 transition-colors" />
+              <X className="w-6 h-6 text-gray-400 group-hover:text-red-400 transition-colors" />
             </motion.button>
             <p className="text-[12px] text-white/25 leading-relaxed">Like any photo or prompt to send a Miamo Move</p>
           </div>
@@ -505,7 +505,7 @@ function ProfileCard({
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="fixed inset-x-0 bottom-0 z-50 p-5"
           >
-            <div className="max-w-[480px] mx-auto bg-[#1a1a2e] border border-white/[0.1] rounded-[20px] shadow-[0_8px_60px_rgba(0,0,0,0.5)] overflow-hidden">
+            <div className="max-w-[480px] mx-auto bg-white border border-gray-200 rounded-[20px] shadow-[0_8px_60px_rgba(0,0,0,0.5)] overflow-hidden">
               <div className="p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
@@ -513,14 +513,14 @@ function ProfileCard({
                       <Heart className="w-5 h-5 text-[#1a1a2e]" fill="#1a1a2e" />
                     </div>
                     <div>
-                      <h4 className="text-[13px] font-bold text-white">Miamo Move</h4>
-                      <p className="text-[11px] text-white/40">
+                      <h4 className="text-[13px] font-bold text-gray-900">Miamo Move</h4>
+                      <p className="text-[11px] text-gray-400">
                         {moveTarget.type === 'prompt' ? 'Liked their answer' : moveTarget.type === 'photo' ? 'Liked their photo' : 'Liked their profile'}
                       </p>
                     </div>
                   </div>
-                  <button onClick={() => setMoveTarget(null)} className="w-8 h-8 rounded-full bg-white/[0.06] flex items-center justify-center hover:bg-white/10 transition-colors">
-                    <X className="w-4 h-4 text-white/50" />
+                  <button onClick={() => setMoveTarget(null)} className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center hover:bg-white/10 transition-colors">
+                    <X className="w-4 h-4 text-gray-500" />
                   </button>
                 </div>
                 <div className="relative">
@@ -528,7 +528,7 @@ function ProfileCard({
                     value={moveText}
                     onChange={e => setMoveText(e.target.value)}
                     placeholder="Write your move... or send blank"
-                    className="w-full h-20 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white text-[13px] px-4 py-3 pr-14 resize-none focus:border-white/20 focus:outline-none placeholder:text-white/20"
+                    className="w-full h-20 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 py-3 pr-14 resize-none focus:border-white/20 focus:outline-none placeholder:text-gray-300"
                     autoFocus
                   />
                   <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
@@ -542,7 +542,7 @@ function ProfileCard({
                 {aiData?.moveRecommendations && aiData.moveRecommendations.length > 0 && (
                   <div className="mt-3">
                     <button onClick={() => setShowMoveRecs(!showMoveRecs)}
-                      className="flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/60 font-semibold transition-colors">
+                      className="flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-gray-600 font-semibold transition-colors">
                       <Sparkles className="w-3 h-3" /> {showMoveRecs ? 'Hide' : 'Show'} AI suggestions
                       <ChevronDown className={cn('w-3 h-3 transition-transform', showMoveRecs && 'rotate-180')} />
                     </button>
@@ -552,8 +552,8 @@ function ProfileCard({
                           className="overflow-hidden mt-2 space-y-1.5">
                           {aiData.moveRecommendations.slice(0, 5).map((rec, i) => (
                             <button key={i} onClick={() => { setMoveText(rec.text); setShowMoveRecs(false); }}
-                              className="w-full text-left px-3 py-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.05] hover:border-white/[0.1] transition-all">
-                              <p className="text-[12px] text-white/70 leading-relaxed">{rec.text}</p>
+                              className="w-full text-left px-3 py-2.5 rounded-xl bg-gray-50 hover:bg-white/[0.07] border border-gray-100 hover:border-gray-200 transition-all">
+                              <p className="text-[12px] text-gray-700 leading-relaxed">{rec.text}</p>
                             </button>
                           ))}
                         </motion.div>
@@ -616,10 +616,10 @@ function AiSidePanel({
       <div className="space-y-3">
         {[1, 2, 3, 4].map(i => (
           <div key={i} className="rounded-2xl bg-white/[0.02] border border-white/[0.04] p-5">
-            <div className="h-3 bg-white/[0.06] rounded-full animate-pulse w-1/2 mb-4" />
+            <div className="h-3 bg-gray-50 rounded-full animate-pulse w-1/2 mb-4" />
             <div className="space-y-2.5">
-              <div className="h-2.5 bg-white/[0.04] rounded-full animate-pulse" />
-              <div className="h-2.5 bg-white/[0.03] rounded-full animate-pulse w-4/5" />
+              <div className="h-2.5 bg-gray-50 rounded-full animate-pulse" />
+              <div className="h-2.5 bg-gray-50 rounded-full animate-pulse w-4/5" />
             </div>
           </div>
         ))}
@@ -646,15 +646,15 @@ function AiSidePanel({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
-        className={`rounded-2xl bg-gradient-to-b ${scoreBg} to-transparent border border-white/[0.06] overflow-hidden`}
+        className={`rounded-2xl bg-gradient-to-b ${scoreBg} to-transparent border border-gray-200 overflow-hidden`}
       >
         <div className="p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-white/[0.08] flex items-center justify-center">
-                <Brain className="w-4 h-4 text-white/80" />
+              <div className="w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center">
+                <Brain className="w-4 h-4 text-gray-800" />
               </div>
-              <span className="text-[13px] font-bold text-white tracking-wide">AI Compatibility</span>
+              <span className="text-[13px] font-bold text-gray-900 tracking-wide">AI Compatibility</span>
             </div>
             <motion.span
               initial={{ scale: 0 }}
@@ -673,10 +673,10 @@ function AiSidePanel({
                 return (
                   <div key={key}>
                     <div className="flex items-center justify-between mb-1">
-                      <span className="text-[11px] text-white/40 font-semibold">{breakdownLabels[key] || key}</span>
-                      <span className="text-[11px] text-white/60 font-bold tabular-nums">{pct}%</span>
+                      <span className="text-[11px] text-gray-400 font-semibold">{breakdownLabels[key] || key}</span>
+                      <span className="text-[11px] text-gray-600 font-bold tabular-nums">{pct}%</span>
                     </div>
-                    <div className="h-[5px] bg-white/[0.06] rounded-full overflow-hidden">
+                    <div className="h-[5px] bg-gray-50 rounded-full overflow-hidden">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${pct}%` }}
@@ -699,13 +699,13 @@ function AiSidePanel({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-5"
+          className="rounded-2xl bg-white/[0.02] border border-gray-200 p-5"
         >
           <div className="flex items-center gap-2.5 mb-4">
             <div className="w-8 h-8 rounded-xl bg-lavender-400/10 flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-lavender-400" />
             </div>
-            <span className="text-[13px] font-bold text-white tracking-wide">Why this match?</span>
+            <span className="text-[13px] font-bold text-gray-900 tracking-wide">Why this match?</span>
           </div>
           <div className="space-y-3">
             {aiData.whyThisMatch.map((reason, i) => (
@@ -716,10 +716,10 @@ function AiSidePanel({
                 transition={{ delay: 0.3 + i * 0.1 }}
                 className="flex items-start gap-3"
               >
-                <div className="w-5 h-5 rounded-full bg-white/[0.08] flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <span className="text-[9px] font-black text-white/60">{i + 1}</span>
+                <div className="w-5 h-5 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <span className="text-[9px] font-black text-gray-600">{i + 1}</span>
                 </div>
-                <p className="text-[12px] text-white/60 leading-[1.7] font-medium">{reason}</p>
+                <p className="text-[12px] text-gray-600 leading-[1.7] font-medium">{reason}</p>
               </motion.div>
             ))}
           </div>
@@ -742,7 +742,7 @@ function AiSidePanel({
               'w-full text-left rounded-2xl p-5 border transition-all group',
               isSent
                 ? 'bg-emerald-400/[0.06] border-emerald-400/20'
-                : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.05] hover:border-white/[0.12] hover:shadow-[0_0_20px_rgba(255,255,255,0.04)]',
+                : 'bg-white/[0.02] border-gray-200 hover:bg-white/[0.05] hover:border-gray-200 hover:shadow-[0_0_20px_rgba(255,255,255,0.04)]',
             )}
           >
             <p className="text-[10px] font-bold text-white/25 uppercase tracking-[0.12em] mb-2">
@@ -750,16 +750,16 @@ function AiSidePanel({
             </p>
             <p className={cn(
               'text-[14px] leading-[1.65] font-medium',
-              isSent ? 'text-emerald-300' : 'text-white/80',
+              isSent ? 'text-emerald-300' : 'text-gray-800',
             )}>
               {rec.text}
             </p>
             {!isSent && (
               <div className="flex items-center gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <div className="w-6 h-6 rounded-full bg-white/[0.08] flex items-center justify-center">
-                  <Send className="w-3 h-3 text-white/50" />
+                <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center">
+                  <Send className="w-3 h-3 text-gray-500" />
                 </div>
-                <span className="text-[10px] text-white/30 font-semibold">Click to send</span>
+                <span className="text-[10px] text-gray-400 font-semibold">Click to send</span>
               </div>
             )}
           </motion.button>
@@ -776,37 +776,37 @@ function AiSidePanel({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-5"
+        className="rounded-2xl bg-white/[0.02] border border-gray-200 p-5"
       >
         <div className="flex items-center gap-2.5 mb-4">
-          <div className="w-8 h-8 rounded-xl bg-white/[0.06] flex items-center justify-center">
-            <Shield className="w-4 h-4 text-white/80" />
+          <div className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center">
+            <Shield className="w-4 h-4 text-gray-800" />
           </div>
-          <span className="text-[13px] font-bold text-white tracking-wide">Trust & Safety</span>
+          <span className="text-[13px] font-bold text-gray-900 tracking-wide">Trust & Safety</span>
         </div>
         <div className="space-y-2.5">
           <div className="flex items-center gap-2.5">
             <div className={cn('w-2 h-2 rounded-full', user.verified ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.4)]' : 'bg-amber-400')} />
-            <span className="text-[12px] text-white/50 font-medium">
+            <span className="text-[12px] text-gray-500 font-medium">
               {user.verified ? (
-                <>Identity <span className="px-2 py-0.5 bg-white/[0.08] text-white/80 rounded-md text-[10px] font-bold ml-1">VERIFIED</span></>
+                <>Identity <span className="px-2 py-0.5 bg-gray-100 text-gray-800 rounded-md text-[10px] font-bold ml-1">VERIFIED</span></>
               ) : 'Not yet verified'}
             </span>
           </div>
           <div className="flex items-center gap-2.5">
             <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.4)]" />
-            <span className="text-[12px] text-white/50 font-medium">No reports</span>
+            <span className="text-[12px] text-gray-500 font-medium">No reports</span>
           </div>
           {profile.profileScore && (
             <div className="flex items-center gap-2.5">
               <div className={cn('w-2 h-2 rounded-full', profile.profileScore >= 80 ? 'bg-emerald-400' : profile.profileScore >= 60 ? 'bg-amber-400' : 'bg-rose-400')} />
-              <span className="text-[12px] text-white/50 font-medium">Profile {profile.profileScore}% complete</span>
+              <span className="text-[12px] text-gray-500 font-medium">Profile {profile.profileScore}% complete</span>
             </div>
           )}
           {profile.online && (
             <div className="flex items-center gap-2.5">
               <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.6)]" />
-              <span className="text-[12px] text-white/50 font-medium">Currently online</span>
+              <span className="text-[12px] text-gray-500 font-medium">Currently online</span>
             </div>
           )}
         </div>
@@ -817,20 +817,20 @@ function AiSidePanel({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.55 }}
-        className="rounded-2xl bg-white/[0.02] border border-white/[0.06] p-5"
+        className="rounded-2xl bg-white/[0.02] border border-gray-200 p-5"
       >
         <div className="flex items-center gap-2.5 mb-3">
-          <div className="w-8 h-8 rounded-xl bg-white/[0.06] flex items-center justify-center">
-            <MessageSquare className="w-4 h-4 text-white/80" />
+          <div className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center">
+            <MessageSquare className="w-4 h-4 text-gray-800" />
           </div>
-          <span className="text-[13px] font-bold text-white tracking-wide">Write Your Move</span>
+          <span className="text-[13px] font-bold text-gray-900 tracking-wide">Write Your Move</span>
         </div>
         <div className="relative">
           <textarea
             value={customText}
             onChange={e => setCustomText(e.target.value)}
             placeholder={`Say something to ${user.displayName}...`}
-            className="w-full h-[60px] rounded-xl bg-white/[0.03] border border-white/[0.06] text-white text-[12px] px-4 py-3 pr-12 resize-none focus:border-white/[0.15] focus:outline-none placeholder:text-white/15 transition-colors"
+            className="w-full h-[60px] rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] px-4 py-3 pr-12 resize-none focus:border-white/[0.15] focus:outline-none placeholder:text-white/15 transition-colors"
           />
           <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
             onClick={handleCustomSend}
@@ -842,7 +842,7 @@ function AiSidePanel({
             {customSent ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Send className="w-3.5 h-3.5 text-[#131320]" />}
           </motion.button>
         </div>
-        <p className="text-[10px] text-white/20 mt-2 font-medium">Or send blank — just press send</p>
+        <p className="text-[10px] text-gray-300 mt-2 font-medium">Or send blank — just press send</p>
       </motion.div>
     </div>
   );
@@ -859,13 +859,13 @@ function MoreMovesSection({
 }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div className="rounded-2xl bg-white/[0.02] border border-white/[0.06] overflow-hidden">
+    <div className="rounded-2xl bg-white/[0.02] border border-gray-200 overflow-hidden">
       <button onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-white/[0.02] transition-colors">
-        <span className="text-[11px] font-bold text-white/30 uppercase tracking-[0.12em] flex items-center gap-2">
+        <span className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.12em] flex items-center gap-2">
           <Sparkles className="w-3.5 h-3.5 text-lavender-400/60" /> {moves.length} more suggestions
         </span>
-        <ChevronDown className={cn('w-4 h-4 text-white/20 transition-transform', expanded && 'rotate-180')} />
+        <ChevronDown className={cn('w-4 h-4 text-gray-300 transition-transform', expanded && 'rotate-180')} />
       </button>
       <AnimatePresence>
         {expanded && (
@@ -878,14 +878,14 @@ function MoreMovesSection({
                   <button key={i} onClick={() => !isSent && onSend(rec, idx)} disabled={isSent}
                     className={cn(
                       'w-full text-left px-4 py-3 rounded-xl border transition-all',
-                      isSent ? 'bg-emerald-400/[0.06] border-emerald-400/20' : 'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.05] hover:border-white/[0.1]',
+                      isSent ? 'bg-emerald-400/[0.06] border-emerald-400/20' : 'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.05] hover:border-gray-200',
                     )}>
-                    <p className={cn('text-[12px] leading-relaxed', isSent ? 'text-emerald-300' : 'text-white/60')}>{rec.text}</p>
+                    <p className={cn('text-[12px] leading-relaxed', isSent ? 'text-emerald-300' : 'text-gray-600')}>{rec.text}</p>
                     <div className="flex items-center gap-3 mt-1.5">
                       <span className="text-[9px] text-white/25 capitalize font-medium">{rec.type.replace(/-/g, ' ')}</span>
                       <div className="flex gap-[3px]">
                         {Array.from({ length: 5 }).map((_, j) => (
-                          <div key={j} className={cn('w-[5px] h-[5px] rounded-full', j < Math.round(rec.confidence * 5) ? 'bg-white/40' : 'bg-white/[0.06]')} />
+                          <div key={j} className={cn('w-[5px] h-[5px] rounded-full', j < Math.round(rec.confidence * 5) ? 'bg-white/40' : 'bg-gray-50')} />
                         ))}
                       </div>
                       {isSent && <Check className="w-3 h-3 text-emerald-400 ml-auto" />}
@@ -1015,11 +1015,11 @@ export default function DiscoverPage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center max-w-sm px-8"
         >
-          <div className="w-20 h-20 rounded-full bg-white/[0.04] border border-white/[0.06] flex items-center justify-center mx-auto mb-5">
+          <div className="w-20 h-20 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-5">
             <Heart className="w-8 h-8 text-white/15" />
           </div>
-          <h3 className="text-lg font-bold text-white mb-2">No more profiles</h3>
-          <p className="text-[13px] text-white/30 mb-6 leading-relaxed">Check back later or adjust your filters</p>
+          <h3 className="text-lg font-bold text-gray-900 mb-2">No more profiles</h3>
+          <p className="text-[13px] text-gray-400 mb-6 leading-relaxed">Check back later or adjust your filters</p>
           <button onClick={() => setShowFilters(true)}
             className="h-11 px-6 rounded-xl bg-white text-[#0d0d12] text-sm font-bold hover:bg-white/90 transition-all inline-flex items-center gap-2">
             <SlidersHorizontal className="w-4 h-4" /> Adjust Filters
@@ -1043,13 +1043,13 @@ export default function DiscoverPage() {
               'flex items-center gap-2 h-10 px-4 rounded-xl border text-[13px] font-semibold transition-all',
               activeFilterCount > 0
                 ? 'bg-white text-[#0d0d12] border-white shadow-[0_0_16px_rgba(236,64,122,0.1)]'
-                : 'bg-white/[0.04] border-white/[0.08] text-white/50 hover:bg-white/[0.08]',
+                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100',
             )}
           >
             <SlidersHorizontal className="w-4 h-4" />
             Filters
             {activeFilterCount > 0 && (
-              <span className="ml-0.5 w-5 h-5 rounded-full bg-lavender-500 text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="ml-0.5 w-5 h-5 rounded-full bg-lavender-500 text-gray-900 text-[10px] font-bold flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
@@ -1069,7 +1069,7 @@ export default function DiscoverPage() {
                     'flex items-center gap-1.5 h-10 px-4 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all border',
                     isActive
                       ? 'bg-white/[0.1] border-white/[0.15] text-white'
-                      : 'bg-transparent border-white/[0.05] text-white/30 hover:text-white/50 hover:border-white/[0.1]',
+                      : 'bg-transparent border-gray-100 text-gray-400 hover:text-gray-500 hover:border-gray-200',
                   )}
                 >
                   <Icon className="w-3.5 h-3.5" /> {f.label}
@@ -1094,7 +1094,7 @@ export default function DiscoverPage() {
                   {p.photos?.[0] ? (
                     <img src={p.photos[0].url || p.photos[0]} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full bg-white/10 flex items-center justify-center text-[8px] text-white/40 font-bold">{p.displayName?.[0]}</div>
+                    <div className="w-full h-full bg-white/10 flex items-center justify-center text-[8px] text-gray-400 font-bold">{p.displayName?.[0]}</div>
                   )}
                 </div>
               ))}
@@ -1104,10 +1104,10 @@ export default function DiscoverPage() {
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.04] border border-white/[0.06]"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200"
             >
-              <Brain className="w-3.5 h-3.5 text-white/50" />
-              <span className="text-[12px] font-bold text-white/70 tabular-nums">{aiData[currentUser.id].score}%</span>
+              <Brain className="w-3.5 h-3.5 text-gray-500" />
+              <span className="text-[12px] font-bold text-gray-700 tabular-nums">{aiData[currentUser.id].score}%</span>
               <span className="text-[11px] text-white/25 font-medium">match</span>
             </motion.div>
           )}
