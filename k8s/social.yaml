@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: social
+  namespace: miamo
+  labels:
+    app: miamo
+    service: social
+spec:
+  type: ClusterIP
+  selector:
+    app: miamo
+    service: social
+  ports:
+    - port: 3203
+      targetPort: 3203
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: social
+  namespace: miamo
+  labels:
+    app: miamo
+    service: social
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: miamo
+      service: social
+  template:
+    metadata:
+      labels:
+        app: miamo
+        service: social
+    spec:
+      containers:
+        - name: social
+          image: miamo-social:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3203
+          envFrom:
+            - configMapRef:
+                name: miamo-config
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3203
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3203
+            initialDelaySeconds: 5
+            periodSeconds: 5

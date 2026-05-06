@@ -1,0 +1,66 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: notifications
+  namespace: miamo
+  labels:
+    app: miamo
+    service: notifications
+spec:
+  type: ClusterIP
+  selector:
+    app: miamo
+    service: notifications
+  ports:
+    - port: 3206
+      targetPort: 3206
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notifications
+  namespace: miamo
+  labels:
+    app: miamo
+    service: notifications
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: miamo
+      service: notifications
+  template:
+    metadata:
+      labels:
+        app: miamo
+        service: notifications
+    spec:
+      containers:
+        - name: notifications
+          image: miamo-notifications:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3206
+          envFrom:
+            - configMapRef:
+                name: miamo-config
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3206
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 3206
+            initialDelaySeconds: 5
+            periodSeconds: 5

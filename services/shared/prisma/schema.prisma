@@ -70,6 +70,12 @@ model User {
   notifications   Notification[]
   auditLogs       AuditLog[]
 
+  sentMoves       MiamoMove[]     @relation("MiamoMoveSent")
+  receivedMoves   MiamoMove[]     @relation("MiamoMoveReceived")
+  discoverFilter  DiscoverFilter?
+  matchFeedback   MatchFeedback[] @relation("MatchFeedbackUser")
+  matchFeedbackTargets MatchFeedback[] @relation("MatchFeedbackTarget")
+
   @@index([email])
   @@index([username])
   @@index([miamoId])
@@ -90,6 +96,21 @@ model Profile {
   online          Boolean  @default(false)
   lastActive      DateTime @default(now())
   avatarGradient  String   @default("from-lavender-400 to-violet-deep")
+
+  // Lifestyle / dating preferences
+  height          Int?
+  sexuality       String   @default("straight")
+  lookingFor      String   @default("open")
+  smoking         String   @default("never")
+  drinking        String   @default("socially")
+  exercise        String   @default("sometimes")
+  education       String   @default("")
+  religion        String   @default("")
+  zodiac          String   @default("")
+  languages       String   @default("")
+  pets            String   @default("")
+  children        String   @default("")
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -97,6 +118,9 @@ model Profile {
   @@index([gender])
   @@index([datingIntent])
   @@index([seriousMode])
+  @@index([sexuality])
+  @@index([lookingFor])
+  @@index([height])
 }
 
 model ProfilePhoto {
@@ -224,13 +248,85 @@ model Match {
   user1     User     @relation("MatchUser1", fields: [user1Id], references: [id], onDelete: Cascade)
   user2     User     @relation("MatchUser2", fields: [user2Id], references: [id], onDelete: Cascade)
   active    Boolean  @default(true)
+  favorite1 Boolean  @default(false)
+  favorite2 Boolean  @default(false)
+  pinned1   Boolean  @default(false)
+  pinned2   Boolean  @default(false)
   createdAt DateTime @default(now())
 
   chat      Chat?
+  feedback  MatchFeedback[]
 
   @@unique([user1Id, user2Id])
   @@index([user1Id])
   @@index([user2Id])
+}
+
+model MatchFeedback {
+  id           String   @id @default(uuid())
+  matchId      String
+  match        Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation("MatchFeedbackUser", fields: [userId], references: [id], onDelete: Cascade)
+  targetUserId String
+  targetUser   User     @relation("MatchFeedbackTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  type         String
+  reason       String
+  details      String   @default("")
+  createdAt    DateTime @default(now())
+
+  @@index([matchId])
+  @@index([userId])
+  @@index([targetUserId])
+  @@index([reason])
+  @@index([type])
+}
+
+model MiamoMove {
+  id         String   @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  fromUser   User     @relation("MiamoMoveSent", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("MiamoMoveReceived", fields: [toUserId], references: [id], onDelete: Cascade)
+  message    String   @default("")
+  targetType String   @default("profile")
+  targetId   String?
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([fromUserId, toUserId, targetType, targetId])
+  @@index([toUserId, status])
+  @@index([fromUserId, createdAt])
+}
+
+model DiscoverFilter {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  minAge      Int      @default(18)
+  maxAge      Int      @default(99)
+  minHeight   Int?
+  maxHeight   Int?
+  distance    Int      @default(50)
+  city        String   @default("")
+  genders     String   @default("")
+  sexualities String   @default("")
+  lookingFor  String   @default("")
+  smoking     String   @default("")
+  drinking    String   @default("")
+  exercise    String   @default("")
+  education   String   @default("")
+  religion    String   @default("")
+  zodiac      String   @default("")
+  pets        String   @default("")
+  children    String   @default("")
+  activeToday Boolean  @default(false)
+  newHere     Boolean  @default(false)
+  verified    Boolean  @default(false)
+  hasPhotos   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 // ─── Messages & Chats ────────────────────────────────

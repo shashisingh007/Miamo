@@ -1,21 +1,21 @@
 # ═══════════════════════════════════════════════════════════════
-# Miamo — Docker Compose (Production-Ready Microservices)
+# Miamo — Docker Compose
 # ═══════════════════════════════════════════════════════════════
-# Architecture:
-#   web (Next.js:3100) → gateway (:3200) → microservices (:3201-3206)
-#                                        → postgres + redis
 #
-# Commands:
-#   docker-compose up -d              # Start everything
-#   docker-compose up -d --build      # Rebuild & start
-#   docker-compose down               # Stop everything
-#   docker-compose down -v            # Stop + delete volumes (fresh DB)
-#   docker-compose logs -f gateway    # Tail specific service
-#   docker-compose ps                 # Service status
+# Architecture:
+#   Browser → web (:3100) → gateway (:3200) → microservices (:3201-3206)
+#                                            → postgres + redis
+#
+# Quick Start:
+#   docker-compose up -d              Start everything
+#   docker-compose up -d --build      Rebuild & start
+#   docker-compose down               Stop (keeps data)
+#   docker-compose down -v            Stop + wipe DB
+#   docker-compose logs -f <service>  Stream logs
+#
 # ═══════════════════════════════════════════════════════════════
 
-# ─── Shared environment variables ─────────────────────────
-x-service-env: &service-env
+x-env: &env
   NODE_ENV: production
   DATABASE_URL: postgresql://miamo:miamo_dev_pass@postgres:5432/miamo_dev
   REDIS_URL: redis://redis:6379
@@ -24,8 +24,7 @@ x-service-env: &service-env
   JWT_REFRESH_SECRET: miamo-dev-refresh-secret-change-in-production-2026
   FRONTEND_URL: http://localhost:3100
 
-# ─── Shared healthcheck dependency ───────────────────────
-x-service-depends: &service-depends
+x-depends: &depends
   postgres:
     condition: service_healthy
   redis:
@@ -33,13 +32,7 @@ x-service-depends: &service-depends
   migrate:
     condition: service_completed_successfully
 
-# ─── Shared build config for microservices ───────────────
-x-service-build: &service-build
-  context: .
-  dockerfile: docker/Dockerfile.service
-
-# ─── Resource limits (prevents runaway containers) ───────
-x-service-resources: &service-resources
+x-resources: &resources
   deploy:
     resources:
       limits:
@@ -50,10 +43,7 @@ x-service-resources: &service-resources
         cpus: '0.1'
 
 services:
-  # ═══════════════════════════════════════════════════════
-  # INFRASTRUCTURE
-  # ═══════════════════════════════════════════════════════
-
+  # ─── Infrastructure ───────────────────────────────────
   postgres:
     image: postgres:16-alpine
     container_name: miamo-postgres
@@ -66,15 +56,10 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./docker/postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
-      - ./docker/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
-    command: >
-      postgres
-        -c config_file=/etc/postgresql/postgresql.conf
-        -c max_connections=200
-        -c shared_buffers=256MB
-        -c effective_cache_size=768MB
+      - pg_data:/var/lib/postgresql/data
+      - ./docker/config/postgres/init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - ./docker/config/postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U miamo -d miamo_dev"]
       interval: 3s
@@ -86,8 +71,6 @@ services:
         limits:
           memory: 512M
           cpus: '1.0'
-        reservations:
-          memory: 128M
 
   redis:
     image: redis:7-alpine
@@ -97,7 +80,7 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-      - ./docker/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - ./docker/config/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
     command: redis-server /usr/local/etc/redis/redis.conf
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -111,14 +94,11 @@ services:
           memory: 128M
           cpus: '0.3'
 
-  # ═══════════════════════════════════════════════════════
-  # DATABASE MIGRATION + SEED (runs once, then exits)
-  # ═══════════════════════════════════════════════════════
-
+  # ─── Database Init (run-once) ─────────────────────────
   migrate:
     build:
       context: .
-      dockerfile: docker/Dockerfile.migrate
+      dockerfile: docker/migrate.Dockerfile
     container_name: miamo-migrate
     environment:
       DATABASE_URL: postgresql://miamo:miamo_dev_pass@postgres:5432/miamo_dev
@@ -127,114 +107,90 @@ services:
         condition: service_healthy
     restart: "no"
 
-  # ═══════════════════════════════════════════════════════
-  # MICROSERVICES
-  # ═══════════════════════════════════════════════════════
-
+  # ─── Microservices ────────────────────────────────────
   auth:
     build:
-      <<: *service-build
-      args:
-        SERVICE: auth
+      context: .
+      dockerfile: docker/auth.Dockerfile
     container_name: miamo-auth
     restart: unless-stopped
-    expose:
-      - "3201"
+    expose: ["3201"]
     environment:
-      <<: *service-env
+      <<: *env
       PORT: "3201"
-    depends_on:
-      <<: *service-depends
-    <<: *service-resources
+    depends_on: *depends
+    <<: *resources
 
   users:
     build:
-      <<: *service-build
-      args:
-        SERVICE: users
+      context: .
+      dockerfile: docker/users.Dockerfile
     container_name: miamo-users
     restart: unless-stopped
-    expose:
-      - "3202"
+    expose: ["3202"]
     environment:
-      <<: *service-env
+      <<: *env
       PORT: "3202"
-    depends_on:
-      <<: *service-depends
-    <<: *service-resources
+    depends_on: *depends
+    <<: *resources
 
   social:
     build:
-      <<: *service-build
-      args:
-        SERVICE: social
+      context: .
+      dockerfile: docker/social.Dockerfile
     container_name: miamo-social
     restart: unless-stopped
-    expose:
-      - "3203"
+    expose: ["3203"]
     environment:
-      <<: *service-env
+      <<: *env
       PORT: "3203"
-    depends_on:
-      <<: *service-depends
-    <<: *service-resources
+    depends_on: *depends
+    <<: *resources
 
   messaging:
     build:
-      <<: *service-build
-      args:
-        SERVICE: messaging
+      context: .
+      dockerfile: docker/messaging.Dockerfile
     container_name: miamo-messaging
     restart: unless-stopped
-    expose:
-      - "3204"
+    expose: ["3204"]
     environment:
-      <<: *service-env
+      <<: *env
       PORT: "3204"
-    depends_on:
-      <<: *service-depends
-    <<: *service-resources
+    depends_on: *depends
+    <<: *resources
 
   content:
     build:
-      <<: *service-build
-      args:
-        SERVICE: content
+      context: .
+      dockerfile: docker/content.Dockerfile
     container_name: miamo-content
     restart: unless-stopped
-    expose:
-      - "3205"
+    expose: ["3205"]
     environment:
-      <<: *service-env
+      <<: *env
       PORT: "3205"
-    depends_on:
-      <<: *service-depends
-    <<: *service-resources
+    depends_on: *depends
+    <<: *resources
 
   notifications:
     build:
-      <<: *service-build
-      args:
-        SERVICE: notifications
+      context: .
+      dockerfile: docker/notifications.Dockerfile
     container_name: miamo-notifications
     restart: unless-stopped
-    expose:
-      - "3206"
+    expose: ["3206"]
     environment:
-      <<: *service-env
+      <<: *env
       PORT: "3206"
-    depends_on:
-      <<: *service-depends
-    <<: *service-resources
+    depends_on: *depends
+    <<: *resources
 
-  # ═══════════════════════════════════════════════════════
-  # API GATEWAY (only public-facing backend port)
-  # ═══════════════════════════════════════════════════════
-
+  # ─── API Gateway (public backend) ────────────────────
   gateway:
     build:
       context: .
-      dockerfile: docker/Dockerfile.gateway
+      dockerfile: docker/gateway.Dockerfile
     container_name: miamo-gateway
     restart: unless-stopped
     ports:
@@ -245,7 +201,6 @@ services:
       JWT_SECRET: miamo-dev-jwt-secret-change-in-production-2026
       INTERNAL_SERVICE_KEY: miamo-internal-dev-key
       FRONTEND_URL: http://localhost:3100
-      # Internal service discovery (container names = hostnames)
       AUTH_SERVICE_URL: http://auth:3201
       USER_SERVICE_URL: http://users:3202
       SOCIAL_SERVICE_URL: http://social:3203
@@ -271,14 +226,11 @@ services:
           memory: 256M
           cpus: '0.5'
 
-  # ═══════════════════════════════════════════════════════
-  # WEB FRONTEND (Next.js standalone — YES, also a container)
-  # ═══════════════════════════════════════════════════════
-
+  # ─── Web Frontend (Next.js) ──────────────────────────
   web:
     build:
       context: .
-      dockerfile: docker/Dockerfile.web
+      dockerfile: docker/web.Dockerfile
     container_name: miamo-web
     restart: unless-stopped
     ports:
@@ -294,19 +246,10 @@ services:
           memory: 256M
           cpus: '0.5'
 
-# ═══════════════════════════════════════════════════════
-# VOLUMES (persistent data across restarts)
-# ═══════════════════════════════════════════════════════
 volumes:
-  postgres_data:
-    driver: local
+  pg_data:
   redis_data:
-    driver: local
 
-# ═══════════════════════════════════════════════════════
-# NETWORK (all services on one bridge — fast internal comms)
-# ═══════════════════════════════════════════════════════
 networks:
   default:
     name: miamo-network
-    driver: bridge
