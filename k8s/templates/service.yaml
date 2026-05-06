@@ -1,0 +1,70 @@
+# ═══ Microservice Template ═══
+# Placeholders: __SVC_NAME__, __NAMESPACE__, __SERVICE_PORT__, __CONTAINER_PORT__,
+#   __IMAGE_PREFIX__, __IMAGE_TAG__, __PULL_POLICY__,
+#   __REQ_MEM__, __REQ_CPU__, __LIM_MEM__, __LIM_CPU__, __REPLICAS__
+apiVersion: v1
+kind: Service
+metadata:
+  name: __SVC_NAME__
+  namespace: __NAMESPACE__
+  labels:
+    app: miamo
+    service: __SVC_NAME__
+spec:
+  type: ClusterIP
+  selector:
+    app: miamo
+    service: __SVC_NAME__
+  ports:
+    - port: __SERVICE_PORT__
+      targetPort: __CONTAINER_PORT__
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: __SVC_NAME__
+  namespace: __NAMESPACE__
+  labels:
+    app: miamo
+    service: __SVC_NAME__
+spec:
+  replicas: __REPLICAS__
+  selector:
+    matchLabels:
+      app: miamo
+      service: __SVC_NAME__
+  template:
+    metadata:
+      labels:
+        app: miamo
+        service: __SVC_NAME__
+    spec:
+      containers:
+        - name: __SVC_NAME__
+          image: __IMAGE_PREFIX__miamo-__SVC_NAME__:__IMAGE_TAG__
+          imagePullPolicy: __PULL_POLICY__
+          ports:
+            - containerPort: __CONTAINER_PORT__
+          envFrom:
+            - configMapRef:
+                name: miamo-config
+          resources:
+            requests:
+              memory: "__REQ_MEM__"
+              cpu: "__REQ_CPU__"
+            limits:
+              memory: "__LIM_MEM__"
+              cpu: "__LIM_CPU__"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: __CONTAINER_PORT__
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: __CONTAINER_PORT__
+            initialDelaySeconds: 5
+            periodSeconds: 5

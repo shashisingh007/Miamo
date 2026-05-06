@@ -2,7 +2,7 @@ apiVersion: batch/v1
 kind: Job
 metadata:
   name: miamo-migrate
-  namespace: miamo
+  namespace: __NAMESPACE__
   labels:
     app: miamo
     service: migrate
@@ -22,15 +22,15 @@ spec:
             - sh
             - -c
             - |
-              until nc -z postgres.miamo.svc.cluster.local 5432; do
+              until nc -z postgres.__NAMESPACE__.svc.cluster.local __POSTGRES_PORT__; do
                 echo "Waiting for postgres..."
                 sleep 2
               done
               echo "Postgres is ready"
       containers:
         - name: migrate
-          image: miamo-migrate:latest
-          imagePullPolicy: IfNotPresent
+          image: __IMAGE_PREFIX__miamo-migrate:__IMAGE_TAG__
+          imagePullPolicy: __PULL_POLICY__
           envFrom:
             - configMapRef:
                 name: miamo-config

@@ -1,29 +1,24 @@
 #!/bin/bash
-# ═══ Miamo — Full Cleanup (Kubernetes) ═══
-# Removes namespace, pods, PVCs, and optionally minikube
+# ═══ Miamo — Full Cleanup ═══
+# Usage: bash scripts/cleanup.sh <env> [--full]
 set -e
-cd "$(dirname "$0")/.."
+source "$(dirname "$0")/_config.sh" "${1:-}"
 
-G='\033[0;32m'; Y='\033[1;33m'; R='\033[0;31m'; B='\033[1;34m'; NC='\033[0m'
-echo -e "\n${R}═══ MIAMO K8S CLEANUP ═══${NC}\n"
+echo -e "\n${R}═══ MIAMO K8S CLEANUP [${ENV}] ═══${NC}\n"
 
-# Kill port-forwards
-pkill -f "port-forward.*-n miamo" 2>/dev/null || true
+pkill -f "port-forward.*-n ${NAMESPACE}" 2>/dev/null || true
 
-# Delete namespace (removes everything)
-echo -e "${Y}[1/2]${NC} Deleting miamo namespace (all resources)..."
-kubectl delete namespace miamo --ignore-not-found --timeout=60s
+echo -e "${Y}[1/2]${NC} Deleting namespace ${NAMESPACE}..."
+kubectl delete namespace ${NAMESPACE} --ignore-not-found --timeout=60s
 echo -e "  ${G}✓${NC} Namespace deleted"
 
-if [[ "$1" == "--full" ]]; then
-  echo -e "${Y}[2/2]${NC} Stopping minikube cluster..."
+if [[ "${2:-}" == "--full" ]]; then
+  echo -e "${Y}[2/2]${NC} Stopping minikube..."
   minikube stop
   echo -e "  ${G}✓${NC} Minikube stopped"
-  echo ""
-  echo -e "  To completely remove minikube: ${Y}minikube delete${NC}"
+  echo -e "  To nuke completely: ${Y}minikube delete${NC}"
 else
   echo -e "\n${G}✓ Cleaned.${NC} Minikube still running."
-  echo -e "  To also stop minikube: ${Y}scripts/cleanup.sh --full${NC}"
-  echo -e "  To nuke minikube entirely: ${Y}minikube delete${NC}"
+  echo -e "  Full cleanup: ${Y}bash scripts/cleanup.sh ${ENV} --full${NC}"
 fi
 echo ""

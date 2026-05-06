@@ -1,8 +1,10 @@
+# ═══ Gateway Template ═══
+# The gateway gets NodePort + service URL env vars
 apiVersion: v1
 kind: Service
 metadata:
   name: gateway
-  namespace: miamo
+  namespace: __NAMESPACE__
   labels:
     app: miamo
     service: gateway
@@ -12,21 +14,21 @@ spec:
     app: miamo
     service: gateway
   ports:
-    - port: 3200
-      targetPort: 3200
-      nodePort: 30200
+    - port: __SERVICE_PORT__
+      targetPort: __GATEWAY_PORT__
+      nodePort: __GATEWAY_NODEPORT__
       protocol: TCP
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: gateway
-  namespace: miamo
+  namespace: __NAMESPACE__
   labels:
     app: miamo
     service: gateway
 spec:
-  replicas: 1
+  replicas: __REPLICAS__
   selector:
     matchLabels:
       app: miamo
@@ -39,46 +41,46 @@ spec:
     spec:
       containers:
         - name: gateway
-          image: miamo-gateway:latest
-          imagePullPolicy: IfNotPresent
+          image: __IMAGE_PREFIX__miamo-gateway:__IMAGE_TAG__
+          imagePullPolicy: __PULL_POLICY__
           ports:
-            - containerPort: 3200
+            - containerPort: __GATEWAY_PORT__
           envFrom:
             - configMapRef:
                 name: miamo-config
           env:
             - name: AUTH_SERVICE_URL
-              value: "http://auth:3201"
+              value: "http://auth:__SERVICE_PORT__"
             - name: USER_SERVICE_URL
-              value: "http://users:3202"
+              value: "http://users:__SERVICE_PORT__"
             - name: USERS_SERVICE_URL
-              value: "http://users:3202"
+              value: "http://users:__SERVICE_PORT__"
             - name: SOCIAL_SERVICE_URL
-              value: "http://social:3203"
+              value: "http://social:__SERVICE_PORT__"
             - name: MESSAGING_SERVICE_URL
-              value: "http://messaging:3204"
+              value: "http://messaging:__SERVICE_PORT__"
             - name: CONTENT_SERVICE_URL
-              value: "http://content:3205"
+              value: "http://content:__SERVICE_PORT__"
             - name: NOTIFICATION_SERVICE_URL
-              value: "http://notifications:3206"
+              value: "http://notifications:__SERVICE_PORT__"
             - name: NOTIFICATIONS_SERVICE_URL
-              value: "http://notifications:3206"
+              value: "http://notifications:__SERVICE_PORT__"
           resources:
             requests:
-              memory: "32Mi"
-              cpu: "50m"
+              memory: "__REQ_MEM__"
+              cpu: "__REQ_CPU__"
             limits:
-              memory: "128Mi"
-              cpu: "250m"
+              memory: "__LIM_MEM__"
+              cpu: "__LIM_CPU__"
           livenessProbe:
             httpGet:
               path: /health
-              port: 3200
+              port: __GATEWAY_PORT__
             initialDelaySeconds: 10
             periodSeconds: 10
           readinessProbe:
             httpGet:
               path: /health
-              port: 3200
+              port: __GATEWAY_PORT__
             initialDelaySeconds: 5
             periodSeconds: 5

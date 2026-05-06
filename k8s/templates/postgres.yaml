@@ -2,7 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: postgres
-  namespace: miamo
+  namespace: __NAMESPACE__
   labels:
     app: miamo
     service: postgres
@@ -12,15 +12,15 @@ spec:
     app: miamo
     service: postgres
   ports:
-    - port: 5432
-      targetPort: 5432
+    - port: __POSTGRES_PORT__
+      targetPort: __POSTGRES_PORT__
       protocol: TCP
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: postgres
-  namespace: miamo
+  namespace: __NAMESPACE__
   labels:
     app: miamo
     service: postgres
@@ -41,14 +41,14 @@ spec:
         - name: postgres
           image: postgres:16-alpine
           ports:
-            - containerPort: 5432
+            - containerPort: __POSTGRES_PORT__
           env:
             - name: POSTGRES_USER
-              value: "miamo"
+              value: "__DB_USER__"
             - name: POSTGRES_PASSWORD
-              value: "miamo"
+              value: "__DB_PASS__"
             - name: POSTGRES_DB
-              value: "miamo"
+              value: "__DB_NAME__"
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
@@ -64,7 +64,7 @@ spec:
               command:
                 - pg_isready
                 - -U
-                - miamo
+                - __DB_USER__
             initialDelaySeconds: 15
             periodSeconds: 10
           readinessProbe:
@@ -72,7 +72,7 @@ spec:
               command:
                 - pg_isready
                 - -U
-                - miamo
+                - __DB_USER__
             initialDelaySeconds: 5
             periodSeconds: 5
   volumeClaimTemplates:

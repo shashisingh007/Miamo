@@ -1,8 +1,9 @@
+# ═══ Web (Next.js) Template ═══
 apiVersion: v1
 kind: Service
 metadata:
   name: web
-  namespace: miamo
+  namespace: __NAMESPACE__
   labels:
     app: miamo
     service: web
@@ -12,21 +13,21 @@ spec:
     app: miamo
     service: web
   ports:
-    - port: 3100
-      targetPort: 3100
-      nodePort: 30100
+    - port: __SERVICE_PORT__
+      targetPort: __WEB_PORT__
+      nodePort: __WEB_NODEPORT__
       protocol: TCP
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web
-  namespace: miamo
+  namespace: __NAMESPACE__
   labels:
     app: miamo
     service: web
 spec:
-  replicas: 1
+  replicas: __REPLICAS__
   selector:
     matchLabels:
       app: miamo
@@ -39,29 +40,29 @@ spec:
     spec:
       containers:
         - name: web
-          image: miamo-web:latest
-          imagePullPolicy: IfNotPresent
+          image: __IMAGE_PREFIX__miamo-web:__IMAGE_TAG__
+          imagePullPolicy: __PULL_POLICY__
           ports:
-            - containerPort: 3100
+            - containerPort: __WEB_PORT__
           envFrom:
             - configMapRef:
                 name: miamo-config
           resources:
             requests:
-              memory: "32Mi"
-              cpu: "50m"
+              memory: "__REQ_MEM__"
+              cpu: "__REQ_CPU__"
             limits:
-              memory: "128Mi"
-              cpu: "250m"
+              memory: "__LIM_MEM__"
+              cpu: "__LIM_CPU__"
           livenessProbe:
             httpGet:
               path: /
-              port: 3100
+              port: __WEB_PORT__
             initialDelaySeconds: 15
             periodSeconds: 15
           readinessProbe:
             httpGet:
               path: /
-              port: 3100
+              port: __WEB_PORT__
             initialDelaySeconds: 5
             periodSeconds: 10

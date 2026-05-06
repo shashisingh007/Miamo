@@ -1,6 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: miamo
+  name: __NAMESPACE__
   labels:
     app: miamo
+    env: __ENV__

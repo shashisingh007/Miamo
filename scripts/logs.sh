@@ -1,32 +1,29 @@
 #!/bin/bash
-# ═══ Miamo — View Logs (Kubernetes) ═══
-cd "$(dirname "$0")/.."
-
-B='\033[1;34m'; NC='\033[0m'
-
-SERVICE=${1:-""}
-TAIL=${2:-50}
+# ═══ Miamo — View Logs ═══
+# Usage: bash scripts/logs.sh <env> [service] [lines]
+source "$(dirname "$0")/_config.sh" "${1:-}" 2>/dev/null || {
+  echo "Usage: bash scripts/logs.sh <env> <service> [lines]"
+  echo "Environments: dev, staging, prod"
+  exit 0
+}
+SERVICE="${2:-}"
+TAIL="${3:-50}"
 
 if [[ -z "$SERVICE" ]]; then
-  echo -e "${B}═══ MIAMO K8S LOGS ═══${NC}"
+  echo -e "${B}═══ MIAMO K8S LOGS [${ENV}] ═══${NC}"
   echo ""
-  echo "Usage: scripts/logs.sh <service> [lines]"
+  echo "Usage: bash scripts/logs.sh ${ENV} <service> [lines]"
   echo ""
-  echo "Services: auth, users, social, messaging, content, notifications, gateway, web, postgres, redis"
-  echo ""
-  echo "Examples:"
-  echo "  scripts/logs.sh gateway        # Last 50 lines of gateway"
-  echo "  scripts/logs.sh auth 100       # Last 100 lines of auth"
-  echo "  scripts/logs.sh all            # All pods (follow)"
+  echo "Services: auth, users, social, messaging, content, notifications, gateway, web, postgres, redis, all, migrate"
   echo ""
   exit 0
 fi
 
 if [[ "$SERVICE" == "all" ]]; then
-  echo -e "${B}═══ All pod logs (follow) ═══${NC}"
-  kubectl logs -f -l app=miamo -n miamo --all-containers --prefix --tail=$TAIL
+  echo -e "${B}═══ All pod logs [${ENV}] (follow) ═══${NC}"
+  kubectl logs -f -l app=miamo -n ${NAMESPACE} --all-containers --prefix --tail=$TAIL
 elif [[ "$SERVICE" == "migrate" ]]; then
-  kubectl logs job/miamo-migrate -n miamo
+  kubectl logs job/miamo-migrate -n ${NAMESPACE}
 else
-  kubectl logs -f -l service=$SERVICE -n miamo --tail=$TAIL
+  kubectl logs -f deployment/$SERVICE -n ${NAMESPACE} --tail=$TAIL
 fi

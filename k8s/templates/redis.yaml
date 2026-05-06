@@ -1,50 +1,45 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: notifications
-  namespace: miamo
+  name: redis
+  namespace: __NAMESPACE__
   labels:
     app: miamo
-    service: notifications
+    service: redis
 spec:
-  type: ClusterIP
   selector:
     app: miamo
-    service: notifications
+    service: redis
   ports:
-    - port: 3206
-      targetPort: 3206
+    - port: __REDIS_PORT__
+      targetPort: __REDIS_PORT__
       protocol: TCP
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: notifications
-  namespace: miamo
+  name: redis
+  namespace: __NAMESPACE__
   labels:
     app: miamo
-    service: notifications
+    service: redis
 spec:
   replicas: 1
   selector:
     matchLabels:
       app: miamo
-      service: notifications
+      service: redis
   template:
     metadata:
       labels:
         app: miamo
-        service: notifications
+        service: redis
     spec:
       containers:
-        - name: notifications
-          image: miamo-notifications:latest
-          imagePullPolicy: IfNotPresent
+        - name: redis
+          image: redis:7-alpine
           ports:
-            - containerPort: 3206
-          envFrom:
-            - configMapRef:
-                name: miamo-config
+            - containerPort: __REDIS_PORT__
           resources:
             requests:
               memory: "32Mi"
@@ -53,14 +48,16 @@ spec:
               memory: "128Mi"
               cpu: "250m"
           livenessProbe:
-            httpGet:
-              path: /health
-              port: 3206
+            exec:
+              command:
+                - redis-cli
+                - ping
             initialDelaySeconds: 10
             periodSeconds: 10
           readinessProbe:
-            httpGet:
-              path: /health
-              port: 3206
+            exec:
+              command:
+                - redis-cli
+                - ping
             initialDelaySeconds: 5
             periodSeconds: 5
