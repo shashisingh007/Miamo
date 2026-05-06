@@ -6,8 +6,8 @@
 # ═══════════════════════════════════════════════════════════════════
 
 # ─── Cluster ──────────────────────────────────────────────────────
-# Change this IP when deploying to a real cluster or remote machine
-cluster_host: "127.0.0.1"
+# Change this IP/hostname when deploying to a real cluster or remote machine
+cluster_host: "localhost"
 namespace: "miamo"
 env: "dev"
 

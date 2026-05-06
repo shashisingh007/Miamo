@@ -59,6 +59,8 @@ render() {
     -e "s|__NOTIFICATIONS_PORT__|${NOTIFICATIONS_PORT}|g" \
     -e "s|__GATEWAY_PORT__|${GATEWAY_PORT}|g" \
     -e "s|__WEB_PORT__|${WEB_PORT}|g" \
+    -e "s|__LOCAL_WEB_PORT__|${LOCAL_WEB_PORT}|g" \
+    -e "s|__LOCAL_GATEWAY_PORT__|${LOCAL_GATEWAY_PORT}|g" \
     -e "s|__GATEWAY_NODEPORT__|${GATEWAY_NODEPORT}|g" \
     -e "s|__WEB_NODEPORT__|${WEB_NODEPORT}|g" \
     -e "s|__IMAGE_PREFIX__|${IMAGE_PREFIX}|g" \
