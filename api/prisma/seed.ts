@@ -1,9 +1,26 @@
 // ─── Miamo Seed Data ─────────────────────────────────
 // 20 diverse users with full profiles, posts, stories, videos, creativity, messages, beats
+// FULLY DETERMINISTIC: same data every run for consistent testing
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
+
+// Fixed base date: 2026-05-15T12:00:00Z — all timestamps derive from this
+const SEED_DATE = new Date('2026-05-15T12:00:00.000Z').getTime();
+
+// Simple seeded PRNG (mulberry32) — produces the same sequence every run
+function createRng(seed: number) {
+  let s = seed;
+  return () => {
+    s |= 0; s = s + 0x6D2B79F5 | 0;
+    let t = Math.imul(s ^ s >>> 15, 1 | s);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+const rng = createRng(42);
+function randInt(min: number, max: number) { return Math.floor(rng() * (max - min + 1)) + min; }
 
 // Password = username for easy testing (e.g. miamo1/miamo1)
 function getPassword(username: string) { return username; }
@@ -143,7 +160,7 @@ async function main() {
             seriousMode: u.seriousMode,
             profileScore: u.profileScore,
             online: u.online,
-            lastActive: new Date(),
+            lastActive: new Date(SEED_DATE),
             avatarGradient: u.avatarGradient,
             height: u.height,
             sexuality: u.sexuality,
@@ -249,7 +266,7 @@ async function main() {
           content: msgs[mi],
           type: 'text',
           read: mi < msgs.length - 1,
-          createdAt: new Date(Date.now() - (msgs.length - mi) * 3600000),
+          createdAt: new Date(SEED_DATE - (msgs.length - mi) * 3600000),
         },
       });
     }
@@ -260,8 +277,8 @@ async function main() {
   for (let bi = 0; bi < matchRecords.length; bi++) {
     const match = matchRecords[bi];
     let state = 'active';
-    let count = Math.floor(Math.random() * 30) + 5;
-    if (bi >= 10 && bi < 13) { state = 'weak'; count = Math.floor(Math.random() * 10) + 1; }
+    let count = randInt(5, 34);
+    if (bi >= 10 && bi < 13) { state = 'weak'; count = randInt(1, 10); }
     if (bi >= 13) { state = 'lost'; count = 0; }
 
     const beat = await prisma.beat.create({
@@ -270,8 +287,8 @@ async function main() {
         user2Id: match.user2Id,
         count,
         state,
-        lastUser1: state !== 'lost' ? new Date() : null,
-        lastUser2: state === 'active' ? new Date() : null,
+        lastUser1: state !== 'lost' ? new Date(SEED_DATE) : null,
+        lastUser2: state === 'active' ? new Date(SEED_DATE) : null,
       },
     });
 
@@ -284,7 +301,7 @@ async function main() {
             userId: e % 2 === 0 ? match.user1Id : match.user2Id,
             type: ['snap', 'text', 'mood', 'voice'][e % 4],
             content: ['Good morning! ☀️', 'Thinking of you', '😊', 'Check this out!', 'Daily beat!'][e % 5],
-            createdAt: new Date(Date.now() - e * 86400000),
+            createdAt: new Date(SEED_DATE - e * 86400000),
           },
         });
       }
@@ -319,7 +336,7 @@ async function main() {
         type: postTypes[pi % postTypes.length],
         content: postContents[pi % postContents.length],
         visibility: 'everyone',
-        createdAt: new Date(Date.now() - pi * 1800000),
+        createdAt: new Date(SEED_DATE - pi * 1800000),
       },
     });
   }
@@ -338,8 +355,8 @@ async function main() {
         type: si % 3 === 0 ? 'text' : 'photo',
         content: storyTexts[si % storyTexts.length],
         visibility: 'everyone',
-        expiresAt: new Date(Date.now() + 24 * 3600000),
-        createdAt: new Date(Date.now() - si * 900000),
+        expiresAt: new Date(SEED_DATE + 24 * 3600000),
+        createdAt: new Date(SEED_DATE - si * 900000),
       },
     });
   }
@@ -360,8 +377,8 @@ async function main() {
         description: `A short video by ${USERS[authorIdx].displayName}`,
         category: USERS[authorIdx].interests[0] || 'general',
         visibility: 'everyone',
-        views: Math.floor(Math.random() * 500) + 10,
-        createdAt: new Date(Date.now() - vi * 1200000),
+        views: randInt(10, 509),
+        createdAt: new Date(SEED_DATE - vi * 1200000),
       },
     });
   }
@@ -388,10 +405,10 @@ async function main() {
         type: ['text', 'image', 'project', 'poem', 'performance'][ci % 5],
         title: creativityTitles[ci % creativityTitles.length],
         content: `A creative piece by ${USERS[authorIdx].displayName}. Category: ${catName}. Showcasing talent and passion.`,
-        views: Math.floor(Math.random() * 1000) + 20,
-        trendScore: Math.random() * 100,
+        views: randInt(20, 1019),
+        trendScore: rng() * 100,
         featured: ci < 10,
-        createdAt: new Date(Date.now() - ci * 600000),
+        createdAt: new Date(SEED_DATE - ci * 600000),
       },
     });
   }
@@ -413,10 +430,10 @@ async function main() {
           type: ['image', 'video', 'text'][d % 3],
           title: `dummy_${catName}${d > 1 ? `_${d}` : ''}`,
           content: `This is test content for the ${catName} category. Item ${d} of 3 for filter testing.`,
-          views: Math.floor(Math.random() * 300) + 50,
-          trendScore: Math.random() * 80 + 20,
+          views: randInt(50, 349),
+          trendScore: rng() * 80 + 20,
           featured: d === 1,
-          createdAt: new Date(Date.now() - dummyCount * 300000),
+          createdAt: new Date(SEED_DATE - dummyCount * 300000),
         },
       });
       dummyCount++;
@@ -455,7 +472,7 @@ async function main() {
         postId: feedPosts[postIdx].id,
         authorId: userRecords[userIdx].id,
         content: commentTexts[ci % commentTexts.length],
-        createdAt: new Date(Date.now() - ci * 300000),
+        createdAt: new Date(SEED_DATE - ci * 300000),
       },
     });
   }
@@ -473,7 +490,7 @@ async function main() {
         title: type === 'match' ? 'New Match! 🎉' : type === 'message' ? 'New Message' : type === 'like' ? 'Someone liked your profile' : type === 'beat' ? 'Beat reminder ⚡' : 'Notification',
         body: type === 'match' ? 'You matched with someone!' : type === 'message' ? 'You have a new message' : type === 'like' ? 'Check who liked your profile' : type === 'beat' ? 'Don\'t lose your streak!' : 'Check your activity',
         read: ni > 15,
-        createdAt: new Date(Date.now() - ni * 1800000),
+        createdAt: new Date(SEED_DATE - ni * 1800000),
       },
     });
   }
@@ -505,7 +522,7 @@ async function main() {
     const likes = item.reactions.length;
     const comments = item.comments.length;
     const views = item.views;
-    const recencyBoost = Math.max(0, 50 - (Date.now() - item.createdAt.getTime()) / 3600000);
+    const recencyBoost = Math.max(0, 50 - (SEED_DATE - item.createdAt.getTime()) / 3600000);
     const score = views * 1 + likes * 3 + comments * 5 + recencyBoost;
     await prisma.trend.create({
       data: {
