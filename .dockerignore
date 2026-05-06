@@ -1,0 +1,61 @@
+# ─── Miamo Root .dockerignore ───────────────────────────
+# Keeps Docker build context minimal (faster builds, smaller images)
+
+# Dependencies (installed in container)
+**/node_modules
+**/.pnp
+**/.pnp.js
+
+# Build outputs
+**/dist
+**/.next
+**/out
+**/.turbo
+
+# Environment & secrets
+**/.env
+**/.env.*
+!**/.env.example
+
+# Version control
+.git
+.gitignore
+**/.gitkeep
+
+# IDE & OS
+**/.vscode
+**/.idea
+**/.DS_Store
+**/Thumbs.db
+**/*.swp
+**/*.swo
+
+# Tests & coverage
+**/*.test.ts
+**/*.spec.ts
+**/__tests__
+**/coverage
+**/.nyc_output
+**/vitest.config.*
+**/jest.config.*
+
+# Documentation (not needed in images)
+**/*.md
+**/docs
+LICENSE
+
+# Logs & temp
+**/*.log
+**/.logs
+**/tmp
+**/.miamo-pids
+
+# CI/CD & K8s (not part of app)
+k8s/
+.github/
+tests/
+
+# Docker (prevent recursive context)
+**/Dockerfile*
+**/.dockerignore
+docker-compose*.yml

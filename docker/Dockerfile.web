@@ -1,0 +1,57 @@
+# ═══════════════════════════════════════════════════════════
+# Miamo Web (Next.js) Dockerfile
+# Multi-stage: deps → build → standalone production server
+# Final image: ~120MB with standalone output
+# ═══════════════════════════════════════════════════════════
+
+ARG NODE_VERSION=20
+
+# ═══ STAGE 1: Dependencies ════════════════════════════
+FROM node:${NODE_VERSION}-alpine AS deps
+WORKDIR /app
+
+COPY web/package.json web/package-lock.json* ./
+RUN npm ci --prefer-offline --no-audit --no-fund 2>/dev/null || \
+    npm install --prefer-offline --no-audit --no-fund
+
+# ═══ STAGE 2: Build ══════════════════════════════════
+FROM node:${NODE_VERSION}-alpine AS build
+WORKDIR /app
+
+COPY --from=deps /app/node_modules ./node_modules
+COPY web/ ./
+
+# Build-time env vars (baked into client bundle)
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_PUBLIC_API_URL=http://localhost:3200
+
+# Build standalone output (no node_modules needed at runtime)
+RUN npm run build
+
+# ═══ STAGE 3: Production ═════════════════════════════
+FROM node:${NODE_VERSION}-alpine AS runner
+WORKDIR /app
+
+# Security: non-root user
+RUN addgroup -g 1001 -S miamo && adduser -u 1001 -S miamo -G miamo
+
+# Install curl for healthcheck
+RUN apk add --no-cache curl
+
+# Copy standalone output (includes only required node_modules)
+COPY --from=build --chown=miamo:miamo /app/public ./public
+COPY --from=build --chown=miamo:miamo /app/.next/standalone ./
+COPY --from=build --chown=miamo:miamo /app/.next/static ./.next/static
+
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3100
+ENV HOSTNAME="0.0.0.0"
+
+USER miamo
+EXPOSE 3100
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 \
+    CMD curl -fs http://localhost:3100/ || exit 1
+
+CMD ["node", "server.js"]

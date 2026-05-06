@@ -1,28 +1,41 @@
 #!/bin/bash
 # ═══════════════════════════════════════════════════════════
-# Miamo Dev - RESTART all services (no DB re-seed)
-# Usage: bash scripts/restart.sh
+# Miamo — RESTART (Docker Compose)
+# Restarts services without rebuilding (fast)
+# Use --build to force rebuild
 # ═══════════════════════════════════════════════════════════
 set -e
-
 cd "$(dirname "$0")/.."
-ROOT=$(pwd)
-source "$ROOT/scripts/_common.sh"
 
-header "MIAMO — RESTART"
+G='\033[0;32m'; Y='\033[1;33m'; B='\033[1;34m'; NC='\033[0m'
 
-# ─── Kill ────────────────────────────────────────────────
-step "1/3" "Stopping all services..."
-kill_all
-ok "All stopped"
+echo -e "\n${B}══════════════════════════════════════${NC}"
+echo -e "${B}  MIAMO — DOCKER RESTART${NC}"
+echo -e "${B}══════════════════════════════════════${NC}\n"
 
-# ─── Environment ─────────────────────────────────────────
-step "2/3" "Loading environment..."
-load_env
-ok "Environment set"
+if [ "$1" = "--build" ] || [ "$1" = "-b" ]; then
+  echo -e "${Y}[1/3]${NC} Stopping services..."
+  docker-compose down --remove-orphans 2>/dev/null
+  echo -e "  ${G}✓${NC} Stopped"
 
-# ─── Start ───────────────────────────────────────────────
-step "3/3" "Starting all services..."
-start_all_services
+  echo -e "${Y}[2/3]${NC} Rebuilding images..."
+  docker-compose build --parallel 2>&1 | tail -3
+  echo -e "  ${G}✓${NC} Built"
 
-footer
+  echo -e "${Y}[3/3]${NC} Starting services..."
+  docker-compose up -d
+  echo -e "  ${G}✓${NC} Running"
+else
+  echo -e "${Y}[1/2]${NC} Restarting services..."
+  docker-compose restart
+  echo -e "  ${G}✓${NC} All services restarted"
+
+  echo -e "${Y}[2/2]${NC} Checking health..."
+  sleep 5
+fi
+
+# Status
+echo -e "\n${B}── Service Status ──────────────────────${NC}"
+docker-compose ps --format "table {{.Name}}\t{{.Status}}" 2>/dev/null | head -15
+
+echo -e "\n  Web: ${G}http://localhost:3100${NC}  Gateway: ${G}http://localhost:3200${NC}\n"

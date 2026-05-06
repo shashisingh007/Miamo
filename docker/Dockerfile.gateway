@@ -1,0 +1,43 @@
+# ═══════════════════════════════════════════════════════════
+# Miamo API Gateway Dockerfile (no Prisma needed)
+# Simpler build: deps → compile → run
+# ═══════════════════════════════════════════════════════════
+
+ARG NODE_VERSION=20
+
+# ═══ STAGE 1: Dependencies ════════════════════════════
+FROM node:${NODE_VERSION}-alpine AS deps
+WORKDIR /app
+
+COPY services/gateway/package.json services/gateway/package-lock.json* ./
+RUN npm ci --prefer-offline --no-audit --no-fund 2>/dev/null || \
+    npm install --prefer-offline --no-audit --no-fund
+
+# ═══ STAGE 2: TypeScript Build ════════════════════════
+FROM deps AS build
+WORKDIR /app
+
+COPY services/gateway/tsconfig.json ./
+COPY services/gateway/src ./src
+RUN npx tsc --removeComments
+
+# ═══ STAGE 3: Production ═════════════════════════════
+FROM node:${NODE_VERSION}-alpine AS runner
+WORKDIR /app
+
+RUN addgroup -g 1001 -S miamo && \
+    adduser -u 1001 -S miamo -G miamo && \
+    apk add --no-cache curl
+
+COPY --from=deps --chown=miamo:miamo /app/node_modules ./node_modules
+COPY --from=build --chown=miamo:miamo /app/dist ./dist
+COPY services/gateway/package.json ./
+
+ENV NODE_ENV=production
+USER miamo
+EXPOSE 3200
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -fs http://localhost:3200/health || exit 1
+
+CMD ["node", "dist/server.js"]

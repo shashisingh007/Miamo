@@ -1,0 +1,66 @@
+# ═══════════════════════════════════════════════════════════
+# Miamo Microservice Dockerfile (shared across all services)
+# Multi-stage build: deps → build → production
+# Final image: ~80-120MB, non-root, health-checked
+# ═══════════════════════════════════════════════════════════
+# Build context: project root
+# Usage: docker build --build-arg SERVICE=auth -f docker/Dockerfile.service .
+
+ARG NODE_VERSION=20
+ARG SERVICE=auth
+
+# ═══ STAGE 1: Dependencies ════════════════════════════
+FROM node:${NODE_VERSION}-alpine AS deps
+ARG SERVICE
+WORKDIR /app
+
+# OpenSSL required for Prisma on Alpine
+RUN apk add --no-cache openssl
+
+COPY services/${SERVICE}/package.json services/${SERVICE}/package-lock.json* ./
+RUN npm ci --prefer-offline --no-audit --no-fund 2>/dev/null || \
+    npm install --prefer-offline --no-audit --no-fund
+
+# ═══ STAGE 2: Prisma Generate ═════════════════════════
+FROM deps AS prisma
+ARG SERVICE
+WORKDIR /app
+
+COPY services/${SERVICE}/prisma ./prisma
+RUN npx prisma generate
+
+# ═══ STAGE 3: TypeScript Build ════════════════════════
+FROM prisma AS build
+ARG SERVICE
+WORKDIR /app
+
+COPY services/${SERVICE}/tsconfig.json ./
+COPY services/${SERVICE}/src ./src
+RUN npx tsc --removeComments
+
+# ═══ STAGE 4: Production (minimal) ═══════════════════
+FROM node:${NODE_VERSION}-alpine AS runner
+ARG SERVICE
+WORKDIR /app
+
+# Security: non-root user
+RUN addgroup -g 1001 -S miamo && \
+    adduser -u 1001 -S miamo -G miamo && \
+    apk add --no-cache curl openssl
+
+# Copy artifacts (only what's needed to run)
+COPY --from=deps --chown=miamo:miamo /app/node_modules ./node_modules
+COPY --from=prisma --chown=miamo:miamo /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=prisma --chown=miamo:miamo /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=build --chown=miamo:miamo /app/dist ./dist
+COPY --from=prisma --chown=miamo:miamo /app/prisma ./prisma
+COPY services/${SERVICE}/package.json ./
+
+# Runtime
+ENV NODE_ENV=production
+USER miamo
+
+HEALTHCHECK --interval=10s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -fs http://localhost:${PORT:-3200}/health || exit 1
+
+CMD ["node", "dist/server.js"]

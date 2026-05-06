@@ -292,7 +292,7 @@ app.post('/api/v1/matches/:id/favorite', authMiddleware, async (req: AuthRequest
     const currentFav = isUser1 ? (match as any).favorite1 : (match as any).favorite2;
     await prisma.match.update({
       where: { id: req.params.id },
-      data: isUser1 ? { favorite1: !currentFav } : { favorite2: !currentFav },
+      data: isUser1 ? { favorite1: !currentFav } : { favorite2: !currentFav } as any,
     });
     res.json({ data: { isFavorite: !currentFav } });
   } catch (e) { next(e); }
@@ -307,7 +307,7 @@ app.post('/api/v1/matches/:id/pin', authMiddleware, async (req: AuthRequest, res
     const currentPin = isUser1 ? (match as any).pinned1 : (match as any).pinned2;
     await prisma.match.update({
       where: { id: req.params.id },
-      data: isUser1 ? { pinned1: !currentPin } : { pinned2: !currentPin },
+      data: isUser1 ? { pinned1: !currentPin } : { pinned2: !currentPin } as any,
     });
     res.json({ data: { isPinned: !currentPin } });
   } catch (e) { next(e); }

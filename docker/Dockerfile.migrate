@@ -1,0 +1,30 @@
+# ═══════════════════════════════════════════════════════════
+# Miamo Database Migrations & Seed
+# Runs prisma migrate deploy + seed, then exits
+# Used as init container in docker-compose
+# ═══════════════════════════════════════════════════════════
+
+ARG NODE_VERSION=20
+
+FROM node:${NODE_VERSION}-alpine AS runner
+WORKDIR /app
+
+# OpenSSL needed for Prisma on Alpine
+RUN apk add --no-cache openssl
+
+# Install deps for prisma + seed (tsx for TypeScript seed)
+COPY api/package.json api/package-lock.json* ./
+RUN npm ci --prefer-offline --no-audit --no-fund 2>/dev/null || \
+    npm install --prefer-offline --no-audit --no-fund
+
+# Copy prisma schema + migrations + seed
+COPY api/prisma ./prisma
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Entry: migrate then seed
+COPY docker/migrate-and-seed.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+ENTRYPOINT ["/entrypoint.sh"]
