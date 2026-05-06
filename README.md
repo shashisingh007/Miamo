@@ -1,6 +1,6 @@
 # Miamo
 
-A modern dating platform built as containerized microservices. Rose-gold themed, Instagram-inspired architecture.
+A modern dating platform running on Kubernetes. Microservice architecture with per-service Dockerfiles.
 
 ## Architecture
 
@@ -12,9 +12,9 @@ Browser → Web (:3100) → Gateway (:3200) → Microservices → PostgreSQL + R
 |---------|------|----------------|
 | **web** | 3100 | Next.js frontend (SSR, standalone) |
 | **gateway** | 3200 | API proxy, JWT validation, rate limiting |
-| **auth** | 3201 | Login, register, tokens, sessions |
-| **users** | 3202 | Profiles, settings, premium features |
-| **social** | 3203 | Discover, matches, AI matching, safety |
+| **auth** | 3201 | Login, register, tokens |
+| **users** | 3202 | Profiles, settings, search |
+| **social** | 3203 | Discover, matches, AI matching |
 | **messaging** | 3204 | Chats, real-time messages |
 | **content** | 3205 | Feed, stories, videos, creativity |
 | **notifications** | 3206 | Push notifications, alerts |
@@ -25,21 +25,21 @@ Browser → Web (:3100) → Gateway (:3200) → Microservices → PostgreSQL + R
 
 ```
 Miamo/
-├── services/                    ← All application services
-│   ├── auth/                    ← Authentication service
-│   ├── users/                   ← User management service
-│   ├── social/                  ← Social features service
-│   ├── messaging/               ← Messaging service
-│   ├── content/                 ← Content service
-│   ├── notifications/           ← Notification service
-│   ├── gateway/                 ← API gateway (public entry point)
-│   ├── web/                     ← Next.js frontend
-│   └── shared/                  ← Shared Prisma schema, migrations, seed
+├── services/               ← All application code
+│   ├── auth/               ← Authentication service
+│   ├── users/              ← User management
+│   ├── social/             ← Social features (discover, match)
+│   ├── messaging/          ← Chat & messages
+│   ├── content/            ← Feed, stories, videos, creativity
+│   ├── notifications/      ← Notification service
+│   ├── gateway/            ← API gateway (entry point)
+│   ├── web/                ← Next.js frontend
+│   └── shared/             ← Shared database schema
 │       └── prisma/
-│           ├── schema.prisma    ← Database schema (single source of truth)
-│           ├── migrations/      ← All DB migrations
-│           └── seed.ts          ← Deterministic test data
-├── docker/                      ← One Dockerfile per service
+│           ├── schema.prisma
+│           ├── migrations/
+│           └── seed.ts
+├── docker/                 ← One Dockerfile per service
 │   ├── auth.Dockerfile
 │   ├── users.Dockerfile
 │   ├── social.Dockerfile
@@ -48,132 +48,79 @@ Miamo/
 │   ├── notifications.Dockerfile
 │   ├── gateway.Dockerfile
 │   ├── web.Dockerfile
-│   ├── migrate.Dockerfile       ← DB migration init container
-│   ├── migrate-and-seed.sh      ← Migration entrypoint script
-│   └── config/                  ← Infrastructure configs
-│       ├── postgres/
-│       └── redis/
-├── k8s/                         ← Kubernetes manifests (flat, one per resource)
+│   ├── migrate.Dockerfile
+│   └── migrate-and-seed.sh
+├── k8s/                    ← Kubernetes manifests
 │   ├── namespace.yaml
 │   ├── config.yaml
 │   ├── postgres.yaml
 │   ├── redis.yaml
-│   ├── auth.yaml ... web.yaml
+│   ├── auth.yaml
+│   ├── users.yaml
+│   ├── social.yaml
+│   ├── messaging.yaml
+│   ├── content.yaml
+│   ├── notifications.yaml
 │   ├── gateway.yaml
-│   ├── ingress.yaml
+│   ├── web.yaml
 │   └── migrate-job.yaml
-├── scripts/                     ← Developer scripts
-│   ├── dev.sh                   ← Start all services
-│   ├── stop.sh                  ← Stop all services
-│   ├── restart.sh               ← Restart (--build to rebuild)
-│   ├── test.sh                  ← Run test suite
-│   ├── logs.sh                  ← Stream logs
-│   └── cleanup.sh               ← Docker prune
-├── tests/                       ← Test files
-│   ├── e2e/
-│   ├── integration/
-│   └── unit/
-├── docker-compose.yml           ← Local development orchestration
-├── .dockerignore                ← Build context exclusions
-└── package.json                 ← Root workspace config
+├── scripts/                ← Developer scripts
+│   ├── dev.sh              ← Build + deploy to k8s
+│   ├── stop.sh             ← Scale down pods
+│   ├── restart.sh          ← Rolling restart
+│   ├── test.sh             ← Run test suite (26 checks)
+│   ├── logs.sh             ← Tail pod logs
+│   └── cleanup.sh          ← Delete namespace
+└── .gitignore
 ```
 
 ## Quick Start
 
+**Prerequisites:** Docker, minikube, kubectl
+
 ```bash
-# Start everything (builds images + starts containers)
+# Deploy everything to Kubernetes (builds images, runs migrations, starts pods)
 bash scripts/dev.sh
 
-# Run tests (must pass before deploy)
+# Run tests (26 checks: pod health, service connectivity, e2e auth)
 bash scripts/test.sh
 
-# Stop
-bash scripts/stop.sh
+# Access services
+kubectl port-forward svc/gateway 3200:3200 -n miamo &
+kubectl port-forward svc/web 3100:3100 -n miamo &
 
-# Stop + wipe database
-bash scripts/stop.sh --clean
+# Open in browser
+open http://localhost:3100
 ```
 
-## Docker Strategy
+## Scripts
 
-**Why one Dockerfile per service?**
-- Each service is independently trackable and deployable
-- Clear ownership: `docker/auth.Dockerfile` → builds `services/auth/`
-- Different build strategies per service type (gateway has no Prisma, web uses Next.js standalone)
-- Easy to see what changed in a PR
-
-**Build pattern (microservices):**
-```
-Stage 1: deps     → Install npm packages (cached layer)
-Stage 2: prisma   → Generate Prisma client
-Stage 3: build    → Compile TypeScript (tsc --removeComments)
-Stage 4: runner   → Minimal production image (Alpine + compiled JS only)
-```
-
-**Image sizes:**
-- Microservices: ~360MB (includes Prisma engine)
-- Gateway: ~260MB (no Prisma)
-- Web: ~240MB (Next.js standalone)
-- All run as non-root user `miamo:1001`
-
-## Kubernetes Deployment
-
-```bash
-# Apply all manifests
-kubectl apply -f k8s/namespace.yaml
-kubectl apply -f k8s/config.yaml
-kubectl apply -f k8s/postgres.yaml -f k8s/redis.yaml
-kubectl apply -f k8s/migrate-job.yaml
-kubectl apply -f k8s/auth.yaml -f k8s/users.yaml -f k8s/social.yaml \
-              -f k8s/messaging.yaml -f k8s/content.yaml -f k8s/notifications.yaml
-kubectl apply -f k8s/gateway.yaml -f k8s/web.yaml
-kubectl apply -f k8s/ingress.yaml
-```
-
-Each service runs as a **Deployment with 2 replicas**, with:
-- Liveness probes (`/health`)
-- Readiness probes (`/ready`)
-- Resource limits (256Mi memory, 500m CPU)
-- ConfigMap-based environment
-
-## Testing
-
-```bash
-# Run full test suite (health + API + performance)
-bash scripts/test.sh
-```
-
-Tests verify:
-1. All containers healthy
-2. API endpoints respond correctly
-3. Auth flow works (login → token → authenticated requests)
-4. Response times < 500ms
+| Script | What it does |
+|--------|--------------|
+| `scripts/dev.sh` | Start minikube → build images → deploy pods → port-forward |
+| `scripts/stop.sh` | Scale all deployments to 0 |
+| `scripts/restart.sh [service]` | Rolling restart (one service or all) |
+| `scripts/test.sh` | 26-point test suite |
+| `scripts/logs.sh <service>` | Stream logs for a service |
+| `scripts/cleanup.sh` | Delete miamo namespace (add `--full` to stop minikube) |
 
 ## Test Users
 
-20 deterministic users (same data every seed run):
-- **Email:** `miamo1@miamo.test` to `miamo20@miamo.test`
-- **Password:** same as username (e.g., `miamo1` / `miamo1`)
+20 seed users, same data every run:
 
-## Scripts Reference
-
-| Script | Purpose |
-|--------|---------|
-| `scripts/dev.sh` | Build + start all containers |
-| `scripts/stop.sh` | Stop containers (add `--clean` to wipe DB) |
-| `scripts/restart.sh` | Restart (add `--build` to rebuild images) |
-| `scripts/test.sh` | Run full test suite |
-| `scripts/logs.sh` | Tail all logs (or `logs.sh gateway` for one) |
-| `scripts/cleanup.sh` | Remove images/cache (add `--all` for full prune) |
+- **Email:** `miamo1@miamo.test` ... `miamo20@miamo.test`
+- **Password:** same as username (`miamo1` / `miamo1`)
 
 ## Tech Stack
 
-- **Runtime:** Node.js 20 (Alpine)
-- **Language:** TypeScript (strict)
-- **Backend:** Express.js + Prisma ORM
-- **Frontend:** Next.js 14 + Tailwind CSS + shadcn/ui
-- **Database:** PostgreSQL 16
-- **Cache:** Redis 7
-- **Containers:** Docker + Docker Compose
-- **Orchestration:** Kubernetes
-- **Auth:** JWT + refresh tokens
+| Layer | Technology |
+|-------|-----------|
+| Runtime | Node.js 20 (Alpine) |
+| Language | TypeScript |
+| Backend | Express.js + Prisma ORM |
+| Frontend | Next.js 14 + Tailwind CSS |
+| Database | PostgreSQL 16 |
+| Cache | Redis 7 |
+| Containers | Docker (per-service Dockerfiles) |
+| Orchestration | Kubernetes (minikube local) |
+| Auth | JWT + refresh tokens |
