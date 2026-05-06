@@ -93,7 +93,7 @@ function FilterPanel({
     <button onClick={onClick} className={cn(
       'px-3.5 py-2 rounded-full text-[11px] font-semibold tracking-wide transition-all border',
       active
-        ? 'bg-white text-[#0d0d12] border-white shadow-[0_0_12px_rgba(255,255,255,0.15)]'
+        ? 'bg-white text-[#0d0d12] border-white shadow-[0_0_12px_rgba(236,64,122,0.15)]'
         : 'bg-white/[0.04] border-white/[0.08] text-white/50 hover:bg-white/[0.08] hover:text-white/70',
     )}>
       {label}
@@ -1042,14 +1042,14 @@ export default function DiscoverPage() {
             className={cn(
               'flex items-center gap-2 h-10 px-4 rounded-xl border text-[13px] font-semibold transition-all',
               activeFilterCount > 0
-                ? 'bg-white text-[#0d0d12] border-white shadow-[0_0_16px_rgba(255,255,255,0.1)]'
+                ? 'bg-white text-[#0d0d12] border-white shadow-[0_0_16px_rgba(236,64,122,0.1)]'
                 : 'bg-white/[0.04] border-white/[0.08] text-white/50 hover:bg-white/[0.08]',
             )}
           >
             <SlidersHorizontal className="w-4 h-4" />
             Filters
             {activeFilterCount > 0 && (
-              <span className="ml-0.5 w-5 h-5 rounded-full bg-[#0d0d12] text-white text-[10px] font-bold flex items-center justify-center">
+              <span className="ml-0.5 w-5 h-5 rounded-full bg-lavender-500 text-white text-[10px] font-bold flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
@@ -1088,7 +1088,7 @@ export default function DiscoverPage() {
             <div className="flex -space-x-1">
               {profiles.slice(currentIndex, currentIndex + 4).map((p, i) => (
                 <div key={p.id} className={cn(
-                  'w-6 h-6 rounded-full border-2 border-[#0d0d12] overflow-hidden',
+                  'w-6 h-6 rounded-full border-2 border-miamo-bg overflow-hidden',
                   i === 0 ? 'ring-2 ring-white/20' : '',
                 )} style={{ zIndex: 4 - i }}>
                   {p.photos?.[0] ? (

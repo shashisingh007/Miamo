@@ -19,11 +19,11 @@ import { useRouter } from 'next/navigation';
 
 /* ─── Category Definitions ──────────────────────────── */
 const CATEGORIES = [
-  { id: 'general', name: 'general', label: 'For You', icon: Sparkles, color: '#D4A574' },
+  { id: 'general', name: 'general', label: 'For You', icon: Sparkles, color: '#EC407A' },
   { id: 'Sports', name: 'Sports', label: 'Sports', icon: Trophy, color: '#22C55E' },
-  { id: 'Music', name: 'Music', label: 'Music', icon: Headphones, color: '#D4A574' },
+  { id: 'Music', name: 'Music', label: 'Music', icon: Headphones, color: '#EC407A' },
   { id: 'Art', name: 'Art', label: 'Art', icon: Palette, color: '#F59E0B' },
-  { id: 'Dance', name: 'Dance', label: 'Dance', icon: Music, color: '#B8804A' },
+  { id: 'Dance', name: 'Dance', label: 'Dance', icon: Music, color: '#D81B60' },
   { id: 'Comedy', name: 'Comedy', label: 'Comedy', icon: Laugh, color: '#F97316' },
   { id: 'Fitness', name: 'Fitness', label: 'Fitness', icon: Dumbbell, color: '#10B981' },
   { id: 'Cooking', name: 'Cooking', label: 'Cooking', icon: UtensilsCrossed, color: '#EF4444' },
@@ -33,7 +33,7 @@ const CATEGORIES = [
   { id: 'Tech Projects', name: 'Tech Projects', label: 'Tech', icon: Cpu, color: '#14B8A6' },
   { id: 'Singing', name: 'Singing', label: 'Singing', icon: Mic, color: '#EC4899' },
   { id: 'Poetry', name: 'Poetry', label: 'Poetry', icon: BookOpen, color: '#6366F1' },
-  { id: 'Writing', name: 'Writing', label: 'Writing', icon: BookOpen, color: '#B8804A' },
+  { id: 'Writing', name: 'Writing', label: 'Writing', icon: BookOpen, color: '#D81B60' },
   { id: 'Lifestyle', name: 'Lifestyle', label: 'Lifestyle', icon: Star, color: '#D946EF' },
   { id: 'Nature', name: 'Nature', label: 'Nature', icon: Leaf, color: '#16A34A' },
   { id: 'Date Ideas', name: 'Date Ideas', label: 'Dates', icon: Sparkles, color: '#EC4899' },
@@ -305,7 +305,7 @@ function ReelCard({
   const author = item.author || {};
   const photo = author.photos?.[0]?.url || author.photos?.[0];
   const catName = item.category?.name || 'General';
-  const catColor = CATEGORIES.find(c => c.name === catName)?.color || '#D4A574';
+  const catColor = CATEGORIES.find(c => c.name === catName)?.color || '#EC407A';
   const isVideo = item.type === 'video' && item.mediaUrl;
   const hasImage = item.mediaUrl && !isVideo;
 
@@ -322,7 +322,7 @@ function ReelCard({
           <video src={item.mediaUrl} className="w-full h-full object-cover" loop muted={!isActive} playsInline autoPlay={isActive} />
         ) : (
           <div className="w-full h-full" style={{ background: catGradient(catColor) }}>
-            <div className="absolute inset-0 bg-gradient-to-b from-[#0d0d12]/40 via-[#0d0d12]/20 to-[#0d0d12]/90" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/90" />
           </div>
         )}
         {/* Gradient overlays */}
@@ -868,13 +868,13 @@ export default function CreativityPage() {
 
   /* ─── Loading ─── */
   if (loading) {
-    return <MiamoLoader text={activeCategory === 'general' ? 'Curating your feed...' : `Loading ${activeCategory}...`} className="bg-[#0d0d12]" />;
+    return <MiamoLoader text={activeCategory === 'general' ? 'Curating your feed...' : `Loading ${activeCategory}...`} className="bg-miamo-bg" />;
   }
 
   /* ─── Empty ─── */
   if (items.length === 0) {
     return (
-      <div className="h-full flex flex-col bg-[#0d0d12]">
+      <div className="h-full flex flex-col bg-miamo-bg">
         {/* Category bar even when empty */}
         <CategoryBar
           categories={displayCategories}
@@ -906,7 +906,7 @@ export default function CreativityPage() {
   }
 
   return (
-    <div className="h-full flex flex-col bg-[#0d0d12] relative">
+    <div className="h-full flex flex-col bg-miamo-bg relative">
       {/* Toast notification */}
       <AnimatePresence>
         {toast && (
@@ -962,7 +962,7 @@ export default function CreativityPage() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setUploadOpen(true)}
-        className="absolute bottom-6 right-4 z-30 w-12 h-12 rounded-full bg-white text-[#0d0d12] flex items-center justify-center shadow-[0_4px_24px_rgba(255,255,255,0.2)]"
+        className="absolute bottom-6 right-4 z-30 w-12 h-12 rounded-full bg-white text-[#0d0d12] flex items-center justify-center shadow-[0_4px_24px_rgba(236,64,122,0.2)]"
       >
         <Plus className="w-6 h-6" />
       </motion.button>
@@ -1024,7 +1024,7 @@ function CategoryBar({
   onShowAll: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 px-4 py-3 overflow-x-auto no-scrollbar z-30 bg-[#0d0d12]/80 backdrop-blur-xl border-b border-white/[0.04]">
+    <div className="flex items-center gap-2 px-4 py-3 overflow-x-auto no-scrollbar z-30 bg-miamo-bg/80 backdrop-blur-xl border-b border-border">
       {categories.slice(0, 8).map(cat => {
         const Icon = cat.icon;
         const isActive = active === cat.name || (active === 'general' && cat.name === 'general');
@@ -1035,7 +1035,7 @@ function CategoryBar({
             className={cn(
               'flex items-center gap-1.5 h-8 px-3.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all border flex-shrink-0',
               isActive
-                ? 'bg-white text-[#0d0d12] border-white shadow-[0_0_12px_rgba(255,255,255,0.15)]'
+                ? 'bg-white text-[#0d0d12] border-white shadow-[0_0_12px_rgba(236,64,122,0.15)]'
                 : 'bg-white/[0.04] border-white/[0.06] text-white/40 hover:text-white/60 hover:bg-white/[0.08]',
             )}
           >

@@ -299,7 +299,7 @@ function ProfileModal({
                   <Heart className="w-4 h-4 fill-white" /> Match Back
                 </motion.button>
                 <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} onClick={() => setShowMoveInput(true)}
-                  className="flex-1 h-12 rounded-xl bg-gradient-to-r from-[#D4A574] to-[#B8804A] text-white text-[13px] font-bold flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(212,165,116,0.3)] hover:shadow-[0_4px_30px_rgba(212,165,116,0.4)] transition-all">
+                  className="flex-1 h-12 rounded-xl bg-gradient-to-r from-[#EC407A] to-[#D81B60] text-white text-[13px] font-bold flex items-center justify-center gap-2 shadow-[0_4px_20px_rgba(236,64,122,0.3)] hover:shadow-[0_4px_30px_rgba(236,64,122,0.4)] transition-all">
                   <Sparkles className="w-4 h-4" /> Miamo Move
                 </motion.button>
               </div>
@@ -636,7 +636,7 @@ function MatchCard({ match, onOpenMenu, onChat }: { match: any; onOpenMenu: (id:
           <div className="w-14 h-14 rounded-2xl overflow-hidden bg-white/[0.06]">
             {photo ? <img src={photo} alt={name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg font-black text-white/20">{name[0]}</div>}
           </div>
-          {online && <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-[#0d0d12] flex items-center justify-center"><div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" /></div>}
+          {online && <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-miamo-bg flex items-center justify-center"><div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" /></div>}
           {isPinned && <div className="absolute -top-1 -left-1 w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-md"><Pin className="w-2.5 h-2.5 text-[#0d0d12]" /></div>}
         </div>
         <div className="flex-1 min-w-0">

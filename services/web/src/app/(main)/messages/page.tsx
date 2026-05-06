@@ -391,7 +391,7 @@ function MessageBubble({
 // ═══════════════════════════════════════════════════════════
 function BackgroundPicker({ chatId, currentBg, onClose, onSelect }: { chatId: string; currentBg: string; onClose: () => void; onSelect: (bg: string, bgName?: string) => void }) {
   const [backgrounds, setBackgrounds] = useState<any[]>([]);
-  const [customColor, setCustomColor] = useState('#B8804A');
+  const [customColor, setCustomColor] = useState('#EC407A');
   const [tab, setTab] = useState<'presets' | 'custom'>('presets');
 
   useEffect(() => { api.getChatBackgrounds().then(r => setBackgrounds(r.data || [])).catch(() => {}); }, []);
@@ -428,14 +428,14 @@ function BackgroundPicker({ chatId, currentBg, onClose, onSelect }: { chatId: st
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <input type="color" value={customColor} onChange={e => setCustomColor(e.target.value)} className="w-12 h-12 rounded-xl border-0 cursor-pointer bg-transparent" />
-                <input value={customColor} onChange={e => setCustomColor(e.target.value)} className="input-premium flex-1 text-sm font-mono" placeholder="#B8804A" />
+                <input value={customColor} onChange={e => setCustomColor(e.target.value)} className="input-premium flex-1 text-sm font-mono" placeholder="#EC407A" />
               </div>
               <div className="aspect-[4/3] rounded-xl border border-border/30 flex items-end p-3" style={{ background: customColor }}>
                 <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-1.5"><span className="text-xs text-white/80">Preview</span></div>
               </div>
               <Button className="w-full" onClick={() => handleSelect(customColor, 'Custom Color')}>Apply Custom Color</Button>
               <div className="flex flex-wrap gap-2">
-                {['#B8804A', '#EC4899', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#C9956B', '#06B6D4', '#F97316', '#84CC16', '#D4A574', '#E11D48'].map(c => (
+                {['#EC407A', '#EC4899', '#EF4444', '#F59E0B', '#10B981', '#3B82F6', '#D81B60', '#06B6D4', '#F97316', '#84CC16', '#FF80AB', '#E11D48'].map(c => (
                   <button key={c} onClick={() => { setCustomColor(c); handleSelect(c, 'Custom Color'); }} className="w-8 h-8 rounded-full border-2 border-border/30 hover:scale-110 transition-transform" style={{ background: c }} />
                 ))}
               </div>
@@ -539,7 +539,7 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
   const [showEntertainment, setShowEntertainment] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [callType, setCallType] = useState<'voice' | 'video' | null>(null);
-  const [chatBackground, setChatBackground] = useState(chat.background || '#0d0d12');
+  const [chatBackground, setChatBackground] = useState(chat.background || '#FDF2F5');
   const [harshWarning, setHarshWarning] = useState<{ warnings: string[]; content: string } | null>(null);
   const [hiddenMsgIds, setHiddenMsgIds] = useState<Set<string>>(new Set());
   const [attachedFile, setAttachedFile] = useState<{ file: File; preview: string; type: string } | null>(null);
@@ -562,7 +562,7 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
       onRefreshChats();
     }).catch(() => {}).finally(() => setLoading(false));
     setReplyTo(null); setEditingMsg(null); setShowSuggestions(false); setShowEntertainment(false);
-    setChatBackground(chat.background || '#0d0d12');
+    setChatBackground(chat.background || '#FDF2F5');
   }, [chat.id]);
 
   // Poll for new messages every 3s
@@ -976,7 +976,7 @@ function MessagesFeedbackModal({ type, userName, onClose, onSubmit }: {
   const title = type === 'report' ? 'Report' : type === 'block' ? 'Block' : 'Unmatch';
   const subtitle = type === 'report' ? 'Help keep Miamo safe' : type === 'block' ? 'They won\'t be able to contact you' : 'Help us improve your matches';
   const iconColor = type === 'report' ? 'text-red-400 bg-red-400/10' : type === 'block' ? 'text-red-400 bg-red-400/10' : 'text-amber-400 bg-amber-400/10';
-  const submitColor = type === 'unmatch' ? 'bg-white text-[#0d0d12]' : 'bg-red-500 text-white';
+  const submitColor = type === 'unmatch' ? 'bg-white text-[#FDF2F5]' : 'bg-red-500 text-white';
 
   const handleSubmit = async () => {
     if (!selectedReason) return;

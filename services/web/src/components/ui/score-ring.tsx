@@ -8,7 +8,7 @@ export function ScoreRing({ score, size = 40, strokeWidth = 3 }: ScoreRingProps)
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
-  const color = score >= 70 ? '#D4A574' : score >= 50 ? '#F59E0B' : '#94A3B8';
+  const color = score >= 70 ? '#EC407A' : score >= 50 ? '#F59E0B' : '#94A3B8';
 
   return (
     <div className="relative" style={{ width: size, height: size }}>

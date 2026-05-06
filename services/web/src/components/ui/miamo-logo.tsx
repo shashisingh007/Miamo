@@ -61,7 +61,7 @@ export function AnimatedMiamoLogo({
         <motion.div
           className="absolute inset-0 rounded-[10px]"
           style={{
-            background: 'radial-gradient(circle at 50% 50%, rgba(212,165,116,0.2), transparent 70%)',
+            background: 'radial-gradient(circle at 50% 50%, rgba(236,64,122,0.2), transparent 70%)',
           }}
           animate={glowPulse ? {
             opacity: [0.5, 1, 0.5],
@@ -121,8 +121,8 @@ export function MiamoWordmark({
           }}
           className={
             i === 0
-              ? 'bg-gradient-to-r from-[#D4A574] to-[#C9956B] bg-clip-text text-transparent'
-              : 'text-white'
+              ? 'bg-gradient-to-r from-[#E91E63] to-[#D81B60] bg-clip-text text-transparent'
+              : 'text-text-primary'
           }
         >
           {letter}
