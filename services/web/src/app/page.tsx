@@ -14,7 +14,7 @@ export default function LandingPage() {
       <nav className="flex items-center justify-between px-6 lg:px-12 h-16 border-b border-border/30">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-lg overflow-hidden">
-            <Image src="/logo.svg" alt="Miamo" width={32} height={32} className="w-full h-full object-contain" />
+            <Image src="/logo.jpg" alt="Miamo" width={32} height={32} className="w-full h-full object-contain" />
           </div>
           <span className="text-lg font-bold tracking-tight">{APP_NAME}</span>
         </div>
@@ -88,7 +88,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded overflow-hidden">
-              <Image src="/logo.svg" alt="Miamo" width={24} height={24} className="w-full h-full object-contain" />
+              <Image src="/logo.jpg" alt="Miamo" width={24} height={24} className="w-full h-full object-contain" />
             </div>
             <span className="text-sm font-semibold">{APP_NAME}</span>
           </div>

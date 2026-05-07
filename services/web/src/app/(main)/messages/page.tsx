@@ -767,7 +767,7 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
         </div>
 
         {loading ? (
-          <div className="flex justify-center py-8"><img src="/logo.svg" alt="" className="w-8 h-8 rounded-lg animate-pulse" /></div>
+          <div className="flex justify-center py-8"><img src="/logo.jpg" alt="" className="w-8 h-8 rounded-lg animate-pulse" /></div>
         ) : visibleMessages.length === 0 ? (
           <div className="text-center py-8 space-y-4">
             <div className="w-16 h-16 mx-auto rounded-full bg-lavender-400/10 flex items-center justify-center"><MessageCircle className="w-8 h-8 text-lavender-400" /></div>
@@ -1056,7 +1056,7 @@ function MessagesFeedbackModal({ type, userName, onClose, onSubmit }: {
                   'flex-1 h-11 rounded-xl text-[13px] font-bold transition-all flex items-center justify-center gap-2',
                   selectedReason ? submitColor : 'bg-gray-50 text-gray-300 cursor-not-allowed',
                 )}>
-                {submitting ? <img src="/logo.svg" alt="" className="w-4 h-4 rounded animate-pulse" /> : title}
+                {submitting ? <img src="/logo.jpg" alt="" className="w-4 h-4 rounded animate-pulse" /> : title}
               </button>
             </div>
           </>
@@ -1205,7 +1205,7 @@ export default function MessagesPage() {
         </div>
         <div className="flex-1 overflow-y-auto px-2 space-y-0.5">
           {loading ? (
-            <div className="flex justify-center py-12"><img src="/logo.svg" alt="" className="w-8 h-8 rounded-lg animate-pulse" /></div>
+            <div className="flex justify-center py-12"><img src="/logo.jpg" alt="" className="w-8 h-8 rounded-lg animate-pulse" /></div>
           ) : filteredChats.length === 0 ? (
             <div className="text-center py-12 space-y-3">
               <MessageCircle className="w-10 h-10 text-text-muted/20 mx-auto" />

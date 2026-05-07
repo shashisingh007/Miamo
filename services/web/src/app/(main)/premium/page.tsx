@@ -36,7 +36,7 @@ export default function PremiumPage() {
     <div className="max-w-4xl mx-auto p-6 space-y-8">
       <div className="text-center">
         <div className="w-14 h-14 rounded-2xl overflow-hidden mx-auto mb-4">
-          <Image src="/logo.svg" alt="Miamo Premium" width={56} height={56} className="w-full h-full object-contain" />
+          <Image src="/logo.jpg" alt="Miamo Premium" width={56} height={56} className="w-full h-full object-contain" />
         </div>
         <h1 className="text-2xl font-bold">Upgrade to Premium</h1>
         <p className="text-sm text-text-muted mt-2 max-w-lg mx-auto">Get more from Miamo with advanced features, unlimited interactions, and priority visibility.</p>

@@ -99,7 +99,7 @@ function CommentSheet({
             <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4">
               {loading ? (
                 <div className="flex justify-center py-8">
-                  <img src="/logo.svg" alt="" className="w-6 h-6 rounded animate-pulse" />
+                  <img src="/logo.jpg" alt="" className="w-6 h-6 rounded animate-pulse" />
                 </div>
               ) : comments.length === 0 ? (
                 <p className="text-center text-[12px] text-gray-400 py-8">No comments yet — be the first!</p>
@@ -227,7 +227,7 @@ function MoveModal({
                   disabled={sending}
                   className="w-full h-11 rounded-xl bg-white text-[#0d0d12] text-[13px] font-bold hover:bg-white/90 transition-all flex items-center justify-center gap-2"
                 >
-                  {sending ? <img src="/logo.svg" alt="" className="w-4 h-4 rounded animate-pulse" /> : <>
+                  {sending ? <img src="/logo.jpg" alt="" className="w-4 h-4 rounded animate-pulse" /> : <>
                     <Send className="w-4 h-4" /> Send Move
                   </>}
                 </button>
@@ -712,7 +712,7 @@ function UploadModal({
                       : 'bg-gray-50 text-gray-300 cursor-not-allowed',
                   )}
                 >
-                  {creating ? <img src="/logo.svg" alt="" className="w-5 h-5 rounded animate-pulse" /> : <>
+                  {creating ? <img src="/logo.jpg" alt="" className="w-5 h-5 rounded animate-pulse" /> : <>
                     <Sparkles className="w-4 h-4" /> Publish
                   </>}
                 </button>

@@ -6,7 +6,7 @@ import Image from 'next/image';
 
 /* ═══════════════════════════════════════════════════════
    MIAMO LOGO SYSTEM — Pink Hearts
-   Uses logo.svg (three overlapping hearts in pink/magenta)
+   Uses logo.jpg (the official Miamo hearts logo image)
    ═══════════════════════════════════════════════════════ */
 
 interface AnimatedMiamoLogoProps {
@@ -63,7 +63,7 @@ export function AnimatedMiamoLogo({
           transition={{ duration: 0.6, ease: [0.4, 0, 0.2, 1] }}
         >
           <Image
-            src="/logo.svg"
+            src="/logo.jpg"
             alt="Miamo"
             width={Math.round(iconSize)}
             height={Math.round(iconSize)}
@@ -159,7 +159,7 @@ export function MiamoSplash({
               transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
             >
               <Image
-                src="/logo.svg"
+                src="/logo.jpg"
                 alt="Miamo"
                 width={96}
                 height={96}
@@ -236,7 +236,7 @@ export function MiamoLoader({ size = 56, text, className = '' }: MiamoLoaderProp
             transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
           >
             <Image
-              src="/logo.svg"
+              src="/logo.jpg"
               alt="Loading..."
               width={size}
               height={size}
