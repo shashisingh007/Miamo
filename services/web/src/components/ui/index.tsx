@@ -52,7 +52,7 @@ export function Avatar({ src, name, size = 'md', online, verified, className, ri
 // ─── Badge ───────────────────────────────────────────────
 interface BadgeProps {
   children: React.ReactNode;
-  variant?: 'default' | 'success' | 'warning' | 'danger' | 'info';
+  variant?: 'default' | 'success' | 'warning' | 'danger' | 'info' | 'muted';
   className?: string;
 }
 
@@ -62,6 +62,7 @@ const badgeVariants = {
   warning: 'bg-amber-500/10 text-amber-400',
   danger: 'bg-red-500/10 text-red-400',
   info: 'bg-sky-500/10 text-sky-400',
+  muted: 'bg-gray-100 text-gray-500',
 };
 
 export function Badge({ children, variant = 'default', className }: BadgeProps) {

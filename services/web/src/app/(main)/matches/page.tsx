@@ -93,7 +93,7 @@ function TooltipButton({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 4, scale: 0.95 }}
             transition={{ duration: 0.12 }}
-            className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap px-2.5 py-1 rounded-lg bg-white text-[#0d0d12] text-[10px] font-bold shadow-lg z-50 pointer-events-none"
+            className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap px-2.5 py-1 rounded-lg bg-white text-gray-900 text-[10px] font-bold shadow-lg z-50 pointer-events-none"
           >
             {label}
             <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-white rotate-45" />
@@ -160,7 +160,7 @@ function ProfileModal({
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 40, scale: 0.95 }}
         transition={{ type: 'spring', damping: 28, stiffness: 300 }}
-        className="fixed inset-x-3 top-[2%] bottom-[2%] max-w-lg mx-auto bg-[#13131f] border border-gray-200 rounded-[24px] shadow-[0_16px_80px_rgba(0,0,0,0.8)] z-50 overflow-hidden flex flex-col"
+        className="fixed inset-x-3 top-[2%] bottom-[2%] max-w-lg mx-auto bg-white border border-gray-200 rounded-[24px] shadow-2xl z-50 overflow-hidden flex flex-col"
       >
         {/* Header bar */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
@@ -231,7 +231,7 @@ function ProfileModal({
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-3 text-[12px] text-white/35 mb-4">
+            <div className="flex items-center gap-3 text-[12px] text-gray-400 mb-4">
               {city && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{city}</span>}
               {profession && <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" />{profession}</span>}
             </div>
@@ -410,7 +410,7 @@ function FeedbackModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed inset-x-4 top-[5%] max-w-md mx-auto bg-[#151522] border border-gray-200 rounded-[20px] shadow-[0_8px_60px_rgba(0,0,0,0.6)] z-[60] overflow-hidden max-h-[90vh] flex flex-col"
+            className="fixed inset-x-4 top-[5%] max-w-md mx-auto bg-white border border-gray-200 rounded-[20px] shadow-2xl z-[60] overflow-hidden max-h-[90vh] flex flex-col"
           >
             <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">
@@ -470,7 +470,7 @@ function FeedbackModal({
                   <button onClick={handleSubmit} disabled={!selectedReason || submitting}
                     className={cn(
                       'flex-1 h-11 rounded-xl text-[13px] font-bold transition-all flex items-center justify-center gap-2',
-                      selectedReason ? (type === 'report' || type === 'block') ? 'bg-red-500 text-gray-900' : 'bg-white text-[#0d0d12]' : 'bg-gray-50 text-gray-300 cursor-not-allowed',
+                      selectedReason ? (type === 'report' || type === 'block') ? 'bg-red-500 text-gray-900' : 'bg-white text-gray-900' : 'bg-gray-50 text-gray-300 cursor-not-allowed',
                     )}>
                     {submitting ? <img src="/logo.png" alt="" className="w-4 h-4 rounded animate-pulse" /> : type === 'unmatch' ? 'Unmatch' : type === 'block' ? 'Block' : 'Report'}
                   </button>
@@ -574,7 +574,7 @@ function IncomingCard({ item, onClick }: { item: any; onClick: () => void }) {
               <div className="w-full h-full flex items-center justify-center text-xl font-black text-gray-300">{name[0]}</div>
             )}
           </div>
-          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#13131f] flex items-center justify-center">
+          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-white flex items-center justify-center">
             {item.type === 'move' ? <span className="text-[11px]">💫</span> : item.type === 'like' ? <Heart className="w-3 h-3 text-pink-400 fill-pink-400" /> : <MessageCircle className="w-3 h-3 text-purple-400" />}
           </div>
         </div>
@@ -637,7 +637,7 @@ function MatchCard({ match, onOpenMenu, onChat }: { match: any; onOpenMenu: (id:
             {photo ? <img src={photo} alt={name} className="w-full h-full object-contain" /> : <div className="w-full h-full flex items-center justify-center text-lg font-black text-gray-300">{name[0]}</div>}
           </div>
           {online && <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-miamo-bg flex items-center justify-center"><div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" /></div>}
-          {isPinned && <div className="absolute -top-1 -left-1 w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-md"><Pin className="w-2.5 h-2.5 text-[#0d0d12]" /></div>}
+          {isPinned && <div className="absolute -top-1 -left-1 w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-md"><Pin className="w-2.5 h-2.5 text-gray-900" /></div>}
         </div>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-0.5">
@@ -646,7 +646,7 @@ function MatchCard({ match, onOpenMenu, onChat }: { match: any; onOpenMenu: (id:
             {isNew && <span className="px-2 py-0.5 rounded-md bg-purple-400/15 text-purple-300 text-[9px] font-bold uppercase">New</span>}
             {isFavorite && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 flex-shrink-0" />}
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-white/35">
+          <div className="flex items-center gap-2 text-[11px] text-gray-400">
             {city && <span className="flex items-center gap-1"><MapPin className="w-2.5 h-2.5" />{city}</span>}
             {age && <span>{age}</span>}
           </div>

@@ -137,7 +137,7 @@ function CommentSheet({
                 disabled={!text.trim() || sending}
                 className={cn(
                   'w-10 h-10 rounded-xl flex items-center justify-center transition-all',
-                  text.trim() ? 'bg-white text-[#0d0d12]' : 'bg-gray-50 text-gray-300',
+                  text.trim() ? 'bg-white text-gray-900' : 'bg-gray-50 text-gray-300',
                 )}
               >
                 <Send className="w-4 h-4" />
@@ -183,7 +183,7 @@ function MoveModal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed inset-x-4 bottom-8 max-w-sm mx-auto bg-[#151522] border border-gray-200 rounded-[20px] shadow-[0_8px_60px_rgba(0,0,0,0.6)] z-50 overflow-hidden"
+            className="fixed inset-x-4 bottom-8 max-w-sm mx-auto bg-white border border-gray-200 rounded-[20px] shadow-2xl z-50 overflow-hidden"
           >
             {sent ? (
               <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="p-8 text-center">
@@ -225,7 +225,7 @@ function MoveModal({
                 <button
                   onClick={handleSend}
                   disabled={sending}
-                  className="w-full h-11 rounded-xl bg-white text-[#0d0d12] text-[13px] font-bold hover:bg-white/90 transition-all flex items-center justify-center gap-2"
+                  className="w-full h-11 rounded-xl bg-white text-gray-900 text-[13px] font-bold hover:bg-white/90 transition-all flex items-center justify-center gap-2"
                 >
                   {sending ? <img src="/logo.png" alt="" className="w-4 h-4 rounded animate-pulse" /> : <>
                     <Send className="w-4 h-4" /> Send Move
@@ -266,7 +266,7 @@ function MoreMenu({
       <motion.div
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="fixed bottom-0 inset-x-0 bg-[#151522] border-t border-gray-200 rounded-t-[20px] z-50 px-4 py-3 pb-8"
+        className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 rounded-t-[20px] z-50 px-4 py-3 pb-8"
       >
         <div className="w-10 h-1 rounded-full bg-white/10 mx-auto mb-4" />
         <div className="space-y-0.5">
@@ -351,7 +351,7 @@ function ReelCard({
             )}
           </div>
           <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-md">
-            <Plus className="w-3 h-3 text-[#0d0d12]" />
+            <Plus className="w-3 h-3 text-gray-900" />
           </div>
         </button>
 
@@ -708,7 +708,7 @@ function UploadModal({
                   className={cn(
                     'w-full h-12 rounded-xl text-[14px] font-bold transition-all flex items-center justify-center gap-2',
                     title.trim() && selectedCat
-                      ? 'bg-white text-[#0d0d12] hover:bg-white/90'
+                      ? 'bg-white text-gray-900 hover:bg-white/90'
                       : 'bg-gray-50 text-gray-300 cursor-not-allowed',
                   )}
                 >
@@ -894,7 +894,7 @@ export default function CreativityPage() {
                 : `No ${activeCategory} content yet — be the pioneer!`}
             </p>
             <button onClick={() => setUploadOpen(true)}
-              className="h-11 px-6 rounded-xl bg-white text-[#0d0d12] text-sm font-bold hover:bg-white/90 transition-all inline-flex items-center gap-2">
+              className="h-11 px-6 rounded-xl bg-white text-gray-900 text-sm font-bold hover:bg-white/90 transition-all inline-flex items-center gap-2">
               <Plus className="w-4 h-4" /> Create
             </button>
           </motion.div>
@@ -962,7 +962,7 @@ export default function CreativityPage() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setUploadOpen(true)}
-        className="absolute bottom-6 right-4 z-30 w-12 h-12 rounded-full bg-white text-[#0d0d12] flex items-center justify-center shadow-[0_4px_24px_rgba(236,64,122,0.2)]"
+        className="absolute bottom-6 right-4 z-30 w-12 h-12 rounded-full bg-white text-gray-900 flex items-center justify-center shadow-[0_4px_24px_rgba(236,64,122,0.2)]"
       >
         <Plus className="w-6 h-6" />
       </motion.button>
@@ -1035,7 +1035,7 @@ function CategoryBar({
             className={cn(
               'flex items-center gap-1.5 h-8 px-3.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all border flex-shrink-0',
               isActive
-                ? 'bg-white text-[#0d0d12] border-white shadow-[0_0_12px_rgba(236,64,122,0.15)]'
+                ? 'bg-white text-gray-900 border-white shadow-[0_0_12px_rgba(236,64,122,0.15)]'
                 : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-100',
             )}
           >
@@ -1106,7 +1106,7 @@ function CategoryPickerSheet({
                       </div>
                       {isActive && (
                         <div className="ml-auto w-5 h-5 rounded-full bg-white flex items-center justify-center flex-shrink-0">
-                          <Check className="w-3 h-3 text-[#0d0d12]" />
+                          <Check className="w-3 h-3 text-gray-900" />
                         </div>
                       )}
                     </button>

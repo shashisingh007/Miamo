@@ -93,7 +93,7 @@ function FilterPanel({
     <button onClick={onClick} className={cn(
       'px-3.5 py-2 rounded-full text-[11px] font-semibold tracking-wide transition-all border',
       active
-        ? 'bg-white text-[#0d0d12] border-white shadow-[0_0_12px_rgba(236,64,122,0.15)]'
+        ? 'bg-white text-gray-900 border-white shadow-[0_0_12px_rgba(236,64,122,0.15)]'
         : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-700',
     )}>
       {label}
@@ -233,7 +233,7 @@ function FilterPanel({
             </div>
             <div className="sticky bottom-0 bg-white/95 backdrop-blur-xl border-t border-gray-100 p-5 flex gap-3">
               <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-all">Cancel</button>
-              <button onClick={() => { onApply(local); onClose(); }} className="flex-1 h-11 rounded-xl bg-white text-[#0d0d12] text-sm font-bold hover:bg-white/90 transition-all flex items-center justify-center gap-2">
+              <button onClick={() => { onApply(local); onClose(); }} className="flex-1 h-11 rounded-xl bg-white text-gray-900 text-sm font-bold hover:bg-white/90 transition-all flex items-center justify-center gap-2">
                 <Check className="w-4 h-4" /> Apply
               </button>
             </div>
@@ -305,7 +305,7 @@ function ProfileCard({
             <div className="aspect-[3/4] max-h-[520px] overflow-hidden relative group">
               <img src={photos[0].url || photos[0]} alt={user.displayName}
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.02]" />
-              <div className="absolute inset-0 bg-gradient-to-t from-[#131320] via-[#131320]/20 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/20 to-transparent" />
               <div className="absolute bottom-0 inset-x-0 px-6 pb-6">
                 <div className="flex items-end justify-between">
                   <div>
@@ -320,7 +320,7 @@ function ProfileCard({
                           transition={{ delay: 0.3, type: 'spring', stiffness: 400 }}
                           className="w-6 h-6 bg-white rounded-full flex items-center justify-center shadow-[0_0_12px_rgba(255,255,255,0.3)]"
                         >
-                          <Shield className="w-3.5 h-3.5 text-[#131320]" />
+                          <Shield className="w-3.5 h-3.5 text-gray-800" />
                         </motion.div>
                       )}
                     </div>
@@ -363,7 +363,7 @@ function ProfileCard({
         <div className="px-6 pt-5 pb-1">
           <div className="flex flex-wrap gap-2">
             {profile.lookingFor && profile.lookingFor !== 'open' && (
-              <span className="px-3 py-1.5 rounded-full text-[11px] font-bold bg-white text-[#131320] shadow-[0_0_8px_rgba(255,255,255,0.1)]">
+              <span className="px-3 py-1.5 rounded-full text-[11px] font-bold bg-white text-gray-800 shadow-md">
                 {profile.lookingFor.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
               </span>
             )}
@@ -450,7 +450,7 @@ function ProfileCard({
                   <span key={name} className={cn(
                     'px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all',
                     isCommon
-                      ? 'bg-white text-[#131320] shadow-[0_0_10px_rgba(255,255,255,0.12)]'
+                      ? 'bg-white text-gray-800 shadow-lg'
                       : 'bg-gray-50 text-gray-500 border border-gray-200',
                   )}>
                     {isCommon && <Star className="w-3 h-3 inline mr-1 -mt-0.5" />}{name}
@@ -510,7 +510,7 @@ function ProfileCard({
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-[0_0_20px_rgba(255,255,255,0.15)]">
-                      <Heart className="w-5 h-5 text-[#1a1a2e]" fill="#1a1a2e" />
+                      <Heart className="w-5 h-5 text-gray-900" fill="currentColor" />
                     </div>
                     <div>
                       <h4 className="text-[13px] font-bold text-gray-900">Miamo Move</h4>
@@ -535,7 +535,7 @@ function ProfileCard({
                     onClick={handleSendMove}
                     className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:shadow-[0_0_24px_rgba(255,255,255,0.25)] transition-all"
                   >
-                    <Send className="w-4 h-4 text-[#1a1a2e]" />
+                    <Send className="w-4 h-4 text-gray-900" />
                   </motion.button>
                 </div>
                 {/* AI suggestions toggle */}
@@ -839,7 +839,7 @@ function AiSidePanel({
               'absolute bottom-2.5 right-2.5 w-8 h-8 rounded-full flex items-center justify-center transition-all',
               customSent ? 'bg-emerald-400/20' : 'bg-white hover:shadow-[0_0_12px_rgba(255,255,255,0.2)]',
             )}>
-            {customSent ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Send className="w-3.5 h-3.5 text-[#131320]" />}
+            {customSent ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Send className="w-3.5 h-3.5 text-gray-800" />}
           </motion.button>
         </div>
         <p className="text-[10px] text-gray-300 mt-2 font-medium">Or send blank — just press send</p>
@@ -1021,7 +1021,7 @@ export default function DiscoverPage() {
           <h3 className="text-lg font-bold text-gray-900 mb-2">No more profiles</h3>
           <p className="text-[13px] text-gray-400 mb-6 leading-relaxed">Check back later or adjust your filters</p>
           <button onClick={() => setShowFilters(true)}
-            className="h-11 px-6 rounded-xl bg-white text-[#0d0d12] text-sm font-bold hover:bg-white/90 transition-all inline-flex items-center gap-2">
+            className="h-11 px-6 rounded-xl bg-white text-gray-900 text-sm font-bold hover:bg-white/90 transition-all inline-flex items-center gap-2">
             <SlidersHorizontal className="w-4 h-4" /> Adjust Filters
           </button>
         </motion.div>
@@ -1042,7 +1042,7 @@ export default function DiscoverPage() {
             className={cn(
               'flex items-center gap-2 h-10 px-4 rounded-xl border text-[13px] font-semibold transition-all',
               activeFilterCount > 0
-                ? 'bg-white text-[#0d0d12] border-white shadow-[0_0_16px_rgba(236,64,122,0.1)]'
+                ? 'bg-white text-gray-900 border-white shadow-[0_0_16px_rgba(236,64,122,0.1)]'
                 : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100',
             )}
           >

@@ -997,7 +997,7 @@ function MessagesFeedbackModal({ type, userName, onClose, onSubmit }: {
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.95, y: 20 }}
         transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-        className="fixed inset-x-4 top-[5%] max-w-md mx-auto bg-[#151522] border border-gray-200 rounded-[20px] shadow-[0_8px_60px_rgba(0,0,0,0.6)] z-[60] overflow-hidden max-h-[90vh] flex flex-col"
+        className="fixed inset-x-4 top-[5%] max-w-md mx-auto bg-white border border-gray-200 rounded-[20px] shadow-2xl z-[60] overflow-hidden max-h-[90vh] flex flex-col"
       >
         <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
