@@ -1,42 +1,59 @@
 import * as React from 'react';
-import { Slot } from '@radix-ui/react-slot';
-import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
+import { cva, type VariantProps } from 'class-variance-authority';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap font-semibold transition-all duration-300 ease-out active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pink-400/40 focus-visible:ring-offset-2',
+  'inline-flex items-center justify-center font-semibold transition-all duration-300 active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none',
   {
     variants: {
       variant: {
-        default: 'btn-primary text-white shadow-[0_4px_20px_rgba(236,64,122,0.3)] hover:shadow-[0_8px_30px_rgba(236,64,122,0.4)] hover:-translate-y-0.5',
-        secondary: 'bg-white/80 backdrop-blur-md text-gray-700 border border-pink-100 shadow-sm hover:border-pink-300 hover:shadow-md hover:-translate-y-0.5',
-        ghost: 'text-gray-600 hover:text-pink-600 hover:bg-pink-50/80 backdrop-blur-sm',
-        outline: 'border-2 border-pink-200 text-pink-600 hover:border-pink-400 hover:bg-pink-50 hover:shadow-[0_4px_15px_rgba(236,64,122,0.1)] hover:-translate-y-0.5',
-        danger: 'bg-red-50 text-red-600 border border-red-100 hover:bg-red-100 hover:border-red-200',
-        success: 'bg-emerald-50 text-emerald-600 border border-emerald-100 hover:bg-emerald-100',
+        default: 'btn-primary',
+        secondary: 'btn-glass',
+        ghost: 'btn-ghost',
+        outline: 'btn-outline',
+        danger: 'bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-2xl shadow-[0_4px_16px_rgba(239,68,68,0.3)] hover:shadow-[0_8px_24px_rgba(239,68,68,0.4)] hover:-translate-y-0.5',
+        link: 'text-pink-600 hover:text-pink-700 underline-offset-4 hover:underline p-0 h-auto font-medium',
       },
       size: {
-        sm: 'h-8 px-3.5 text-xs rounded-xl',
-        md: 'h-10 px-5 text-sm rounded-xl',
-        lg: 'h-12 px-8 text-base rounded-2xl',
+        sm: 'h-9 px-4 text-[12px] rounded-xl',
+        default: 'h-11 px-6 text-sm rounded-2xl',
+        lg: 'h-12 px-8 text-sm rounded-2xl',
+        xl: 'h-14 px-10 text-base rounded-2xl',
         icon: 'h-10 w-10 rounded-xl',
-        'icon-sm': 'h-8 w-8 rounded-lg',
+        'icon-sm': 'h-8 w-8 rounded-lg text-xs',
       },
     },
-    defaultVariants: { variant: 'default', size: 'md' },
+    defaultVariants: {
+      variant: 'default',
+      size: 'default',
+    },
   }
 );
 
 export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
-  asChild?: boolean;
+  loading?: boolean;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
-    const Comp = asChild ? Slot : 'button';
-    return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />;
+  ({ className, variant, size, loading, children, disabled, ...props }, ref) => {
+    return (
+      <button
+        className={cn(buttonVariants({ variant, size }), className)}
+        ref={ref}
+        disabled={disabled || loading}
+        {...props}
+      >
+        {loading && (
+          <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+          </svg>
+        )}
+        {children}
+      </button>
+    );
   }
 );
 Button.displayName = 'Button';

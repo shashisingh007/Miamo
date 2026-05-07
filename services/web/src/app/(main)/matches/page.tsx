@@ -267,7 +267,7 @@ function ProfileModal({
             {prompts.length > 0 && (
               <div className="mb-4 space-y-3">
                 {prompts.slice(0, 2).map((p: any) => (
-                  <div key={p.id} className="p-3 rounded-xl bg-gray-50/50 border border-gray-100">
+                  <div key={p.id} className="p-3 rounded-xl card-premium">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{p.question}</p>
                     <p className="text-[12px] text-gray-600">{p.answer}</p>
                   </div>
@@ -1012,7 +1012,7 @@ export default function MatchesPage() {
 
 
         {/* ─── Main Tabs ─── */}
-        <div className="flex gap-1 mb-5 p-1 rounded-xl bg-gray-50/50 border border-gray-100">
+        <div className="flex gap-1 mb-5 p-1 rounded-xl card-premium">
           {mainTabs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;

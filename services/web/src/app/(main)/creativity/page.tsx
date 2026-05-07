@@ -1045,7 +1045,7 @@ function CategoryBar({
         );
       })}
       <button onClick={onShowAll}
-        className="flex items-center gap-1 h-8 px-3 rounded-full bg-gray-50/50 border border-gray-100 text-gray-400 text-[11px] font-semibold whitespace-nowrap hover:text-gray-400 flex-shrink-0">
+        className="flex items-center gap-1 h-8 px-3 rounded-full card-premium text-gray-400 text-[11px] font-semibold whitespace-nowrap hover:text-gray-400 flex-shrink-0">
         All <ChevronDown className="w-3 h-3" />
       </button>
     </div>

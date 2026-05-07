@@ -297,7 +297,7 @@ function ProfileCard({
   return (
     <div className="w-full">
       {/* Card container */}
-      <div className="rounded-[20px] overflow-hidden bg-white border border-gray-200 shadow-[0_4px_40px_rgba(0,0,0,0.4)]">
+      <div className="rounded-[20px] overflow-hidden bg-white border border-gray-200 shadow-[0_8px_40px_rgba(236,64,122,0.08)]">
 
         {/* ─── Main Photo ─── */}
         <div className="relative">
@@ -305,7 +305,7 @@ function ProfileCard({
             <div className="aspect-[3/4] max-h-[520px] overflow-hidden relative group">
               <img src={photos[0].url || photos[0]} alt={user.displayName}
                 className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.02]" />
-              <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/20 to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
               <div className="absolute bottom-0 inset-x-0 px-6 pb-6">
                 <div className="flex items-end justify-between">
                   <div>
@@ -408,7 +408,7 @@ function ProfileCard({
         {/* ─── Prompts ─── */}
         {prompts.map((prompt: any, i: number) => (
           <div key={i} className="mx-6 my-3">
-            <div className="relative rounded-2xl bg-gray-50 border border-gray-200 p-5 group hover:border-gray-200 transition-all">
+            <div className="relative rounded-2xl card-premium p-5 group hover:border-gray-200 transition-all">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-2">
                 {prompt.question}
               </p>
@@ -615,7 +615,7 @@ function AiSidePanel({
     return (
       <div className="space-y-3">
         {[1, 2, 3, 4].map(i => (
-          <div key={i} className="rounded-2xl bg-gray-50/50 border border-gray-100 p-5">
+          <div key={i} className="rounded-2xl card-premium p-5">
             <div className="h-3 bg-gray-50 rounded-full animate-pulse w-1/2 mb-4" />
             <div className="space-y-2.5">
               <div className="h-2.5 bg-gray-50 rounded-full animate-pulse" />
@@ -699,7 +699,7 @@ function AiSidePanel({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="rounded-2xl bg-gray-50/50 border border-gray-200 p-5"
+          className="rounded-2xl card-premium p-5"
         >
           <div className="flex items-center gap-2.5 mb-4">
             <div className="w-8 h-8 rounded-xl bg-lavender-400/10 flex items-center justify-center">
@@ -776,7 +776,7 @@ function AiSidePanel({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="rounded-2xl bg-gray-50/50 border border-gray-200 p-5"
+        className="rounded-2xl card-premium p-5"
       >
         <div className="flex items-center gap-2.5 mb-4">
           <div className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center">
@@ -817,7 +817,7 @@ function AiSidePanel({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.55 }}
-        className="rounded-2xl bg-gray-50/50 border border-gray-200 p-5"
+        className="rounded-2xl card-premium p-5"
       >
         <div className="flex items-center gap-2.5 mb-3">
           <div className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center">
@@ -859,7 +859,7 @@ function MoreMovesSection({
 }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div className="rounded-2xl bg-gray-50/50 border border-gray-200 overflow-hidden">
+    <div className="rounded-2xl card-premium overflow-hidden">
       <button onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50/50 transition-colors">
         <span className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.12em] flex items-center gap-2">
@@ -1068,8 +1068,8 @@ export default function DiscoverPage() {
                   className={cn(
                     'flex items-center gap-1.5 h-10 px-4 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all border',
                     isActive
-                      ? 'bg-pink-50 border-pink-200 text-gray-900'
-                      : 'bg-transparent border-gray-100 text-gray-400 hover:text-gray-500 hover:border-gray-200',
+                      ? 'chip-glass-active'
+                      : 'chip-glass text-gray-500',
                   )}
                 >
                   <Icon className="w-3.5 h-3.5" /> {f.label}
