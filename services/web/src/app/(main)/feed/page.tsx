@@ -152,7 +152,7 @@ function FeedPost({ post, onDelete }: { post: any; onDelete?: () => void }) {
             <Button size="sm" onClick={submitComment} disabled={!commentText.trim()}>Post</Button>
           </div>
           {loadingComments ? (
-            <div className="flex justify-center py-3"><img src="/logo.jpg" alt="" className="w-5 h-5 rounded animate-pulse" /></div>
+            <div className="flex justify-center py-3"><img src="/logo.png" alt="" className="w-5 h-5 rounded animate-pulse" /></div>
           ) : comments.length === 0 ? (
             <p className="text-xs text-text-muted text-center py-2">No comments yet. Be the first!</p>
           ) : (

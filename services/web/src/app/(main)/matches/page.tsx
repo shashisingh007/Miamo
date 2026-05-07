@@ -472,7 +472,7 @@ function FeedbackModal({
                       'flex-1 h-11 rounded-xl text-[13px] font-bold transition-all flex items-center justify-center gap-2',
                       selectedReason ? (type === 'report' || type === 'block') ? 'bg-red-500 text-gray-900' : 'bg-white text-[#0d0d12]' : 'bg-gray-50 text-gray-300 cursor-not-allowed',
                     )}>
-                    {submitting ? <img src="/logo.jpg" alt="" className="w-4 h-4 rounded animate-pulse" /> : type === 'unmatch' ? 'Unmatch' : type === 'block' ? 'Block' : 'Report'}
+                    {submitting ? <img src="/logo.png" alt="" className="w-4 h-4 rounded animate-pulse" /> : type === 'unmatch' ? 'Unmatch' : type === 'block' ? 'Block' : 'Report'}
                   </button>
                 </div>
               </>
