@@ -6,11 +6,11 @@ import { Providers } from '@/components/providers';
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
-  title: 'Miamo — Where connections become something real',
+  title: 'Miamo — Premium Dating App',
   description: 'A premium dating and social platform for meaningful connections, thoughtful matching, and authentic relationships.',
   keywords: ['dating', 'social', 'meaningful connections', 'relationships', 'AI matching'],
   openGraph: {
-    title: 'Miamo — Where connections become something real',
+    title: 'Miamo — Premium Dating App',
     description: 'Premium dating and social platform',
     type: 'website',
     siteName: 'Miamo',
