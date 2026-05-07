@@ -81,7 +81,7 @@ function TooltipButton({
     <div className="relative" onMouseEnter={() => setShow(true)} onMouseLeave={() => setShow(false)}>
       <button onClick={onClick} className={cn(
         'w-8 h-8 rounded-lg flex items-center justify-center transition-all',
-        active ? 'bg-white/[0.12] text-white' : 'bg-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50',
+        active ? 'bg-pink-50 text-gray-900' : 'bg-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-50',
         className,
       )}>
         <Icon style={{ width: size, height: size }} />
@@ -164,13 +164,13 @@ function ProfileModal({
       >
         {/* Header bar */}
         <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 flex-shrink-0">
-          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-white/[0.05] flex items-center justify-center hover:bg-white/[0.1] transition">
+          <button onClick={onClose} className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center hover:bg-pink-50 transition">
             <ArrowLeft className="w-4 h-4 text-gray-600" />
           </button>
           <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">
             {incoming.type === 'move' ? '💫 Miamo Move' : incoming.type === 'like' ? '❤️ Liked You' : '💬 Sent a thought'}
           </span>
-          <button onClick={() => setShowActions(!showActions)} className="w-9 h-9 rounded-xl bg-white/[0.05] flex items-center justify-center hover:bg-white/[0.1] transition">
+          <button onClick={() => setShowActions(!showActions)} className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center hover:bg-pink-50 transition">
             <MoreHorizontal className="w-4 h-4 text-gray-600" />
           </button>
         </div>
@@ -252,10 +252,10 @@ function ProfileModal({
             {/* Interests */}
             {interests.length > 0 && (
               <div className="mb-4">
-                <p className="text-[10px] font-bold text-white/25 uppercase tracking-wider mb-2">Interests</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Interests</p>
                 <div className="flex flex-wrap gap-1.5">
                   {interests.map((i: any) => (
-                    <span key={i.id || i.name} className="px-2.5 py-1 rounded-lg bg-white/[0.05] border border-gray-200 text-[11px] text-gray-500 font-medium">
+                    <span key={i.id || i.name} className="px-2.5 py-1 rounded-lg bg-gray-50 border border-gray-200 text-[11px] text-gray-500 font-medium">
                       {i.name}
                     </span>
                   ))}
@@ -267,8 +267,8 @@ function ProfileModal({
             {prompts.length > 0 && (
               <div className="mb-4 space-y-3">
                 {prompts.slice(0, 2).map((p: any) => (
-                  <div key={p.id} className="p-3 rounded-xl bg-white/[0.02] border border-gray-100">
-                    <p className="text-[10px] font-bold text-white/25 uppercase tracking-wider mb-1">{p.question}</p>
+                  <div key={p.id} className="p-3 rounded-xl bg-gray-50/50 border border-gray-100">
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">{p.question}</p>
                     <p className="text-[12px] text-gray-600">{p.answer}</p>
                   </div>
                 ))}
@@ -306,11 +306,11 @@ function ProfileModal({
               {/* Secondary actions */}
               <div className="flex gap-2">
                 <button onClick={onHold}
-                  className="flex-1 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-400 text-[12px] font-semibold flex items-center justify-center gap-1.5 hover:bg-white/[0.07] hover:text-gray-600 transition-all">
+                  className="flex-1 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-400 text-[12px] font-semibold flex items-center justify-center gap-1.5 hover:bg-gray-100 hover:text-gray-600 transition-all">
                   <Pause className="w-3.5 h-3.5" /> Hold for Now
                 </button>
                 <button onClick={() => { onHide(); onClose(); }}
-                  className="flex-1 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-400 text-[12px] font-semibold flex items-center justify-center gap-1.5 hover:bg-white/[0.07] hover:text-gray-600 transition-all">
+                  className="flex-1 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-400 text-[12px] font-semibold flex items-center justify-center gap-1.5 hover:bg-gray-100 hover:text-gray-600 transition-all">
                   <EyeOff className="w-3.5 h-3.5" /> Not Interested
                 </button>
               </div>
@@ -340,7 +340,7 @@ function ProfileModal({
               {/* Input */}
               <div className="flex gap-2">
                 <button onClick={() => setShowMoveInput(false)}
-                  className="w-10 h-10 rounded-xl bg-white/[0.05] flex items-center justify-center hover:bg-white/[0.1] transition flex-shrink-0">
+                  className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center hover:bg-pink-50 transition flex-shrink-0">
                   <ArrowLeft className="w-4 h-4 text-gray-400" />
                 </button>
                 <input
@@ -349,14 +349,14 @@ function ProfileModal({
                   onKeyDown={e => { if (e.key === 'Enter' && moveMessage.trim()) onMatchMove(moveMessage.trim()); }}
                   placeholder="Write your Miamo Move..."
                   autoFocus
-                  className="flex-1 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] px-4 focus:border-purple-500/30 focus:outline-none placeholder:text-white/15 transition"
+                  className="flex-1 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] px-4 focus:border-purple-500/30 focus:outline-none placeholder:text-gray-400 transition"
                 />
                 <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                   onClick={() => { if (moveMessage.trim()) onMatchMove(moveMessage.trim()); }}
                   disabled={!moveMessage.trim()}
                   className={cn(
                     'w-10 h-10 rounded-xl flex items-center justify-center transition flex-shrink-0',
-                    moveMessage.trim() ? 'bg-purple-500 text-white' : 'bg-gray-50 text-white/15',
+                    moveMessage.trim() ? 'bg-purple-500 text-gray-900' : 'bg-gray-50 text-gray-300',
                   )}>
                   <Send className="w-4 h-4" />
                 </motion.button>
@@ -422,7 +422,7 @@ function FeedbackModal({
                   <p className="text-[11px] text-gray-400 mt-0.5">{type === 'unmatch' ? 'Help us improve your matches' : type === 'block' ? 'They won\'t be able to contact you' : 'Help keep Miamo safe'}</p>
                 </div>
               </div>
-              <button onClick={onClose} className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center hover:bg-white/[0.1] transition-colors">
+              <button onClick={onClose} className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center hover:bg-pink-50 transition-colors">
                 <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
@@ -446,12 +446,12 @@ function FeedbackModal({
                       <button key={r.code} onClick={() => setSelectedReason(r.code)}
                         className={cn(
                           'w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all',
-                          isActive ? 'bg-gray-100 border-white/[0.15]' : 'bg-transparent border-white/[0.04] hover:bg-gray-50',
+                          isActive ? 'bg-gray-100 border-pink-200' : 'bg-transparent border-gray-100 hover:bg-gray-50',
                         )}>
-                        <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0', isActive ? 'bg-white/[0.1]' : 'bg-gray-50')}>
+                        <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0', isActive ? 'bg-pink-50' : 'bg-gray-50')}>
                           <Icon className={cn('w-4 h-4', isActive ? 'text-gray-800' : 'text-gray-400')} />
                         </div>
-                        <span className={cn('text-[13px] font-medium', isActive ? 'text-white' : 'text-gray-500')}>{r.label}</span>
+                        <span className={cn('text-[13px] font-medium', isActive ? 'text-gray-900' : 'text-gray-500')}>{r.label}</span>
                         {isActive && (
                           <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="ml-auto w-5 h-5 rounded-full bg-white flex items-center justify-center">
                             <Check className="w-3 h-3 text-[#151522]" />
@@ -462,7 +462,7 @@ function FeedbackModal({
                   })}
                   <div className="pt-3">
                     <textarea value={details} onChange={e => setDetails(e.target.value)} placeholder="Additional details (optional)"
-                      className="w-full h-20 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] px-4 py-3 resize-none focus:border-white/[0.15] focus:outline-none placeholder:text-white/15 transition-colors" />
+                      className="w-full h-20 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] px-4 py-3 resize-none focus:border-pink-200 focus:outline-none placeholder:text-gray-400 transition-colors" />
                   </div>
                 </div>
                 <div className="flex-shrink-0 px-5 py-4 border-t border-gray-100 flex gap-3">
@@ -470,7 +470,7 @@ function FeedbackModal({
                   <button onClick={handleSubmit} disabled={!selectedReason || submitting}
                     className={cn(
                       'flex-1 h-11 rounded-xl text-[13px] font-bold transition-all flex items-center justify-center gap-2',
-                      selectedReason ? (type === 'report' || type === 'block') ? 'bg-red-500 text-white' : 'bg-white text-[#0d0d12]' : 'bg-gray-50 text-gray-300 cursor-not-allowed',
+                      selectedReason ? (type === 'report' || type === 'block') ? 'bg-red-500 text-gray-900' : 'bg-white text-[#0d0d12]' : 'bg-gray-50 text-gray-300 cursor-not-allowed',
                     )}>
                     {submitting ? <img src="/logo.svg" alt="" className="w-4 h-4 rounded animate-pulse" /> : type === 'unmatch' ? 'Unmatch' : type === 'block' ? 'Block' : 'Report'}
                   </button>
@@ -562,7 +562,7 @@ function IncomingCard({ item, onClick }: { item: any; onClick: () => void }) {
       whileHover={{ scale: 1.01, y: -2 }}
       whileTap={{ scale: 0.99 }}
       onClick={onClick}
-      className="w-full text-left rounded-2xl border border-gray-200 bg-white/[0.02] hover:bg-gray-50 hover:border-gray-200 transition-all overflow-hidden"
+      className="w-full text-left rounded-2xl border border-gray-200 bg-gray-50/50 hover:bg-gray-50 hover:border-gray-200 transition-all overflow-hidden"
     >
       <div className="flex items-center gap-4 p-4">
         {/* Avatar */}
@@ -629,7 +629,7 @@ function MatchCard({ match, onOpenMenu, onChat }: { match: any; onOpenMenu: (id:
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
-      className={cn('group rounded-2xl border transition-all cursor-pointer', isPinned ? 'bg-gray-50 border-gray-200' : 'bg-white/[0.02] border-gray-100 hover:bg-gray-50 hover:border-gray-200')}
+      className={cn('group rounded-2xl border transition-all cursor-pointer', isPinned ? 'bg-gray-50 border-gray-200' : 'bg-gray-50/50 border-gray-100 hover:bg-gray-50 hover:border-gray-200')}
       onClick={() => onChat(match)}>
       <div className="flex items-center gap-4 p-4">
         <div className="relative flex-shrink-0">
@@ -650,7 +650,7 @@ function MatchCard({ match, onOpenMenu, onChat }: { match: any; onOpenMenu: (id:
             {city && <span className="flex items-center gap-1"><MapPin className="w-2.5 h-2.5" />{city}</span>}
             {age && <span>{age}</span>}
           </div>
-          {lastMsg ? <p className="text-[11px] text-white/25 mt-1.5 truncate max-w-[260px]">{lastMsg.content}</p> : <p className="text-[11px] text-purple-400/50 mt-1.5 italic">No messages yet — say hi!</p>}
+          {lastMsg ? <p className="text-[11px] text-gray-400 mt-1.5 truncate max-w-[260px]">{lastMsg.content}</p> : <p className="text-[11px] text-purple-400/50 mt-1.5 italic">No messages yet — say hi!</p>}
         </div>
         <div className="flex items-center gap-1 flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
           <span className="text-[10px] text-gray-300 font-medium mr-2 hidden sm:block">{timeLabel}</span>
@@ -703,7 +703,7 @@ function ContextMenu({
           const Icon = item.icon;
           return (
             <button key={i} onClick={(e) => { e.stopPropagation(); item.onClick(); onClose(); }}
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-white/[0.05] transition-colors">
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors">
               <Icon className={cn('w-4 h-4', item.color)} />
               <span className={cn('text-[12px] font-medium', item.color)}>{item.label}</span>
             </button>
@@ -1000,7 +1000,7 @@ export default function MatchesPage() {
         <div className="flex items-center justify-between mb-5">
           <div>
             <h1 className="text-xl font-extrabold text-gray-900 tracking-tight">Matches</h1>
-            <p className="text-[12px] text-white/25 mt-0.5 font-medium">
+            <p className="text-[12px] text-gray-400 mt-0.5 font-medium">
               {incoming.length > 0 && <span className="text-pink-400">{incoming.length} incoming</span>}
               {incoming.length > 0 && matches.length > 0 && <span> · </span>}
               {matches.length > 0 && <span>{matches.length} mutual</span>}
@@ -1012,18 +1012,18 @@ export default function MatchesPage() {
 
 
         {/* ─── Main Tabs ─── */}
-        <div className="flex gap-1 mb-5 p-1 rounded-xl bg-white/[0.02] border border-gray-100">
+        <div className="flex gap-1 mb-5 p-1 rounded-xl bg-gray-50/50 border border-gray-100">
           {mainTabs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             const count = tab.id === 'incoming' ? incoming.length : tab.id === 'matches' ? matches.length : heldItems.length;
             return (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={cn('flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-[12px] font-semibold transition-all', isActive ? 'bg-white/[0.1] text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-500')}>
+                className={cn('flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-[12px] font-semibold transition-all', isActive ? 'bg-pink-50 text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-500')}>
                 <Icon className="w-3.5 h-3.5" />
                 {tab.label}
                 {count > 0 && (
-                  <span className={cn('w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center', isActive ? 'bg-pink-500 text-white' : 'bg-gray-50 text-gray-400')}>
+                  <span className={cn('w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center', isActive ? 'bg-pink-500 text-gray-900' : 'bg-gray-50 text-gray-400')}>
                     {count > 99 ? '99+' : count}
                   </span>
                 )}
@@ -1038,22 +1038,22 @@ export default function MatchesPage() {
             {incoming.length === 0 ? (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-20">
                 <div className="w-20 h-20 rounded-full bg-gradient-to-b from-lavender-400/10 to-lavender-600/10 border border-gray-200 flex items-center justify-center mx-auto mb-5">
-                  <Heart className="w-8 h-8 text-white/15" />
+                  <Heart className="w-8 h-8 text-gray-300" />
                 </div>
                 <h3 className="text-[16px] font-bold text-gray-900 mb-2">No matches for now</h3>
                 <p className="text-[13px] text-gray-400 max-w-[280px] mx-auto leading-relaxed">
                   When someone likes your profile, they&apos;ll appear here. Keep your profile active and engaging!
                 </p>
                 <button onClick={() => router.push('/discover')}
-                  className="mt-6 h-10 px-6 rounded-xl bg-gray-50 border border-gray-200 text-gray-500 text-[12px] font-semibold hover:bg-white/[0.1] transition-all">
+                  className="mt-6 h-10 px-6 rounded-xl bg-gray-50 border border-gray-200 text-gray-500 text-[12px] font-semibold hover:bg-pink-50 transition-all">
                   Explore Discover →
                 </button>
               </motion.div>
             ) : (
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-white/25 uppercase tracking-[0.15em] mb-3 flex items-center gap-2">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-3 flex items-center gap-2">
                   <Heart className="w-3.5 h-3.5 text-pink-400" /> People who liked you
-                  <span className="ml-auto text-[10px] text-white/15 font-normal normal-case">Tap to view profile</span>
+                  <span className="ml-auto text-[10px] text-gray-300 font-normal normal-case">Tap to view profile</span>
                 </p>
                 {incoming.map((item) => (
                   <IncomingCard key={item.id} item={item} onClick={() => setSelectedIncoming(item)} />
@@ -1070,13 +1070,13 @@ export default function MatchesPage() {
               <div className="flex-1 relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
                 <input value={searchQuery} onChange={e => handleSearch(e.target.value)} placeholder="Search matches..."
-                  className="w-full h-9 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] pl-9 pr-4 focus:border-white/[0.15] focus:outline-none placeholder:text-white/15 transition" />
+                  className="w-full h-9 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] pl-9 pr-4 focus:border-pink-200 focus:outline-none placeholder:text-gray-400 transition" />
               </div>
             </div>
             <div className="flex gap-1.5 mb-4 overflow-x-auto no-scrollbar">
               {matchFilters.map(f => (
                 <button key={f.id} onClick={() => setMatchFilter(f.id)}
-                  className={cn('px-3 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-all border', matchFilter === f.id ? 'bg-white/[0.1] border-white/[0.15] text-white' : 'border-white/[0.04] text-white/25 hover:text-gray-400')}>
+                  className={cn('px-3 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-all border', matchFilter === f.id ? 'bg-pink-50 border-pink-200 text-gray-900' : 'border-gray-100 text-gray-400 hover:text-gray-400')}>
                   {f.label}
                 </button>
               ))}
@@ -1085,12 +1085,12 @@ export default function MatchesPage() {
             {matches.length === 0 ? (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
                 <div className="w-16 h-16 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-4">
-                  <Sparkles className="w-7 h-7 text-white/15" />
+                  <Sparkles className="w-7 h-7 text-gray-300" />
                 </div>
                 <h3 className="text-[15px] font-bold text-gray-900 mb-1.5">
                   {searchQuery ? 'No matches found' : matchFilter !== 'all' ? `No ${matchFilter} matches` : 'No mutual matches yet'}
                 </h3>
-                <p className="text-[12px] text-white/25 max-w-xs mx-auto">
+                <p className="text-[12px] text-gray-400 max-w-xs mx-auto">
                   {searchQuery ? 'Try a different search' : "When you match back with someone, they'll appear here and you can start chatting!"}
                 </p>
               </motion.div>
@@ -1098,9 +1098,9 @@ export default function MatchesPage() {
               <div className="space-y-2">
                 {matches.some(m => m.isPinned) && (
                   <>
-                    <p className="text-[10px] font-bold text-white/25 uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5"><Pin className="w-3 h-3" /> Pinned</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5"><Pin className="w-3 h-3" /> Pinned</p>
                     {matches.filter(m => m.isPinned).map(match => <MatchCard key={match.id} match={match} onOpenMenu={openMenu} onChat={handleChat} />)}
-                    <p className="text-[10px] font-bold text-white/25 uppercase tracking-[0.15em] mt-4 mb-1 flex items-center gap-1.5"><Clock className="w-3 h-3" /> All Matches</p>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mt-4 mb-1 flex items-center gap-1.5"><Clock className="w-3 h-3" /> All Matches</p>
                   </>
                 )}
                 {matches.filter(m => !m.isPinned).map(match => <MatchCard key={match.id} match={match} onOpenMenu={openMenu} onChat={handleChat} />)}
@@ -1115,12 +1115,12 @@ export default function MatchesPage() {
             {heldItems.length === 0 ? (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
                 <div className="w-16 h-16 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-4">
-                  <Pause className="w-7 h-7 text-white/15" />
+                  <Pause className="w-7 h-7 text-gray-300" />
                 </div>
                 <h3 className="text-[15px] font-bold text-gray-900 mb-1.5">Nothing on hold</h3>
-                <p className="text-[12px] text-white/25 max-w-xs mx-auto">When you&apos;re not sure about someone, put them on hold to revisit later.</p>
+                <p className="text-[12px] text-gray-400 max-w-xs mx-auto">When you&apos;re not sure about someone, put them on hold to revisit later.</p>
                 {incomingMeta?.heldCount > 0 && (
-                  <button onClick={loadData} className="mt-4 px-4 py-2 rounded-lg bg-gray-50 text-gray-500 text-[12px] font-medium hover:bg-white/[0.1] transition">
+                  <button onClick={loadData} className="mt-4 px-4 py-2 rounded-lg bg-gray-50 text-gray-500 text-[12px] font-medium hover:bg-pink-50 transition">
                     Refresh
                   </button>
                 )}
@@ -1129,7 +1129,7 @@ export default function MatchesPage() {
               <div className="space-y-2">
                 {/* Header with Select toggle */}
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-[10px] font-bold text-white/25 uppercase tracking-[0.15em] flex items-center gap-2">
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] flex items-center gap-2">
                     <Pause className="w-3.5 h-3.5 text-amber-400" /> Saved for later ({heldItems.length})
                   </p>
                   <button
@@ -1151,7 +1151,7 @@ export default function MatchesPage() {
                     >
                       <span className="text-[11px] text-gray-500 font-medium">{selectedHeldIds.size} selected</span>
                       <div className="flex items-center gap-2">
-                        <button onClick={selectAllHeld} className="px-2.5 py-1 rounded-md text-[10px] font-medium bg-gray-50 text-gray-500 hover:bg-white/[0.1] transition">
+                        <button onClick={selectAllHeld} className="px-2.5 py-1 rounded-md text-[10px] font-medium bg-gray-50 text-gray-500 hover:bg-pink-50 transition">
                           All
                         </button>
                         <button onClick={handleBulkResume} className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-semibold hover:bg-emerald-500/20 transition flex items-center gap-1">
@@ -1183,7 +1183,7 @@ export default function MatchesPage() {
                           <button onClick={() => toggleHeldSelect(userId)} className="flex-shrink-0">
                             <div className={cn(
                               "w-5 h-5 rounded-md border-2 flex items-center justify-center transition",
-                              isSelected ? "bg-amber-400 border-amber-400" : "border-white/20 bg-transparent hover:border-white/40"
+                              isSelected ? "bg-amber-400 border-amber-400" : "border-pink-200 bg-transparent hover:border-white/40"
                             )}>
                               {isSelected && <Check className="w-3 h-3 text-black" />}
                             </div>

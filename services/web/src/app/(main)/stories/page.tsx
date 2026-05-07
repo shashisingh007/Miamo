@@ -49,7 +49,7 @@ function StoryViewer({ story, onClose }: { story: any; onClose: () => void }) {
           </div>
           <div className="flex gap-2">
             <input value={reply} onChange={e => setReply(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleReply()}
-              placeholder="Reply to story…" className="input-premium flex-1 text-sm bg-black/50 border-white/20 text-gray-900 placeholder:text-gray-400" />
+              placeholder="Reply to story…" className="input-premium flex-1 text-sm bg-black/50 border-pink-200 text-gray-900 placeholder:text-gray-400" />
             <Button size="sm" onClick={handleReply} disabled={!reply.trim()}>Send</Button>
           </div>
         </div>

@@ -137,24 +137,24 @@ function FilterPanel({
               <Section title="Age Range" icon={<span className="text-[10px]">🎂</span>}>
                 <div className="flex items-center gap-3">
                   <input type="number" value={local.minAge} onChange={e => set('minAge', parseInt(e.target.value) || 18)}
-                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-sm focus:border-white/20 focus:outline-none" min={18} max={99} />
+                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-sm focus:border-pink-200 focus:outline-none" min={18} max={99} />
                   <span className="text-gray-400 text-sm font-medium">to</span>
                   <input type="number" value={local.maxAge} onChange={e => set('maxAge', parseInt(e.target.value) || 99)}
-                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-sm focus:border-white/20 focus:outline-none" min={18} max={99} />
+                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-sm focus:border-pink-200 focus:outline-none" min={18} max={99} />
                 </div>
               </Section>
               <Section title="Height (cm)" icon={<span className="text-[10px]">📏</span>}>
                 <div className="flex items-center gap-3">
                   <input type="number" value={local.minHeight || ''} onChange={e => set('minHeight', parseInt(e.target.value) || null)}
-                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-sm focus:border-white/20 focus:outline-none" placeholder="Min" />
+                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-sm focus:border-pink-200 focus:outline-none" placeholder="Min" />
                   <span className="text-gray-400 text-sm font-medium">to</span>
                   <input type="number" value={local.maxHeight || ''} onChange={e => set('maxHeight', parseInt(e.target.value) || null)}
-                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-sm focus:border-white/20 focus:outline-none" placeholder="Max" />
+                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-sm focus:border-pink-200 focus:outline-none" placeholder="Max" />
                 </div>
               </Section>
               <Section title="City" icon={<MapPin className="w-3 h-3 text-blue-400" />}>
                 <input value={local.city} onChange={e => set('city', e.target.value)}
-                  className="w-full h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 px-4 text-sm focus:border-white/20 focus:outline-none placeholder:text-gray-300" placeholder="Any city..." />
+                  className="w-full h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 px-4 text-sm focus:border-pink-200 focus:outline-none placeholder:text-gray-400" placeholder="Any city..." />
               </Section>
               <Section title="Show Me" icon={<span className="text-[10px]">👤</span>}>
                 <div className="flex flex-wrap gap-2">
@@ -228,7 +228,7 @@ function FilterPanel({
               </Section>
               <Section title="Religion" icon={<span className="text-[10px]">🙏</span>}>
                 <input value={local.religion} onChange={e => set('religion', e.target.value)}
-                  className="w-full h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 px-4 text-sm focus:border-white/20 focus:outline-none placeholder:text-gray-300" placeholder="Any religion..." />
+                  className="w-full h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 px-4 text-sm focus:border-pink-200 focus:outline-none placeholder:text-gray-400" placeholder="Any religion..." />
               </Section>
             </div>
             <div className="sticky bottom-0 bg-white/95 backdrop-blur-xl border-t border-gray-100 p-5 flex gap-3">
@@ -344,7 +344,7 @@ function ProfileCard({
                 whileHover={{ scale: 1.1 }}
                 whileTap={{ scale: 0.9 }}
                 onClick={() => handleLikeContent('photo', photos[0]?.id)}
-                className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-white/[0.12] backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-white/25 transition-all shadow-lg"
+                className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-pink-50 backdrop-blur-xl border border-pink-200 flex items-center justify-center hover:bg-pink-100 transition-all shadow-lg"
               >
                 <Heart className="w-5 h-5 text-gray-900" />
               </motion.button>
@@ -398,7 +398,7 @@ function ProfileCard({
             <img src={photos[1].url || photos[1]} alt="" className="w-full aspect-[4/3] object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
             <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
               onClick={() => handleLikeContent('photo', photos[1]?.id)}
-              className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-white/[0.12] backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-white/25 transition-all"
+              className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-pink-50 backdrop-blur-xl border border-pink-200 flex items-center justify-center hover:bg-pink-100 transition-all"
             >
               <Heart className="w-4 h-4 text-gray-900" />
             </motion.button>
@@ -431,7 +431,7 @@ function ProfileCard({
             <img src={photos[2].url || photos[2]} alt="" className="w-full aspect-[4/3] object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
             <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
               onClick={() => handleLikeContent('photo', photos[2]?.id)}
-              className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-white/[0.12] backdrop-blur-xl border border-white/20 flex items-center justify-center hover:bg-white/25 transition-all"
+              className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-pink-50 backdrop-blur-xl border border-pink-200 flex items-center justify-center hover:bg-pink-100 transition-all"
             >
               <Heart className="w-4 h-4 text-gray-900" />
             </motion.button>
@@ -480,7 +480,7 @@ function ProfileCard({
         )}
 
         {/* ─── Pass Button ─── */}
-        <div className="px-6 py-5 border-t border-white/[0.04]">
+        <div className="px-6 py-5 border-t border-gray-100">
           <div className="flex items-center gap-4">
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -490,7 +490,7 @@ function ProfileCard({
             >
               <X className="w-6 h-6 text-gray-400 group-hover:text-red-400 transition-colors" />
             </motion.button>
-            <p className="text-[12px] text-white/25 leading-relaxed">Like any photo or prompt to send a Miamo Move</p>
+            <p className="text-[12px] text-gray-400 leading-relaxed">Like any photo or prompt to send a Miamo Move</p>
           </div>
         </div>
       </div>
@@ -528,7 +528,7 @@ function ProfileCard({
                     value={moveText}
                     onChange={e => setMoveText(e.target.value)}
                     placeholder="Write your move... or send blank"
-                    className="w-full h-20 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 py-3 pr-14 resize-none focus:border-white/20 focus:outline-none placeholder:text-gray-300"
+                    className="w-full h-20 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 py-3 pr-14 resize-none focus:border-pink-200 focus:outline-none placeholder:text-gray-400"
                     autoFocus
                   />
                   <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
@@ -552,7 +552,7 @@ function ProfileCard({
                           className="overflow-hidden mt-2 space-y-1.5">
                           {aiData.moveRecommendations.slice(0, 5).map((rec, i) => (
                             <button key={i} onClick={() => { setMoveText(rec.text); setShowMoveRecs(false); }}
-                              className="w-full text-left px-3 py-2.5 rounded-xl bg-gray-50 hover:bg-white/[0.07] border border-gray-100 hover:border-gray-200 transition-all">
+                              className="w-full text-left px-3 py-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 transition-all">
                               <p className="text-[12px] text-gray-700 leading-relaxed">{rec.text}</p>
                             </button>
                           ))}
@@ -615,7 +615,7 @@ function AiSidePanel({
     return (
       <div className="space-y-3">
         {[1, 2, 3, 4].map(i => (
-          <div key={i} className="rounded-2xl bg-white/[0.02] border border-white/[0.04] p-5">
+          <div key={i} className="rounded-2xl bg-gray-50/50 border border-gray-100 p-5">
             <div className="h-3 bg-gray-50 rounded-full animate-pulse w-1/2 mb-4" />
             <div className="space-y-2.5">
               <div className="h-2.5 bg-gray-50 rounded-full animate-pulse" />
@@ -699,7 +699,7 @@ function AiSidePanel({
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
-          className="rounded-2xl bg-white/[0.02] border border-gray-200 p-5"
+          className="rounded-2xl bg-gray-50/50 border border-gray-200 p-5"
         >
           <div className="flex items-center gap-2.5 mb-4">
             <div className="w-8 h-8 rounded-xl bg-lavender-400/10 flex items-center justify-center">
@@ -742,10 +742,10 @@ function AiSidePanel({
               'w-full text-left rounded-2xl p-5 border transition-all group',
               isSent
                 ? 'bg-emerald-400/[0.06] border-emerald-400/20'
-                : 'bg-white/[0.02] border-gray-200 hover:bg-white/[0.05] hover:border-gray-200 hover:shadow-[0_0_20px_rgba(255,255,255,0.04)]',
+                : 'bg-gray-50/50 border-gray-200 hover:bg-gray-50 hover:border-gray-200 hover:shadow-md',
             )}
           >
-            <p className="text-[10px] font-bold text-white/25 uppercase tracking-[0.12em] mb-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.12em] mb-2">
               {isSent ? '✓ Move sent!' : labels[i] || `Suggested move`}
             </p>
             <p className={cn(
@@ -776,7 +776,7 @@ function AiSidePanel({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="rounded-2xl bg-white/[0.02] border border-gray-200 p-5"
+        className="rounded-2xl bg-gray-50/50 border border-gray-200 p-5"
       >
         <div className="flex items-center gap-2.5 mb-4">
           <div className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center">
@@ -817,7 +817,7 @@ function AiSidePanel({
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.55 }}
-        className="rounded-2xl bg-white/[0.02] border border-gray-200 p-5"
+        className="rounded-2xl bg-gray-50/50 border border-gray-200 p-5"
       >
         <div className="flex items-center gap-2.5 mb-3">
           <div className="w-8 h-8 rounded-xl bg-gray-50 flex items-center justify-center">
@@ -830,7 +830,7 @@ function AiSidePanel({
             value={customText}
             onChange={e => setCustomText(e.target.value)}
             placeholder={`Say something to ${user.displayName}...`}
-            className="w-full h-[60px] rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] px-4 py-3 pr-12 resize-none focus:border-white/[0.15] focus:outline-none placeholder:text-white/15 transition-colors"
+            className="w-full h-[60px] rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] px-4 py-3 pr-12 resize-none focus:border-pink-200 focus:outline-none placeholder:text-gray-400 transition-colors"
           />
           <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
             onClick={handleCustomSend}
@@ -859,9 +859,9 @@ function MoreMovesSection({
 }) {
   const [expanded, setExpanded] = useState(false);
   return (
-    <div className="rounded-2xl bg-white/[0.02] border border-gray-200 overflow-hidden">
+    <div className="rounded-2xl bg-gray-50/50 border border-gray-200 overflow-hidden">
       <button onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-white/[0.02] transition-colors">
+        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50/50 transition-colors">
         <span className="text-[11px] font-bold text-gray-400 uppercase tracking-[0.12em] flex items-center gap-2">
           <Sparkles className="w-3.5 h-3.5 text-lavender-400/60" /> {moves.length} more suggestions
         </span>
@@ -878,11 +878,11 @@ function MoreMovesSection({
                   <button key={i} onClick={() => !isSent && onSend(rec, idx)} disabled={isSent}
                     className={cn(
                       'w-full text-left px-4 py-3 rounded-xl border transition-all',
-                      isSent ? 'bg-emerald-400/[0.06] border-emerald-400/20' : 'bg-white/[0.02] border-white/[0.04] hover:bg-white/[0.05] hover:border-gray-200',
+                      isSent ? 'bg-emerald-400/[0.06] border-emerald-400/20' : 'bg-gray-50/50 border-gray-100 hover:bg-gray-50 hover:border-gray-200',
                     )}>
                     <p className={cn('text-[12px] leading-relaxed', isSent ? 'text-emerald-300' : 'text-gray-600')}>{rec.text}</p>
                     <div className="flex items-center gap-3 mt-1.5">
-                      <span className="text-[9px] text-white/25 capitalize font-medium">{rec.type.replace(/-/g, ' ')}</span>
+                      <span className="text-[9px] text-gray-400 capitalize font-medium">{rec.type.replace(/-/g, ' ')}</span>
                       <div className="flex gap-[3px]">
                         {Array.from({ length: 5 }).map((_, j) => (
                           <div key={j} className={cn('w-[5px] h-[5px] rounded-full', j < Math.round(rec.confidence * 5) ? 'bg-white/40' : 'bg-gray-50')} />
@@ -1016,7 +1016,7 @@ export default function DiscoverPage() {
           className="text-center max-w-sm px-8"
         >
           <div className="w-20 h-20 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-5">
-            <Heart className="w-8 h-8 text-white/15" />
+            <Heart className="w-8 h-8 text-gray-300" />
           </div>
           <h3 className="text-lg font-bold text-gray-900 mb-2">No more profiles</h3>
           <p className="text-[13px] text-gray-400 mb-6 leading-relaxed">Check back later or adjust your filters</p>
@@ -1068,7 +1068,7 @@ export default function DiscoverPage() {
                   className={cn(
                     'flex items-center gap-1.5 h-10 px-4 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all border',
                     isActive
-                      ? 'bg-white/[0.1] border-white/[0.15] text-white'
+                      ? 'bg-pink-50 border-pink-200 text-gray-900'
                       : 'bg-transparent border-gray-100 text-gray-400 hover:text-gray-500 hover:border-gray-200',
                   )}
                 >
@@ -1082,8 +1082,8 @@ export default function DiscoverPage() {
         {/* ─── Profile Counter & Score ─── */}
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
-            <span className="text-[12px] text-white/25 font-semibold tabular-nums">
-              {currentIndex + 1} <span className="text-white/15">of</span> {profiles.length}
+            <span className="text-[12px] text-gray-400 font-semibold tabular-nums">
+              {currentIndex + 1} <span className="text-gray-300">of</span> {profiles.length}
             </span>
             <div className="flex -space-x-1">
               {profiles.slice(currentIndex, currentIndex + 4).map((p, i) => (
@@ -1108,7 +1108,7 @@ export default function DiscoverPage() {
             >
               <Brain className="w-3.5 h-3.5 text-gray-500" />
               <span className="text-[12px] font-bold text-gray-700 tabular-nums">{aiData[currentUser.id].score}%</span>
-              <span className="text-[11px] text-white/25 font-medium">match</span>
+              <span className="text-[11px] text-gray-400 font-medium">match</span>
             </motion.div>
           )}
         </div>

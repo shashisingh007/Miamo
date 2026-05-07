@@ -90,7 +90,7 @@ function CommentSheet({
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
               <h3 className="text-[14px] font-bold text-gray-900">{commentCount} Comments</h3>
-              <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center hover:bg-white/[0.1]">
+              <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center hover:bg-pink-50">
                 <X className="w-4 h-4 text-gray-500" />
               </button>
             </div>
@@ -102,7 +102,7 @@ function CommentSheet({
                   <img src="/logo.svg" alt="" className="w-6 h-6 rounded animate-pulse" />
                 </div>
               ) : comments.length === 0 ? (
-                <p className="text-center text-[12px] text-white/25 py-8">No comments yet — be the first!</p>
+                <p className="text-center text-[12px] text-gray-400 py-8">No comments yet — be the first!</p>
               ) : (
                 comments.map((c: any) => (
                   <div key={c.id} className="flex gap-3">
@@ -129,7 +129,7 @@ function CommentSheet({
                 onChange={e => setText(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSend()}
                 placeholder="Add a comment..."
-                className="flex-1 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 focus:border-white/[0.15] focus:outline-none placeholder:text-white/15"
+                className="flex-1 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 focus:border-pink-200 focus:outline-none placeholder:text-gray-400"
               />
               <motion.button
                 whileTap={{ scale: 0.9 }}
@@ -211,7 +211,7 @@ function MoveModal({
                 </div>
 
                 <div className="rounded-xl bg-gray-50 border border-gray-200 p-3 mb-4">
-                  <p className="text-[10px] text-white/25 font-semibold uppercase tracking-wider mb-1">Reacting to</p>
+                  <p className="text-[10px] text-gray-400 font-semibold uppercase tracking-wider mb-1">Reacting to</p>
                   <p className="text-[13px] text-gray-700 font-medium">{item?.title || 'Content'}</p>
                 </div>
 
@@ -219,7 +219,7 @@ function MoveModal({
                   value={message}
                   onChange={e => setMessage(e.target.value)}
                   placeholder="Write a message (optional)..."
-                  className="w-full h-20 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 py-3 resize-none focus:border-white/[0.15] focus:outline-none placeholder:text-gray-300 mb-4"
+                  className="w-full h-20 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 py-3 resize-none focus:border-pink-200 focus:outline-none placeholder:text-gray-400 mb-4"
                 />
 
                 <button
@@ -358,7 +358,7 @@ function ReelCard({
         {/* Like */}
         <button onClick={onLike} className="flex flex-col items-center gap-1">
           <motion.div whileTap={{ scale: 1.3 }}>
-            <Heart className={cn('w-7 h-7', item.liked ? 'text-red-500 fill-red-500' : 'text-white')} />
+            <Heart className={cn('w-7 h-7', item.liked ? 'text-red-500 fill-red-500' : 'text-gray-900')} />
           </motion.div>
           <span className="text-[11px] font-semibold text-gray-800">{fmt(item.likeCount || 0)}</span>
         </button>
@@ -378,7 +378,7 @@ function ReelCard({
         {/* Miamo Move */}
         <button onClick={onMove} className="flex flex-col items-center gap-1">
           <motion.div whileTap={{ scale: 1.2 }}
-            className="w-10 h-10 rounded-full bg-white/[0.15] backdrop-blur-md border border-white/20 flex items-center justify-center"
+            className="w-10 h-10 rounded-full bg-pink-100 backdrop-blur-md border border-pink-200 flex items-center justify-center"
           >
             <span className="text-[18px] font-black text-gray-900 italic" style={{ fontFamily: 'system-ui' }}>M</span>
           </motion.div>
@@ -395,7 +395,7 @@ function ReelCard({
       <div className="absolute bottom-6 left-5 right-20 z-10">
         {/* Author row */}
         <button onClick={onProfileClick} className="flex items-center gap-2.5 mb-3">
-          <div className="w-9 h-9 rounded-full overflow-hidden border border-white/20">
+          <div className="w-9 h-9 rounded-full overflow-hidden border border-pink-200">
             {photo ? (
               <img src={photo} alt={author.displayName} className="w-full h-full object-contain" />
             ) : (
@@ -569,7 +569,7 @@ function UploadModal({
                 <div>
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-2 block">Media</label>
                   {mediaFile ? (
-                    <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-white/[0.02]">
+                    <div className="relative rounded-xl overflow-hidden border border-gray-200 bg-gray-50/50">
                       {mediaPreview && type === 'image' ? (
                         <img src={mediaPreview} alt="Upload preview" className="w-full h-40 object-contain" />
                       ) : mediaPreview && (type === 'video' || type === 'performance') ? (
@@ -590,7 +590,7 @@ function UploadModal({
                     </div>
                   ) : (
                     <button onClick={handleFileSelect}
-                      className="w-full h-28 rounded-xl border-2 border-dashed border-gray-200 hover:border-white/[0.15] bg-white/[0.02] hover:bg-gray-50 flex flex-col items-center justify-center gap-2 transition-all">
+                      className="w-full h-28 rounded-xl border-2 border-dashed border-gray-200 hover:border-pink-200 bg-gray-50/50 hover:bg-gray-50 flex flex-col items-center justify-center gap-2 transition-all">
                       <Upload className="w-6 h-6 text-gray-300" />
                       <span className="text-[11px] text-gray-400">Tap to select photo, video, or file</span>
                     </button>
@@ -602,7 +602,7 @@ function UploadModal({
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-2 block">Title *</label>
                   <input value={title} onChange={e => setTitle(e.target.value)}
                     placeholder="What did you create?"
-                    className="w-full h-11 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 focus:border-white/[0.15] focus:outline-none placeholder:text-white/15" />
+                    className="w-full h-11 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 focus:border-pink-200 focus:outline-none placeholder:text-gray-400" />
                 </div>
 
                 {/* Category — REQUIRED */}
@@ -617,8 +617,8 @@ function UploadModal({
                           className={cn(
                             'flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold transition-all border',
                             isActive
-                              ? 'bg-white/[0.1] border-white/[0.15] text-white'
-                              : 'bg-white/[0.02] border-gray-100 text-gray-400 hover:text-gray-500',
+                              ? 'bg-pink-50 border-pink-200 text-gray-900'
+                              : 'bg-gray-50/50 border-gray-100 text-gray-400 hover:text-gray-500',
                           )}
                         >
                           <CatIcon className="w-3 h-3" /> {c.name}
@@ -636,7 +636,7 @@ function UploadModal({
                       <button key={t} onClick={() => setType(t)}
                         className={cn(
                           'px-3 py-2 rounded-xl text-[11px] font-semibold border transition-all capitalize',
-                          type === t ? 'bg-white/[0.1] border-white/[0.15] text-white' : 'bg-white/[0.02] border-gray-100 text-gray-400',
+                          type === t ? 'bg-pink-50 border-pink-200 text-gray-900' : 'bg-gray-50/50 border-gray-100 text-gray-400',
                         )}
                       >
                         {t}
@@ -650,7 +650,7 @@ function UploadModal({
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-2 block">Caption</label>
                   <textarea value={content} onChange={e => setContent(e.target.value)}
                     placeholder="Write a caption for your post…"
-                    className="w-full h-20 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 py-3 resize-none focus:border-white/[0.15] focus:outline-none placeholder:text-white/15" />
+                    className="w-full h-20 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 py-3 resize-none focus:border-pink-200 focus:outline-none placeholder:text-gray-400" />
                 </div>
 
                 {/* Hashtags */}
@@ -695,9 +695,9 @@ function UploadModal({
                     <input value={hashtagInput} onChange={e => setHashtagInput(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && hashtagInput.trim()) { addHashtag(hashtagInput.trim()); setHashtagInput(''); } }}
                       placeholder="Add custom hashtag…"
-                      className="flex-1 h-9 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] px-3 focus:border-white/[0.15] focus:outline-none placeholder:text-white/15" />
+                      className="flex-1 h-9 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] px-3 focus:border-pink-200 focus:outline-none placeholder:text-gray-400" />
                     <button onClick={() => { if (hashtagInput.trim()) { addHashtag(hashtagInput.trim()); setHashtagInput(''); } }}
-                      className="px-3 h-9 rounded-xl bg-gray-50 text-gray-500 text-[11px] font-semibold hover:bg-white/[0.1] transition-all">Add</button>
+                      className="px-3 h-9 rounded-xl bg-gray-50 text-gray-500 text-[11px] font-semibold hover:bg-pink-50 transition-all">Add</button>
                   </div>
                 </div>
 
@@ -885,7 +885,7 @@ export default function CreativityPage() {
         <div className="flex-1 flex items-center justify-center">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center px-8">
             <div className="w-20 h-20 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-5">
-              <Sparkles className="w-8 h-8 text-white/15" />
+              <Sparkles className="w-8 h-8 text-gray-300" />
             </div>
             <h3 className="text-lg font-bold text-gray-900 mb-2">No content yet</h3>
             <p className="text-[13px] text-gray-400 mb-6 leading-relaxed">
@@ -1045,7 +1045,7 @@ function CategoryBar({
         );
       })}
       <button onClick={onShowAll}
-        className="flex items-center gap-1 h-8 px-3 rounded-full bg-white/[0.02] border border-white/[0.04] text-white/25 text-[11px] font-semibold whitespace-nowrap hover:text-gray-400 flex-shrink-0">
+        className="flex items-center gap-1 h-8 px-3 rounded-full bg-gray-50/50 border border-gray-100 text-gray-400 text-[11px] font-semibold whitespace-nowrap hover:text-gray-400 flex-shrink-0">
         All <ChevronDown className="w-3 h-3" />
       </button>
     </div>
@@ -1090,8 +1090,8 @@ function CategoryPickerSheet({
                       className={cn(
                         'flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all text-left',
                         isActive
-                          ? 'bg-gray-100 border-white/[0.15] shadow-[0_0_12px_rgba(255,255,255,0.03)]'
-                          : 'bg-white/[0.02] border-gray-100 hover:bg-white/[0.05]',
+                          ? 'bg-gray-100 border-pink-200 shadow-[0_0_12px_rgba(255,255,255,0.03)]'
+                          : 'bg-gray-50/50 border-gray-100 hover:bg-gray-50',
                       )}
                     >
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -1099,7 +1099,7 @@ function CategoryPickerSheet({
                         <Icon className="w-4 h-4" style={{ color: cat.color }} />
                       </div>
                       <div className="min-w-0">
-                        <p className={cn('text-[12px] font-semibold truncate', isActive ? 'text-white' : 'text-gray-500')}>{cat.label}</p>
+                        <p className={cn('text-[12px] font-semibold truncate', isActive ? 'text-gray-900' : 'text-gray-500')}>{cat.label}</p>
                         {cat.count !== undefined && cat.count > 0 && (
                           <p className="text-[10px] text-gray-300">{cat.count} items</p>
                         )}

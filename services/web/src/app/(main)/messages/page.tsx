@@ -976,7 +976,7 @@ function MessagesFeedbackModal({ type, userName, onClose, onSubmit }: {
   const title = type === 'report' ? 'Report' : type === 'block' ? 'Block' : 'Unmatch';
   const subtitle = type === 'report' ? 'Help keep Miamo safe' : type === 'block' ? 'They won\'t be able to contact you' : 'Help us improve your matches';
   const iconColor = type === 'report' ? 'text-red-400 bg-red-400/10' : type === 'block' ? 'text-red-400 bg-red-400/10' : 'text-amber-400 bg-amber-400/10';
-  const submitColor = type === 'unmatch' ? 'bg-white text-[#FDF2F5]' : 'bg-red-500 text-white';
+  const submitColor = type === 'unmatch' ? 'bg-white text-[#FDF2F5]' : 'bg-red-500 text-gray-900';
 
   const handleSubmit = async () => {
     if (!selectedReason) return;
@@ -1009,7 +1009,7 @@ function MessagesFeedbackModal({ type, userName, onClose, onSubmit }: {
               <p className="text-[11px] text-gray-400 mt-0.5">{subtitle}</p>
             </div>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-lg bg-white/[0.05] flex items-center justify-center hover:bg-white/[0.1] transition-colors">
+          <button onClick={onClose} className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center hover:bg-pink-50 transition-colors">
             <X className="w-4 h-4 text-gray-500" />
           </button>
         </div>
@@ -1033,9 +1033,9 @@ function MessagesFeedbackModal({ type, userName, onClose, onSubmit }: {
                   <button key={reason} onClick={() => setSelectedReason(reason)}
                     className={cn(
                       'w-full flex items-center gap-3 px-4 py-3 rounded-xl border text-left transition-all',
-                      isActive ? 'bg-gray-100 border-white/[0.15]' : 'bg-transparent border-white/[0.04] hover:bg-gray-50',
+                      isActive ? 'bg-gray-100 border-pink-200' : 'bg-transparent border-gray-100 hover:bg-gray-50',
                     )}>
-                    <span className={cn('text-[13px] font-medium', isActive ? 'text-white' : 'text-gray-500')}>{reason}</span>
+                    <span className={cn('text-[13px] font-medium', isActive ? 'text-gray-900' : 'text-gray-500')}>{reason}</span>
                     {isActive && (
                       <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="ml-auto w-5 h-5 rounded-full bg-white flex items-center justify-center">
                         <Check className="w-3 h-3 text-[#151522]" />
@@ -1046,7 +1046,7 @@ function MessagesFeedbackModal({ type, userName, onClose, onSubmit }: {
               })}
               <div className="pt-3">
                 <textarea value={details} onChange={e => setDetails(e.target.value)} placeholder="Additional details (optional) — helps our AI learn your preferences"
-                  className="w-full h-20 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] px-4 py-3 resize-none focus:border-white/[0.15] focus:outline-none placeholder:text-white/15 transition-colors" />
+                  className="w-full h-20 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] px-4 py-3 resize-none focus:border-pink-200 focus:outline-none placeholder:text-gray-400 transition-colors" />
               </div>
             </div>
             <div className="flex-shrink-0 px-5 py-4 border-t border-gray-100 flex gap-3">

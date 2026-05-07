@@ -1,6 +1,14 @@
-# Miamo
+# Miamo 💕
 
-A modern dating platform running on Kubernetes. Microservice architecture with Docker images deployed as k8s pods. Configuration is environment-driven.
+A premium romantic dating platform with 3D glass UI, floating heart animations, and AI-powered matching. Runs on Kubernetes with microservice architecture.
+
+## UI Design
+
+- **Theme:** Soft pink romantic palette (`#FDF2F5` background)
+- **Buttons:** 3D glass mirror effect with hover lift
+- **Animations:** Floating hearts, heartbeat pulse, shimmer-glass effects
+- **Logo:** Custom SVG with overlapping gradient hearts
+- **Layout:** Frosted glass sidebar & header with `backdrop-blur-xl`
 
 ## Architecture
 
@@ -149,7 +157,8 @@ secrets:
 | Runtime | Node.js 20 (Alpine) |
 | Language | TypeScript |
 | Backend | Express.js + Prisma ORM |
-| Frontend | Next.js 14 + Tailwind CSS |
+| Frontend | Next.js 14 + Tailwind CSS + Framer Motion |
+| UI | 3D Glass / Romantic Pink Theme |
 | Database | PostgreSQL 16 |
 | Cache | Redis 7 |
 | Containers | Docker (per-service Dockerfiles) |

@@ -87,13 +87,26 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-miamo-bg">
+    <div className="flex h-screen overflow-hidden bg-miamo-bg relative">
+      {/* Floating Hearts Background Animation */}
+      <div className="floating-hearts">
+        <span className="heart">💕</span>
+        <span className="heart">💗</span>
+        <span className="heart">💖</span>
+        <span className="heart">💕</span>
+        <span className="heart">💗</span>
+        <span className="heart">💖</span>
+        <span className="heart">💕</span>
+        <span className="heart">💗</span>
+      </div>
+
       {/* Sidebar */}
-      <aside className="hidden lg:flex flex-col w-[260px] border-r border-border bg-miamo-surface/50 backdrop-blur-sm">
-        <div className="flex items-center gap-3 px-6 h-16 border-b border-border/50">
-          <AnimatedMiamoLogo size={32} showWordmark={true} variant="sidebar" />
+      <aside className="hidden lg:flex flex-col w-[260px] border-r border-pink-100/50 bg-white/70 backdrop-blur-xl shadow-[4px_0_30px_rgba(236,64,122,0.04)]">
+        <div className="flex items-center gap-3 px-6 h-16 border-b border-pink-100/50">
+          <AnimatedMiamoLogo size={32} showWordmark={false} variant="sidebar" />
+          <span className="text-lg font-bold text-romantic">Miamo</span>
           <div className="ml-auto">
-            <Link href="/premium" className="text-lavender-400 hover:text-lavender-300 transition-colors">
+            <Link href="/premium" className="text-lavender-400 hover:text-lavender-300 transition-colors heartbeat">
               <Crown className="w-4 h-4" />
             </Link>
           </div>
@@ -153,7 +166,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
       {/* Main content area */}
       <main className="flex-1 flex flex-col overflow-hidden">
-        <header className="h-16 border-b border-border/50 bg-miamo-surface/30 backdrop-blur-md flex items-center px-6 gap-4 shrink-0">
+        <header className="h-16 border-b border-pink-100/30 bg-white/60 backdrop-blur-xl flex items-center px-6 gap-4 shrink-0 shadow-[0_2px_20px_rgba(236,64,122,0.03)]">
           <div className="lg:hidden flex items-center gap-2">
             <MiamoCompactIcon size={28} />
           </div>
