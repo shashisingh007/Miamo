@@ -8,6 +8,7 @@ import {
   Flag, Eye, EyeOff, Film, Sparkles, Moon, Music, Lightbulb,
   ChevronDown, Play, ArrowUp, ArrowDown, Users, Crown,
   Check, CheckCheck, Volume2, Coffee, Activity, UserMinus, ThumbsUp, Filter,
+  Hourglass, Timer,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, Badge, Card, EmptyState } from '@/components/ui';
@@ -164,6 +165,9 @@ interface BeatMatch {
   count: number;
   state: string;
   todayCompleted: boolean;
+  iSentToday: boolean;
+  theyCompletedToday: boolean;
+  streakDeadline: string; // ISO timestamp — when the 24h window ends
   lastBeatAt?: string;
   longestStreak?: number;
   totalSent?: number;
@@ -183,7 +187,29 @@ interface BeatEntry {
 /* ═══════════════════════════════════════════════════════════
    MOCK DATA — used when API returns empty (demo)
    ═══════════════════════════════════════════════════════════ */
+// Helpers for streak deadline (end of current 24h window)
+function getStreakDeadline(): string {
+  const now = new Date();
+  const deadline = new Date(now);
+  deadline.setHours(23, 59, 59, 999);
+  return deadline.toISOString();
+}
+
+function getHoursLeft(deadline: string): number {
+  return Math.max(0, (new Date(deadline).getTime() - Date.now()) / 3600000);
+}
+
+function formatTimeLeft(deadline: string): string {
+  const ms = new Date(deadline).getTime() - Date.now();
+  if (ms <= 0) return 'Expired';
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  if (h > 0) return `${h}h ${m}m left`;
+  return `${m}m left`;
+}
+
 function generateMockBeats(): BeatMatch[] {
+  const deadline = getStreakDeadline();
   const names = [
     { name: 'Sofia Rivera', verified: true },
     { name: 'Emma Chen', verified: false },
@@ -191,18 +217,27 @@ function generateMockBeats(): BeatMatch[] {
     { name: 'Luna Martinez', verified: false },
     { name: 'Zara Kim', verified: true },
   ];
-  return names.map((n, i) => ({
-    id: `beat-${i}`,
-    matchId: `match-${i}`,
-    matchedUser: { id: `user-${i}`, displayName: n.name, photos: [], online: i < 3, verified: n.verified },
-    count: [23, 7, 14, 3, 45][i],
-    state: ['strong', 'soft', 'strong', 'weak', 'strong'][i],
-    todayCompleted: i === 0 || i === 4,
-    lastBeatAt: new Date(Date.now() - [3600000, 7200000, 1800000, 86400000, 900000][i]).toISOString(),
-    longestStreak: [30, 12, 14, 5, 52][i],
-    totalSent: [45, 15, 28, 6, 90][i],
-    totalReceived: [42, 13, 27, 4, 88][i],
-  }));
+  // Scenario: 0=both sent, 1=I sent/waiting, 2=they sent/my turn, 3=neither sent(urgent), 4=both sent
+  const iSent =     [true,  true,  false, false, true];
+  const theySent =  [true,  false, true,  false, true];
+  return names.map((n, i) => {
+    const bothDone = iSent[i] && theySent[i];
+    return {
+      id: `beat-${i}`,
+      matchId: `match-${i}`,
+      matchedUser: { id: `user-${i}`, displayName: n.name, photos: [], online: i < 3, verified: n.verified },
+      count: [23, 7, 14, 3, 45][i],
+      state: ['strong', 'soft', 'strong', 'weak', 'strong'][i],
+      todayCompleted: bothDone,
+      iSentToday: iSent[i],
+      theyCompletedToday: theySent[i],
+      streakDeadline: deadline,
+      lastBeatAt: new Date(Date.now() - [3600000, 7200000, 1800000, 86400000, 900000][i]).toISOString(),
+      longestStreak: [30, 12, 14, 5, 52][i],
+      totalSent: [45, 15, 28, 6, 90][i],
+      totalReceived: [42, 13, 27, 4, 88][i],
+    };
+  });
 }
 
 function generateMockBeatEntries(matchName: string): BeatEntry[] {
@@ -246,6 +281,76 @@ function StreakFlame({ count, size = 'md' }: { count: number; size?: 'sm' | 'md'
         <motion.div animate={{ opacity: [0.5, 1, 0.5] }} transition={{ duration: 1.5, repeat: Infinity }}
           className="absolute -top-0.5 -right-0.5 text-[10px]">{'\uD83D\uDD25'}</motion.div>
       )}
+    </motion.div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   STREAK COUNTDOWN — hourglass with time remaining
+   ═══════════════════════════════════════════════════════════ */
+function StreakCountdown({ deadline }: { deadline: string }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 60000);
+    return () => clearInterval(t);
+  }, []);
+  const ms = new Date(deadline).getTime() - now;
+  if (ms <= 0) return null;
+  const h = Math.floor(ms / 3600000);
+  const m = Math.floor((ms % 3600000) / 60000);
+  const urgent = h < 3;
+  const critical = h < 1;
+  return (
+    <motion.div
+      animate={critical ? { scale: [1, 1.08, 1] } : undefined}
+      transition={critical ? { duration: 1.5, repeat: Infinity } : undefined}
+      className={cn(
+        'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold',
+        critical ? 'bg-red-50 text-red-600 border border-red-200' :
+        urgent ? 'bg-amber-50 text-amber-600 border border-amber-200' :
+        'bg-gray-50 text-gray-500 border border-gray-100'
+      )}
+    >
+      <Hourglass className={cn('w-3 h-3', critical ? 'text-red-500' : urgent ? 'text-amber-500' : 'text-gray-400')} />
+      {h > 0 ? `${h}h ${m}m` : `${m}m`}
+    </motion.div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BEAT STATUS — shows who still needs to send
+   ═══════════════════════════════════════════════════════════ */
+function BeatDayStatus({ beat }: { beat: BeatMatch }) {
+  const { iSentToday, theyCompletedToday, todayCompleted } = beat;
+  const name = beat.matchedUser?.displayName?.split(' ')[0] || 'They';
+
+  if (todayCompleted) {
+    return (
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+        <CheckCheck className="w-3 h-3" /> Both sent — streak saved!
+      </div>
+    );
+  }
+  if (iSentToday && !theyCompletedToday) {
+    return (
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold text-sky-600 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100">
+        <Clock className="w-3 h-3" /> You sent — waiting for {name}
+      </div>
+    );
+  }
+  if (!iSentToday && theyCompletedToday) {
+    return (
+      <motion.div animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 2, repeat: Infinity }}
+        className="flex items-center gap-1.5 text-[10px] font-semibold text-pink-600 bg-pink-50 px-2.5 py-1 rounded-lg border border-pink-200">
+        <Zap className="w-3 h-3" /> {name} sent — your turn!
+      </motion.div>
+    );
+  }
+  // Neither sent
+  return (
+    <motion.div animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 2, repeat: Infinity }}
+      className="flex items-center gap-1.5 text-[10px] font-semibold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+      <AlertTriangle className="w-3 h-3" /> No one sent yet!
     </motion.div>
   );
 }
@@ -662,6 +767,12 @@ function BeatsPageInner() {
   const [confirmAction, setConfirmAction] = useState<{ type: 'remove' | 'block' | 'delete'; beatId: string; entryId?: string } | null>(null);
   const [celebration, setCelebration] = useState<number | null>(null);
   const [completing, setCompleting] = useState<string | null>(null);
+  // Tick every 60s so StreakCountdown components re-render with fresh times
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => setTick(t => t + 1), 60_000);
+    return () => clearInterval(iv);
+  }, []);
 
   const loadBeats = useCallback(() => {
     setLoading(true);
@@ -684,6 +795,7 @@ function BeatsPageInner() {
         const events = b.events || [];
         const today = new Date().toDateString();
         const myEvents = events.filter((e: any) => e.userId && new Date(e.createdAt).toDateString() === today);
+        const theirEvents = events.filter((e: any) => !e.userId && new Date(e.createdAt).toDateString() === today);
         const sentEvents = events.filter((e: any) => e.userId);
         // Derive photo from user's photos array
         const photos = apiUser.photos || [];
@@ -704,7 +816,10 @@ function BeatsPageInner() {
           },
           count: b.count || 0,
           state,
-          todayCompleted: myEvents.length > 0,
+          todayCompleted: myEvents.length > 0 && theirEvents.length > 0,
+          iSentToday: myEvents.length > 0,
+          theyCompletedToday: theirEvents.length > 0,
+          streakDeadline: getStreakDeadline(),
           lastBeatAt: b.updatedAt || b.createdAt || undefined,
           longestStreak: b.count || 0,
           totalSent: sentEvents.length || 0,
@@ -729,21 +844,27 @@ function BeatsPageInner() {
   const completedToday = beats.filter(b => b.todayCompleted).length;
 
   const handleSendBeat = async (beatId: string, type: string, content?: string) => {
+    // Check if already sent today — prevent double sends
+    const beat = beats.find(b => b.id === beatId);
+    if (beat?.iSentToday) return; // Already sent today, ignore
+
     setCompleting(beatId);
     const token = typeof window !== 'undefined' ? localStorage.getItem('miamo_token') : null;
     try {
       if (token) {
         await api.completeBeat(beatId, type, content || `Quick ${type} beat!`);
       }
-      // Update local state regardless (mock or real)
+      // Update local state: mark that I sent
       setBeats(prev => prev.map(b => {
         if (b.id !== beatId) return b;
-        const newCount = (b.count || 0) + 1;
-        if (MILESTONE_EMOJIS[newCount]) setCelebration(newCount);
+        const nowBothSent = b.theyCompletedToday; // they already sent + I just sent
+        const newCount = nowBothSent ? (b.count || 0) + 1 : b.count; // streak +1 ONLY when both sent
+        if (nowBothSent && MILESTONE_EMOJIS[newCount]) setCelebration(newCount);
         return {
           ...b,
+          iSentToday: true,
+          todayCompleted: nowBothSent,
           count: newCount,
-          todayCompleted: true,
           totalSent: (b.totalSent || 0) + 1,
           lastBeatAt: new Date().toISOString(),
           longestStreak: Math.max(b.longestStreak || 0, newCount),
@@ -754,9 +875,10 @@ function BeatsPageInner() {
       // Still update locally on API failure so UI responds
       setBeats(prev => prev.map(b => {
         if (b.id !== beatId) return b;
-        const newCount = (b.count || 0) + 1;
-        if (MILESTONE_EMOJIS[newCount]) setCelebration(newCount);
-        return { ...b, count: newCount, todayCompleted: true, totalSent: (b.totalSent || 0) + 1, lastBeatAt: new Date().toISOString() };
+        const nowBothSent = b.theyCompletedToday;
+        const newCount = nowBothSent ? (b.count || 0) + 1 : b.count;
+        if (nowBothSent && MILESTONE_EMOJIS[newCount]) setCelebration(newCount);
+        return { ...b, iSentToday: true, todayCompleted: nowBothSent, count: newCount, totalSent: (b.totalSent || 0) + 1, lastBeatAt: new Date().toISOString() };
       }));
     }
     setCompleting(null);
@@ -867,7 +989,7 @@ function BeatsPageInner() {
         <div className="grid grid-cols-4 lg:grid-cols-8 gap-2">
           {BEAT_TYPES.map(bt => (
             <BeatTypeButton key={bt.type} bt={bt} onClick={() => {
-              const activeBeat = beats.find(b => !b.todayCompleted);
+              const activeBeat = beats.find(b => !b.todayCompleted && !b.iSentToday);
               if (activeBeat) handleSendBeat(activeBeat.id, bt.type);
             }} />
           ))}
@@ -889,7 +1011,7 @@ function BeatsPageInner() {
         {showIceBreakers && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
             <IceBreakerPanel onSend={(text) => {
-              const activeBeat = beats.find(b => !b.todayCompleted);
+              const activeBeat = beats.find(b => !b.todayCompleted && !b.iSentToday);
               if (activeBeat) handleSendBeat(activeBeat.id, 'text', text);
             }} />
           </motion.div>
@@ -947,6 +1069,8 @@ function BeatsPageInner() {
                         <p className="text-[11px] text-gray-400 mt-0.5">
                           {beat.count} day streak &bull; Best: {beat.longestStreak || beat.count} &bull; {beat.lastBeatAt ? formatRelativeTime(beat.lastBeatAt) : 'Start now'}
                         </p>
+                        {/* Day Status — who sent, who hasn't */}
+                        <BeatDayStatus beat={beat} />
                         <div className="flex items-center gap-3 mt-1">
                           <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
                             <ArrowUp className="w-2.5 h-2.5 text-pink-400" /> {beat.totalSent || 0} sent
@@ -954,14 +1078,20 @@ function BeatsPageInner() {
                           <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
                             <ArrowDown className="w-2.5 h-2.5 text-emerald-400" /> {beat.totalReceived || 0} received
                           </span>
+                          {/* Countdown timer */}
+                          <StreakCountdown deadline={beat.streakDeadline} />
                         </div>
                       </button>
 
-                      {/* Actions */}
+                      {/* Actions — 3 states: Done (both sent), Sent (I sent, waiting), Beat (not sent) */}
                       <div className="flex items-center gap-1.5 shrink-0">
                         {beat.todayCompleted ? (
                           <Badge variant="success" className="text-[10px] gap-1">
                             <Check className="w-3 h-3" /> Done
+                          </Badge>
+                        ) : beat.iSentToday ? (
+                          <Badge variant="default" className="text-[10px] gap-1 bg-blue-50 text-blue-600 border-blue-100">
+                            <Check className="w-3 h-3" /> Sent
                           </Badge>
                         ) : (
                           <Button size="sm" variant={isUrgent ? 'default' : 'secondary'}
@@ -981,19 +1111,19 @@ function BeatsPageInner() {
                       </div>
                     </div>
 
-                    {/* Urgent warning */}
-                    {beat.state === 'critical' && (
+                    {/* Urgent / weak streak warnings */}
+                    {beat.state === 'critical' && !beat.todayCompleted && (
                       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                         className="mt-3 flex items-center gap-2 bg-red-50 px-3 py-2 rounded-lg border border-red-100">
                         <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                        <span className="text-[11px] text-red-500 font-medium">Streak expires soon! Send a beat now to save it.</span>
+                        <span className="text-[11px] text-red-500 font-medium">Streak expires soon! {beat.iSentToday ? `Waiting for ${other.displayName}...` : 'Send a beat now!'}</span>
                       </motion.div>
                     )}
-                    {beat.state === 'weak' && (
+                    {beat.state === 'weak' && !beat.todayCompleted && (
                       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
                         className="mt-3 flex items-center gap-2 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
                         <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                        <span className="text-[11px] text-amber-600 font-medium">Beat is weakening — don&apos;t let it fade!</span>
+                        <span className="text-[11px] text-amber-600 font-medium">{beat.iSentToday ? `You sent — waiting for ${other.displayName}` : 'Your turn! Don\'t let it fade!'}</span>
                       </motion.div>
                     )}
                   </Card>
