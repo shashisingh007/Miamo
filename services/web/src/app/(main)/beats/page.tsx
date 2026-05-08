@@ -673,8 +673,47 @@ function BeatsPageInner() {
       return;
     }
     api.getBeats().then(res => {
-      const data = res.data || [];
-      setBeats(data.length > 0 ? data : generateMockBeats());
+      const raw = res.data || [];
+      if (raw.length === 0) {
+        setBeats(generateMockBeats());
+        return;
+      }
+      // Map API response format to our BeatMatch interface
+      const mapped: BeatMatch[] = raw.map((b: any) => {
+        const apiUser = b.user || b.matchedUser || {};
+        const events = b.events || [];
+        const today = new Date().toDateString();
+        const myEvents = events.filter((e: any) => e.userId && new Date(e.createdAt).toDateString() === today);
+        const sentEvents = events.filter((e: any) => e.userId);
+        // Derive photo from user's photos array
+        const photos = apiUser.photos || [];
+        const photoUrl = photos[0]?.url || photos[0]?.imageUrl || undefined;
+        // Determine state mapping
+        let state = b.state || 'active';
+        if (state === 'active') state = b.count >= 7 ? 'strong' : b.count >= 3 ? 'soft' : 'soft';
+        
+        return {
+          id: b.id,
+          matchId: b.id,
+          matchedUser: {
+            id: apiUser.id || '',
+            displayName: apiUser.displayName || apiUser.name || apiUser.username || 'User',
+            photos: photoUrl ? [{ url: photoUrl }] : photos,
+            online: apiUser.active || false,
+            verified: apiUser.verified || false,
+          },
+          count: b.count || 0,
+          state,
+          todayCompleted: myEvents.length > 0,
+          lastBeatAt: b.updatedAt || b.createdAt || undefined,
+          longestStreak: b.count || 0,
+          totalSent: sentEvents.length || 0,
+          totalReceived: Math.max(0, events.length - sentEvents.length),
+        };
+      });
+      // If all names are generic/missing, supplement with mock for demo
+      const hasNames = mapped.some(b => b.matchedUser.displayName !== 'User' && b.matchedUser.displayName !== 'Unknown');
+      setBeats(hasNames ? mapped : generateMockBeats());
     }).catch(() => {
       setBeats(generateMockBeats());
     }).finally(() => setLoading(false));
