@@ -1,14 +1,13 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Component } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Zap, Camera, Mic, MessageSquare, Palette, Heart, Clock, Trophy, Flame, Shield,
-  AlertTriangle, Send, MoreVertical, X, ChevronLeft, ChevronRight, Trash2, Ban,
-  Flag, Eye, EyeOff, Image, Film, Sparkles, Star, TrendingUp, ArrowRight,
-  Check, CheckCheck, Volume2, Coffee, Gift, Sun, Moon, Music, Lightbulb,
-  ChevronDown, Search, Filter, Play, ArrowUp, ArrowDown, Users, Crown,
-  MessageCircle, Smile, ThumbsUp, Activity, Target, Bookmark, UserMinus,
+  AlertTriangle, Send, MoreVertical, ChevronLeft, ChevronRight, Trash2, Ban,
+  Flag, Eye, EyeOff, Film, Sparkles, Moon, Music, Lightbulb,
+  ChevronDown, Play, ArrowUp, ArrowDown, Users, Crown,
+  Check, CheckCheck, Volume2, Coffee, Activity, UserMinus, ThumbsUp, Filter,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, Badge, Card, EmptyState } from '@/components/ui';
@@ -18,32 +17,61 @@ import { BEAT_STATES } from '@/lib/constants';
 import { cn, formatRelativeTime } from '@/lib/utils';
 
 /* ═══════════════════════════════════════════════════════════
+   ERROR BOUNDARY — prevents full page crash
+   ═══════════════════════════════════════════════════════════ */
+class BeatsErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="max-w-3xl mx-auto p-6 text-center py-20">
+          <Zap className="w-10 h-10 text-pink-300 mx-auto mb-4" />
+          <h2 className="text-lg font-bold text-gray-800 mb-2">Something went wrong</h2>
+          <p className="text-sm text-gray-500 mb-4">The Beats page encountered an error. Please try refreshing.</p>
+          <Button onClick={() => { this.setState({ hasError: false }); window.location.reload(); }}>
+            Refresh Page
+          </Button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════
    BEATS ICON — UNIQUE ANIMATED HEARTBEAT PULSE
    ═══════════════════════════════════════════════════════════ */
 function BeatsIcon({ size = 24, className, animate = false }: { size?: number; className?: string; animate?: boolean }) {
+  const id = useRef(`beat-${Math.random().toString(36).slice(2, 8)}`).current;
   return (
     <motion.svg
       width={size} height={size} viewBox="0 0 32 32" fill="none" className={className}
-      animate={animate ? { scale: [1, 1.15, 1, 1.1, 1] } : {}}
-      transition={animate ? { duration: 1.8, repeat: Infinity, ease: 'easeInOut' } : {}}
+      animate={animate ? { scale: [1, 1.15, 1, 1.1, 1] } : undefined}
+      transition={animate ? { duration: 1.8, repeat: Infinity, ease: 'easeInOut' } : undefined}
     >
-      {/* Heart base */}
       <path d="M16 28S3 20 3 12a6.5 6.5 0 0 1 13-1 6.5 6.5 0 0 1 13 1c0 8-13 16-13 16Z"
-        fill="url(#beatGrad)" stroke="url(#beatStroke)" strokeWidth="1.5" />
-      {/* ECG line across heart */}
+        fill={`url(#g${id})`} stroke={`url(#s${id})`} strokeWidth="1.5" />
       <path d="M6 15h4l2-4 3 8 2-6 2 4 3-2h4"
         stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"
         fill="none" opacity="0.9" />
-      {/* Sparkle dots */}
       <circle cx="8" cy="9" r="1" fill="white" opacity="0.6" />
       <circle cx="24" cy="9" r="1" fill="white" opacity="0.6" />
       <defs>
-        <linearGradient id="beatGrad" x1="3" y1="6" x2="29" y2="28" gradientUnits="userSpaceOnUse">
+        <linearGradient id={`g${id}`} x1="3" y1="6" x2="29" y2="28" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#EC407A" />
           <stop offset="50%" stopColor="#E91E63" />
           <stop offset="100%" stopColor="#AD1457" />
         </linearGradient>
-        <linearGradient id="beatStroke" x1="3" y1="6" x2="29" y2="28" gradientUnits="userSpaceOnUse">
+        <linearGradient id={`s${id}`} x1="3" y1="6" x2="29" y2="28" gradientUnits="userSpaceOnUse">
           <stop offset="0%" stopColor="#F48FB1" />
           <stop offset="100%" stopColor="#880E4F" />
         </linearGradient>
@@ -200,8 +228,8 @@ function StreakFlame({ count, size = 'md' }: { count: number; size?: 'sm' | 'md'
   const color = count >= 30 ? 'from-amber-400 to-orange-500' : count >= 14 ? 'from-pink-500 to-rose-500' : count >= 7 ? 'from-pink-400 to-pink-500' : 'from-gray-300 to-gray-400';
   return (
     <motion.div
-      animate={count >= 7 ? { scale: [1, 1.1, 1] } : {}}
-      transition={{ duration: 2, repeat: Infinity }}
+      animate={count >= 7 ? { scale: [1, 1.1, 1] } : undefined}
+      transition={count >= 7 ? { duration: 2, repeat: Infinity } : undefined}
       className={cn('relative rounded-full bg-gradient-to-br flex items-center justify-center font-black text-white shadow-lg', sizeMap[size], color)}
     >
       {count >= 7 && <div className="absolute inset-0 rounded-full bg-gradient-to-br from-white/20 to-transparent" />}
@@ -304,14 +332,17 @@ function BeatMenu({ onRemove, onBlock, onReport, onMute }: {
           <motion.div initial={{ opacity: 0, scale: 0.95, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -4 }}
             className="absolute right-0 top-full mt-1 w-52 card-premium shadow-xl z-50 py-1 overflow-hidden"
           >
-            {items.map(item => (
-              <button key={item.label} onClick={() => { setOpen(false); item.action(); }}
-                className={cn('flex items-center gap-2.5 w-full px-4 py-2.5 text-[13px] font-medium transition-colors',
-                  item.danger ? 'text-red-500 hover:bg-red-50' : 'text-gray-600 hover:bg-gray-50'
-                )}>
-                <item.icon className="w-4 h-4" /> {item.label}
-              </button>
-            ))}
+            {items.map(item => {
+              const ItemIcon = item.icon;
+              return (
+                <button key={item.label} onClick={() => { setOpen(false); item.action(); }}
+                  className={cn('flex items-center gap-2.5 w-full px-4 py-2.5 text-[13px] font-medium transition-colors',
+                    item.danger ? 'text-red-500 hover:bg-red-50' : 'text-gray-600 hover:bg-gray-50'
+                  )}>
+                  <ItemIcon className="w-4 h-4" /> {item.label}
+                </button>
+              );
+            })}
           </motion.div>
         )}
       </AnimatePresence>
@@ -425,14 +456,17 @@ function MatchBeatsChatView({ beat, entries, onBack, onSendBeat, onDeleteEntry, 
       {/* Quick send bar */}
       <div className="border-t border-pink-100/30 p-3">
         <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-          {BEAT_TYPES.slice(0, 6).map(bt => (
+          {BEAT_TYPES.slice(0, 6).map(bt => {
+            const BtIcon = bt.icon;
+            return (
             <button key={bt.type} onClick={() => onSendBeat(bt.type)}
               className={cn('flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all',
                 'bg-gradient-to-r from-white to-pink-50/50 border border-pink-100/30 text-gray-600 hover:border-pink-200 hover:shadow-sm active:scale-95'
               )}>
-              <bt.icon className={cn('w-3.5 h-3.5', bt.color)} /> {bt.label}
+              <BtIcon className={cn('w-3.5 h-3.5', bt.color)} /> {bt.label}
             </button>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -500,14 +534,17 @@ function IceBreakerPanel({ onSend }: { onSend: (text: string) => void }) {
         </div>
       </div>
       <div className="flex gap-1.5 mb-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
-        {ICE_BREAKERS.map((cat, i) => (
-          <button key={cat.category} onClick={() => setActiveCategory(i)}
-            className={cn('flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold whitespace-nowrap transition-all',
-              activeCategory === i ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
-            )}>
-            <cat.icon className="w-3 h-3" /> {cat.category}
-          </button>
-        ))}
+        {ICE_BREAKERS.map((cat, i) => {
+          const CatIcon = cat.icon;
+          return (
+            <button key={cat.category} onClick={() => setActiveCategory(i)}
+              className={cn('flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold whitespace-nowrap transition-all',
+                activeCategory === i ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+              )}>
+              <CatIcon className="w-3 h-3" /> {cat.category}
+            </button>
+          );
+        })}
       </div>
       <div className="space-y-1.5">
         {category.prompts.map((prompt, i) => (
@@ -555,9 +592,58 @@ function NudgeBar({ beats }: { beats: BeatMatch[] }) {
 }
 
 /* ═══════════════════════════════════════════════════════════
+   STAT CARD
+   ═══════════════════════════════════════════════════════════ */
+function StatCard({ label, value, color, icon, clickable, subtitle, onClick }: {
+  label: string; value: number; color: string; icon: React.ReactNode;
+  clickable?: boolean; subtitle?: string; onClick?: () => void;
+}) {
+  return (
+    <motion.div whileHover={clickable ? { y: -2 } : undefined}
+      className={cn('card-premium p-4 text-center', clickable && 'cursor-pointer')}
+      onClick={onClick}
+    >
+      <div className={cn('w-10 h-10 rounded-xl bg-gradient-to-br mx-auto mb-2 flex items-center justify-center shadow-lg', color)}>
+        {icon}
+      </div>
+      <p className="text-2xl font-black text-gray-800">{value}</p>
+      <p className="text-[10px] text-gray-400 font-medium mt-0.5">{label}</p>
+      {subtitle && (
+        <p className="text-[9px] text-pink-400 font-semibold mt-1">{subtitle}</p>
+      )}
+    </motion.div>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
+   BEAT TYPE BUTTON
+   ═══════════════════════════════════════════════════════════ */
+function BeatTypeButton({ bt, onClick }: { bt: typeof BEAT_TYPES[number]; onClick: () => void }) {
+  const Icon = bt.icon;
+  return (
+    <motion.button whileHover={{ y: -3 }} whileTap={{ scale: 0.93 }} onClick={onClick}
+      className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-gradient-to-b from-white to-gray-50/50 border border-gray-100/60 hover:border-pink-200/60 hover:shadow-sm transition-all"
+    >
+      <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center', bt.bg)}>
+        <Icon className={cn('w-4 h-4', bt.color)} />
+      </div>
+      <span className="text-[10px] font-semibold text-gray-500">{bt.label}</span>
+    </motion.button>
+  );
+}
+
+/* ═══════════════════════════════════════════════════════════
    MAIN BEATS PAGE
    ═══════════════════════════════════════════════════════════ */
 export default function BeatsPage() {
+  return (
+    <BeatsErrorBoundary>
+      <BeatsPageInner />
+    </BeatsErrorBoundary>
+  );
+}
+
+function BeatsPageInner() {
   const [beats, setBeats] = useState<BeatMatch[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeView, setActiveView] = useState<'dashboard' | 'sent' | 'received'>('dashboard');
@@ -696,31 +782,18 @@ export default function BeatsPage() {
 
       {/* STATS GRID */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { label: 'Active Beats', value: activeCount, icon: Zap, color: 'from-pink-500 to-rose-500', useBeatsIcon: true },
-          { label: 'Longest Streak', value: longest, icon: Trophy, color: 'from-amber-400 to-orange-500', useBeatsIcon: false },
-          { label: 'Total Sent', value: totalSent, icon: ArrowUp, color: 'from-sky-400 to-blue-500', useBeatsIcon: false, clickable: true, view: 'sent' as const },
-          { label: 'Total Received', value: totalReceived, icon: ArrowDown, color: 'from-emerald-400 to-green-500', useBeatsIcon: false, clickable: true, view: 'received' as const },
-        ].map(stat => (
-          <motion.div key={stat.label} whileHover={stat.clickable ? { y: -2 } : {}}
-            className={cn('card-premium p-4 text-center', stat.clickable && 'cursor-pointer')}
-            onClick={() => stat.clickable && stat.view && setActiveView(activeView === stat.view ? 'dashboard' : stat.view)}
-          >
-            <div className={cn('w-10 h-10 rounded-xl bg-gradient-to-br mx-auto mb-2 flex items-center justify-center shadow-lg', stat.color)}>
-              {stat.useBeatsIcon
-                ? <BeatsIcon size={18} className="text-white" />
-                : <stat.icon className="w-5 h-5 text-white" />
-              }
-            </div>
-            <p className="text-2xl font-black text-gray-800">{stat.value}</p>
-            <p className="text-[10px] text-gray-400 font-medium mt-0.5">{stat.label}</p>
-            {stat.clickable && (
-              <p className="text-[9px] text-pink-400 font-semibold mt-1">
-                {activeView === stat.view ? '\u2190 Back to dashboard' : 'Tap to view \u2192'}
-              </p>
-            )}
-          </motion.div>
-        ))}
+        <StatCard label="Active Beats" value={activeCount} color="from-pink-500 to-rose-500"
+          icon={<BeatsIcon size={18} />} />
+        <StatCard label="Longest Streak" value={longest} color="from-amber-400 to-orange-500"
+          icon={<Trophy className="w-5 h-5 text-white" />} />
+        <StatCard label="Total Sent" value={totalSent} color="from-sky-400 to-blue-500"
+          icon={<ArrowUp className="w-5 h-5 text-white" />} clickable
+          subtitle={activeView === 'sent' ? '\u2190 Back' : 'Tap to view \u2192'}
+          onClick={() => setActiveView(activeView === 'sent' ? 'dashboard' : 'sent')} />
+        <StatCard label="Total Received" value={totalReceived} color="from-emerald-400 to-green-500"
+          icon={<ArrowDown className="w-5 h-5 text-white" />} clickable
+          subtitle={activeView === 'received' ? '\u2190 Back' : 'Tap to view \u2192'}
+          onClick={() => setActiveView(activeView === 'received' ? 'dashboard' : 'received')} />
       </div>
 
       {/* SENT / RECEIVED LIST (expandable) */}
@@ -746,18 +819,10 @@ export default function BeatsPage() {
         </div>
         <div className="grid grid-cols-4 lg:grid-cols-8 gap-2">
           {BEAT_TYPES.map(bt => (
-            <motion.button key={bt.type} whileHover={{ y: -3 }} whileTap={{ scale: 0.93 }}
-              onClick={() => {
-                const activeBeat = beats.find(b => !b.todayCompleted);
-                if (activeBeat) handleSendBeat(activeBeat.id, bt.type);
-              }}
-              className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-gradient-to-b from-white to-gray-50/50 border border-gray-100/60 hover:border-pink-200/60 hover:shadow-sm transition-all"
-            >
-              <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center', bt.bg)}>
-                <bt.icon className={cn('w-4 h-4', bt.color)} />
-              </div>
-              <span className="text-[10px] font-semibold text-gray-500">{bt.label}</span>
-            </motion.button>
+            <BeatTypeButton key={bt.type} bt={bt} onClick={() => {
+              const activeBeat = beats.find(b => !b.todayCompleted);
+              if (activeBeat) handleSendBeat(activeBeat.id, bt.type);
+            }} />
           ))}
         </div>
       </Card>
