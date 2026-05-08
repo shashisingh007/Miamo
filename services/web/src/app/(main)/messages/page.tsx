@@ -669,7 +669,7 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
   const visibleMessages = messages.filter(m => !hiddenMsgIds.has(m.id));
 
   return (
-    <div className="flex flex-col h-full relative">
+    <div className="flex flex-col h-full relative min-h-0">
       <AnimatePresence>{callType && <CallOverlay type={callType} user={other} onEnd={() => setCallType(null)} />}</AnimatePresence>
       <AnimatePresence>{showBgPicker && <BackgroundPicker chatId={chat.id} currentBg={chatBackground} onClose={() => setShowBgPicker(false)} onSelect={(bg, bgName) => {
         setChatBackground(bg);
@@ -1167,7 +1167,7 @@ export default function MessagesPage() {
   const activeConversation = chats.find(c => c.id === activeChat);
 
   return (
-    <div className="h-full flex">
+    <div className="h-full flex overflow-hidden">
       {/* ── Sidebar ── */}
       <div className={cn('w-full lg:w-[360px] border-r border-border/50 flex flex-col bg-miamo-surface/20', activeChat && 'hidden lg:flex')}>
         <div className="p-4 space-y-3">
@@ -1321,7 +1321,7 @@ export default function MessagesPage() {
       </div>
 
       {/* ── Chat View ── */}
-      <div className={cn('flex-1 flex flex-col', !activeChat && 'hidden lg:flex')}>
+      <div className={cn('flex-1 flex flex-col min-h-0', !activeChat && 'hidden lg:flex')}>
         {activeConversation ? (
           <ChatView chat={activeConversation} onBack={() => setActiveChat(null)} onRefreshChats={loadChats}
             onReport={() => {

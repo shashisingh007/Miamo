@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback, Component } from 'react';
+import React, { useState, useEffect, useId, useRef, useCallback, Component } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Zap, Camera, Mic, MessageSquare, Palette, Heart, Clock, Trophy, Flame, Shield,
@@ -30,6 +30,9 @@ class BeatsErrorBoundary extends Component<
   static getDerivedStateFromError(error: Error) {
     return { hasError: true, error };
   }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error('[BeatsErrorBoundary]', error, info?.componentStack);
+  }
   render() {
     if (this.state.hasError) {
       return (
@@ -37,6 +40,11 @@ class BeatsErrorBoundary extends Component<
           <Zap className="w-10 h-10 text-pink-300 mx-auto mb-4" />
           <h2 className="text-lg font-bold text-gray-800 mb-2">Something went wrong</h2>
           <p className="text-sm text-gray-500 mb-4">The Beats page encountered an error. Please try refreshing.</p>
+          {this.state.error && (
+            <p className="text-xs text-red-400 font-mono mb-4 max-w-lg mx-auto break-all">
+              {this.state.error.message}
+            </p>
+          )}
           <Button onClick={() => { this.setState({ hasError: false }); window.location.reload(); }}>
             Refresh Page
           </Button>
@@ -51,7 +59,7 @@ class BeatsErrorBoundary extends Component<
    BEATS ICON — UNIQUE ANIMATED HEARTBEAT PULSE
    ═══════════════════════════════════════════════════════════ */
 function BeatsIcon({ size = 24, className, animate = false }: { size?: number; className?: string; animate?: boolean }) {
-  const id = useRef(`beat-${Math.random().toString(36).slice(2, 8)}`).current;
+  const id = useId().replace(/:/g, '');
   return (
     <motion.svg
       width={size} height={size} viewBox="0 0 32 32" fill="none" className={className}
@@ -398,8 +406,8 @@ function MatchBeatsChatView({ beat, entries, onBack, onSendBeat, onDeleteEntry, 
   onToggleChat: (id: string) => void; filter: 'all' | 'sent' | 'received';
   setFilter: (f: 'all' | 'sent' | 'received') => void;
 }) {
-  const other = beat.matchedUser;
-  const photo = other.photos?.[0]?.url || other.photos?.[0];
+  const other = beat.matchedUser || { id: '', displayName: 'Unknown', photos: [], online: false, verified: false };
+  const photo = other.photos?.[0]?.url || other.photos?.[0] || undefined;
   const filtered = entries.filter(e =>
     filter === 'all' ? true : filter === 'sent' ? e.sender === 'me' : e.sender === 'them'
   );
@@ -491,8 +499,8 @@ function BeatListView({ beats, direction, onSelectMatch }: {
       </div>
       <div className="space-y-2">
         {beats.filter(b => (direction === 'sent' ? (b.totalSent || 0) : (b.totalReceived || 0)) > 0).map(beat => {
-          const other = beat.matchedUser;
-          const photo = other.photos?.[0]?.url || other.photos?.[0];
+          const other = beat.matchedUser || { id: '', displayName: 'Unknown', photos: [], online: false, verified: false };
+          const photo = other.photos?.[0]?.url || other.photos?.[0] || undefined;
           const count = direction === 'sent' ? (beat.totalSent || 0) : (beat.totalReceived || 0);
           return (
             <motion.button key={beat.id} whileHover={{ x: 3 }} onClick={() => onSelectMatch(beat)}
@@ -868,8 +876,8 @@ function BeatsPageInner() {
         ) : (
           <div className="space-y-2">
             {beats.map((beat, i) => {
-              const other = beat.matchedUser;
-              const photo = other.photos?.[0]?.url || other.photos?.[0];
+              const other = beat.matchedUser || { id: '', displayName: 'Unknown', photos: [], online: false, verified: false };
+              const photo = other.photos?.[0]?.url || other.photos?.[0] || undefined;
               const state = BEAT_STATES[beat.state as keyof typeof BEAT_STATES] || BEAT_STATES.soft;
               const isUrgent = beat.state === 'critical' || beat.state === 'weak';
               const milestone = Object.entries(MILESTONE_EMOJIS).reverse().find(([k]) => beat.count >= Number(k));
