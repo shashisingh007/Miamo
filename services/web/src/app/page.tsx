@@ -40,8 +40,8 @@ export default function LandingPage() {
           <span className="text-xl font-bold text-romantic tracking-tight">{APP_NAME}</span>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/login"><Button variant="ghost" className="btn-glass">Sign In</Button></Link>
-          <Link href="/register"><Button className="btn-primary shimmer-glass">Get Started</Button></Link>
+          <Link href="/login"><Button variant="secondary">Sign In</Button></Link>
+          <Link href="/register"><Button className="shimmer-glass">Get Started</Button></Link>
         </div>
       </nav>
 
@@ -80,14 +80,14 @@ export default function LandingPage() {
           <div className="flex items-center justify-center gap-4 mt-10">
             <Link href="/register">
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button size="lg" className="btn-primary text-lg px-8 py-4 shimmer-glass">
+                <Button size="xl" className="shimmer-glass text-lg">
                   Start Your Journey <ArrowRight className="w-5 h-5 ml-1" />
                 </Button>
               </motion.div>
             </Link>
             <Link href="/login">
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button variant="outline" size="lg" className="btn-glass text-lg px-8 py-4">
+                <Button variant="secondary" size="xl" className="text-lg">
                   Sign In
                 </Button>
               </motion.div>
@@ -153,7 +153,7 @@ export default function LandingPage() {
             <p className="text-gray-500 mb-8">Join thousands already connecting on {APP_NAME}.</p>
             <Link href="/register">
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }} className="inline-block">
-                <Button size="lg" className="btn-primary text-lg px-10 shimmer-glass">
+                <Button size="xl" className="shimmer-glass text-lg px-10">
                   Get Started Free <Heart className="w-5 h-5 ml-1" fill="currentColor" />
                 </Button>
               </motion.div>
