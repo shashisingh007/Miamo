@@ -571,6 +571,13 @@ export default function BeatsPage() {
 
   const loadBeats = useCallback(() => {
     setLoading(true);
+    // If no auth token, skip API and use mock data directly
+    const token = typeof window !== 'undefined' ? localStorage.getItem('miamo_token') : null;
+    if (!token) {
+      setBeats(generateMockBeats());
+      setLoading(false);
+      return;
+    }
     api.getBeats().then(res => {
       const data = res.data || [];
       setBeats(data.length > 0 ? data : generateMockBeats());
@@ -590,15 +597,35 @@ export default function BeatsPage() {
 
   const handleSendBeat = async (beatId: string, type: string, content?: string) => {
     setCompleting(beatId);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('miamo_token') : null;
     try {
-      await api.completeBeat(beatId, type, content || `Quick ${type} beat!`);
-      const beat = beats.find(b => b.id === beatId);
-      if (beat) {
-        const newCount = (beat.count || 0) + 1;
-        if (MILESTONE_EMOJIS[newCount]) setCelebration(newCount);
+      if (token) {
+        await api.completeBeat(beatId, type, content || `Quick ${type} beat!`);
       }
-      loadBeats();
-    } catch (e) { /* silently fail */ }
+      // Update local state regardless (mock or real)
+      setBeats(prev => prev.map(b => {
+        if (b.id !== beatId) return b;
+        const newCount = (b.count || 0) + 1;
+        if (MILESTONE_EMOJIS[newCount]) setCelebration(newCount);
+        return {
+          ...b,
+          count: newCount,
+          todayCompleted: true,
+          totalSent: (b.totalSent || 0) + 1,
+          lastBeatAt: new Date().toISOString(),
+          longestStreak: Math.max(b.longestStreak || 0, newCount),
+        };
+      }));
+      if (token) loadBeats();
+    } catch (e) {
+      // Still update locally on API failure so UI responds
+      setBeats(prev => prev.map(b => {
+        if (b.id !== beatId) return b;
+        const newCount = (b.count || 0) + 1;
+        if (MILESTONE_EMOJIS[newCount]) setCelebration(newCount);
+        return { ...b, count: newCount, todayCompleted: true, totalSent: (b.totalSent || 0) + 1, lastBeatAt: new Date().toISOString() };
+      }));
+    }
     setCompleting(null);
   };
 
