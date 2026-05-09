@@ -215,8 +215,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
       {/* ═══ MAIN CONTENT ═══ */}
       <main className="flex-1 flex flex-col overflow-hidden relative z-10">
-        {/* Premium Header — hidden on messages page to give full height */}
-        {!pathname.startsWith('/messages') && (
+        {/* Premium Header */}
         <header className="h-[72px] header-premium flex items-center px-6 gap-4 shrink-0 relative z-20">
           <div className="lg:hidden flex items-center gap-2">
             <MiamoCompactIcon size={28} />
@@ -246,10 +245,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             </div>
           </div>
         </header>
-        )}
 
-        {/* Page content with animation */}
-        <div className="flex-1 overflow-y-auto min-h-0">
+        {/* Page content — messages needs overflow-hidden so its internal height fills correctly */}
+        <div className={cn('flex-1 min-h-0', pathname.startsWith('/messages') ? 'overflow-hidden' : 'overflow-y-auto')}>
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}
