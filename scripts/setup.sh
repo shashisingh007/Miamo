@@ -129,11 +129,17 @@ has() {
     node)
       [[ -x "/c/Program Files/nodejs/node.exe" ]] && return 0
       [[ -x /usr/local/bin/node ]]                && return 0
+      [[ -x /usr/bin/node ]]                      && return 0
+      [[ -x "$HOME/.local/bin/node" ]]            && return 0
+      # nvm
+      [[ -s "${NVM_DIR:-$HOME/.nvm}/nvm.sh" ]] && . "${NVM_DIR:-$HOME/.nvm}/nvm.sh" 2>/dev/null && command -v node &>/dev/null && return 0
       ;;
     npm)
       [[ -x "/c/Program Files/nodejs/npm" ]]  && return 0
       [[ -x "/c/Program Files/nodejs/npm.cmd" ]] && return 0
       [[ -x /usr/local/bin/npm ]]              && return 0
+      [[ -x /usr/bin/npm ]]                    && return 0
+      [[ -x "$HOME/.local/bin/npm" ]]          && return 0
       ;;
     docker)
       [[ -x "/c/Program Files/Docker/Docker/resources/bin/docker.exe" ]] && return 0
@@ -261,6 +267,14 @@ if [[ "$PLATFORM" == "linux" ]]; then
   elif command -v apk     &>/dev/null; then PKG="apk"
   fi
 
+  # Detect musl vs glibc (Alpine & others use musl)
+  _IS_MUSL=false
+  if [[ -f /etc/alpine-release ]]; then
+    _IS_MUSL=true
+  elif ldd --version 2>&1 | grep -qi musl; then
+    _IS_MUSL=true
+  fi
+
   # Generic package install helper
   pkg_install() {
     [[ -z "$PKG" ]] && return 1
@@ -270,7 +284,7 @@ if [[ "$PLATFORM" == "linux" ]]; then
       yum)    $SUDO yum install -y "$@" 2>/dev/null ;;
       pacman) $SUDO pacman -S --noconfirm "$@" 2>/dev/null ;;
       zypper) $SUDO zypper install -y "$@" 2>/dev/null ;;
-      apk)    $SUDO apk add --no-cache "$@" 2>/dev/null ;;
+      apk)    $SUDO apk add "$@" 2>/dev/null ;;
     esac
   }
 
@@ -355,7 +369,7 @@ if [[ "$PLATFORM" == "linux" ]]; then
     echo "  Installing Node.js 20.x..."
     _NODE_OK=false
 
-    # Method A: package-manager–specific repo setup
+    # ── Method A: distro package manager ──────────────────────
     if ! $_NODE_OK && [[ "$PKG" == "apt" ]] && (has curl || has wget); then
       _dl_pipe "https://deb.nodesource.com/setup_20.x" | $SUDO -E bash - 2>/dev/null || true
       $SUDO apt-get install -y nodejs 2>/dev/null || true
@@ -374,52 +388,100 @@ if [[ "$PLATFORM" == "linux" ]]; then
       pkg_install nodejs20 npm20 2>/dev/null || pkg_install nodejs npm 2>/dev/null || true
       refresh_path; has node && _NODE_OK=true
     fi
+    # Alpine/apk — needs special handling (apk may report errors but still install)
     if ! $_NODE_OK && [[ "$PKG" == "apk" ]]; then
-      pkg_install nodejs npm || true
-      refresh_path; has node && _NODE_OK=true
+      $SUDO apk update 2>/dev/null || true
+      $SUDO apk add nodejs npm 2>/dev/null || true
+      # apk may show "N errors; ..." in status but still install the binary
+      refresh_path
+      # Check directly — apk installs to /usr/bin
+      if has node; then
+        _NODE_OK=true
+      elif [[ -x /usr/bin/node ]]; then
+        export PATH="/usr/bin:$PATH"
+        hash -r 2>/dev/null || true
+        _NODE_OK=true
+        echo -e "  ${G}✓ node found at /usr/bin/node${NC}"
+      else
+        # Try alternative package names
+        $SUDO apk add nodejs-current npm 2>/dev/null || true
+        $SUDO apk add nodejs18 npm 2>/dev/null || true
+        refresh_path
+        has node && _NODE_OK=true
+        [[ ! $_NODE_OK ]] && [[ -x /usr/bin/node ]] && export PATH="/usr/bin:$PATH" && _NODE_OK=true
+      fi
     fi
 
-    # Method B: direct binary download (works on ANY Linux)
+    # ── Method B: direct binary download ──────────────────────
     if ! $_NODE_OK && (has curl || has wget); then
-      echo "  Package manager didn't work — trying direct binary download..."
+      echo "  Trying direct binary download..."
       NARCH=$(uname -m)
       [[ "$NARCH" == "x86_64" ]]  && NARCH="x64"
       [[ "$NARCH" == "aarch64" ]] && NARCH="arm64"
       [[ "$NARCH" == "armv7l" ]]  && NARCH="armv7l"
       NODE_VER="v20.18.1"
-      NODE_TAR="node-${NODE_VER}-linux-${NARCH}.tar.xz"
-      NODE_URL="https://nodejs.org/dist/${NODE_VER}/${NODE_TAR}"
+
+      if $_IS_MUSL; then
+        # Alpine/musl: official binaries won't work — use unofficial musl builds
+        NODE_TAR="node-${NODE_VER}-linux-${NARCH}-musl.tar.xz"
+        NODE_URL="https://unofficial-builds.nodejs.org/download/release/${NODE_VER}/${NODE_TAR}"
+        echo "  Detected musl libc — using musl-compatible build..."
+      else
+        NODE_TAR="node-${NODE_VER}-linux-${NARCH}.tar.xz"
+        NODE_URL="https://nodejs.org/dist/${NODE_VER}/${NODE_TAR}"
+      fi
 
       if _dl "$NODE_URL" "/tmp/${NODE_TAR}"; then
         # Unpack: try xz first, then gz fallback
         if command -v xz &>/dev/null || command -v unxz &>/dev/null; then
           tar -xJf "/tmp/${NODE_TAR}" -C /tmp/ 2>/dev/null
         else
-          # If xz is not installed, try fetching .tar.gz instead
-          NODE_TAR="node-${NODE_VER}-linux-${NARCH}.tar.gz"
-          NODE_URL="https://nodejs.org/dist/${NODE_VER}/${NODE_TAR}"
-          _dl "$NODE_URL" "/tmp/${NODE_TAR}" && tar -xzf "/tmp/${NODE_TAR}" -C /tmp/ 2>/dev/null
+          # Install xz if possible, or try .tar.gz
+          [[ -n "$PKG" ]] && pkg_install xz xz-utils 2>/dev/null || true
+          if command -v xz &>/dev/null; then
+            tar -xJf "/tmp/${NODE_TAR}" -C /tmp/ 2>/dev/null
+          else
+            # Try fetching .tar.gz variant instead
+            local _gz_tar="${NODE_TAR%.xz}.gz"
+            local _gz_url="${NODE_URL%.xz}.gz"
+            _dl "$_gz_url" "/tmp/${_gz_tar}" 2>/dev/null && tar -xzf "/tmp/${_gz_tar}" -C /tmp/ 2>/dev/null
+          fi
         fi
-        # Install to /usr/local or ~/.local
-        if [[ -d "/tmp/node-${NODE_VER}-linux-${NARCH}" ]]; then
-          $SUDO cp -r /tmp/node-${NODE_VER}-linux-${NARCH}/{bin,include,lib,share} /usr/local/ 2>/dev/null || {
-            mkdir -p "$HOME/.local/bin" 2>/dev/null
-            cp -r /tmp/node-${NODE_VER}-linux-${NARCH}/{bin,include,lib,share} "$HOME/.local/" 2>/dev/null
+        # Find the extracted directory (name varies for musl builds)
+        local _node_dir=""
+        for d in /tmp/node-${NODE_VER}-linux-*; do
+          [[ -d "$d" ]] && _node_dir="$d" && break
+        done
+        if [[ -n "$_node_dir" && -d "$_node_dir" ]]; then
+          $SUDO cp -r "$_node_dir"/bin/* /usr/local/bin/ 2>/dev/null && \
+          $SUDO cp -r "$_node_dir"/lib/* /usr/local/lib/ 2>/dev/null && \
+          $SUDO cp -r "$_node_dir"/include/* /usr/local/include/ 2>/dev/null && \
+          $SUDO cp -r "$_node_dir"/share/* /usr/local/share/ 2>/dev/null || {
+            mkdir -p "$HOME/.local/bin" "$HOME/.local/lib" 2>/dev/null
+            cp -r "$_node_dir"/bin/* "$HOME/.local/bin/" 2>/dev/null
+            cp -r "$_node_dir"/lib/* "$HOME/.local/lib/" 2>/dev/null
             export PATH="$HOME/.local/bin:$PATH"
           }
         fi
-        rm -rf "/tmp/${NODE_TAR}" "/tmp/node-${NODE_VER}-linux-${NARCH}" 2>/dev/null
+        rm -rf "/tmp/${NODE_TAR}" /tmp/node-${NODE_VER}-linux-* 2>/dev/null
         refresh_path; has node && _NODE_OK=true
       fi
     fi
 
-    # Method C: nvm
+    # ── Method C: nvm (last resort, works almost everywhere) ──
     if ! $_NODE_OK && (has curl || has wget); then
       echo "  Trying nvm..."
+      # Ensure a profile file exists (nvm installer needs one)
+      [[ ! -f "$HOME/.bashrc" ]] && touch "$HOME/.bashrc"
       export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
-      _dl_pipe "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh" | bash 2>/dev/null || true
+      _dl_pipe "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh" | PROFILE="$HOME/.bashrc" bash 2>/dev/null || true
+      # Source nvm into current shell
       [[ -s "$NVM_DIR/nvm.sh" ]] && . "$NVM_DIR/nvm.sh" 2>/dev/null
-      command -v nvm &>/dev/null && nvm install 20 2>/dev/null || true
+      if command -v nvm &>/dev/null; then
+        nvm install 20 2>/dev/null || nvm install --lts 2>/dev/null || true
+        # Re-source after install
+        [[ -s "$NVM_DIR/nvm.sh" ]] && . "$NVM_DIR/nvm.sh" 2>/dev/null
+      fi
       refresh_path; has node && _NODE_OK=true
     fi
 
