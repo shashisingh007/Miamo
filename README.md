@@ -67,6 +67,7 @@ Miamo/
 │       ├── web.yaml
 │       └── migrate-job.yaml
 ├── scripts/                ← Single entry point
+│   ├── setup.sh           ← Install all prerequisites (Node, Docker, minikube, kubectl)
 │   ├── start.sh           ← All commands: local, dev, stop, restart, logs, test, cleanup, status
 │   └── start.ps1          ← Windows PowerShell equivalent (local + stop)
 ├── services/               ← All application code
@@ -84,13 +85,23 @@ Miamo/
 
 ## Quick Start
 
-### Option A: Local Dev (Fastest — recommended for UI work)
-
-**Prerequisites:** Node.js 18+
+### Zero to Running (fresh machine)
 
 ```bash
 git clone https://github.com/shashisingh007/Miamo.git
 cd Miamo
+bash scripts/setup.sh          # Installs Node, Docker, minikube, kubectl (auto-detects OS)
+bash scripts/start.sh local    # Start dev server
+```
+
+`setup.sh` works on **macOS** (Homebrew), **Linux** (apt), and **Windows** (Chocolatey via Git Bash).  
+Skips anything already installed.
+
+### Option A: Local Dev (Fastest — recommended for UI work)
+
+**Prerequisites:** Node.js 18+ (or just run `setup.sh` first)
+
+```bash
 bash scripts/start.sh local
 ```
 
