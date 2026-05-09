@@ -216,6 +216,14 @@ if [[ "$MODE" == "stop" ]]; then
   echo ""
 
   echo -e "${Y}[1/3]${NC} Stopping local dev servers..."
+  # Kill by saved PID first
+  if [[ -f /tmp/miamo-local.pid ]]; then
+    LOCAL_PID=$(cat /tmp/miamo-local.pid)
+    kill "$LOCAL_PID" 2>/dev/null || true
+    # Also kill child processes (next-router-worker etc.)
+    pkill -P "$LOCAL_PID" 2>/dev/null || true
+    rm -f /tmp/miamo-local.pid
+  fi
   pkill -f "next dev" 2>/dev/null || true
   pkill -f "next-router-worker" 2>/dev/null || true
   kill_port 3100; kill_port 3101
@@ -271,35 +279,51 @@ if [[ "$MODE" == "local" ]]; then
   sleep 1
   echo -e "  ${G}✓${NC} Clean"
 
-  echo -e "${Y}[3/3]${NC} Starting Next.js dev server on port 3100..."
+  # Create logs directory
+  mkdir -p "$ROOT/logs"
+  LOG_FILE="$ROOT/logs/local.log"
+
+  echo -e "${Y}[3/3]${NC} Starting Next.js dev server on port 3100 (background)..."
   cd services/web
-  npx next dev -p 3100 &
+  nohup npx next dev -p 3100 > "$LOG_FILE" 2>&1 &
   DEV_PID=$!
+  echo $DEV_PID > /tmp/miamo-local.pid
+  disown $DEV_PID 2>/dev/null
   cd "$ROOT"
 
+  # Wait for server to start (up to 90s for first compile)
   echo -n "  Waiting for server"
-  for i in $(seq 1 30); do
+  SERVER_READY=0
+  for i in $(seq 1 45); do
     if curl -s -o /dev/null http://localhost:3100 2>/dev/null; then
-      echo -e " ${G}✓${NC}"; break
+      SERVER_READY=1
+      echo -e " ${G}✓${NC}"
+      break
     fi
-    echo -n "."; sleep 2
+    echo -n "."
+    sleep 2
   done
-  [[ $i -eq 30 ]] && echo -e " ${Y}(compiling — check browser shortly)${NC}"
+  if [[ $SERVER_READY -eq 0 ]]; then
+    echo -e " ${Y}(still compiling — check browser in a moment)${NC}"
+  fi
 
   echo ""
   echo -e "${B}═══════════════════════════════════════════════${NC}"
-  echo -e "${B}  MIAMO LOCAL DEV IS RUNNING                   ${NC}"
+  echo -e "${B}  MIAMO LOCAL DEV IS RUNNING (background)       ${NC}"
   echo -e "${B}═══════════════════════════════════════════════${NC}"
   echo ""
   echo -e "  ${G}➜${NC} Web App:  ${G}http://localhost:3100${NC}"
   echo ""
+  echo -e "  PID:    ${DEV_PID} (survives terminal close)"
+  echo -e "  Logs:   ${G}tail -f logs/local.log${NC}"
+  echo ""
   echo -e "  Mock data on all pages — no backend needed."
   echo -e "  File changes auto-reload instantly."
   echo ""
-  echo -e "  Stop: ${G}bash scripts/start.sh stop${NC}"
+  echo -e "  Stop:   ${G}bash scripts/start.sh stop${NC}"
+  echo -e "  Status: ${G}bash scripts/start.sh status${NC}"
   echo -e "${B}═══════════════════════════════════════════════${NC}"
   echo ""
-  wait $DEV_PID
   exit 0
 fi
 
@@ -599,7 +623,16 @@ if [[ "$MODE" == "status" ]]; then
   echo ""
 
   # Local dev
-  if pgrep -f "next dev" &>/dev/null; then
+  if [[ -f /tmp/miamo-local.pid ]] && kill -0 "$(cat /tmp/miamo-local.pid)" 2>/dev/null; then
+    LOCAL_PID=$(cat /tmp/miamo-local.pid)
+    echo -e "  Local dev: ${G}running${NC} (port 3100, PID ${LOCAL_PID})"
+    if [[ -f "$ROOT/logs/local.log" ]]; then
+      echo -e "  Logs:      ${C}tail -f logs/local.log${NC}"
+      echo ""
+      echo -e "  ${Y}Last 5 log lines:${NC}"
+      tail -5 "$ROOT/logs/local.log" 2>/dev/null | sed 's/^/    /'
+    fi
+  elif pgrep -f "next dev" &>/dev/null; then
     echo -e "  Local dev: ${G}running${NC} (port 3100)"
   else
     echo -e "  Local dev: ${Y}stopped${NC}"
