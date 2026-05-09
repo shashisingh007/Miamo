@@ -72,7 +72,8 @@ refresh_path() {
     fi
   fi
 
-  # Linux: common bin paths
+  # Linux: common bin paths + user-local
+  [[ -d "$HOME/.local/bin" ]] && export PATH="$HOME/.local/bin:$PATH"
   export PATH="/usr/local/bin:/usr/bin:/bin:/snap/bin:$PATH"
 
   hash -r 2>/dev/null || true
@@ -144,9 +145,11 @@ has() {
       ;;
     kubectl)
       [[ -x /usr/local/bin/kubectl ]] && return 0
+      [[ -x "$HOME/.local/bin/kubectl" ]] && return 0
       ;;
     minikube)
       [[ -x /usr/local/bin/minikube ]] && return 0
+      [[ -x "$HOME/.local/bin/minikube" ]] && return 0
       ;;
   esac
   return 1
@@ -235,7 +238,8 @@ if [[ "$PLATFORM" == "mac" ]]; then
 fi
 
 # ═════════════════════════════════════════════════════════════════
-#  Linux — apt (Debian/Ubuntu) + fallback to direct downloads
+#  Linux — multi-distro (apt / dnf / yum / pacman / zypper / apk)
+#  Falls back to direct binary downloads if no pkg manager found
 # ═════════════════════════════════════════════════════════════════
 if [[ "$PLATFORM" == "linux" ]]; then
   SUDO=""
@@ -247,130 +251,344 @@ if [[ "$PLATFORM" == "linux" ]]; then
     fi
   fi
 
-  HAS_APT=false
-  command -v apt-get &>/dev/null && HAS_APT=true
-
-  # 1. Update package index
-  echo -e "${Y}[1/7]${NC} Package index..."
-  if $HAS_APT; then
-    $SUDO apt-get update -qq 2>/dev/null && echo -e "  ${G}✓${NC} Updated" || echo -e "  ${Y}⚠ apt update failed${NC}"
-  else
-    echo -e "  ${Y}⚠ apt not found — will try direct downloads${NC}"
+  # ── Detect package manager ──────────────────────────────────
+  PKG=""
+  if   command -v apt-get &>/dev/null; then PKG="apt"
+  elif command -v dnf     &>/dev/null; then PKG="dnf"
+  elif command -v yum     &>/dev/null; then PKG="yum"
+  elif command -v pacman  &>/dev/null; then PKG="pacman"
+  elif command -v zypper  &>/dev/null; then PKG="zypper"
+  elif command -v apk     &>/dev/null; then PKG="apk"
   fi
 
-  # 2. Git & curl
+  # Generic package install helper
+  pkg_install() {
+    [[ -z "$PKG" ]] && return 1
+    case "$PKG" in
+      apt)    $SUDO apt-get install -y "$@" 2>/dev/null ;;
+      dnf)    $SUDO dnf install -y "$@" 2>/dev/null ;;
+      yum)    $SUDO yum install -y "$@" 2>/dev/null ;;
+      pacman) $SUDO pacman -S --noconfirm "$@" 2>/dev/null ;;
+      zypper) $SUDO zypper install -y "$@" 2>/dev/null ;;
+      apk)    $SUDO apk add --no-cache "$@" 2>/dev/null ;;
+    esac
+  }
+
+  # Download helpers — use curl OR wget, whichever is available
+  _dl() {
+    local url="$1" dest="$2"
+    if command -v curl &>/dev/null; then
+      curl -fsSL "$url" -o "$dest" 2>/dev/null
+    elif command -v wget &>/dev/null; then
+      wget -qO "$dest" "$url" 2>/dev/null
+    else
+      return 1
+    fi
+  }
+  _dl_pipe() {
+    local url="$1"
+    if command -v curl &>/dev/null; then
+      curl -fsSL "$url" 2>/dev/null
+    elif command -v wget &>/dev/null; then
+      wget -qO- "$url" 2>/dev/null
+    else
+      return 1
+    fi
+  }
+
+  # ── 1. Update package index ─────────────────────────────────
+  echo -e "${Y}[1/7]${NC} Package index..."
+  case "$PKG" in
+    apt)    $SUDO apt-get update -qq 2>/dev/null && echo -e "  ${G}✓${NC} Updated" || echo -e "  ${Y}⚠ apt update had warnings${NC}" ;;
+    dnf)    echo -e "  ${C}● Using dnf${NC}" ;;
+    yum)    echo -e "  ${C}● Using yum${NC}" ;;
+    pacman) $SUDO pacman -Sy --noconfirm 2>/dev/null && echo -e "  ${G}✓${NC} Synced" || true ;;
+    zypper) $SUDO zypper refresh 2>/dev/null && echo -e "  ${G}✓${NC} Refreshed" || true ;;
+    apk)    $SUDO apk update 2>/dev/null && echo -e "  ${G}✓${NC} Updated" || true ;;
+    *)      echo -e "  ${Y}⚠ No package manager found — will use direct downloads${NC}" ;;
+  esac
+
+  # ── 2. Git & curl (needed for everything else) ──────────────
   echo -e "${Y}[2/7]${NC} Git & curl..."
   if has git && has curl; then
     skipped "Git & curl"
   else
-    if $HAS_APT; then
-      $SUDO apt-get install -y git curl ca-certificates gnupg 2>/dev/null || true
+    if [[ -n "$PKG" ]]; then
+      # Package names vary slightly across distros
+      case "$PKG" in
+        apt)    pkg_install git curl ca-certificates gnupg || true ;;
+        pacman) pkg_install git curl ca-certificates-utils || true ;;
+        apk)    pkg_install git curl ca-certificates || true ;;
+        *)      pkg_install git curl ca-certificates || true ;;
+      esac
     fi
     refresh_path
-    has git && has curl && installed "Git & curl" || failed "Git & curl (install manually: sudo apt install git curl)"
+    if has git && has curl; then
+      installed "Git & curl"
+    elif has git && has wget; then
+      installed "Git (using wget for downloads)"
+    elif has git; then
+      installed "Git"
+      echo -e "  ${Y}⚠ curl not available — some installs may be limited${NC}"
+    else
+      # Last resort: try to grab statically-linked curl if wget exists
+      if has wget; then
+        echo "  Trying to fetch curl via wget..."
+        CARCH=$(uname -m); [[ "$CARCH" == "x86_64" ]] && CARCH="amd64"; [[ "$CARCH" == "aarch64" ]] && CARCH="arm64"
+        wget -qO /tmp/curl.tar.xz "https://github.com/moparisthebest/static-curl/releases/latest/download/curl-${CARCH}.tar.xz" 2>/dev/null && \
+          tar -xJf /tmp/curl.tar.xz -C /tmp/ 2>/dev/null && \
+          ($SUDO install -m 0755 /tmp/curl /usr/local/bin/curl 2>/dev/null || install -m 0755 /tmp/curl "$HOME/.local/bin/curl" 2>/dev/null) && \
+          rm -f /tmp/curl /tmp/curl.tar.xz 2>/dev/null
+        refresh_path
+        has curl && echo -e "  ${G}✓ Got curl via wget${NC}"
+      fi
+      (has git || has curl || has wget) && installed "Git/curl (partial)" || failed "Git & curl"
+    fi
   fi
 
-  # 3. Node.js
+  # ── 3. Node.js ──────────────────────────────────────────────
   echo -e "${Y}[3/7]${NC} Node.js..."
   refresh_path
   if has node; then
     skipped "Node.js ($(node -v 2>/dev/null || echo '?'))"
   else
     echo "  Installing Node.js 20.x..."
-    if has curl; then
-      curl -fsSL https://deb.nodesource.com/setup_20.x | $SUDO -E bash - 2>/dev/null || true
+    _NODE_OK=false
+
+    # Method A: package-manager–specific repo setup
+    if ! $_NODE_OK && [[ "$PKG" == "apt" ]] && (has curl || has wget); then
+      _dl_pipe "https://deb.nodesource.com/setup_20.x" | $SUDO -E bash - 2>/dev/null || true
       $SUDO apt-get install -y nodejs 2>/dev/null || true
+      refresh_path; has node && _NODE_OK=true
     fi
-    refresh_path
-    has node && installed "Node.js ($(node -v))" || failed "Node.js — install manually: https://nodejs.org"
+    if ! $_NODE_OK && [[ "$PKG" == "dnf" || "$PKG" == "yum" ]] && (has curl || has wget); then
+      _dl_pipe "https://rpm.nodesource.com/setup_20.x" | $SUDO bash - 2>/dev/null || true
+      $SUDO $PKG install -y nodejs 2>/dev/null || true
+      refresh_path; has node && _NODE_OK=true
+    fi
+    if ! $_NODE_OK && [[ "$PKG" == "pacman" ]]; then
+      pkg_install nodejs npm || true
+      refresh_path; has node && _NODE_OK=true
+    fi
+    if ! $_NODE_OK && [[ "$PKG" == "zypper" ]]; then
+      pkg_install nodejs20 npm20 2>/dev/null || pkg_install nodejs npm 2>/dev/null || true
+      refresh_path; has node && _NODE_OK=true
+    fi
+    if ! $_NODE_OK && [[ "$PKG" == "apk" ]]; then
+      pkg_install nodejs npm || true
+      refresh_path; has node && _NODE_OK=true
+    fi
+
+    # Method B: direct binary download (works on ANY Linux)
+    if ! $_NODE_OK && (has curl || has wget); then
+      echo "  Package manager didn't work — trying direct binary download..."
+      NARCH=$(uname -m)
+      [[ "$NARCH" == "x86_64" ]]  && NARCH="x64"
+      [[ "$NARCH" == "aarch64" ]] && NARCH="arm64"
+      [[ "$NARCH" == "armv7l" ]]  && NARCH="armv7l"
+      NODE_VER="v20.18.1"
+      NODE_TAR="node-${NODE_VER}-linux-${NARCH}.tar.xz"
+      NODE_URL="https://nodejs.org/dist/${NODE_VER}/${NODE_TAR}"
+
+      if _dl "$NODE_URL" "/tmp/${NODE_TAR}"; then
+        # Unpack: try xz first, then gz fallback
+        if command -v xz &>/dev/null || command -v unxz &>/dev/null; then
+          tar -xJf "/tmp/${NODE_TAR}" -C /tmp/ 2>/dev/null
+        else
+          # If xz is not installed, try fetching .tar.gz instead
+          NODE_TAR="node-${NODE_VER}-linux-${NARCH}.tar.gz"
+          NODE_URL="https://nodejs.org/dist/${NODE_VER}/${NODE_TAR}"
+          _dl "$NODE_URL" "/tmp/${NODE_TAR}" && tar -xzf "/tmp/${NODE_TAR}" -C /tmp/ 2>/dev/null
+        fi
+        # Install to /usr/local or ~/.local
+        if [[ -d "/tmp/node-${NODE_VER}-linux-${NARCH}" ]]; then
+          $SUDO cp -r /tmp/node-${NODE_VER}-linux-${NARCH}/{bin,include,lib,share} /usr/local/ 2>/dev/null || {
+            mkdir -p "$HOME/.local/bin" 2>/dev/null
+            cp -r /tmp/node-${NODE_VER}-linux-${NARCH}/{bin,include,lib,share} "$HOME/.local/" 2>/dev/null
+            export PATH="$HOME/.local/bin:$PATH"
+          }
+        fi
+        rm -rf "/tmp/${NODE_TAR}" "/tmp/node-${NODE_VER}-linux-${NARCH}" 2>/dev/null
+        refresh_path; has node && _NODE_OK=true
+      fi
+    fi
+
+    # Method C: nvm
+    if ! $_NODE_OK && (has curl || has wget); then
+      echo "  Trying nvm..."
+      export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+      _dl_pipe "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh" | bash 2>/dev/null || true
+      [[ -s "$NVM_DIR/nvm.sh" ]] && . "$NVM_DIR/nvm.sh" 2>/dev/null
+      command -v nvm &>/dev/null && nvm install 20 2>/dev/null || true
+      refresh_path; has node && _NODE_OK=true
+    fi
+
+    $_NODE_OK && installed "Node.js ($(node -v 2>/dev/null))" || failed "Node.js"
   fi
 
-  # 4. Docker
+  # ── 4. Docker ───────────────────────────────────────────────
   echo -e "${Y}[4/7]${NC} Docker..."
   if has docker; then
     skipped "Docker"
   else
     echo "  Installing Docker Engine..."
-    if has curl && $HAS_APT; then
-      $SUDO install -m 0755 -d /etc/apt/keyrings 2>/dev/null || true
+    _DOCKER_OK=false
 
-      # Detect distro for correct Docker repo
+    # Method A: apt-based (Debian/Ubuntu)
+    if ! $_DOCKER_OK && [[ "$PKG" == "apt" ]] && (has curl || has wget); then
+      $SUDO install -m 0755 -d /etc/apt/keyrings 2>/dev/null || true
       if [[ -f /etc/os-release ]]; then
         . /etc/os-release
-        DISTRO_ID="${ID}"
-        DISTRO_CODENAME="${VERSION_CODENAME:-$(lsb_release -cs 2>/dev/null || echo '')}"
+        DISTRO_ID="${ID}"; DISTRO_CODENAME="${VERSION_CODENAME:-$(lsb_release -cs 2>/dev/null || echo jammy)}"
       else
-        DISTRO_ID="ubuntu"
-        DISTRO_CODENAME="jammy"
+        DISTRO_ID="ubuntu"; DISTRO_CODENAME="jammy"
       fi
-
-      curl -fsSL "https://download.docker.com/linux/${DISTRO_ID}/gpg" | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg 2>/dev/null || true
+      _dl_pipe "https://download.docker.com/linux/${DISTRO_ID}/gpg" | $SUDO gpg --dearmor -o /etc/apt/keyrings/docker.gpg 2>/dev/null || true
       $SUDO chmod a+r /etc/apt/keyrings/docker.gpg 2>/dev/null || true
       echo "deb [arch=$(dpkg --print-architecture 2>/dev/null || echo amd64) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/${DISTRO_ID} ${DISTRO_CODENAME} stable" | \
         $SUDO tee /etc/apt/sources.list.d/docker.list > /dev/null 2>/dev/null || true
       $SUDO apt-get update -qq 2>/dev/null || true
       $SUDO apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin 2>/dev/null || true
-      $SUDO usermod -aG docker "$USER" 2>/dev/null || true
+      refresh_path; has docker && _DOCKER_OK=true
     fi
-    refresh_path
-    if has docker; then
+
+    # Method B: dnf/yum (Fedora/RHEL/CentOS)
+    if ! $_DOCKER_OK && [[ "$PKG" == "dnf" || "$PKG" == "yum" ]]; then
+      $SUDO $PKG install -y dnf-plugins-core 2>/dev/null || true
+      $SUDO $PKG config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo 2>/dev/null || \
+        $SUDO $PKG config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo 2>/dev/null || true
+      $SUDO $PKG install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin 2>/dev/null || true
+      refresh_path; has docker && _DOCKER_OK=true
+    fi
+
+    # Method C: pacman (Arch)
+    if ! $_DOCKER_OK && [[ "$PKG" == "pacman" ]]; then
+      pkg_install docker docker-buildx || true
+      refresh_path; has docker && _DOCKER_OK=true
+    fi
+
+    # Method D: zypper (openSUSE)
+    if ! $_DOCKER_OK && [[ "$PKG" == "zypper" ]]; then
+      pkg_install docker docker-buildx || true
+      refresh_path; has docker && _DOCKER_OK=true
+    fi
+
+    # Method E: apk (Alpine)
+    if ! $_DOCKER_OK && [[ "$PKG" == "apk" ]]; then
+      pkg_install docker docker-cli-buildx || true
+      refresh_path; has docker && _DOCKER_OK=true
+    fi
+
+    # Method F: official convenience script (works on many distros)
+    if ! $_DOCKER_OK && (has curl || has wget); then
+      echo "  Trying official install script (get.docker.com)..."
+      _dl_pipe "https://get.docker.com" | $SUDO sh 2>/dev/null || true
+      refresh_path; has docker && _DOCKER_OK=true
+    fi
+
+    if $_DOCKER_OK; then
+      $SUDO usermod -aG docker "$USER" 2>/dev/null || true
+      $SUDO systemctl enable docker 2>/dev/null || true
+      $SUDO systemctl start docker 2>/dev/null || true
       installed "Docker"
       echo -e "  ${Y}⚠ Log out & back in for docker group to take effect${NC}"
     else
-      failed "Docker — install manually: https://docs.docker.com/engine/install/"
+      failed "Docker"
     fi
   fi
 
-  # 5. kubectl
+  # ── 5. kubectl ──────────────────────────────────────────────
   echo -e "${Y}[5/7]${NC} kubectl..."
   if has kubectl; then
     skipped "kubectl"
   else
     echo "  Installing kubectl..."
-    # Try apt repo first, fallback to direct download
-    if $HAS_APT && has curl; then
-      curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key | $SUDO gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg 2>/dev/null || true
+    _KUBE_OK=false
+
+    # Try package manager repo first (apt)
+    if ! $_KUBE_OK && [[ "$PKG" == "apt" ]] && (has curl || has wget); then
+      _dl_pipe "https://pkgs.k8s.io/core:/stable:/v1.31/deb/Release.key" | $SUDO gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg 2>/dev/null || true
       echo "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.31/deb/ /" | \
         $SUDO tee /etc/apt/sources.list.d/kubernetes.list > /dev/null 2>/dev/null || true
       $SUDO apt-get update -qq 2>/dev/null || true
       $SUDO apt-get install -y kubectl 2>/dev/null || true
+      refresh_path; has kubectl && _KUBE_OK=true
     fi
-    # Fallback: direct binary download
-    if ! has kubectl && has curl; then
+
+    # Try package manager (dnf/yum)
+    if ! $_KUBE_OK && [[ "$PKG" == "dnf" || "$PKG" == "yum" ]]; then
+      cat <<'KREPO' | $SUDO tee /etc/yum.repos.d/kubernetes.repo > /dev/null 2>/dev/null
+[kubernetes]
+name=Kubernetes
+baseurl=https://pkgs.k8s.io/core:/stable:/v1.31/rpm/
+enabled=1
+gpgcheck=1
+gpgkey=https://pkgs.k8s.io/core:/stable:/v1.31/rpm/repodata/repomd.xml.key
+KREPO
+      $SUDO $PKG install -y kubectl 2>/dev/null || true
+      refresh_path; has kubectl && _KUBE_OK=true
+    fi
+
+    # Try native package (pacman/zypper/apk)
+    if ! $_KUBE_OK && [[ "$PKG" == "pacman" || "$PKG" == "zypper" || "$PKG" == "apk" ]]; then
+      pkg_install kubectl || true
+      refresh_path; has kubectl && _KUBE_OK=true
+    fi
+
+    # Direct binary download (any Linux)
+    if ! $_KUBE_OK && (has curl || has wget); then
       echo "  Trying direct download..."
       KARCH=$(uname -m); [[ "$KARCH" == "x86_64" ]] && KARCH="amd64"; [[ "$KARCH" == "aarch64" ]] && KARCH="arm64"
-      curl -fsSL "https://dl.k8s.io/release/$(curl -fsSL https://dl.k8s.io/release/stable.txt)/bin/linux/${KARCH}/kubectl" -o /tmp/kubectl 2>/dev/null || true
-      $SUDO install -o root -g root -m 0755 /tmp/kubectl /usr/local/bin/kubectl 2>/dev/null || true
+      K_VER=$(_dl_pipe "https://dl.k8s.io/release/stable.txt" 2>/dev/null || echo "v1.31.0")
+      _dl "https://dl.k8s.io/release/${K_VER}/bin/linux/${KARCH}/kubectl" /tmp/kubectl && \
+        ($SUDO install -m 0755 /tmp/kubectl /usr/local/bin/kubectl 2>/dev/null || install -m 0755 /tmp/kubectl "$HOME/.local/bin/kubectl" 2>/dev/null)
       rm -f /tmp/kubectl
+      refresh_path; has kubectl && _KUBE_OK=true
     fi
-    refresh_path
-    has kubectl && installed "kubectl" || failed "kubectl — install manually: https://kubernetes.io/docs/tasks/tools/"
+
+    $_KUBE_OK && installed "kubectl" || failed "kubectl"
   fi
 
-  # 6. minikube
+  # ── 6. minikube ─────────────────────────────────────────────
   echo -e "${Y}[6/7]${NC} minikube..."
   if has minikube; then
     skipped "minikube"
   else
     echo "  Installing minikube..."
-    if has curl; then
-      MARCH=$(uname -m); [[ "$MARCH" == "x86_64" ]] && MARCH="amd64"; [[ "$MARCH" == "aarch64" ]] && MARCH="arm64"
-      curl -fsSL "https://storage.googleapis.com/minikube/releases/latest/minikube-linux-${MARCH}" -o /tmp/minikube 2>/dev/null || true
-      $SUDO install /tmp/minikube /usr/local/bin/minikube 2>/dev/null || true
-      rm -f /tmp/minikube
+    _MINI_OK=false
+
+    # Try native package
+    if ! $_MINI_OK && [[ "$PKG" == "pacman" || "$PKG" == "apk" ]]; then
+      pkg_install minikube || true
+      refresh_path; has minikube && _MINI_OK=true
     fi
-    refresh_path
-    has minikube && installed "minikube" || failed "minikube — install manually: https://minikube.sigs.k8s.io/docs/start/"
+
+    # Direct binary download (most reliable)
+    if ! $_MINI_OK && (has curl || has wget); then
+      MARCH=$(uname -m); [[ "$MARCH" == "x86_64" ]] && MARCH="amd64"; [[ "$MARCH" == "aarch64" ]] && MARCH="arm64"
+      _dl "https://storage.googleapis.com/minikube/releases/latest/minikube-linux-${MARCH}" /tmp/minikube && \
+        ($SUDO install /tmp/minikube /usr/local/bin/minikube 2>/dev/null || install -m 0755 /tmp/minikube "$HOME/.local/bin/minikube" 2>/dev/null)
+      rm -f /tmp/minikube
+      refresh_path; has minikube && _MINI_OK=true
+    fi
+
+    $_MINI_OK && installed "minikube" || failed "minikube"
   fi
 
-  # 7. Build tools
+  # ── 7. Build tools (optional) ──────────────────────────────
   echo -e "${Y}[7/7]${NC} Build tools..."
   if has make && has gcc; then
     skipped "Build tools"
   else
-    $HAS_APT && $SUDO apt-get install -y build-essential 2>/dev/null || true
+    case "$PKG" in
+      apt)           pkg_install build-essential || true ;;
+      dnf|yum)       pkg_install gcc gcc-c++ make || true ;;
+      pacman)        pkg_install base-devel || true ;;
+      zypper)        pkg_install -t pattern devel_basis || true ;;
+      apk)           pkg_install build-base || true ;;
+    esac
     refresh_path
-    has make && installed "Build tools" || echo -e "  ${Y}⚠ build-essential not installed (optional)${NC}"
+    has make && installed "Build tools" || echo -e "  ${Y}⚠ Build tools not installed (optional)${NC}"
   fi
 fi
 
