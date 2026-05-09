@@ -715,6 +715,53 @@ function ContextMenu({
 }
 
 /* ═══════════════════════════════════════════════════════
+   MOCK DATA — shown when no auth token / API returns empty
+   ═══════════════════════════════════════════════════════ */
+const MOCK_USERS = [
+  { id: 'u1', name: 'Sofia Rivera',   photo: 'https://i.pravatar.cc/150?img=32', verified: true,  age: 24, city: 'Barcelona',  profession: 'UX Designer',      bio: 'Coffee addict. Art lover. Always planning my next trip.', online: true },
+  { id: 'u2', name: 'Emma Chen',      photo: 'https://i.pravatar.cc/150?img=25', verified: false, age: 22, city: 'Toronto',    profession: 'Software Engineer', bio: 'Bookworm and hiking enthusiast. Let\'s explore together!', online: true },
+  { id: 'u3', name: 'Aisha Patel',    photo: 'https://i.pravatar.cc/150?img=23', verified: true,  age: 26, city: 'London',     profession: 'Marketing Lead',    bio: 'Foodie who loves cooking and trying new restaurants.', online: true },
+  { id: 'u4', name: 'Luna Martinez',  photo: 'https://i.pravatar.cc/150?img=44', verified: false, age: 21, city: 'Miami',      profession: 'Photographer',      bio: 'Capturing moments, one sunset at a time.', online: false },
+  { id: 'u5', name: 'Zara Kim',       photo: 'https://i.pravatar.cc/150?img=45', verified: true,  age: 25, city: 'Seoul',      profession: 'Product Manager',   bio: 'K-drama binger. Yoga every morning. Dog mom.', online: false },
+  { id: 'u6', name: 'Mia Johnson',    photo: 'https://i.pravatar.cc/150?img=47', verified: false, age: 23, city: 'New York',   profession: 'Journalist',        bio: 'Storyteller. Street food lover. Night owl.', online: true },
+  { id: 'u7', name: 'Priya Singh',    photo: 'https://i.pravatar.cc/150?img=36', verified: true,  age: 27, city: 'Mumbai',     profession: 'Data Scientist',    bio: 'Love dancing, chai, and meaningful conversations.', online: false },
+  { id: 'u8', name: 'Olivia Brown',   photo: 'https://i.pravatar.cc/150?img=27', verified: false, age: 24, city: 'Sydney',     profession: 'Nurse',             bio: 'Beach lover. Guitar player. Rescue dog mom.', online: true },
+];
+
+function generateMockIncoming() {
+  return MOCK_USERS.slice(0, 4).map((u, i) => ({
+    id: `inc-${i}`,
+    user: {
+      id: u.id,
+      displayName: u.name,
+      photos: [{ url: u.photo }],
+      verified: u.verified,
+      profile: { age: u.age, city: u.city, profession: u.profession, bio: u.bio, online: u.online },
+    },
+    createdAt: new Date(Date.now() - i * 3600000 * 6).toISOString(),
+    isHeld: false,
+  }));
+}
+
+function generateMockMatches() {
+  return MOCK_USERS.slice(2, 8).map((u, i) => ({
+    id: `match-${i}`,
+    matchedUser: {
+      id: u.id,
+      displayName: u.name,
+      photos: [{ url: u.photo }],
+      verified: u.verified,
+      profile: { age: u.age, city: u.city, profession: u.profession, bio: u.bio, online: u.online },
+    },
+    createdAt: new Date(Date.now() - i * 86400000).toISOString(),
+    isFavorite: i === 0,
+    isPinned: i === 1,
+    lastMessage: ['Hey! How was your day? 😊', 'That hiking photo is amazing!', 'We should try that new place!', 'Haha that\'s so funny 😂', 'Good morning ☀️', 'Let\'s plan something this weekend!'][i],
+    lastMessageAt: new Date(Date.now() - i * 7200000).toISOString(),
+  }));
+}
+
+/* ═══════════════════════════════════════════════════════
    MAIN MATCHES PAGE
    ═══════════════════════════════════════════════════════ */
 export default function MatchesPage() {
@@ -772,6 +819,16 @@ export default function MatchesPage() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('miamo_token') : null;
+    if (!token) {
+      // No auth — use mock data for testing
+      setIncoming(generateMockIncoming());
+      setMatches(generateMockMatches());
+      setIncomingMeta({ total: 4, newToday: 2 });
+      setHeldItems([]);
+      setLoading(false);
+      return;
+    }
     try {
       const [inc, mtch, held, heldMatches] = await Promise.allSettled([
         api.getIncomingLikes(),
@@ -779,13 +836,20 @@ export default function MatchesPage() {
         api.getIncomingLikes({ showHeld: 'true' }),
         api.getMatches({ includeHeld: 'true' }),
       ]);
-      if (inc.status === 'fulfilled') {
-        setIncoming(inc.value.data || []);
-        setIncomingMeta(inc.value.meta || {});
+      const incData = inc.status === 'fulfilled' ? inc.value.data || [] : [];
+      const mtchData = mtch.status === 'fulfilled' ? mtch.value.data || [] : [];
+      // If API returned nothing, use mock data
+      if (incData.length === 0 && mtchData.length === 0) {
+        setIncoming(generateMockIncoming());
+        setMatches(generateMockMatches());
+        setIncomingMeta({ total: 4, newToday: 2 });
+        setHeldItems([]);
+        setLoading(false);
+        return;
       }
-      if (mtch.status === 'fulfilled') {
-        setMatches(mtch.value.data || []);
-      }
+      setIncoming(incData);
+      if (inc.status === 'fulfilled') setIncomingMeta(inc.value.meta || {});
+      setMatches(mtchData);
       // Merge held incoming + held matches for the On Hold tab
       const heldList: any[] = [];
       const seenUserIds = new Set<string>();
@@ -808,6 +872,10 @@ export default function MatchesPage() {
       setHeldItems(heldList);
     } catch (e: any) {
       console.error('Failed to load matches data:', e);
+      // Fallback to mock on error
+      setIncoming(generateMockIncoming());
+      setMatches(generateMockMatches());
+      setIncomingMeta({ total: 4, newToday: 2 });
     } finally {
       setLoading(false);
     }

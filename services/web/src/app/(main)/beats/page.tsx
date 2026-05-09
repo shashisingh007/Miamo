@@ -210,22 +210,29 @@ function formatTimeLeft(deadline: string): string {
 
 function generateMockBeats(): BeatMatch[] {
   const deadline = getStreakDeadline();
-  const names = [
-    { name: 'Sofia Rivera', verified: true },
-    { name: 'Emma Chen', verified: false },
-    { name: 'Aisha Patel', verified: true },
-    { name: 'Luna Martinez', verified: false },
-    { name: 'Zara Kim', verified: true },
+  const users = [
+    { name: 'Sofia Rivera',   verified: true,  photo: 'https://i.pravatar.cc/150?img=32', age: 24, city: 'Barcelona' },
+    { name: 'Emma Chen',      verified: false, photo: 'https://i.pravatar.cc/150?img=25', age: 22, city: 'Toronto' },
+    { name: 'Aisha Patel',    verified: true,  photo: 'https://i.pravatar.cc/150?img=23', age: 26, city: 'London' },
+    { name: 'Luna Martinez',  verified: false, photo: 'https://i.pravatar.cc/150?img=44', age: 21, city: 'Miami' },
+    { name: 'Zara Kim',       verified: true,  photo: 'https://i.pravatar.cc/150?img=45', age: 25, city: 'Seoul' },
   ];
   // Scenario: 0=both sent, 1=I sent/waiting, 2=they sent/my turn, 3=neither sent(urgent), 4=both sent
   const iSent =     [true,  true,  false, false, true];
   const theySent =  [true,  false, true,  false, true];
-  return names.map((n, i) => {
+  return users.map((u, i) => {
     const bothDone = iSent[i] && theySent[i];
     return {
       id: `beat-${i}`,
       matchId: `match-${i}`,
-      matchedUser: { id: `user-${i}`, displayName: n.name, photos: [], online: i < 3, verified: n.verified },
+      matchedUser: {
+        id: `user-${i}`,
+        displayName: u.name,
+        photos: [{ url: u.photo }],
+        online: i < 3,
+        verified: u.verified,
+        profile: { age: u.age, city: u.city },
+      },
       count: [23, 7, 14, 3, 45][i],
       state: ['strong', 'soft', 'strong', 'weak', 'strong'][i],
       todayCompleted: bothDone,
