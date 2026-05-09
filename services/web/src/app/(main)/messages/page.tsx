@@ -1067,6 +1067,17 @@ function MessagesFeedbackModal({ type, userName, onClose, onSubmit }: {
 }
 
 // ═══════════════════════════════════════════════════════════
+// MOCK CHAT DATA
+// ═══════════════════════════════════════════════════════════
+const MOCK_CHATS = [
+  { id: 'c1', otherUser: { id: 'u1', displayName: 'Sofia Rivera', photos: [{ url: 'https://i.pravatar.cc/150?img=32' }], verified: true, profile: { online: true } }, lastMessage: { content: 'Hey! How was your day? 😊', createdAt: new Date(Date.now() - 1800000).toISOString(), senderId: 'u1' }, unreadCount: 2, createdAt: new Date(Date.now() - 86400000).toISOString() },
+  { id: 'c2', otherUser: { id: 'u3', displayName: 'Aisha Patel', photos: [{ url: 'https://i.pravatar.cc/150?img=23' }], verified: true, profile: { online: true } }, lastMessage: { content: 'That restaurant was amazing!', createdAt: new Date(Date.now() - 3600000).toISOString(), senderId: 'me' }, unreadCount: 0, createdAt: new Date(Date.now() - 172800000).toISOString() },
+  { id: 'c3', otherUser: { id: 'u2', displayName: 'Emma Chen', photos: [{ url: 'https://i.pravatar.cc/150?img=25' }], verified: false, profile: { online: false } }, lastMessage: { content: "Let's go hiking this weekend!", createdAt: new Date(Date.now() - 7200000).toISOString(), senderId: 'u2' }, unreadCount: 1, createdAt: new Date(Date.now() - 259200000).toISOString() },
+  { id: 'c4', otherUser: { id: 'u5', displayName: 'Zara Kim', photos: [{ url: 'https://i.pravatar.cc/150?img=45' }], verified: true, profile: { online: false } }, lastMessage: { content: 'Haha that K-drama ending was wild 😂', createdAt: new Date(Date.now() - 14400000).toISOString(), senderId: 'u5' }, unreadCount: 0, createdAt: new Date(Date.now() - 345600000).toISOString() },
+  { id: 'c5', otherUser: { id: 'u4', displayName: 'Luna Martinez', photos: [{ url: 'https://i.pravatar.cc/150?img=44' }], verified: false, profile: { online: true } }, lastMessage: { content: 'Check out this sunset shot I took 🌅', createdAt: new Date(Date.now() - 28800000).toISOString(), senderId: 'u4' }, unreadCount: 0, createdAt: new Date(Date.now() - 432000000).toISOString() },
+];
+
+// ═══════════════════════════════════════════════════════════
 // MESSAGES PAGE
 // ═══════════════════════════════════════════════════════════
 export default function MessagesPage() {
@@ -1121,23 +1132,21 @@ export default function MessagesPage() {
 
   const loadChats = useCallback(() => {
     setLoading(true);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('miamo_token') : null;
+    if (!token) { setChats(MOCK_CHATS); setTotalMsgCount(3); setLoading(false); return; }
     const fetcher = tab === 'archived' ? api.getArchivedChats() : api.getChats();
     fetcher.then(r => {
       let data = r.data || [];
-      // Count total messages across all chats
+      if (data.length === 0 && tab !== 'archived') { setChats(MOCK_CHATS); setTotalMsgCount(3); setLoading(false); return; }
       const total = data.reduce((sum: number, c: any) => sum + (c.unreadCount || 0), 0);
       setTotalMsgCount(total);
-      // Mark held chats based on backend heldUserIds (source of truth)
       data = data.map((c: any) => {
         const otherUserId = (c.otherUser || c.user1)?.id;
         return { ...c, _isHeld: heldUserIds.has(otherUserId) || heldChatIds.has(c.id) };
       });
-      // Filter by tab
-      if (tab === 'held') {
-        data = data.filter((c: any) => c._isHeld);
-      }
+      if (tab === 'held') data = data.filter((c: any) => c._isHeld);
       setChats(data);
-    }).catch(() => {}).finally(() => setLoading(false));
+    }).catch(() => { setChats(MOCK_CHATS); setTotalMsgCount(3); }).finally(() => setLoading(false));
   }, [tab, heldUserIds, heldChatIds]);
 
   useEffect(() => { loadChats(); }, [loadChats]);

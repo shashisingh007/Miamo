@@ -89,26 +89,57 @@ Miamo/
 
 ## Quick Start
 
+### Option A: Local Dev (Fastest — recommended for UI work)
+
+**Prerequisites:** Node.js 18+
+
+```bash
+git clone https://github.com/shashisingh007/Miamo.git
+cd Miamo
+bash scripts/start.sh local
+```
+
+Opens http://localhost:3100 with mock data on all pages. No Docker/K8s needed.  
+Hot reload — edit any file and see changes instantly.
+
+### Option B: Full K8s Deploy (minikube)
+
 **Prerequisites:** Docker, minikube, kubectl
 
 ```bash
-# Deploy everything (builds images, generates ConfigMap, runs migrations, starts pods)
 bash scripts/start.sh dev
+```
 
-# Run tests
-bash scripts/test.sh dev
+Builds all 9 Docker images, deploys to minikube, runs migrations, sets up port-forwarding.  
+Web: http://localhost:3100 — API: http://localhost:3200
 
-# Access services (port-forward set up automatically by start.sh)
-open http://127.0.0.1:443
+### Stop Everything
+
+```bash
+bash scripts/start.sh stop
+```
+
+### Windows
+
+```powershell
+# PowerShell — local dev
+.\scripts\start.ps1 local
+
+# PowerShell — stop
+.\scripts\start.ps1 stop
+
+# K8s deploy — use Git Bash or WSL
+bash scripts/start.sh dev
 ```
 
 ## Scripts
 
-All scripts accept an environment argument: `dev`, `staging`, `prod`
-
 | Script | Usage | What it does |
 |--------|-------|--------------|
-| `start.sh` | `bash scripts/start.sh dev` | Build images → generate ConfigMap → deploy pods |
+| `start.sh local` | `bash scripts/start.sh local` | Next.js dev server with mock data (fast) |
+| `start.sh dev` | `bash scripts/start.sh dev` | Full K8s deploy (build → migrate → deploy) |
+| `start.sh stop` | `bash scripts/start.sh stop` | Stop local dev + scale K8s to 0 |
+| `start.ps1` | `.\scripts\start.ps1 local` | Windows PowerShell equivalent |
 | `stop.sh` | `bash scripts/stop.sh dev` | Scale all deployments to 0 |
 | `restart.sh` | `bash scripts/restart.sh dev [service]` | Rolling restart (one service or all) |
 | `test.sh` | `bash scripts/test.sh dev` | Full test suite (pods, health, e2e) |

@@ -16,7 +16,15 @@ import { MiamoLoader } from '@/components/ui/miamo-logo';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
-/* ─── Types ──────────────────────────────────────────── */
+/* ─── Mock Data (shown without auth) ─────────────────── */
+const MOCK_DISCOVER_PROFILES: DiscoverProfile[] = [
+  { id: 'u1', displayName: 'Sofia Rivera', verified: true, photos: [{ url: 'https://i.pravatar.cc/400?img=32' }], profile: { age: 24, city: 'Barcelona', profession: 'UX Designer', bio: 'Coffee addict. Art lover. Always planning my next trip.', height: 168, smoking: 'never', drinking: 'socially', exercise: 'active' }, interests: [{ id: '1', name: 'Travel' }, { id: '2', name: 'Photography' }, { id: '3', name: 'Art' }], prompts: [{ id: '1', question: 'My ideal Sunday', answer: 'Brunch, museum, sunset walk by the beach' }], commonInterests: ['Travel', 'Art'], compatibilityScore: 92 },
+  { id: 'u2', displayName: 'Emma Chen', verified: false, photos: [{ url: 'https://i.pravatar.cc/400?img=25' }], profile: { age: 22, city: 'Toronto', profession: 'Software Engineer', bio: 'Bookworm and hiking enthusiast. Let\'s explore together!', height: 163, smoking: 'never', drinking: 'rarely', exercise: 'daily' }, interests: [{ id: '4', name: 'Hiking' }, { id: '5', name: 'Reading' }, { id: '6', name: 'Cooking' }], prompts: [{ id: '1', question: 'I geek out on', answer: 'Solving complex algorithms while drinking matcha' }], commonInterests: ['Hiking'], compatibilityScore: 87 },
+  { id: 'u3', displayName: 'Aisha Patel', verified: true, photos: [{ url: 'https://i.pravatar.cc/400?img=23' }], profile: { age: 26, city: 'London', profession: 'Marketing Lead', bio: 'Foodie who loves cooking and trying new restaurants.', height: 165, smoking: 'never', drinking: 'socially', exercise: 'sometimes' }, interests: [{ id: '7', name: 'Foodie' }, { id: '8', name: 'Yoga' }, { id: '9', name: 'Movies' }], prompts: [{ id: '1', question: 'The way to my heart', answer: 'Cook me something spicy and put on a good playlist' }], commonInterests: ['Foodie', 'Movies'], compatibilityScore: 85 },
+  { id: 'u4', displayName: 'Luna Martinez', verified: false, photos: [{ url: 'https://i.pravatar.cc/400?img=44' }], profile: { age: 21, city: 'Miami', profession: 'Photographer', bio: 'Capturing moments, one sunset at a time.', height: 170, smoking: 'never', drinking: 'socially', exercise: 'active' }, interests: [{ id: '2', name: 'Photography' }, { id: '10', name: 'Surfing' }, { id: '11', name: 'Music' }], prompts: [{ id: '1', question: 'A perfect date', answer: 'Golden hour photoshoot then tacos on the beach' }], commonInterests: ['Photography', 'Music'], compatibilityScore: 81 },
+  { id: 'u5', displayName: 'Zara Kim', verified: true, photos: [{ url: 'https://i.pravatar.cc/400?img=45' }], profile: { age: 25, city: 'Seoul', profession: 'Product Manager', bio: 'K-drama binger. Yoga every morning. Dog mom.', height: 160, smoking: 'never', drinking: 'rarely', exercise: 'daily' }, interests: [{ id: '12', name: 'K-drama' }, { id: '8', name: 'Yoga' }, { id: '13', name: 'Dogs' }], prompts: [{ id: '1', question: 'Together we could', answer: 'Binge-watch K-dramas while my dog judges us both' }], commonInterests: ['Yoga'], compatibilityScore: 88 },
+];
+
 interface DiscoverProfile {
   id: string;
   displayName: string;
@@ -944,12 +952,20 @@ export default function DiscoverPage() {
 
   const loadProfiles = useCallback(async () => {
     setLoading(true);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('miamo_token') : null;
+    if (!token) {
+      setProfiles(MOCK_DISCOVER_PROFILES);
+      setCurrentIndex(0);
+      setLoading(false);
+      return;
+    }
     try {
       const params = buildParams(filters, activeQuickFilter);
       const res = await api.getDiscover(params);
-      setProfiles(res.data || []);
+      const data = res.data || [];
+      setProfiles(data.length > 0 ? data : MOCK_DISCOVER_PROFILES);
       setCurrentIndex(0);
-    } catch { setProfiles([]); }
+    } catch { setProfiles(MOCK_DISCOVER_PROFILES); }
     finally { setLoading(false); }
   }, [filters, activeQuickFilter, buildParams]);
 

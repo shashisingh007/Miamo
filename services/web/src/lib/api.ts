@@ -30,14 +30,10 @@ class ApiClient {
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: { message: 'Network error' } }));
         const apiErr = new ApiError(err.error?.message || 'Request failed', res.status, err.error?.code);
-        // Auto-logout on auth failures (stale token, user deleted after reseed, etc.)
+        // Only clear stale token — do NOT auto-redirect; let pages handle their own fallback
         if (typeof window !== 'undefined' && (res.status === 401 || (res.status === 404 && path.includes('/auth/me')))) {
           localStorage.removeItem('miamo_token');
-          // Clear Zustand persisted state
           try { localStorage.removeItem('miamo-auth'); } catch {}
-          if (!path.includes('/auth/login') && !path.includes('/auth/register')) {
-            window.location.href = '/login';
-          }
         }
         throw apiErr;
       }

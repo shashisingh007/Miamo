@@ -10,6 +10,15 @@ import { api } from '@/lib/api';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { useAuthStore } from '@/stores';
 
+/* ─── Mock Feed Data ─────────────────────────────────── */
+const MOCK_FEED_POSTS = [
+  { id: 'p1', type: 'thought', content: 'Just had the best date night making pasta from scratch together! Sometimes the simplest things are the most romantic 🍝', user: { id: 'u1', displayName: 'Sofia Rivera', photos: [{ url: 'https://i.pravatar.cc/150?img=32' }], verified: true }, likesCount: 24, commentsCount: 5, createdAt: new Date(Date.now() - 3600000).toISOString(), liked: false },
+  { id: 'p2', type: 'photo', content: 'Sunset vibes from our weekend hike 🌅', photos: [{ url: 'https://picsum.photos/seed/miamo1/600/400' }], user: { id: 'u4', displayName: 'Luna Martinez', photos: [{ url: 'https://i.pravatar.cc/150?img=44' }], verified: false }, likesCount: 42, commentsCount: 12, createdAt: new Date(Date.now() - 7200000).toISOString(), liked: true },
+  { id: 'p3', type: 'date_idea', content: 'Date idea: pottery class followed by wine tasting! Anyone tried this?', user: { id: 'u3', displayName: 'Aisha Patel', photos: [{ url: 'https://i.pravatar.cc/150?img=23' }], verified: true }, likesCount: 18, commentsCount: 8, createdAt: new Date(Date.now() - 14400000).toISOString(), liked: false },
+  { id: 'p4', type: 'milestone', content: 'Hit our 30-day streak! 🔥 This app actually made me better at staying connected', user: { id: 'u2', displayName: 'Emma Chen', photos: [{ url: 'https://i.pravatar.cc/150?img=25' }], verified: false }, likesCount: 56, commentsCount: 15, createdAt: new Date(Date.now() - 28800000).toISOString(), liked: false },
+  { id: 'p5', type: 'mood', content: 'Feeling grateful today. Good conversations > everything else 💕', user: { id: 'u5', displayName: 'Zara Kim', photos: [{ url: 'https://i.pravatar.cc/150?img=45' }], verified: true }, likesCount: 31, commentsCount: 3, createdAt: new Date(Date.now() - 43200000).toISOString(), liked: true },
+];
+
 function ComposeBox({ onPost }: { onPost: () => void }) {
   const [content, setContent] = useState('');
   const [posting, setPosting] = useState(false);
@@ -182,9 +191,14 @@ export default function FeedPage() {
 
   const loadPosts = () => {
     setLoading(true);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('miamo_token') : null;
+    if (!token) { setPosts(MOCK_FEED_POSTS); setLoading(false); return; }
     const params: Record<string, string> = {};
     if (activeFilter !== 'all') params.type = activeFilter;
-    api.getFeed(params).then(res => setPosts(res.data || [])).catch(() => {}).finally(() => setLoading(false));
+    api.getFeed(params).then(res => {
+      const data = res.data || [];
+      setPosts(data.length > 0 ? data : MOCK_FEED_POSTS);
+    }).catch(() => { setPosts(MOCK_FEED_POSTS); }).finally(() => setLoading(false));
   };
 
   useEffect(() => { loadPosts(); }, [activeFilter]);

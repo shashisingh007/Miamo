@@ -783,7 +783,6 @@ function BeatsPageInner() {
 
   const loadBeats = useCallback(() => {
     setLoading(true);
-    // If no auth token, skip API and use mock data directly
     const token = typeof window !== 'undefined' ? localStorage.getItem('miamo_token') : null;
     if (!token) {
       setBeats(generateMockBeats());
@@ -794,6 +793,7 @@ function BeatsPageInner() {
       const raw = res.data || [];
       if (raw.length === 0) {
         setBeats(generateMockBeats());
+        setLoading(false);
         return;
       }
       // Map API response format to our BeatMatch interface
@@ -804,10 +804,8 @@ function BeatsPageInner() {
         const myEvents = events.filter((e: any) => e.userId && new Date(e.createdAt).toDateString() === today);
         const theirEvents = events.filter((e: any) => !e.userId && new Date(e.createdAt).toDateString() === today);
         const sentEvents = events.filter((e: any) => e.userId);
-        // Derive photo from user's photos array
         const photos = apiUser.photos || [];
         const photoUrl = photos[0]?.url || photos[0]?.imageUrl || undefined;
-        // Determine state mapping
         let state = b.state || 'active';
         if (state === 'active') state = b.count >= 7 ? 'strong' : b.count >= 3 ? 'soft' : 'soft';
         
@@ -833,12 +831,13 @@ function BeatsPageInner() {
           totalReceived: Math.max(0, events.length - sentEvents.length),
         };
       });
-      // If all names are generic/missing, supplement with mock for demo
       const hasNames = mapped.some(b => b.matchedUser.displayName !== 'User' && b.matchedUser.displayName !== 'Unknown');
       setBeats(hasNames ? mapped : generateMockBeats());
+      setLoading(false);
     }).catch(() => {
       setBeats(generateMockBeats());
-    }).finally(() => setLoading(false));
+      setLoading(false);
+    });
   }, []);
 
   useEffect(() => { loadBeats(); }, [loadBeats]);
