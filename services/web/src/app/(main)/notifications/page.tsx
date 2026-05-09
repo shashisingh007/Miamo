@@ -7,15 +7,7 @@ import { MiamoLoader } from '@/components/ui/miamo-logo';
 import { api } from '@/lib/api';
 import { cn, formatRelativeTime } from '@/lib/utils';
 
-/* ─── Mock Notifications ─────────────────────────────── */
-const MOCK_NOTIFICATIONS = [
-  { id: 'n1', type: 'match', title: 'New Match!', body: 'You matched with Sofia Rivera!', read: false, createdAt: new Date(Date.now() - 1800000).toISOString(), fromUser: { id: 'u1', displayName: 'Sofia Rivera', photos: [{ url: 'https://i.pravatar.cc/150?img=32' }] } },
-  { id: 'n2', type: 'like', title: 'Someone likes you', body: 'Emma Chen liked your profile', read: false, createdAt: new Date(Date.now() - 3600000).toISOString(), fromUser: { id: 'u2', displayName: 'Emma Chen', photos: [{ url: 'https://i.pravatar.cc/150?img=25' }] } },
-  { id: 'n3', type: 'beat', title: 'Beat received!', body: 'Aisha Patel sent you a daily beat', read: false, createdAt: new Date(Date.now() - 7200000).toISOString(), fromUser: { id: 'u3', displayName: 'Aisha Patel', photos: [{ url: 'https://i.pravatar.cc/150?img=23' }] } },
-  { id: 'n4', type: 'comment', title: 'New comment', body: 'Luna Martinez commented on your post', read: true, createdAt: new Date(Date.now() - 14400000).toISOString(), fromUser: { id: 'u4', displayName: 'Luna Martinez', photos: [{ url: 'https://i.pravatar.cc/150?img=44' }] } },
-  { id: 'n5', type: 'match_request', title: 'Match request', body: 'Zara Kim wants to match with you', read: true, createdAt: new Date(Date.now() - 28800000).toISOString(), fromUser: { id: 'u5', displayName: 'Zara Kim', photos: [{ url: 'https://i.pravatar.cc/150?img=45' }] } },
-  { id: 'n6', type: 'like', title: 'Profile liked', body: 'Mia Johnson liked your photo', read: true, createdAt: new Date(Date.now() - 43200000).toISOString(), fromUser: { id: 'u6', displayName: 'Mia Johnson', photos: [{ url: 'https://i.pravatar.cc/150?img=47' }] } },
-];
+
 
 const typeIcons: Record<string, typeof Heart> = { match: Heart, comment: MessageCircle, beat: Zap, message: MessageCircle, like: Star, story: Users, match_request: Heart };
 
@@ -24,12 +16,10 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('miamo_token') : null;
-    if (!token) { setNotifications(MOCK_NOTIFICATIONS); setLoading(false); return; }
     api.getNotifications().then(res => {
       const filtered = (res.data || []).filter((n: any) => n.type !== 'message' && n.type !== 'media_share' && n.type !== 'media');
-      setNotifications(filtered.length > 0 ? filtered : MOCK_NOTIFICATIONS);
-    }).catch(() => { setNotifications(MOCK_NOTIFICATIONS); }).finally(() => setLoading(false));
+      setNotifications(filtered);
+    }).catch(() => { setNotifications([]); }).finally(() => setLoading(false));
   }, []);
 
   const markAllRead = async () => {

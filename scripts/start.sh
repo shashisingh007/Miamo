@@ -203,7 +203,7 @@ if [[ -z "$MODE" ]]; then
   echo ""
   echo -e "${B}═══ Miamo ═══${NC}"
   echo ""
-  echo -e "  ${G}bash scripts/start.sh local${NC}              Local dev (Next.js, mock data, hot reload)"
+  echo -e "  ${G}bash scripts/start.sh local${NC}              Full-stack local dev (DB + API + frontend)"
   echo -e "  ${G}bash scripts/start.sh dev${NC}                Full K8s deploy (minikube + Docker)"
   echo -e "  ${G}bash scripts/start.sh stop${NC}               Stop everything"
   echo -e "  ${G}bash scripts/start.sh restart${NC} [service]  Rolling restart (one or all)"
@@ -225,26 +225,47 @@ if [[ "$MODE" == "stop" ]]; then
   echo -e "${B}═══ MIAMO STOP ═══${NC}"
   echo ""
 
-  echo -e "${Y}[1/3]${NC} Stopping local dev servers..."
-  # Kill by saved PID first
+  echo -e "${Y}[1/4]${NC} Stopping local dev servers..."
+  # Kill web by saved PID
   if [[ -f /tmp/miamo-local.pid ]]; then
     LOCAL_PID=$(cat /tmp/miamo-local.pid)
     kill "$LOCAL_PID" 2>/dev/null || true
-    # Also kill child processes (next-router-worker etc.)
     pkill -P "$LOCAL_PID" 2>/dev/null || true
     rm -f /tmp/miamo-local.pid
   fi
   pkill -f "next dev" 2>/dev/null || true
   pkill -f "next-router-worker" 2>/dev/null || true
   kill_port 3100; kill_port 3101
-  echo -e "  ${G}✓${NC} Local dev servers stopped"
+  echo -e "  ${G}✓${NC} Frontend stopped"
 
-  echo -e "${Y}[2/3]${NC} Stopping port-forwards..."
+  echo -e "${Y}[2/4]${NC} Stopping backend services..."
+  # Kill backend services by saved PIDs
+  if [[ -f /tmp/miamo-backend.pids ]]; then
+    for pid in $(cat /tmp/miamo-backend.pids); do
+      kill "$pid" 2>/dev/null || true
+      pkill -P "$pid" 2>/dev/null || true
+    done
+    rm -f /tmp/miamo-backend.pids
+  fi
+  pkill -f "tsx watch src/server.ts" 2>/dev/null || true
+  for p in 3200 3201 3202 3203 3204 3205 3206; do
+    kill_port $p
+  done
+  echo -e "  ${G}✓${NC} Backend services stopped"
+
+  echo -e "${Y}[3/4]${NC} Stopping PostgreSQL container..."
+  PG_CONTAINER="miamo-postgres-local"
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${PG_CONTAINER}$"; then
+    docker stop "$PG_CONTAINER" >/dev/null 2>&1 || true
+    echo -e "  ${G}✓${NC} PostgreSQL stopped (data preserved)"
+    echo -e "  ${C}  To delete data: docker rm $PG_CONTAINER && docker volume rm miamo-pgdata-local${NC}"
+  else
+    echo -e "  ${G}✓${NC} No PostgreSQL running"
+  fi
+
+  echo -e "${Y}[4/4]${NC} Stopping K8s / port-forwards..."
   pkill -f "kubectl.*port-forward" 2>/dev/null || true
   [[ -f /tmp/miamo-pf.pid ]] && { kill "$(cat /tmp/miamo-pf.pid)" 2>/dev/null || true; rm -f /tmp/miamo-pf.pid; }
-  echo -e "  ${G}✓${NC} Port-forwards stopped"
-
-  echo -e "${Y}[3/3]${NC} Stopping K8s services..."
   if command -v kubectl &>/dev/null && kubectl get ns miamo &>/dev/null 2>&1; then
     kubectl scale deployment --all --replicas=0 -n miamo 2>/dev/null || true
     echo -e "  ${G}✓${NC} K8s deployments scaled to 0"
@@ -259,76 +280,196 @@ if [[ "$MODE" == "stop" ]]; then
 fi
 
 # ═════════════════════════════════════════════════════════════════
-#  LOCAL — fast Next.js dev (mock data, hot reload)
+#  LOCAL — full-stack dev (PostgreSQL + all services + Next.js)
 # ═════════════════════════════════════════════════════════════════
 if [[ "$MODE" == "local" ]]; then
   echo ""
-  echo -e "${B}═══ MIAMO LOCAL DEV ═══${NC}"
+  echo -e "${B}═══ MIAMO LOCAL DEV (full-stack) ═══${NC}"
   echo ""
 
+  # ── Prerequisites ───────────────────────────────────────────
   if ! command -v node &>/dev/null; then
-    echo -e "  ${R}✗ Node.js not found.${NC}"
-    echo "    macOS:   brew install node"
-    echo "    Windows: winget install OpenJS.NodeJS"
-    echo "    Linux:   curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt install -y nodejs"
-    exit 1
+    echo -e "  ${R}✗ Node.js not found. Run: bash scripts/setup.sh${NC}"; exit 1
   fi
   echo -e "  ${G}✓${NC} Node.js $(node -v)"
 
-  echo -e "${Y}[1/3]${NC} Checking dependencies..."
-  if [[ ! -d "services/web/node_modules" ]]; then
-    echo "  Installing web dependencies..."
-    (cd services/web && npm install)
+  if ! command -v docker &>/dev/null; then
+    echo -e "  ${R}✗ Docker not found. Run: bash scripts/setup.sh${NC}"; exit 1
   fi
-  echo -e "  ${G}✓${NC} Dependencies ready"
+  echo -e "  ${G}✓${NC} Docker $(docker --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)"
 
-  echo -e "${Y}[2/3]${NC} Cleaning up old processes..."
+  # Ensure Docker daemon is running
+  if ! docker info &>/dev/null 2>&1; then
+    echo -e "  ${Y}⚠ Docker daemon not running — trying to start...${NC}"
+    if [[ "$(uname)" == "Darwin" ]]; then
+      open -a Docker 2>/dev/null || true
+    else
+      $SUDO systemctl start docker 2>/dev/null || $SUDO service docker start 2>/dev/null || true
+    fi
+    echo -n "  Waiting for Docker"
+    for i in $(seq 1 30); do
+      docker info &>/dev/null 2>&1 && break
+      echo -n "."; sleep 2
+    done
+    if docker info &>/dev/null 2>&1; then
+      echo -e " ${G}✓${NC}"
+    else
+      echo -e " ${R}✗ Could not start Docker. Please start Docker Desktop manually.${NC}"; exit 1
+    fi
+  fi
+
+  # ── [1/7] Install all dependencies ──────────────────────────
+  echo -e "${Y}[1/7]${NC} Installing dependencies..."
+  SERVICES_WITH_DEPS=(shared auth users social messaging content notifications gateway web)
+  for svc in "${SERVICES_WITH_DEPS[@]}"; do
+    if [[ ! -d "services/$svc/node_modules" ]]; then
+      echo "  Installing $svc dependencies..."
+      (cd "services/$svc" && npm install --silent 2>&1) || echo -e "  ${Y}⚠ $svc install had warnings${NC}"
+    fi
+  done
+  echo -e "  ${G}✓${NC} All dependencies ready"
+
+  # ── [2/7] Start PostgreSQL via Docker ───────────────────────
+  echo -e "${Y}[2/7]${NC} Starting PostgreSQL..."
+  PG_CONTAINER="miamo-postgres-local"
+  PG_PORT=5432
+  DB_URL="postgresql://miamo:miamo@localhost:${PG_PORT}/miamo?schema=public"
+
+  if docker ps --format '{{.Names}}' | grep -q "^${PG_CONTAINER}$"; then
+    echo -e "  ${C}●${NC} PostgreSQL already running"
+  else
+    # Remove stopped container if it exists
+    docker rm -f "$PG_CONTAINER" 2>/dev/null || true
+    docker run -d \
+      --name "$PG_CONTAINER" \
+      -p "${PG_PORT}:5432" \
+      -e POSTGRES_USER=miamo \
+      -e POSTGRES_PASSWORD=miamo \
+      -e POSTGRES_DB=miamo \
+      -v miamo-pgdata-local:/var/lib/postgresql/data \
+      postgres:16-alpine \
+      >/dev/null 2>&1
+    echo -n "  Waiting for PostgreSQL"
+    for i in $(seq 1 30); do
+      docker exec "$PG_CONTAINER" pg_isready -U miamo -q 2>/dev/null && break
+      echo -n "."; sleep 1
+    done
+    if docker exec "$PG_CONTAINER" pg_isready -U miamo -q 2>/dev/null; then
+      echo -e " ${G}✓${NC}"
+    else
+      echo -e " ${R}✗ PostgreSQL failed to start${NC}"; exit 1
+    fi
+  fi
+
+  # ── [3/7] Run Prisma migrations + generate ─────────────────
+  echo -e "${Y}[3/7]${NC} Running database migrations..."
+  export DATABASE_URL="$DB_URL"
+
+  # Generate Prisma client for shared (canonical schema)
+  (cd services/shared && npx prisma generate 2>&1 | tail -1)
+
+  # Run migrations from shared (has the canonical schema)
+  (cd services/shared && npx prisma migrate deploy 2>&1 | tail -3)
+
+  # Generate Prisma client for each service
+  for svc in auth users social messaging content notifications; do
+    (cd "services/$svc" && npx prisma generate 2>&1 | tail -1) || true
+  done
+  echo -e "  ${G}✓${NC} Database migrated & Prisma clients generated"
+
+  # ── [4/7] Seed database (if empty) ─────────────────────────
+  echo -e "${Y}[4/7]${NC} Checking seed data..."
+  USER_COUNT=$(docker exec "$PG_CONTAINER" psql -U miamo -d miamo -tAc "SELECT count(*) FROM \"User\"" 2>/dev/null || echo "0")
+  USER_COUNT=$(echo "$USER_COUNT" | tr -d '[:space:]')
+  if [[ "$USER_COUNT" == "0" || -z "$USER_COUNT" ]]; then
+    echo "  Seeding database with 20 demo users..."
+    (cd services/shared && npx tsx prisma/seed.ts 2>&1 | grep -E '✓|✗|Seeding|Done' | head -20) || echo -e "  ${Y}⚠ Seeding had issues, continuing...${NC}"
+    echo -e "  ${G}✓${NC} Database seeded"
+  else
+    echo -e "  ${C}●${NC} Database already has ${USER_COUNT} users"
+  fi
+
+  # ── [5/7] Clean up old processes ────────────────────────────
+  echo -e "${Y}[5/7]${NC} Cleaning up old processes..."
   pkill -f "next dev" 2>/dev/null || true
   pkill -f "next-router-worker" 2>/dev/null || true
-  kill_port 3100
+  pkill -f "tsx watch src/server.ts" 2>/dev/null || true
+  for p in 3100 3200 3201 3202 3203 3204 3205 3206; do
+    kill_port $p
+  done
   sleep 1
   echo -e "  ${G}✓${NC} Clean"
 
-  # Create logs directory
+  # ── [6/7] Start backend services ───────────────────────────
+  echo -e "${Y}[6/7]${NC} Starting backend services..."
   mkdir -p "$ROOT/logs"
-  LOG_FILE="$ROOT/logs/local.log"
 
-  echo -e "${Y}[3/3]${NC} Starting Next.js dev server on port 3100 (background)..."
-  cd services/web
-  nohup npx next dev -p 3100 > "$LOG_FILE" 2>&1 &
-  DEV_PID=$!
-  echo $DEV_PID > /tmp/miamo-local.pid
-  disown $DEV_PID 2>/dev/null
-  cd "$ROOT"
+  # Environment for all backend services
+  export JWT_SECRET="miamo-dev-jwt-secret-change-in-production-2026"
+  export INTERNAL_KEY="miamo-internal-dev-key"
+  export NODE_ENV="development"
+  export ENCRYPTION_KEY="miamo-dev-encrypt-key-32-bytes!!"
 
-  # Wait for server to start (up to 90s for first compile)
-  echo -n "  Waiting for server"
-  SERVER_READY=0
-  for i in $(seq 1 45); do
-    if curl -s -o /dev/null http://localhost:3100 2>/dev/null; then
-      SERVER_READY=1
-      echo -e " ${G}✓${NC}"
-      break
-    fi
-    echo -n "."
-    sleep 2
+  # Start each service in background
+  BACKEND_SERVICES=(gateway auth users social messaging content notifications)
+  BACKEND_PORTS=(3200 3201 3202 3203 3204 3205 3206)
+  BACKEND_PIDS=()
+
+  for i in "${!BACKEND_SERVICES[@]}"; do
+    svc="${BACKEND_SERVICES[$i]}"
+    port="${BACKEND_PORTS[$i]}"
+    LOG="$ROOT/logs/${svc}.log"
+    echo -n "  Starting $svc (:$port)..."
+    (cd "services/$svc" && PORT=$port DATABASE_URL="$DB_URL" nohup npx tsx watch src/server.ts > "$LOG" 2>&1 &)
+    BACKEND_PIDS+=($!)
+    echo -e " ${G}✓${NC}"
   done
-  if [[ $SERVER_READY -eq 0 ]]; then
+
+  # Save all PIDs
+  echo "${BACKEND_PIDS[*]}" > /tmp/miamo-backend.pids
+
+  # ── [7/7] Start Next.js frontend ───────────────────────────
+  echo -e "${Y}[7/7]${NC} Starting Next.js dev server..."
+  LOG_FILE="$ROOT/logs/web.log"
+  (cd services/web && NEXT_PUBLIC_API_URL=http://localhost:3200 nohup npx next dev -p 3100 > "$LOG_FILE" 2>&1 &)
+  WEB_PID=$!
+  echo $WEB_PID > /tmp/miamo-local.pid
+  disown $WEB_PID 2>/dev/null
+
+  # Wait for gateway to start
+  echo -n "  Waiting for API gateway"
+  for i in $(seq 1 20); do
+    curl -s -o /dev/null http://localhost:3200/health 2>/dev/null && break
+    echo -n "."; sleep 1
+  done
+  echo -e " ${G}✓${NC}"
+
+  # Wait for web to start
+  echo -n "  Waiting for web app"
+  for i in $(seq 1 45); do
+    curl -s -o /dev/null http://localhost:3100 2>/dev/null && break
+    echo -n "."; sleep 2
+  done
+  if curl -s -o /dev/null http://localhost:3100 2>/dev/null; then
+    echo -e " ${G}✓${NC}"
+  else
     echo -e " ${Y}(still compiling — check browser in a moment)${NC}"
   fi
 
   echo ""
   echo -e "${B}═══════════════════════════════════════════════${NC}"
-  echo -e "${B}  MIAMO LOCAL DEV IS RUNNING (background)       ${NC}"
+  echo -e "${B}  MIAMO LOCAL DEV IS RUNNING (full-stack)       ${NC}"
   echo -e "${B}═══════════════════════════════════════════════${NC}"
   echo ""
-  echo -e "  ${G}➜${NC} Web App:  ${G}http://localhost:3100${NC}"
+  echo -e "  ${G}➜${NC} Web App:      ${G}http://localhost:3100${NC}"
+  echo -e "  ${G}➜${NC} API Gateway:  ${G}http://localhost:3200${NC}"
+  echo -e "  ${G}➜${NC} PostgreSQL:   ${C}localhost:5432${NC} (miamo/miamo)"
   echo ""
-  echo -e "  PID:    ${DEV_PID} (survives terminal close)"
-  echo -e "  Logs:   ${G}tail -f logs/local.log${NC}"
+  echo -e "  ${C}Login:${NC}  miamo1@miamo.test / miamo1"
+  echo -e "         (or miamo2..miamo20, password = username)"
   echo ""
-  echo -e "  Mock data on all pages — no backend needed."
-  echo -e "  File changes auto-reload instantly."
+  echo -e "  Logs:   ${G}tail -f logs/gateway.log${NC}"
+  echo -e "          ${G}tail -f logs/web.log${NC}"
   echo ""
   echo -e "  Stop:   ${G}bash scripts/start.sh stop${NC}"
   echo -e "  Status: ${G}bash scripts/start.sh status${NC}"
@@ -632,35 +773,58 @@ if [[ "$MODE" == "status" ]]; then
   echo -e "${B}═══ MIAMO STATUS ═══${NC}"
   echo ""
 
-  # Local dev
-  if [[ -f /tmp/miamo-local.pid ]] && kill -0 "$(cat /tmp/miamo-local.pid)" 2>/dev/null; then
-    LOCAL_PID=$(cat /tmp/miamo-local.pid)
-    echo -e "  Local dev: ${G}running${NC} (port 3100, PID ${LOCAL_PID})"
-    if [[ -f "$ROOT/logs/local.log" ]]; then
-      echo -e "  Logs:      ${C}tail -f logs/local.log${NC}"
-      echo ""
-      echo -e "  ${Y}Last 5 log lines:${NC}"
-      tail -5 "$ROOT/logs/local.log" 2>/dev/null | sed 's/^/    /'
-    fi
-  elif pgrep -f "next dev" &>/dev/null; then
-    echo -e "  Local dev: ${G}running${NC} (port 3100)"
+  # ── Local services ──────────────────────────────────────
+  echo -e "  ${B}Local Services${NC}"
+
+  # PostgreSQL
+  PG_CONTAINER="miamo-postgres-local"
+  if docker ps --format '{{.Names}}' 2>/dev/null | grep -q "^${PG_CONTAINER}$"; then
+    echo -e "  PostgreSQL:     ${G}running${NC} (port 5432)"
   else
-    echo -e "  Local dev: ${Y}stopped${NC}"
+    echo -e "  PostgreSQL:     ${Y}stopped${NC}"
+  fi
+
+  # Backend services
+  BACKEND_NAMES=(gateway auth users social messaging content notifications)
+  BACKEND_PORTS=(3200 3201 3202 3203 3204 3205 3206)
+  for i in "${!BACKEND_NAMES[@]}"; do
+    svc="${BACKEND_NAMES[$i]}"
+    port="${BACKEND_PORTS[$i]}"
+    if curl -s -o /dev/null "http://localhost:${port}/health" 2>/dev/null; then
+      echo -e "  ${svc}:$(printf '%*s' $((15 - ${#svc})) '')${G}running${NC} (port ${port})"
+    elif lsof -iTCP:${port} -sTCP:LISTEN &>/dev/null 2>&1; then
+      echo -e "  ${svc}:$(printf '%*s' $((15 - ${#svc})) '')${G}running${NC} (port ${port})"
+    else
+      echo -e "  ${svc}:$(printf '%*s' $((15 - ${#svc})) '')${Y}stopped${NC}"
+    fi
+  done
+
+  # Frontend
+  if [[ -f /tmp/miamo-local.pid ]] && kill -0 "$(cat /tmp/miamo-local.pid)" 2>/dev/null; then
+    echo -e "  web:            ${G}running${NC} (port 3100, PID $(cat /tmp/miamo-local.pid))"
+  elif pgrep -f "next dev" &>/dev/null; then
+    echo -e "  web:            ${G}running${NC} (port 3100)"
+  else
+    echo -e "  web:            ${Y}stopped${NC}"
+  fi
+
+  # Log guidance
+  if [[ -d "$ROOT/logs" ]]; then
+    echo ""
+    echo -e "  ${C}Logs:${NC} tail -f logs/{gateway,web,auth,...}.log"
   fi
 
   # K8s
   if command -v kubectl &>/dev/null && kubectl get ns miamo &>/dev/null 2>&1; then
     echo ""
+    echo -e "  ${B}K8s Pods${NC}"
     kubectl get pods -n miamo --no-headers 2>/dev/null | awk '{printf "  %-40s %-10s %-12s %s\n", $1, $3, $4, $5}'
     echo ""
-    # Port-forwards
     if pgrep -f "kubectl.*port-forward" &>/dev/null; then
       echo -e "  Port-forwards: ${G}active${NC}"
     else
       echo -e "  Port-forwards: ${Y}inactive${NC}"
     fi
-  else
-    echo -e "  K8s:       ${Y}no cluster${NC}"
   fi
   echo ""
   exit 0

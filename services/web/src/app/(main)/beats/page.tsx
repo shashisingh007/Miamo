@@ -208,68 +208,6 @@ function formatTimeLeft(deadline: string): string {
   return `${m}m left`;
 }
 
-function generateMockBeats(): BeatMatch[] {
-  const deadline = getStreakDeadline();
-  const users = [
-    { name: 'Sofia Rivera',   verified: true,  photo: 'https://i.pravatar.cc/150?img=32', age: 24, city: 'Barcelona' },
-    { name: 'Emma Chen',      verified: false, photo: 'https://i.pravatar.cc/150?img=25', age: 22, city: 'Toronto' },
-    { name: 'Aisha Patel',    verified: true,  photo: 'https://i.pravatar.cc/150?img=23', age: 26, city: 'London' },
-    { name: 'Luna Martinez',  verified: false, photo: 'https://i.pravatar.cc/150?img=44', age: 21, city: 'Miami' },
-    { name: 'Zara Kim',       verified: true,  photo: 'https://i.pravatar.cc/150?img=45', age: 25, city: 'Seoul' },
-  ];
-  // Scenario: 0=both sent, 1=I sent/waiting, 2=they sent/my turn, 3=neither sent(urgent), 4=both sent
-  const iSent =     [true,  true,  false, false, true];
-  const theySent =  [true,  false, true,  false, true];
-  return users.map((u, i) => {
-    const bothDone = iSent[i] && theySent[i];
-    return {
-      id: `beat-${i}`,
-      matchId: `match-${i}`,
-      matchedUser: {
-        id: `user-${i}`,
-        displayName: u.name,
-        photos: [{ url: u.photo }],
-        online: i < 3,
-        verified: u.verified,
-        profile: { age: u.age, city: u.city },
-      },
-      count: [23, 7, 14, 3, 45][i],
-      state: ['strong', 'soft', 'strong', 'weak', 'strong'][i],
-      todayCompleted: bothDone,
-      iSentToday: iSent[i],
-      theyCompletedToday: theySent[i],
-      streakDeadline: deadline,
-      lastBeatAt: new Date(Date.now() - [3600000, 7200000, 1800000, 86400000, 900000][i]).toISOString(),
-      longestStreak: [30, 12, 14, 5, 52][i],
-      totalSent: [45, 15, 28, 6, 90][i],
-      totalReceived: [42, 13, 27, 4, 88][i],
-    };
-  });
-}
-
-function generateMockBeatEntries(matchName: string): BeatEntry[] {
-  const types = ['photo', 'text', 'voice', 'mood', 'video', 'music', 'text', 'gif'];
-  const contents = [
-    'Good morning sunshine! Here\'s my coffee art',
-    'Just thinking about our conversation yesterday',
-    '30s voice note',
-    'Feeling: Happy & grateful today',
-    '15s video — sunset from my balcony',
-    'Shared: "Golden Hour" by JVKE',
-    'Your turn to tell me something random!',
-    'Celebration GIF',
-  ];
-  return types.map((type, i) => ({
-    id: `entry-${i}`,
-    type,
-    content: contents[i],
-    sender: (i % 2 === 0 ? 'me' : 'them') as 'me' | 'them',
-    sentAt: new Date(Date.now() - (i * 3600000 * 4)).toISOString(),
-    seen: i < 5,
-    showInChat: i < 3,
-  }));
-}
-
 /* ═══════════════════════════════════════════════════════════
    STREAK FLAME BADGE
    ═══════════════════════════════════════════════════════════ */
@@ -783,19 +721,8 @@ function BeatsPageInner() {
 
   const loadBeats = useCallback(() => {
     setLoading(true);
-    const token = typeof window !== 'undefined' ? localStorage.getItem('miamo_token') : null;
-    if (!token) {
-      setBeats(generateMockBeats());
-      setLoading(false);
-      return;
-    }
     api.getBeats().then(res => {
       const raw = res.data || [];
-      if (raw.length === 0) {
-        setBeats(generateMockBeats());
-        setLoading(false);
-        return;
-      }
       // Map API response format to our BeatMatch interface
       const mapped: BeatMatch[] = raw.map((b: any) => {
         const apiUser = b.user || b.matchedUser || {};
@@ -832,10 +759,10 @@ function BeatsPageInner() {
         };
       });
       const hasNames = mapped.some(b => b.matchedUser.displayName !== 'User' && b.matchedUser.displayName !== 'Unknown');
-      setBeats(hasNames ? mapped : generateMockBeats());
+      setBeats(hasNames ? mapped : []);
       setLoading(false);
     }).catch(() => {
-      setBeats(generateMockBeats());
+      setBeats([]);
       setLoading(false);
     });
   }, []);
@@ -855,11 +782,8 @@ function BeatsPageInner() {
     if (beat?.iSentToday) return; // Already sent today, ignore
 
     setCompleting(beatId);
-    const token = typeof window !== 'undefined' ? localStorage.getItem('miamo_token') : null;
     try {
-      if (token) {
-        await api.completeBeat(beatId, type, content || `Quick ${type} beat!`);
-      }
+      await api.completeBeat(beatId, type, content || `Quick ${type} beat!`);
       // Update local state: mark that I sent
       setBeats(prev => prev.map(b => {
         if (b.id !== beatId) return b;
@@ -876,7 +800,7 @@ function BeatsPageInner() {
           longestStreak: Math.max(b.longestStreak || 0, newCount),
         };
       }));
-      if (token) loadBeats();
+      loadBeats();
     } catch (e) {
       // Still update locally on API failure so UI responds
       setBeats(prev => prev.map(b => {
@@ -892,7 +816,7 @@ function BeatsPageInner() {
 
   const handleSelectMatch = (beat: BeatMatch) => {
     setSelectedBeat(beat);
-    setBeatEntries(generateMockBeatEntries(beat.matchedUser.displayName));
+    setBeatEntries([]);
     setChatFilter('all');
   };
 
