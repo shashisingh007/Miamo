@@ -20,6 +20,15 @@ import { useAuthStore } from '@/stores';
 // ── Quick Reactions ──
 const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '🔥', '👍'];
 const ALL_EMOJIS = ['❤️', '😂', '😮', '😢', '🔥', '👍', '😍', '🤔', '👏', '🙌', '💀', '💯', '🎉', '😭', '🥰', '😈'];
+const EMOJI_CATEGORIES: { label: string; emojis: string[] }[] = [
+  { label: '😊 Smileys', emojis: ['😀', '😃', '😄', '😁', '😆', '😅', '🤣', '😂', '🙂', '😊', '😇', '🥰', '😍', '🤩', '😘', '😗', '😚', '😙', '🥲', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🫡', '🤐', '🤨', '😐', '😑', '😶', '🫥', '😏', '😒', '🙄', '😬', '🤥'] },
+  { label: '❤️ Love', emojis: ['❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❤️‍🔥', '❤️‍🩹', '💕', '💞', '💓', '💗', '💖', '💘', '💝', '💟', '😍', '🥰', '😘', '😻', '💑', '👩‍❤️‍👨', '💏', '💋', '🫶', '🤟', '🫰'] },
+  { label: '👋 Gestures', emojis: ['👋', '🤚', '🖐️', '✋', '🖖', '🫱', '🫲', '🫳', '🫴', '👌', '🤌', '🤏', '✌️', '🤞', '🫰', '🤟', '🤘', '🤙', '👈', '👉', '👆', '🖕', '👇', '☝️', '🫵', '👍', '👎', '✊', '👊', '🤛', '🤜', '👏', '🙌', '🫶', '👐', '🤲', '🙏', '💪', '🫂'] },
+  { label: '🎉 Party', emojis: ['🎉', '🎊', '🎈', '🎁', '🎂', '🍾', '🥂', '🥳', '🪅', '✨', '🌟', '⭐', '💫', '🔥', '💥', '🎆', '🎇', '🏆', '🥇', '🎯', '🎪', '🎭', '🎬', '🎵', '🎶', '🎸', '🎹', '🎺', '🥁', '🎤'] },
+  { label: '🍕 Food', emojis: ['🍕', '🍔', '🍟', '🌭', '🍿', '🧁', '🍰', '🎂', '🍩', '🍪', '🍫', '🍬', '🍭', '🍮', '☕', '🍵', '🥤', '🧃', '🍷', '🍸', '🍹', '🍺', '🥂', '🍾', '🧊', '🥑', '🍌', '🍓', '🍑', '🍒'] },
+  { label: '🌸 Nature', emojis: ['🌸', '💐', '🌹', '🥀', '🌺', '🌻', '🌼', '🌷', '🌱', '🌲', '🌳', '🍀', '🍁', '🍂', '🍃', '🌿', '🪴', '🌵', '🌈', '☀️', '🌙', '⭐', '🌟', '✨', '⚡', '🔥', '💧', '🌊', '❄️', '🦋'] },
+  { label: '💀 Meme', emojis: ['💀', '☠️', '👻', '👽', '🤖', '🫠', '😈', '👿', '🤡', '💩', '🙈', '🙉', '🙊', '🐸', '🗿', '🫃', '💅', '🤷', '🤦', '😎', '🥶', '🥵', '🤯', '🫨', '😱', '😤', '🤬', '🫡', '🧢', '💀'] },
+];
 
 // ── Entertainment Zone ──
 const ENTERTAINMENT_ITEMS = [
@@ -545,6 +554,7 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
   const [attachedFile, setAttachedFile] = useState<{ file: File; preview: string; type: string } | null>(null);
   const [beatStreak, setBeatStreak] = useState<{ id: string; count: number; iSentToday: boolean; theyCompletedToday: boolean; todayCompleted: boolean } | null>(null);
   const [showBeatPanel, setShowBeatPanel] = useState(false);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -687,25 +697,29 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
 
   const handleSendBeatFromChat = async (type: string) => {
     if (!beatStreak) return;
+    const typeLabels: Record<string, string> = { text: '💬 Text', photo: '📷 Photo', voice: '🎤 Voice', video: '🎬 Video' };
     try {
       const res = await api.completeBeat(beatStreak.id, type, `${type} beat from chat! ⚡`);
       const data = res.data || {};
+      const newCount = data.count ?? beatStreak.count;
       setBeatStreak(prev => prev ? {
         ...prev,
-        count: data.count ?? prev.count,
+        count: newCount,
         iSentToday: true,
         theyCompletedToday: data.theyCompletedToday ?? prev.theyCompletedToday,
         todayCompleted: data.todayCompleted ?? prev.todayCompleted,
       } : null);
-      // Add a system message about the beat
-      const systemMsg = {
-        id: `beat-${Date.now()}`,
+      // Add visible beat event as a system message
+      const beatMsg = {
+        id: `beat-sent-${Date.now()}`,
         type: 'system',
-        content: `⚡ Beat sent! ${data.countIncremented ? `Streak: ${data.count} 🔥` : 'Waiting for their beat to grow the streak!'}`,
+        content: data.countIncremented
+          ? `⚡ You sent a ${typeLabels[type] || type} Beat! Streak is now ${newCount} 🔥`
+          : `⚡ You sent a ${typeLabels[type] || type} Beat! Waiting for ${other.displayName?.split(' ')[0] || 'them'} to send back ⏳`,
         createdAt: new Date().toISOString(),
         isSystem: true,
       };
-      setMessages(prev => [...prev, systemMsg]);
+      setMessages(prev => [...prev, beatMsg]);
       setShowBeatPanel(false);
     } catch (e) { console.error('Beat send error:', e); }
   };
@@ -747,23 +761,23 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
             </p>
           </div>
         </button>
-        {/* Beat streak tracker badge */}
+        {/* Beat streak tracker badge — click to go to beats page */}
         {beatStreak && (
           <button
-            onClick={() => setShowBeatPanel(!showBeatPanel)}
+            onClick={() => router.push('/beats')}
             className={cn(
-              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition-all',
+              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition-all cursor-pointer hover:scale-105',
               beatStreak.todayCompleted
                 ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
                 : beatStreak.iSentToday
                 ? 'bg-blue-50 text-blue-600 border border-blue-100'
-                : 'bg-pink-50 text-pink-600 border border-pink-200 animate-pulse'
+                : 'bg-emerald-50 text-emerald-600 border border-emerald-200 animate-pulse'
             )}
-            title="Beat Streak"
+            title="View Beats — Click to open Beats page"
           >
-            <Zap className="w-3 h-3" />
-            {beatStreak.count}🔥
-            {beatStreak.todayCompleted ? ' ✓' : beatStreak.iSentToday ? ' ⏳' : ' !'}
+            <Zap className="w-3.5 h-3.5" />
+            <span>{beatStreak.count}</span>🔥
+            {beatStreak.todayCompleted && <Check className="w-3 h-3" />}
           </button>
         )}
         <div className="ml-auto flex items-center gap-1">
@@ -849,8 +863,18 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
           visibleMessages.map((msg: any) => (
             msg.isSystem ? (
               <div key={msg.id} className="flex justify-center my-2">
-                <div className="bg-black/20 backdrop-blur-sm px-4 py-1.5 rounded-full">
-                  <span className="text-[11px] text-text-muted">{msg.content}</span>
+                <div className={cn(
+                  'backdrop-blur-sm px-4 py-1.5 rounded-full',
+                  msg.content?.includes('⚡') ? 'bg-pink-500/15 border border-pink-300/20'
+                  : msg.content?.includes('💜') ? 'bg-violet-500/15 border border-violet-300/20'
+                  : 'bg-black/20'
+                )}>
+                  <span className={cn(
+                    'text-[11px]',
+                    msg.content?.includes('⚡') ? 'text-pink-600 font-medium'
+                    : msg.content?.includes('💜') ? 'text-violet-600 font-medium'
+                    : 'text-text-muted'
+                  )}>{msg.content}</span>
                 </div>
               </div>
             ) : (
@@ -1057,26 +1081,76 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
               </AnimatePresence>
             </div>
             <Button variant="ghost" size="icon-sm" title="Voice message" onClick={() => setMessage('[🎤 Voice message]')}><Mic className="w-4 h-4" /></Button>
-            {beatStreak && (
-              <Button variant="ghost" size="icon-sm" title="Send Beat" onClick={() => setShowBeatPanel(!showBeatPanel)}
-                className={cn(showBeatPanel && 'text-pink-400 bg-pink-400/10')}>
-                <Zap className="w-4 h-4" />
-              </Button>
-            )}
           </div>
           <div className="flex-1 relative">
             <input ref={inputRef} value={message} onChange={e => setMessage(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); attachedFile ? handleSendWithAttachment() : handleSend(); } }}
-              placeholder={editingMsg ? 'Edit message…' : attachedFile ? `Add caption for ${attachedFile.file.name}…` : 'Type a message…'} className="input-premium w-full pr-20 text-sm" />
+              placeholder={editingMsg ? 'Edit message…' : attachedFile ? `Add caption for ${attachedFile.file.name}…` : 'Type a message…'} className="input-premium w-full pr-36 text-sm" />
             <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+              {beatStreak && (
+                <button onClick={() => setShowBeatPanel(!showBeatPanel)}
+                  className={cn('p-1.5 rounded-md transition-colors flex items-center gap-0.5', showBeatPanel ? 'text-pink-500 bg-pink-100' : 'text-text-muted hover:text-pink-400')}
+                  title={`Beats (${beatStreak.count}🔥)`}>
+                  <Zap className="w-3.5 h-3.5" />
+                  <span className="text-[9px] font-bold">{beatStreak.count}</span>
+                </button>
+              )}
               <button onClick={() => loadSuggestions()} className="p-1.5 text-text-muted hover:text-lavender-400 transition-colors" title="AI suggestions"><Sparkles className="w-3.5 h-3.5" /></button>
               <button onClick={() => setShowEntertainment(!showEntertainment)} className="p-1.5 text-text-muted hover:text-lavender-400 transition-colors" title="Entertainment"><Gamepad2 className="w-3.5 h-3.5" /></button>
-              <button className="p-1.5 text-text-muted hover:text-text-secondary transition-colors" title="Emoji"><Smile className="w-3.5 h-3.5" /></button>
+              <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={cn('p-1.5 transition-colors', showEmojiPicker ? 'text-amber-500' : 'text-text-muted hover:text-amber-400')} title="Emoji"><Smile className="w-3.5 h-3.5" /></button>
             </div>
           </div>
-          <Button size="icon" className="shrink-0" onClick={() => attachedFile ? handleSendWithAttachment() : handleSend()}><Send className="w-4 h-4" /></Button>
+          <button
+            onClick={() => attachedFile ? handleSendWithAttachment() : handleSend()}
+            className="shrink-0 w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold transition-all duration-200 hover:-translate-y-0.5 active:scale-95"
+            style={{ background: 'linear-gradient(135deg, #EC407A 0%, #D81B60 50%, #AD1457 100%)', boxShadow: '0 4px 14px rgba(236,64,122,0.35)' }}
+            title="Send message"
+          >
+            <Send className="w-4 h-4" />
+          </button>
         </div>
       </div>
+
+      {/* ── Emoji Picker ── */}
+      <AnimatePresence>
+        {showEmojiPicker && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-t border-border/30 overflow-hidden">
+            <div className="p-3 space-y-2 max-h-[240px] flex flex-col">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-text-secondary">Emojis</span>
+                <button onClick={() => setShowEmojiPicker(false)} className="text-text-muted hover:text-text-primary"><X className="w-3.5 h-3.5" /></button>
+              </div>
+              <div className="flex gap-1 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+                {EMOJI_CATEGORIES.map((cat, i) => (
+                  <button key={i} data-cat={i}
+                    className="px-2 py-1 rounded-lg text-[10px] font-medium whitespace-nowrap text-text-muted hover:text-lavender-400 hover:bg-lavender-400/10 transition-colors"
+                    onClick={() => {
+                      const el = document.getElementById(`emoji-cat-${i}`);
+                      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }}>
+                    {cat.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex-1 overflow-y-auto space-y-3" style={{ scrollbarWidth: 'thin' }}>
+                {EMOJI_CATEGORIES.map((cat, ci) => (
+                  <div key={ci} id={`emoji-cat-${ci}`}>
+                    <p className="text-[10px] text-text-muted font-medium mb-1">{cat.label}</p>
+                    <div className="flex flex-wrap gap-1">
+                      {cat.emojis.map((emoji, ei) => (
+                        <button key={ei} onClick={() => { setMessage(prev => prev + emoji); setShowEmojiPicker(false); inputRef.current?.focus(); }}
+                          className="w-8 h-8 flex items-center justify-center text-lg rounded-lg hover:bg-miamo-elevated/50 hover:scale-110 transition-all">
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
