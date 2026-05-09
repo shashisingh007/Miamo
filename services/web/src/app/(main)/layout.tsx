@@ -246,20 +246,22 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
 
-        {/* Page content — messages needs overflow-hidden so its internal height fills correctly */}
-        <div className={cn('flex-1 min-h-0', pathname.startsWith('/messages') ? 'overflow-hidden' : 'overflow-y-auto')}>
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={pathname}
-              initial={{ opacity: 0, y: 12, filter: 'blur(4px)' }}
-              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, y: -8, filter: 'blur(2px)' }}
-              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              className="h-full"
-            >
-              {children}
-            </motion.div>
-          </AnimatePresence>
+        {/* Page content — messages uses absolute positioning for reliable height */}
+        <div className={cn('flex-1 min-h-0 relative', pathname.startsWith('/messages') ? 'overflow-hidden' : 'overflow-y-auto')}>
+          {pathname.startsWith('/messages') ? children : (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={pathname}
+                initial={{ opacity: 0, y: 12, filter: 'blur(4px)' }}
+                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                exit={{ opacity: 0, y: -8, filter: 'blur(2px)' }}
+                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                className="h-full"
+              >
+                {children}
+              </motion.div>
+            </AnimatePresence>
+          )}
         </div>
 
         {/* Mobile Nav — Glass Premium */}
