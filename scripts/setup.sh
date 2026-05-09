@@ -16,6 +16,16 @@
 #    bash scripts/start.sh dev        — Needs Node.js + Docker + minikube + kubectl
 # ═══════════════════════════════════════════════════════════════════
 
+# ─── Fix Windows CRLF line endings (\r) if present ───────────────
+if [[ "$(head -1 "$0" | od -c | head -1)" == *'\r'* ]] || head -1 "$0" | grep -q $'\r'; then
+  _SELF="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")"; pwd)/$(basename "${BASH_SOURCE[0]:-$0}")"
+  if command -v sed &>/dev/null; then
+    sed -i.bak 's/\r$//' "$_SELF" 2>/dev/null || sed -i 's/\r$//' "$_SELF" 2>/dev/null
+    rm -f "${_SELF}.bak" 2>/dev/null
+    exec bash "$_SELF" "$@"
+  fi
+fi
+
 # DO NOT use set -e — we handle errors per-tool
 # so one failure doesn't kill the whole script
 
