@@ -446,7 +446,21 @@ app.get('/api/v1/beats', authMiddleware, async (req: AuthRequest, res: Response,
       include: { user1: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } }, user2: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } }, events: { take: 5, orderBy: { createdAt: 'desc' } } },
       orderBy: { updatedAt: 'desc' },
     });
-    const result = beats.map(b => { const o = b.user1Id === userId ? b.user2 : b.user1; const { passwordHash, ...other } = o; return { id: b.id, user: other, count: b.count, state: b.state, events: b.events, createdAt: b.createdAt, updatedAt: b.updatedAt }; });
+    const result = beats.map(b => {
+      const isUser1 = b.user1Id === userId;
+      const o = isUser1 ? b.user2 : b.user1;
+      const { passwordHash, ...other } = o;
+      const myLast = isUser1 ? b.lastUser1 : b.lastUser2;
+      const theirLast = isUser1 ? b.lastUser2 : b.lastUser1;
+      const now = Date.now();
+      const iSentToday = myLast ? (now - new Date(myLast).getTime()) < 86400000 : false;
+      const theyCompletedToday = theirLast ? (now - new Date(theirLast).getTime()) < 86400000 : false;
+      return {
+        id: b.id, user: other, count: b.count, state: b.state, events: b.events,
+        iSentToday, theyCompletedToday, todayCompleted: iSentToday && theyCompletedToday,
+        createdAt: b.createdAt, updatedAt: b.updatedAt,
+      };
+    });
     res.json({ data: result });
   } catch (e) { next(e); }
 });
@@ -471,12 +485,20 @@ app.post('/api/v1/beats/:id/complete', authMiddleware, async (req: AuthRequest, 
     const isUser1 = beat.user1Id === userId;
     const lastField = isUser1 ? 'lastUser1' : 'lastUser2';
     const otherLastField = isUser1 ? 'lastUser2' : 'lastUser1';
-    const otherLast = beat[otherLastField];
-    const otherCompletedToday = otherLast && (new Date().getTime() - otherLast.getTime()) < 86400000;
-    const newCount = otherCompletedToday ? beat.count + 1 : beat.count;
-    const updated = await prisma.beat.update({ where: { id: req.params.id }, data: { [lastField]: new Date(), count: newCount, state: 'active' } });
+    const myLast = beat[lastField as keyof typeof beat] as Date | null;
+    const otherLast = beat[otherLastField as keyof typeof beat] as Date | null;
+    const now = new Date();
+    const DAY = 86400000;
+    // Did I already send today? (within 24h)
+    const iAlreadySentToday = myLast && (now.getTime() - myLast.getTime()) < DAY;
+    // Did the other user send today?
+    const otherCompletedToday = otherLast && (now.getTime() - otherLast.getTime()) < DAY;
+    // Count increases ONLY when: both sent today AND this is my first send of the day
+    const shouldIncrement = otherCompletedToday && !iAlreadySentToday;
+    const newCount = shouldIncrement ? beat.count + 1 : beat.count;
+    const updated = await prisma.beat.update({ where: { id: req.params.id }, data: { [lastField]: now, count: newCount, state: 'active' } });
     await prisma.beatEvent.create({ data: { beatId: beat.id, userId, type: req.body.type || 'snap', content: req.body.content || 'Daily beat! ⚡' } });
-    res.json({ data: updated });
+    res.json({ data: { ...updated, countIncremented: shouldIncrement, iSentToday: true, theyCompletedToday: !!otherCompletedToday, todayCompleted: !!otherCompletedToday } });
   } catch (e) { next(e); }
 });
 

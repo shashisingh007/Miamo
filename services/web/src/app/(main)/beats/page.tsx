@@ -7,7 +7,7 @@ import {
   AlertTriangle, Send, MoreVertical, ChevronLeft, ChevronRight, Trash2, Ban,
   Flag, Eye, EyeOff, Film, Sparkles, Moon, Music, Lightbulb,
   ChevronDown, Play, ArrowUp, ArrowDown, Users, Crown,
-  Check, CheckCheck, Volume2, Coffee, Activity, UserMinus, ThumbsUp, Filter,
+  Check, CheckCheck, Volume2, Coffee, Activity, UserMinus, ThumbsUp, Filter, X,
   Hourglass, Timer,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -135,12 +135,20 @@ const ICE_BREAKERS: { category: string; icon: any; prompts: string[] }[] = [
 ];
 
 const MILESTONE_EMOJIS: Record<number, { emoji: string; label: string; color: string }> = {
-  3: { emoji: '\uD83D\uDD25', label: 'First Spark!', color: 'text-orange-500' },
-  7: { emoji: '\u2B50', label: 'Week Warrior!', color: 'text-amber-500' },
-  14: { emoji: '\uD83D\uDCAB', label: 'Two Week Champion!', color: 'text-purple-500' },
-  30: { emoji: '\uD83C\uDFC6', label: 'Monthly Master!', color: 'text-yellow-500' },
-  50: { emoji: '\uD83D\uDC8E', label: 'Diamond Streak!', color: 'text-cyan-500' },
-  100: { emoji: '\uD83D\uDC51', label: 'Beat Royalty!', color: 'text-amber-400' },
+  3: { emoji: '🔥', label: 'First Spark!', color: 'text-orange-500' },
+  7: { emoji: '⭐', label: 'Week Warrior!', color: 'text-amber-500' },
+  14: { emoji: '💫', label: 'Two Week Champion!', color: 'text-purple-500' },
+  30: { emoji: '🏆', label: 'Monthly Master!', color: 'text-yellow-500' },
+  50: { emoji: '💎', label: 'Diamond Streak!', color: 'text-cyan-500' },
+  100: { emoji: '👑', label: 'Beat Royalty!', color: 'text-amber-400' },
+  150: { emoji: '🌟', label: 'Legendary!', color: 'text-yellow-300' },
+  200: { emoji: '🔱', label: 'Unstoppable!', color: 'text-blue-400' },
+  365: { emoji: '🎂', label: '1 Year Anniversary!', color: 'text-pink-500' },
+  500: { emoji: '💝', label: 'Soulmate Streak!', color: 'text-rose-500' },
+  730: { emoji: '💍', label: '2 Year Bond!', color: 'text-violet-500' },
+  1095: { emoji: '🏛️', label: '3 Year Legacy!', color: 'text-indigo-500' },
+  1460: { emoji: '🌍', label: '4 Year Journey!', color: 'text-emerald-500' },
+  1825: { emoji: '♾️', label: '5 Year Forever!', color: 'text-amber-300' },
 };
 
 const REMOVE_REASONS = [
@@ -381,27 +389,30 @@ function BeatMenu({ onRemove, onBlock, onReport, onMute }: {
 
   return (
     <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(!open)}
+      <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
         className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all">
         <MoreVertical className="w-4 h-4" />
       </button>
       <AnimatePresence>
         {open && (
-          <motion.div initial={{ opacity: 0, scale: 0.95, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -4 }}
-            className="absolute right-0 top-full mt-1 w-52 card-premium shadow-xl z-50 py-1 overflow-hidden"
-          >
-            {items.map(item => {
-              const ItemIcon = item.icon;
-              return (
-                <button key={item.label} onClick={() => { setOpen(false); item.action(); }}
-                  className={cn('flex items-center gap-2.5 w-full px-4 py-2.5 text-[13px] font-medium transition-colors',
-                    item.danger ? 'text-red-500 hover:bg-red-50' : 'text-gray-600 hover:bg-gray-50'
-                  )}>
-                  <ItemIcon className="w-4 h-4" /> {item.label}
-                </button>
-              );
-            })}
-          </motion.div>
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+            <motion.div initial={{ opacity: 0, scale: 0.95, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -4 }}
+              className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 py-1 overflow-visible"
+            >
+              {items.map(item => {
+                const ItemIcon = item.icon;
+                return (
+                  <button key={item.label} onClick={(e) => { e.stopPropagation(); setOpen(false); item.action(); }}
+                    className={cn('flex items-center gap-2.5 w-full px-4 py-2.5 text-[13px] font-medium transition-colors',
+                      item.danger ? 'text-red-500 hover:bg-red-50' : 'text-gray-600 hover:bg-gray-50'
+                    )}>
+                    <ItemIcon className="w-4 h-4" /> {item.label}
+                  </button>
+                );
+              })}
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </div>
@@ -712,6 +723,7 @@ function BeatsPageInner() {
   const [confirmAction, setConfirmAction] = useState<{ type: 'remove' | 'block' | 'delete'; beatId: string; entryId?: string } | null>(null);
   const [celebration, setCelebration] = useState<number | null>(null);
   const [completing, setCompleting] = useState<string | null>(null);
+  const [quickBeatType, setQuickBeatType] = useState<string | null>(null); // match selection modal
   // Tick every 60s so StreakCountdown components re-render with fresh times
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -727,14 +739,15 @@ function BeatsPageInner() {
       const mapped: BeatMatch[] = raw.map((b: any) => {
         const apiUser = b.user || b.matchedUser || {};
         const events = b.events || [];
-        const today = new Date().toDateString();
-        const myEvents = events.filter((e: any) => e.userId && new Date(e.createdAt).toDateString() === today);
-        const theirEvents = events.filter((e: any) => !e.userId && new Date(e.createdAt).toDateString() === today);
         const sentEvents = events.filter((e: any) => e.userId);
         const photos = apiUser.photos || [];
         const photoUrl = photos[0]?.url || photos[0]?.imageUrl || undefined;
         let state = b.state || 'active';
         if (state === 'active') state = b.count >= 7 ? 'strong' : b.count >= 3 ? 'soft' : 'soft';
+        // Use server-computed flags (reliable 24h window from lastUser1/lastUser2)
+        const iSentToday = !!b.iSentToday;
+        const theyCompletedToday = !!b.theyCompletedToday;
+        const todayCompleted = !!b.todayCompleted || (iSentToday && theyCompletedToday);
         
         return {
           id: b.id,
@@ -748,9 +761,9 @@ function BeatsPageInner() {
           },
           count: b.count || 0,
           state,
-          todayCompleted: myEvents.length > 0 && theirEvents.length > 0,
-          iSentToday: myEvents.length > 0,
-          theyCompletedToday: theirEvents.length > 0,
+          todayCompleted,
+          iSentToday,
+          theyCompletedToday,
           streakDeadline: getStreakDeadline(),
           lastBeatAt: b.updatedAt || b.createdAt || undefined,
           longestStreak: b.count || 0,
@@ -777,38 +790,41 @@ function BeatsPageInner() {
   const completedToday = beats.filter(b => b.todayCompleted).length;
 
   const handleSendBeat = async (beatId: string, type: string, content?: string) => {
-    // Check if already sent today — prevent double sends
-    const beat = beats.find(b => b.id === beatId);
-    if (beat?.iSentToday) return; // Already sent today, ignore
+    if (completing) return; // Prevent concurrent sends
 
     setCompleting(beatId);
     try {
-      await api.completeBeat(beatId, type, content || `Quick ${type} beat!`);
-      // Update local state: mark that I sent
+      const res = await api.completeBeat(beatId, type, content || `Quick ${type} beat!`);
+      const serverData = res.data || {};
+      // Update local state using server response
       setBeats(prev => prev.map(b => {
         if (b.id !== beatId) return b;
-        const nowBothSent = b.theyCompletedToday; // they already sent + I just sent
-        const newCount = nowBothSent ? (b.count || 0) + 1 : b.count; // streak +1 ONLY when both sent
-        if (nowBothSent && MILESTONE_EMOJIS[newCount]) setCelebration(newCount);
+        const newCount = serverData.count ?? b.count;
+        const iSentToday = serverData.iSentToday ?? true;
+        const theyCompletedToday = serverData.theyCompletedToday ?? b.theyCompletedToday;
+        const todayCompleted = serverData.todayCompleted ?? (iSentToday && theyCompletedToday);
+        if (serverData.countIncremented && MILESTONE_EMOJIS[newCount]) setCelebration(newCount);
         return {
           ...b,
-          iSentToday: true,
-          todayCompleted: nowBothSent,
+          iSentToday,
+          theyCompletedToday,
+          todayCompleted,
           count: newCount,
           totalSent: (b.totalSent || 0) + 1,
           lastBeatAt: new Date().toISOString(),
           longestStreak: Math.max(b.longestStreak || 0, newCount),
         };
       }));
+      // Refresh from server to stay in sync
       loadBeats();
     } catch (e) {
-      // Still update locally on API failure so UI responds
+      // Fallback: optimistic update
       setBeats(prev => prev.map(b => {
         if (b.id !== beatId) return b;
-        const nowBothSent = b.theyCompletedToday;
-        const newCount = nowBothSent ? (b.count || 0) + 1 : b.count;
-        if (nowBothSent && MILESTONE_EMOJIS[newCount]) setCelebration(newCount);
-        return { ...b, iSentToday: true, todayCompleted: nowBothSent, count: newCount, totalSent: (b.totalSent || 0) + 1, lastBeatAt: new Date().toISOString() };
+        const shouldIncrement = b.theyCompletedToday && !b.iSentToday;
+        const newCount = shouldIncrement ? (b.count || 0) + 1 : b.count;
+        if (shouldIncrement && MILESTONE_EMOJIS[newCount]) setCelebration(newCount);
+        return { ...b, iSentToday: true, todayCompleted: b.theyCompletedToday, count: newCount, totalSent: (b.totalSent || 0) + 1, lastBeatAt: new Date().toISOString() };
       }));
     }
     setCompleting(null);
@@ -914,17 +930,82 @@ function BeatsPageInner() {
           <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
             <Zap className="w-4 h-4 text-pink-500" /> Quick Beat Actions
           </h3>
-          <span className="text-[10px] text-gray-400">Tap to send to active streaks</span>
+          <span className="text-[10px] text-gray-400">Tap to choose who to send</span>
         </div>
         <div className="grid grid-cols-4 lg:grid-cols-8 gap-2">
           {BEAT_TYPES.map(bt => (
             <BeatTypeButton key={bt.type} bt={bt} onClick={() => {
-              const activeBeat = beats.find(b => !b.todayCompleted && !b.iSentToday);
-              if (activeBeat) handleSendBeat(activeBeat.id, bt.type);
+              if (beats.length === 0) return;
+              if (beats.length === 1) {
+                handleSendBeat(beats[0].id, bt.type);
+              } else {
+                setQuickBeatType(bt.type);
+              }
             }} />
           ))}
         </div>
       </Card>
+
+      {/* MATCH SELECTION MODAL for Quick Beat */}
+      <AnimatePresence>
+        {quickBeatType && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setQuickBeatType(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+              onClick={(e: React.MouseEvent) => e.stopPropagation()}
+              className="card-premium p-6 max-w-sm mx-4 w-full max-h-[70vh] flex flex-col"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+                  {(() => { const bt = BEAT_TYPES.find(b => b.type === quickBeatType); if (!bt) return null; const Icon = bt.icon; return <><Icon className={cn('w-5 h-5', bt.color)} /> Send {bt.label} Beat</>; })()}
+                </h3>
+                <button onClick={() => setQuickBeatType(null)} className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-50">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <p className="text-xs text-gray-400 mb-3">Choose who to send this beat to:</p>
+              <div className="flex-1 overflow-y-auto space-y-1.5">
+                {beats.map(beat => {
+                  const other = beat.matchedUser || { id: '', displayName: 'Unknown', photos: [] };
+                  const photo = other.photos?.[0]?.url || other.photos?.[0] || undefined;
+                  return (
+                    <motion.button
+                      key={beat.id}
+                      whileHover={{ x: 3 }}
+                      onClick={() => { handleSendBeat(beat.id, quickBeatType!); setQuickBeatType(null); }}
+                      disabled={completing === beat.id}
+                      className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-pink-50/40 transition-all text-left"
+                    >
+                      <div className="relative">
+                        <Avatar src={photo} name={other.displayName} size="sm" online={other.online} verified={other.verified} />
+                        <div className="absolute -bottom-1 -right-1">
+                          <StreakFlame count={beat.count} size="sm" />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-gray-800 truncate">{other.displayName}</p>
+                        <p className="text-[11px] text-gray-400">{beat.count} day streak</p>
+                      </div>
+                      {beat.iSentToday ? (
+                        <Badge variant="default" className="text-[10px] gap-1 bg-blue-50 text-blue-600 border-blue-100">
+                          <Check className="w-3 h-3" /> Sent
+                        </Badge>
+                      ) : (
+                        <Badge variant="default" className="text-[10px] gap-1 bg-pink-50 text-pink-600 border-pink-100">
+                          <Send className="w-3 h-3" /> Send
+                        </Badge>
+                      )}
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ICE BREAKER TOGGLE */}
       <motion.button
@@ -941,8 +1022,13 @@ function BeatsPageInner() {
         {showIceBreakers && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}>
             <IceBreakerPanel onSend={(text) => {
-              const activeBeat = beats.find(b => !b.todayCompleted && !b.iSentToday);
-              if (activeBeat) handleSendBeat(activeBeat.id, 'text', text);
+              if (beats.length === 0) return;
+              if (beats.length === 1) {
+                handleSendBeat(beats[0].id, 'text', text);
+              } else {
+                // For ice breakers, send as text type with the modal
+                setQuickBeatType('text');
+              }
             }} />
           </motion.div>
         )}
@@ -1016,12 +1102,21 @@ function BeatsPageInner() {
                       {/* Actions — 3 states: Done (both sent), Sent (I sent, waiting), Beat (not sent) */}
                       <div className="flex items-center gap-1.5 shrink-0">
                         {beat.todayCompleted ? (
-                          <Badge variant="success" className="text-[10px] gap-1">
-                            <Check className="w-3 h-3" /> Done
-                          </Badge>
+                          <Button size="sm" variant="secondary"
+                            disabled={completing === beat.id}
+                            onClick={() => handleSendBeat(beat.id, 'text')}
+                            className="text-[11px] gap-1 bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100"
+                          >
+                            <Check className="w-3 h-3" /> {completing === beat.id ? '…' : 'Done ✓'}
+                          </Button>
                         ) : beat.iSentToday ? (
-                          <Badge variant="default" className="text-[10px] gap-1 bg-blue-50 text-blue-600 border-blue-100">
-                            <Check className="w-3 h-3" /> Sent
+                          <Button size="sm" variant="secondary"
+                            disabled={completing === beat.id}
+                            onClick={() => handleSendBeat(beat.id, 'text')}
+                            className="text-[11px] gap-1 bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
+                          >
+                            <Check className="w-3 h-3" /> {completing === beat.id ? '…' : 'Sent +'}
+                          </Button>
                           </Badge>
                         ) : (
                           <Button size="sm" variant={isUrgent ? 'default' : 'secondary'}
@@ -1076,7 +1171,7 @@ function BeatsPageInner() {
               <p><strong>Send daily beats</strong> — photos, videos, voice notes, or messages to keep your streak alive.</p>
               <p><strong>Build your streak</strong> — both of you must send at least one beat per day. The counter grows daily!</p>
               <p><strong>Don&apos;t get ghosted</strong> — Beats remind both of you to stay connected. No more awkward silence.</p>
-              <p><strong>Earn milestones</strong> — Hit 7, 14, 30, 50, 100 days for special badges and celebrations.</p>
+              <p><strong>Earn milestones</strong> — Hit 7, 30, 100, 365, 730, 1095, 1460, 1825 days for special badges and celebrations up to 5 years!</p>
               <p><strong>Ice breakers</strong> — Stuck? Use our conversation starters to keep things flowing naturally.</p>
               <p><strong>Show in chat</strong> — Choose which beats appear in your regular messages. Private by default.</p>
             </div>

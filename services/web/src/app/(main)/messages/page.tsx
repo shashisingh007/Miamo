@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, Component } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, Phone, Video, MoreVertical, Pin, Archive, Image, Mic, Send, Smile, Paperclip,
@@ -543,6 +543,8 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
   const [harshWarning, setHarshWarning] = useState<{ warnings: string[]; content: string } | null>(null);
   const [hiddenMsgIds, setHiddenMsgIds] = useState<Set<string>>(new Set());
   const [attachedFile, setAttachedFile] = useState<{ file: File; preview: string; type: string } | null>(null);
+  const [beatStreak, setBeatStreak] = useState<{ id: string; count: number; iSentToday: boolean; theyCompletedToday: boolean; todayCompleted: boolean } | null>(null);
+  const [showBeatPanel, setShowBeatPanel] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -551,7 +553,6 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
   const other = chat.otherUser || chat.user1 || {};
   const pollRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Load messages
   // Load messages & mark as read (backend marks read on getChatMessages)
   useEffect(() => {
     setLoading(true);
@@ -563,6 +564,29 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
     }).catch(() => {}).finally(() => setLoading(false));
     setReplyTo(null); setEditingMsg(null); setShowSuggestions(false); setShowEntertainment(false);
     setChatBackground(chat.background || '#FDF2F5');
+
+    // Load beat streak for this chat partner
+    const otherUserId = (chat.otherUser || chat.user1)?.id;
+    if (otherUserId) {
+      api.getBeats().then(r => {
+        const beats = r.data || [];
+        const match = beats.find((b: any) => {
+          const u = b.user || b.matchedUser || {};
+          return u.id === otherUserId;
+        });
+        if (match) {
+          setBeatStreak({
+            id: match.id,
+            count: match.count || 0,
+            iSentToday: !!match.iSentToday,
+            theyCompletedToday: !!match.theyCompletedToday,
+            todayCompleted: !!match.todayCompleted,
+          });
+        } else {
+          setBeatStreak(null);
+        }
+      }).catch(() => setBeatStreak(null));
+    }
   }, [chat.id]);
 
   // Poll for new messages every 3s
@@ -661,6 +685,31 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
     try { const r = await api.searchMessages(chat.id, searchQuery); setSearchResults(r.data || []); } catch {}
   };
 
+  const handleSendBeatFromChat = async (type: string) => {
+    if (!beatStreak) return;
+    try {
+      const res = await api.completeBeat(beatStreak.id, type, `${type} beat from chat! ⚡`);
+      const data = res.data || {};
+      setBeatStreak(prev => prev ? {
+        ...prev,
+        count: data.count ?? prev.count,
+        iSentToday: true,
+        theyCompletedToday: data.theyCompletedToday ?? prev.theyCompletedToday,
+        todayCompleted: data.todayCompleted ?? prev.todayCompleted,
+      } : null);
+      // Add a system message about the beat
+      const systemMsg = {
+        id: `beat-${Date.now()}`,
+        type: 'system',
+        content: `⚡ Beat sent! ${data.countIncremented ? `Streak: ${data.count} 🔥` : 'Waiting for their beat to grow the streak!'}`,
+        createdAt: new Date().toISOString(),
+        isSystem: true,
+      };
+      setMessages(prev => [...prev, systemMsg]);
+      setShowBeatPanel(false);
+    } catch (e) { console.error('Beat send error:', e); }
+  };
+
   const loadSuggestions = async (context?: string) => {
     try { const r = await api.getChatSuggestions(chat.id, context); setSuggestions(r.data || []); setShowSuggestions(true); } catch {}
   };
@@ -698,6 +747,25 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
             </p>
           </div>
         </button>
+        {/* Beat streak tracker badge */}
+        {beatStreak && (
+          <button
+            onClick={() => setShowBeatPanel(!showBeatPanel)}
+            className={cn(
+              'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition-all',
+              beatStreak.todayCompleted
+                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                : beatStreak.iSentToday
+                ? 'bg-blue-50 text-blue-600 border border-blue-100'
+                : 'bg-pink-50 text-pink-600 border border-pink-200 animate-pulse'
+            )}
+            title="Beat Streak"
+          >
+            <Zap className="w-3 h-3" />
+            {beatStreak.count}🔥
+            {beatStreak.todayCompleted ? ' ✓' : beatStreak.iSentToday ? ' ⏳' : ' !'}
+          </button>
+        )}
         <div className="ml-auto flex items-center gap-1">
           <Button variant="ghost" size="icon-sm" onClick={() => setCallType('voice')} title="Voice call"><Phone className="w-4 h-4" /></Button>
           <Button variant="ghost" size="icon-sm" onClick={() => setCallType('video')} title="Video call"><Video className="w-4 h-4" /></Button>
@@ -867,6 +935,55 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
         )}
       </AnimatePresence>
 
+      {/* ── Beat Send Panel ── */}
+      <AnimatePresence>
+        {showBeatPanel && beatStreak && (
+          <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-t border-border/30 overflow-hidden">
+            <div className="p-3 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-text-secondary flex items-center gap-2">
+                  <Zap className="w-3.5 h-3.5 text-pink-400" /> Send a Beat
+                  <span className="text-[10px] text-text-muted">({beatStreak.count} day streak 🔥)</span>
+                </span>
+                <button onClick={() => setShowBeatPanel(false)} className="text-text-muted hover:text-text-primary"><X className="w-3.5 h-3.5" /></button>
+              </div>
+              {beatStreak.todayCompleted ? (
+                <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-[11px] text-emerald-400 font-medium">Both sent today — streak saved! You can still send more beats.</span>
+                </div>
+              ) : beatStreak.iSentToday ? (
+                <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
+                  <Clock className="w-3.5 h-3.5 text-blue-400" />
+                  <span className="text-[11px] text-blue-400 font-medium">You sent — waiting for {other.displayName?.split(' ')[0]} to send back.</span>
+                </div>
+              ) : beatStreak.theyCompletedToday ? (
+                <div className="flex items-center gap-2 bg-pink-500/10 border border-pink-500/20 rounded-lg px-3 py-2 animate-pulse">
+                  <Zap className="w-3.5 h-3.5 text-pink-400" />
+                  <span className="text-[11px] text-pink-400 font-medium">{other.displayName?.split(' ')[0]} sent — send back to grow your streak!</span>
+                </div>
+              ) : null}
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { type: 'text', icon: MessageCircle, label: 'Text', color: 'text-pink-400', bg: 'bg-pink-500/10' },
+                  { type: 'photo', icon: Image, label: 'Photo', color: 'text-blue-400', bg: 'bg-blue-500/10' },
+                  { type: 'voice', icon: Mic, label: 'Voice', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
+                  { type: 'video', icon: Film, label: 'Video', color: 'text-violet-400', bg: 'bg-violet-500/10' },
+                ].map(bt => (
+                  <button key={bt.type} onClick={() => handleSendBeatFromChat(bt.type)}
+                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-miamo-elevated/30 border border-border/20 hover:bg-lavender-400/10 hover:border-lavender-400/20 transition-all group">
+                    <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', bt.bg)}>
+                      <bt.icon className={cn('w-4 h-4', bt.color)} />
+                    </div>
+                    <span className="text-[10px] text-text-muted group-hover:text-lavender-400 font-medium">{bt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* ── Reply / Edit Bar ── */}
       <AnimatePresence>
         {(replyTo || editingMsg) && (
@@ -940,6 +1057,12 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
               </AnimatePresence>
             </div>
             <Button variant="ghost" size="icon-sm" title="Voice message" onClick={() => setMessage('[🎤 Voice message]')}><Mic className="w-4 h-4" /></Button>
+            {beatStreak && (
+              <Button variant="ghost" size="icon-sm" title="Send Beat" onClick={() => setShowBeatPanel(!showBeatPanel)}
+                className={cn(showBeatPanel && 'text-pink-400 bg-pink-400/10')}>
+                <Zap className="w-4 h-4" />
+              </Button>
+            )}
           </div>
           <div className="flex-1 relative">
             <input ref={inputRef} value={message} onChange={e => setMessage(e.target.value)}
@@ -1070,7 +1193,55 @@ function MessagesFeedbackModal({ type, userName, onClose, onSubmit }: {
 // ═══════════════════════════════════════════════════════════
 // MESSAGES PAGE
 // ═══════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// ERROR BOUNDARY — prevents full page crash
+// ═══════════════════════════════════════════════════════════
+class MessagesErrorBoundary extends Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error?: Error }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: Error, info: any) {
+    console.error('[MessagesErrorBoundary]', error, info?.componentStack);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <div className="text-center p-6 space-y-4">
+            <MessageCircle className="w-10 h-10 text-lavender-400/40 mx-auto" />
+            <h2 className="text-lg font-bold text-text-primary">Something went wrong</h2>
+            <p className="text-sm text-text-muted">The chat encountered an error.</p>
+            {this.state.error && (
+              <p className="text-xs text-red-400 font-mono max-w-sm break-all">{this.state.error.message}</p>
+            )}
+            <button onClick={() => { this.setState({ hasError: false }); window.location.reload(); }}
+              className="px-4 py-2 bg-lavender-400 text-gray-900 rounded-lg font-medium text-sm">
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function MessagesPage() {
+  return (
+    <MessagesErrorBoundary>
+      <MessagesPageInner />
+    </MessagesErrorBoundary>
+  );
+}
+
+function MessagesPageInner() {
   const [chats, setChats] = useState<any[]>([]);
   const [activeChat, setActiveChat] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
