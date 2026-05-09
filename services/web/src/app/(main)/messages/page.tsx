@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui';
-import { MiamoLoader } from '@/components/ui/miamo-logo';
+import { MiamoLoader, MiamoCompactIcon } from '@/components/ui/miamo-logo';
 import { api } from '@/lib/api';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
@@ -1414,7 +1414,8 @@ function MessagesPageInner() {
         <div className="p-4 space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold flex items-center gap-2">
-              <MessageCircle className="w-5 h-5 text-lavender-400" /> Messages
+              <span className="lg:hidden"><MiamoCompactIcon size={22} /></span>
+              <MessageCircle className="w-5 h-5 text-lavender-400 hidden lg:block" /> Messages
               {totalMsgCount > 0 && (
                 <span className="ml-1 min-w-[22px] h-[22px] bg-lavender-400 rounded-full text-[11px] font-bold text-gray-900 flex items-center justify-center px-1.5">
                   {totalMsgCount > 99 ? '99+' : totalMsgCount}
