@@ -210,10 +210,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       </aside>
 
       {/* ═══ MAIN CONTENT ═══ */}
-      <main className="flex-1 flex flex-col overflow-hidden relative z-10"
-        style={{ height: '100vh', maxHeight: '100vh' }}>
+      <main className="flex-1 flex flex-col overflow-hidden relative z-10">
         {/* Premium Header — always visible */}
-        <header className="h-[72px] header-premium flex items-center px-6 gap-4 shrink-0 relative z-20">
+        <header className="h-[72px] header-premium flex items-center px-6 gap-4 shrink-0 relative z-20"
+          style={{ borderBottom: '3px solid red' }}>
           <div className="lg:hidden flex items-center gap-2">
             <MiamoCompactIcon size={28} />
           </div>
@@ -243,8 +243,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
 
-        {/* Page content — calc height ensures pixel-perfect sizing regardless of flexbox */}
-        <div className="flex flex-col overflow-hidden" style={{ height: 'calc(100vh - 72px)' }}>
+        {/* Page content */}
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           {pathname.startsWith('/messages') ? children : (
             <div className="flex-1 min-h-0 overflow-y-auto">
               <AnimatePresence mode="wait">

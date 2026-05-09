@@ -732,7 +732,7 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
   const visibleMessages = messages.filter(m => !hiddenMsgIds.has(m.id));
 
   return (
-    <div className="flex flex-col overflow-hidden" style={{ height: '100%' }}>
+    <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
       <AnimatePresence>{callType && <CallOverlay type={callType} user={other} onEnd={() => setCallType(null)} />}</AnimatePresence>
       <AnimatePresence>{showBgPicker && <BackgroundPicker chatId={chat.id} currentBg={chatBackground} onClose={() => setShowBgPicker(false)} onSelect={(bg, bgName) => {
         setChatBackground(bg);
@@ -750,7 +750,7 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
       <AnimatePresence>{harshWarning && <HarshWarningModal warnings={harshWarning.warnings} onSend={() => { setHarshWarning(null); handleSend(true); }} onCancel={() => setHarshWarning(null)} />}</AnimatePresence>
 
       {/* ── Header ── */}
-      <div className="flex items-center gap-3 p-4 border-b border-border/50 bg-miamo-surface/30 backdrop-blur-sm z-10">
+      <div className="shrink-0 flex items-center gap-3 p-4 border-b border-border/50 bg-miamo-surface/30 backdrop-blur-sm z-10">
         <button onClick={onBack} className="lg:hidden text-text-muted hover:text-text-primary"><ChevronLeft className="w-5 h-5" /></button>
         <button onClick={goToProfile} className="flex items-center gap-3 hover:opacity-80 transition-opacity">
           <Avatar src={other.photos?.[0]?.url} name={other.displayName || 'User'} size="sm" online={other.online} verified={other.verified} />
@@ -839,7 +839,7 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
       </AnimatePresence>
 
       {/* ── Messages Area ── */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-3"
+      <div className="flex-1 min-h-0 overflow-y-auto p-4 space-y-3"
         style={{ background: chatBackground.startsWith('linear') || chatBackground.startsWith('radial') ? chatBackground : chatBackground.startsWith('#') ? chatBackground : undefined }}>
         <div className="flex justify-center mb-4">
           <div className="flex items-center gap-2 bg-black/20 backdrop-blur-sm px-3 py-1.5 rounded-full">
@@ -1025,7 +1025,7 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
       </AnimatePresence>
 
       {/* ── Input Bar ── */}
-      <div className="p-3 border-t border-border/50 bg-miamo-surface/30 backdrop-blur-sm">
+      <div className="shrink-0 p-3 border-t border-border/50 bg-miamo-surface/30 backdrop-blur-sm">
         {/* Hidden file input */}
         <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileSelected} />
 
@@ -1408,7 +1408,7 @@ function MessagesPageInner() {
   const activeConversation = chats.find(c => c.id === activeChat);
 
   return (
-    <div className="flex overflow-hidden" style={{ height: '100%' }}>
+    <div className="flex-1 min-h-0 flex overflow-hidden">
       {/* ── Sidebar ── */}
       <div className={cn('w-full lg:w-[360px] border-r border-border/50 flex flex-col bg-miamo-surface/20', activeChat && 'hidden lg:flex')}>
         <div className="p-4 space-y-3">
@@ -1562,7 +1562,7 @@ function MessagesPageInner() {
       </div>
 
       {/* ── Chat View ── */}
-      <div className={cn('flex-1 flex flex-col min-h-0', !activeChat && 'hidden lg:flex')}>
+      <div className={cn('flex-1 flex flex-col min-h-0 overflow-hidden', !activeChat && 'hidden lg:flex')}>
         {activeConversation ? (
           <ChatView chat={activeConversation} onBack={() => setActiveChat(null)} onRefreshChats={loadChats}
             onReport={() => {
