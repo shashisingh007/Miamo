@@ -215,54 +215,53 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
       {/* ═══ MAIN CONTENT ═══ */}
       <main className="flex-1 flex flex-col overflow-hidden relative z-10">
-        {/* Premium Header — hidden on messages page (messages has its own headers) */}
-        {!pathname.startsWith('/messages') && (
-          <header className="h-[72px] header-premium flex items-center px-6 gap-4 shrink-0 relative z-20">
-            <div className="lg:hidden flex items-center gap-2">
-              <MiamoCompactIcon size={28} />
+        {/* Premium Header — always visible */}
+        <header className="h-[72px] header-premium flex items-center px-6 gap-4 shrink-0 relative z-20">
+          <div className="lg:hidden flex items-center gap-2">
+            <MiamoCompactIcon size={28} />
+          </div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-bold text-gray-800 capitalize tracking-tight">
+              {pathname === '/' ? 'Home' : pathname.split('/').filter(Boolean)[0]?.replace(/-/g, ' ')}
+            </h1>
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-100/50">
+              <Sparkles className="w-3 h-3 text-pink-400" />
+              <span className="text-[10px] font-bold text-pink-500 uppercase tracking-wider">Elite</span>
             </div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-lg font-bold text-gray-800 capitalize tracking-tight">
-                {pathname === '/' ? 'Home' : pathname.split('/').filter(Boolean)[0]?.replace(/-/g, ' ')}
-              </h1>
-              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-100/50">
-                <Sparkles className="w-3 h-3 text-pink-400" />
-                <span className="text-[10px] font-bold text-pink-500 uppercase tracking-wider">Elite</span>
+          </div>
+          <div className="ml-auto flex items-center gap-3">
+            <Link href="/notifications" className="relative group">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/60 border border-pink-100/40 backdrop-blur-sm group-hover:bg-white/80 group-hover:border-pink-200/60 transition-all group-hover:shadow-[0_4px_12px_rgba(236,64,122,0.08)]">
+                <Bell className="w-[18px] h-[18px] text-gray-500 group-hover:text-pink-500 transition-colors" />
               </div>
+              {notifCount > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center px-1 shadow-[0_2px_8px_rgba(236,64,122,0.4)] border-2 border-white">
+                  {notifCount > 99 ? '99+' : notifCount}
+                </span>
+              )}
+            </Link>
+            <div className="lg:hidden">
+              <Avatar name={displayUser.displayName || 'User'} size="sm" />
             </div>
-            <div className="ml-auto flex items-center gap-3">
-              <Link href="/notifications" className="relative group">
-                <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/60 border border-pink-100/40 backdrop-blur-sm group-hover:bg-white/80 group-hover:border-pink-200/60 transition-all group-hover:shadow-[0_4px_12px_rgba(236,64,122,0.08)]">
-                  <Bell className="w-[18px] h-[18px] text-gray-500 group-hover:text-pink-500 transition-colors" />
-                </div>
-                {notifCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center px-1 shadow-[0_2px_8px_rgba(236,64,122,0.4)] border-2 border-white">
-                    {notifCount > 99 ? '99+' : notifCount}
-                  </span>
-                )}
-              </Link>
-              <div className="lg:hidden">
-                <Avatar name={displayUser.displayName || 'User'} size="sm" />
-              </div>
-            </div>
-          </header>
-        )}
+          </div>
+        </header>
 
-        {/* Page content — messages uses absolute positioning to fill the entire main area */}
-        <div className={cn('flex-1 min-h-0 relative', pathname.startsWith('/messages') ? 'overflow-hidden' : 'overflow-y-auto')}>
+        {/* Page content — absolute positioning for messages so it fills remaining space below header */}
+        <div className="flex-1 min-h-0 relative overflow-hidden">
           {pathname.startsWith('/messages') ? children : (
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={pathname}
-                initial={{ opacity: 0, y: 12, filter: 'blur(4px)' }}
-                animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                exit={{ opacity: 0, y: -8, filter: 'blur(2px)' }}
-                transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-                className="h-full"
-              >
-                {children}
-              </motion.div>
-            </AnimatePresence>
+            <div className="absolute inset-0 overflow-y-auto">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={pathname}
+                  initial={{ opacity: 0, y: 12, filter: 'blur(4px)' }}
+                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                  exit={{ opacity: 0, y: -8, filter: 'blur(2px)' }}
+                  transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
+                >
+                  {children}
+                </motion.div>
+              </AnimatePresence>
+            </div>
           )}
         </div>
 
