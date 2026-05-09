@@ -732,7 +732,7 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
   const visibleMessages = messages.filter(m => !hiddenMsgIds.has(m.id));
 
   return (
-    <div className="flex flex-col h-full relative min-h-0">
+    <div className="flex-1 flex flex-col relative min-h-0 overflow-hidden">
       <AnimatePresence>{callType && <CallOverlay type={callType} user={other} onEnd={() => setCallType(null)} />}</AnimatePresence>
       <AnimatePresence>{showBgPicker && <BackgroundPicker chatId={chat.id} currentBg={chatBackground} onClose={() => setShowBgPicker(false)} onSelect={(bg, bgName) => {
         setChatBackground(bg);
