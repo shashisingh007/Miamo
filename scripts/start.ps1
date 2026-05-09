@@ -1,10 +1,13 @@
 # ═══════════════════════════════════════════════════════════════════
-# Miamo — Windows Start / Stop Script (PowerShell)
+# Miamo — Windows Start Script (PowerShell)
 # ═══════════════════════════════════════════════════════════════════
 # Usage:
 #   .\scripts\start.ps1 local   — Fast local dev (next dev, mock data, hot reload)
-#   .\scripts\start.ps1 dev     — Full K8s deployment (minikube + Docker)
 #   .\scripts\start.ps1 stop    — Stop everything
+#   .\scripts\start.ps1 status  — Show status
+#
+# For K8s commands (dev, restart, logs, test, cleanup):
+#   Use Git Bash or WSL: bash scripts/start.sh <command>
 # ═══════════════════════════════════════════════════════════════════
 
 param(

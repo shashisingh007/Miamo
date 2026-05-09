@@ -66,14 +66,9 @@ Miamo/
 │       ├── gateway.yaml
 │       ├── web.yaml
 │       └── migrate-job.yaml
-├── scripts/                ← All scripts take <env> argument
-│   ├── _config.sh         ← Shared config loader (sourced by all)
-│   ├── start.sh           ← Build + render templates + deploy
-│   ├── stop.sh            ← Scale down pods
-│   ├── restart.sh         ← Rolling restart
-│   ├── test.sh            ← Run test suite
-│   ├── logs.sh            ← Tail pod logs
-│   └── cleanup.sh         ← Delete namespace
+├── scripts/                ← Single entry point
+│   ├── start.sh           ← All commands: local, dev, stop, restart, logs, test, cleanup, status
+│   └── start.ps1          ← Windows PowerShell equivalent (local + stop)
 ├── services/               ← All application code
 │   ├── auth/
 │   ├── users/
@@ -132,19 +127,20 @@ bash scripts/start.sh stop
 bash scripts/start.sh dev
 ```
 
-## Scripts
+## Commands
 
-| Script | Usage | What it does |
-|--------|-------|--------------|
-| `start.sh local` | `bash scripts/start.sh local` | Next.js dev server with mock data (fast) |
-| `start.sh dev` | `bash scripts/start.sh dev` | Full K8s deploy (build → migrate → deploy) |
-| `start.sh stop` | `bash scripts/start.sh stop` | Stop local dev + scale K8s to 0 |
-| `start.ps1` | `.\scripts\start.ps1 local` | Windows PowerShell equivalent |
-| `stop.sh` | `bash scripts/stop.sh dev` | Scale all deployments to 0 |
-| `restart.sh` | `bash scripts/restart.sh dev [service]` | Rolling restart (one service or all) |
-| `test.sh` | `bash scripts/test.sh dev` | Full test suite (pods, health, e2e) |
-| `logs.sh` | `bash scripts/logs.sh dev gateway` | Stream logs for a service |
-| `cleanup.sh` | `bash scripts/cleanup.sh dev [--full]` | Delete namespace (--full stops minikube) |
+Everything runs through `scripts/start.sh`:
+
+| Command | What it does |
+|---------|--------------|
+| `bash scripts/start.sh local` | Next.js dev server with mock data (fast, no Docker/K8s) |
+| `bash scripts/start.sh dev` | Full K8s deploy (build → migrate → deploy → port-forward) |
+| `bash scripts/start.sh stop` | Stop everything (local dev + K8s) |
+| `bash scripts/start.sh restart [svc]` | Rolling restart (one service or all) |
+| `bash scripts/start.sh logs <svc>` | Stream pod logs (auth, gateway, web, all, etc.) |
+| `bash scripts/start.sh test` | Full test suite (pods, health, auth e2e) |
+| `bash scripts/start.sh cleanup [--full]` | Delete namespace (--full also stops minikube) |
+| `bash scripts/start.sh status` | Show local dev + K8s pod status |
 
 ## Configuration
 
@@ -170,8 +166,8 @@ secrets:
 ```
 
 **How it works:**
-1. `scripts/_config.sh` parses the YAML into shell variables
-2. `start.sh` renders `k8s/templates/*.yaml` by replacing `__PLACEHOLDERS__`
+1. `start.sh` has an inlined YAML parser that loads values into shell variables
+2. Renders `k8s/templates/*.yaml` by replacing `__PLACEHOLDERS__`
 3. Generated manifests applied to cluster — no manual editing needed
 
 ## Test Users
