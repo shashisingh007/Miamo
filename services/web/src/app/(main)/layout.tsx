@@ -78,7 +78,17 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const profileScore = profile?.user?.profile?.profileScore || profile?.profile?.profileScore || 70;
 
   if (!mounted) {
-    return <div className="flex h-screen overflow-hidden bg-miamo-bg">{children}</div>;
+    return (
+      <div className="flex h-screen overflow-hidden bg-miamo-bg relative">
+        <main className="flex-1 flex flex-col overflow-hidden">
+          <header className="h-[72px] header-premium flex items-center px-6 gap-4 shrink-0">
+            <div className="flex items-center gap-2"><MiamoCompactIcon size={28} /></div>
+            <h1 className="text-lg font-bold text-gray-800 capitalize tracking-tight">Loading…</h1>
+          </header>
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden">{children}</div>
+        </main>
+      </div>
+    );
   }
 
   return (
@@ -246,10 +256,10 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </div>
         </header>
 
-        {/* Page content — absolute positioning for messages so it fills remaining space below header */}
-        <div className="flex-1 min-h-0 relative overflow-hidden">
+        {/* Page content — flex column so children get remaining height via flex-1 */}
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
           {pathname.startsWith('/messages') ? children : (
-            <div className="absolute inset-0 overflow-y-auto">
+            <div className="flex-1 min-h-0 overflow-y-auto">
               <AnimatePresence mode="wait">
                 <motion.div
                   key={pathname}

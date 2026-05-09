@@ -1408,7 +1408,7 @@ function MessagesPageInner() {
   const activeConversation = chats.find(c => c.id === activeChat);
 
   return (
-    <div className="absolute inset-0 flex overflow-hidden">
+    <div className="flex-1 min-h-0 flex overflow-hidden">
       {/* ── Sidebar ── */}
       <div className={cn('w-full lg:w-[360px] border-r border-border/50 flex flex-col bg-miamo-surface/20', activeChat && 'hidden lg:flex')}>
         <div className="p-4 space-y-3">
