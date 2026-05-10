@@ -208,7 +208,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       </aside>
 
       {/* ═══ MAIN CONTENT ═══ */}
-      <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative z-10">
+      <main className="flex-1 flex flex-col min-h-0 relative z-10" style={{ overflow: 'clip' }}>
         {/* Premium Header */}
         <header
           className="header-premium flex items-center px-6 gap-4 overflow-hidden shrink-0"

@@ -610,8 +610,16 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, [chat.id]);
 
-  // Auto-scroll
-  useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
+  // Auto-scroll — use scrollTop on the container directly to avoid scrollIntoView
+  // bubbling up and scrolling ancestor elements (which pushes the layout header off-screen)
+  useEffect(() => {
+    const el = messagesEndRef.current;
+    if (!el) return;
+    const container = el.parentElement;
+    if (container) {
+      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+    }
+  }, [messages]);
 
   // Send with harsh-words check
   const handleSend = async (forceSend = false) => {
@@ -1126,7 +1134,9 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
                     className="px-2 py-1 rounded-lg text-[10px] font-medium whitespace-nowrap text-text-muted hover:text-lavender-400 hover:bg-lavender-400/10 transition-colors"
                     onClick={() => {
                       const el = document.getElementById(`emoji-cat-${i}`);
-                      el?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      if (el && el.parentElement) {
+                        el.parentElement.scrollTo({ top: el.offsetTop - el.parentElement.offsetTop, behavior: 'smooth' });
+                      }
                     }}>
                     {cat.label}
                   </button>
