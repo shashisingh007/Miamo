@@ -214,7 +214,7 @@ interface MiamoLoaderProps {
 
 export function MiamoLoader({ size = 56, text, className = '' }: MiamoLoaderProps) {
   return (
-    <div className={`h-full flex items-center justify-center ${className}`}>
+    <div className={`flex items-center justify-center ${className}`} style={{ minHeight: '100%', height: '100%' }}>
       <motion.div
         initial={{ opacity: 0, scale: 0.8 }}
         animate={{ opacity: 1, scale: 1 }}
