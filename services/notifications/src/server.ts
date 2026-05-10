@@ -11,6 +11,20 @@ export const prisma = new PrismaClient();
 export const app = express();
 const PORT = parseInt(process.env.PORT || '3206', 10);
 
+// ═══ GATEWAY SSE PUSH HELPER ═════════════════════════
+const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:3200';
+const INTERNAL_KEY = process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key';
+
+async function pushToUser(userId: string, event: string, data: any) {
+  try {
+    await fetch(`${GATEWAY_URL}/internal/push-event`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-key': INTERNAL_KEY },
+      body: JSON.stringify({ userId, event, data }),
+    });
+  } catch {}
+}
+
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3100', credentials: true }));
 app.use(express.json({ limit: '1mb' }));
@@ -72,6 +86,9 @@ app.post('/internal/notifications', async (req: Request, res: Response, next: Ne
     }
     const { userId, type, title, body, data } = req.body;
     const notification = await prisma.notification.create({ data: { userId, type, title, body, data: data || '{}' } });
+    // Push real-time notification to user via SSE
+    const unreadCount = await prisma.notification.count({ where: { userId, read: false } });
+    pushToUser(userId, 'new-notification', { notification, unreadCount });
     res.json({ data: notification });
   } catch (e) { next(e); }
 });

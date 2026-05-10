@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
 import { NAV_MAIN, NAV_SECONDARY, APP_NAME } from '@/lib/constants';
 import { useAuthStore } from '@/stores';
@@ -12,6 +12,7 @@ import { AnimatedMiamoLogo, MiamoCompactIcon } from '@/components/ui/miamo-logo'
 import { Bell, LogOut, Crown, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSSE, useSSEConnection } from '@/hooks/useSSE';
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -22,7 +23,32 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const [unreadMsgCount, setUnreadMsgCount] = useState(0);
   const [msgToast, setMsgToast] = useState<{ name: string; content: string } | null>(null);
 
+  // ═══ SSE Connection ═══════════════════════════════
+  useSSEConnection(isAuthenticated);
 
+  // Real-time notification count via SSE
+  useSSE('new-notification', (data) => {
+    const newCount = data.unreadCount ?? (notifCount + 1);
+    if (newCount > notifCount && !pathname.startsWith('/messages')) {
+      const title = data.notification?.title || 'New notification';
+      setMsgToast({ name: title, content: `You have ${newCount} unread notifications` });
+      setTimeout(() => setMsgToast(null), 4000);
+    }
+    setNotifCount(newCount);
+  }, isAuthenticated);
+
+  // Real-time unread message count via SSE
+  const refreshUnread = useCallback(() => {
+    api.getChats().then(res => {
+      const chats = res.data || [];
+      const totalUnread = chats.reduce((sum: number, c: any) => sum + (c.unreadCount || 0), 0);
+      setUnreadMsgCount(totalUnread);
+    }).catch(() => {});
+  }, []);
+
+  useSSE('new-message', refreshUnread, isAuthenticated);
+
+  // Initial data fetch on auth
   useEffect(() => {
     if (isAuthenticated) {
       api.getMe().then(res => {
@@ -36,35 +62,21 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       api.getNotificationCount().then(res => {
         setNotifCount(res.data?.count || res.count || 0);
       }).catch(() => {});
-      api.getChats().then(res => {
-        const chats = res.data || [];
-        const totalUnread = chats.reduce((sum: number, c: any) => sum + (c.unreadCount || 0), 0);
-        setUnreadMsgCount(totalUnread);
-      }).catch(() => {});
+      refreshUnread();
     }
-  }, [isAuthenticated, clearAuth, router]);
+  }, [isAuthenticated, clearAuth, router, refreshUnread]);
 
+  // Slow fallback poll every 60s (SSE handles real-time)
   useEffect(() => {
     if (!isAuthenticated) return;
     const interval = setInterval(() => {
       api.getNotificationCount().then(res => {
-        const newCount = res.data?.count || res.count || 0;
-        if (newCount > notifCount && notifCount > 0) {
-          if (!pathname.startsWith('/messages')) {
-            setMsgToast({ name: 'New notification', content: `You have ${newCount} unread notifications` });
-            setTimeout(() => setMsgToast(null), 4000);
-          }
-        }
-        setNotifCount(newCount);
+        setNotifCount(res.data?.count || res.count || 0);
       }).catch(() => {});
-      api.getChats().then(res => {
-        const chats = res.data || [];
-        const totalUnread = chats.reduce((sum: number, c: any) => sum + (c.unreadCount || 0), 0);
-        setUnreadMsgCount(totalUnread);
-      }).catch(() => {});
-    }, 8000);
+      refreshUnread();
+    }, 60000);
     return () => clearInterval(interval);
-  }, [isAuthenticated, notifCount, pathname]);
+  }, [isAuthenticated, refreshUnread]);
 
   const handleLogout = async () => {
     try { await api.logout(); } catch (e) {}

@@ -67,6 +67,20 @@ app.get('/ready', async (_req, res) => {
   catch { res.status(503).json({ ready: false, service: 'messaging' }); }
 });
 
+// ═══ GATEWAY SSE PUSH HELPER ═════════════════════════
+const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:3200';
+const INTERNAL_KEY = process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key';
+
+async function pushToUser(userId: string, event: string, data: any) {
+  try {
+    await fetch(`${GATEWAY_URL}/internal/push-event`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-internal-key': INTERNAL_KEY },
+      body: JSON.stringify({ userId, event, data }),
+    });
+  } catch {}
+}
+
 // ═══ CHATS & MESSAGES ════════════════════════════════
 app.get('/api/v1/messages/chats', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -174,6 +188,12 @@ app.post('/api/v1/messages/chats/:chatId/messages', authMiddleware, async (req: 
       const otherId = chat.user1Id === userId ? chat.user2Id : chat.user1Id;
       const senderUser = await prisma.user.findUnique({ where: { id: userId }, select: { displayName: true, username: true } });
       await prisma.notification.create({ data: { userId: otherId, type: 'message', title: `${senderUser?.displayName || 'Someone'} sent a message`, body: content.substring(0, 100) } });
+      // Push real-time event to receiver
+      const unreadCount = await prisma.notification.count({ where: { userId: otherId, read: false } });
+      pushToUser(otherId, 'new-message', { chatId, senderId: userId, senderName: senderUser?.displayName, content: content.substring(0, 100), messageId: message.id });
+      pushToUser(otherId, 'new-notification', { unreadCount, notification: { type: 'message', title: `${senderUser?.displayName || 'Someone'} sent a message` } });
+      // Push chat-update to sender too (for multi-tab)
+      pushToUser(userId, 'message-sent', { chatId, messageId: message.id });
     }
     // Return decrypted for the sender
     res.json({ data: { ...message, content, isOwn: true } });
@@ -498,6 +518,10 @@ app.post('/api/v1/beats/:id/complete', authMiddleware, async (req: AuthRequest, 
     const newCount = shouldIncrement ? beat.count + 1 : beat.count;
     const updated = await prisma.beat.update({ where: { id: req.params.id }, data: { [lastField]: now, count: newCount, state: 'active' } });
     await prisma.beatEvent.create({ data: { beatId: beat.id, userId, type: req.body.type || 'snap', content: req.body.content || 'Daily beat! ⚡' } });
+    // Push real-time beat update to both users
+    const otherId = isUser1 ? beat.user2Id : beat.user1Id;
+    pushToUser(otherId, 'beat-update', { beatId: beat.id, count: newCount, fromUserId: userId });
+    pushToUser(userId, 'beat-update', { beatId: beat.id, count: newCount, fromUserId: userId });
     res.json({ data: { ...updated, countIncremented: shouldIncrement, iSentToday: true, theyCompletedToday: !!otherCompletedToday, todayCompleted: !!otherCompletedToday } });
   } catch (e) { next(e); }
 });

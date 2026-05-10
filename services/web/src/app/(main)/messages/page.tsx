@@ -16,6 +16,7 @@ import { api } from '@/lib/api';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores';
+import { useSSE } from '@/hooks/useSSE';
 
 // ── Quick Reactions ──
 const QUICK_REACTIONS = ['❤️', '😂', '😮', '😢', '🔥', '👍'];
@@ -599,16 +600,26 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
     }
   }, [chat.id]);
 
-  // Poll for new messages every 3s
-  useEffect(() => {
-    pollRef.current = setInterval(() => {
-      api.getChatMessages(chat.id).then(r => {
-        const newMsgs = r.data || [];
-        setMessages(prev => newMsgs.length !== prev.length ? newMsgs : prev);
-      }).catch(() => {});
-    }, 3000);
-    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  // Real-time SSE: fetch messages instantly when a new-message or message-sent event arrives for this chat
+  const refreshMessages = useCallback(() => {
+    api.getChatMessages(chat.id).then(r => {
+      const newMsgs = r.data || [];
+      setMessages(prev => newMsgs.length !== prev.length ? newMsgs : prev);
+    }).catch(() => {});
   }, [chat.id]);
+
+  useSSE('new-message', (data) => {
+    if (data.chatId === chat.id) refreshMessages();
+  });
+  useSSE('message-sent', (data) => {
+    if (data.chatId === chat.id) refreshMessages();
+  });
+
+  // Slow fallback poll every 30s (in case SSE reconnects)
+  useEffect(() => {
+    pollRef.current = setInterval(refreshMessages, 30000);
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, [refreshMessages]);
 
   // Auto-scroll — use scrollTop on the container directly to avoid scrollIntoView
   // bubbling up and scrolling ancestor elements (which pushes the layout header off-screen)
@@ -1393,22 +1404,18 @@ function MessagesPageInner() {
 
   useEffect(() => { loadChats(); }, [loadChats]);
 
-  // Poll chats every 5s — also re-sync held state
+  // Real-time SSE: refresh chat list instantly on new messages
+  useSSE('new-message', () => { loadChats(); });
+  useSSE('message-sent', () => { loadChats(); });
+
+  // Slow fallback poll every 30s + re-sync held state
   useEffect(() => {
     const i = setInterval(() => {
       syncHeldFromBackend();
-      const f = tab === 'archived' ? api.getArchivedChats() : api.getChats();
-      f.then(r => {
-        let data = (r.data || []).map((c: any) => {
-          const otherUserId = (c.otherUser || c.user1)?.id;
-          return { ...c, _isHeld: heldUserIds.has(otherUserId) || heldChatIds.has(c.id) };
-        });
-        if (tab === 'held') data = data.filter((c: any) => c._isHeld);
-        setChats(data);
-      }).catch(() => {});
-    }, 5000);
+      loadChats();
+    }, 30000);
     return () => clearInterval(i);
-  }, [tab, heldUserIds, heldChatIds, syncHeldFromBackend]);
+  }, [syncHeldFromBackend, loadChats]);
 
   const filteredChats = chats.filter(c => {
     const other = c.otherUser || c.user1 || {};

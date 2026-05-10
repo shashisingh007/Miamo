@@ -1,6 +1,6 @@
 // ─── Miamo API Gateway ───────────────────────────────
 // Instagram-style API Gateway — routes to microservices
-// Handles: rate limiting, CORS, auth validation, routing
+// Handles: rate limiting, CORS, auth validation, routing, SSE real-time
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -13,6 +13,21 @@ import jwt from 'jsonwebtoken';
 const app = express();
 const PORT = parseInt(process.env.PORT || '3200', 10);
 const JWT_SECRET = process.env.JWT_SECRET || 'miamo-dev-jwt-secret-change-in-production-2026';
+
+// ═══ SSE: Real-time event connections per user ═══════
+const sseClients = new Map<string, Set<express.Response>>();
+
+export function pushEvent(userId: string, event: string, data: any) {
+  const clients = sseClients.get(userId);
+  if (!clients) return;
+  const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const res of clients) {
+    try { res.write(payload); } catch { clients.delete(res); }
+  }
+}
+
+// Internal endpoint for microservices to push events
+// Note: do NOT add global express.json() — it interferes with http-proxy-middleware
 
 // ─── Service URLs ────────────────────────────────────
 const SERVICES = {
@@ -98,6 +113,50 @@ app.get('/health', async (_req, res) => {
     timestamp: new Date().toISOString(),
     services: checks,
   });
+});
+
+// ─── SSE Stream Endpoint ─────────────────────────────
+app.get('/api/v1/events/stream', (req: express.Request, res: express.Response) => {
+  // EventSource can't send custom headers — accept token from query param
+  let userId = req.headers['x-user-id'] as string;
+  if (!userId && req.query.token) {
+    try {
+      const payload = jwt.verify(req.query.token as string, JWT_SECRET) as { userId: string };
+      userId = payload.userId;
+    } catch {}
+  }
+  if (!userId) return res.status(401).json({ error: { message: 'Authentication required' } });
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive',
+    'X-Accel-Buffering': 'no', // nginx
+  });
+  res.write(`event: connected\ndata: {"userId":"${userId}"}\n\n`);
+
+  if (!sseClients.has(userId)) sseClients.set(userId, new Set());
+  sseClients.get(userId)!.add(res);
+
+  // Keep alive every 30s
+  const keepAlive = setInterval(() => { try { res.write(': keepalive\n\n'); } catch {} }, 30000);
+
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    sseClients.get(userId)?.delete(res);
+    if (sseClients.get(userId)?.size === 0) sseClients.delete(userId);
+  });
+});
+
+// Internal push endpoint (called by microservices)
+app.post('/internal/push-event', express.json({ limit: '1mb' }), (req: express.Request, res: express.Response) => {
+  const key = req.headers['x-internal-key'];
+  if (key !== (process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key')) {
+    return res.status(403).json({ error: 'Forbidden' });
+  }
+  const { userId, event, data } = req.body;
+  if (userId && event) pushEvent(userId, event, data);
+  res.json({ ok: true });
 });
 
 // ─── Proxy Options Builder ───────────────────────────
