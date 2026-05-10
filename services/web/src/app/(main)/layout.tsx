@@ -250,6 +250,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               <AnimatePresence mode="wait">
                 <motion.div
                   key={pathname}
+                  className="flex flex-col"
                   style={{ minHeight: '100%' }}
                   initial={{ opacity: 0, y: 12, filter: 'blur(4px)' }}
                   animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
