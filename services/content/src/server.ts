@@ -111,35 +111,101 @@ app.get('/api/v1/feed/:id/comments', authMiddleware, async (req: AuthRequest, re
 });
 
 // ═══ STORIES ═════════════════════════════════════════
+
+// Helper: Get matched user IDs for the current user
+async function getMatchedUserIds(userId: string): Promise<string[]> {
+  const matches = await prisma.match.findMany({
+    where: { active: true, OR: [{ user1Id: userId }, { user2Id: userId }] },
+    select: { user1Id: true, user2Id: true },
+  });
+  return matches.map(m => m.user1Id === userId ? m.user2Id : m.user1Id);
+}
+
+// GET /api/v1/stories — Show only match stories + own stories
 app.get('/api/v1/stories', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
+    const matchedIds = await getMatchedUserIds(userId);
+    const visibleUserIds = [userId, ...matchedIds];
+
+    // Stories expire after 7 days hard limit, but stay until match sees them
+    const hardMaxDate = new Date(Date.now() - 7 * 24 * 3600000);
+
     const stories = await prisma.story.findMany({
-      where: { expiresAt: { gt: new Date() }, visibility: 'everyone' },
-      include: { author: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } }, views: { where: { viewerId: userId } }, _count: { select: { views: true } } },
+      where: {
+        authorId: { in: visibleUserIds },
+        createdAt: { gt: hardMaxDate },
+      },
+      include: {
+        author: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } },
+        views: { where: { viewerId: userId } },
+        likes: true,
+        comments: { include: { author: { select: { id: true, displayName: true, username: true } } }, orderBy: { createdAt: 'asc' } },
+        _count: { select: { views: true, likes: true, comments: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
+
+    // Group by author
     const grouped: Record<string, any> = {};
     for (const s of stories) {
       const { passwordHash, ...author } = s.author;
-      if (!grouped[s.authorId]) grouped[s.authorId] = { user: author, stories: [], viewed: true };
+      if (!grouped[s.authorId]) grouped[s.authorId] = { user: author, stories: [], viewed: true, isOwn: s.authorId === userId };
       const viewed = s.views.length > 0;
-      grouped[s.authorId].stories.push({ ...s, author: undefined, viewed, viewCount: s._count.views });
+      const liked = s.likes.some(l => l.userId === userId);
+      grouped[s.authorId].stories.push({
+        id: s.id, authorId: s.authorId, type: s.type, content: s.content, mediaUrl: s.mediaUrl,
+        visibility: s.visibility, expiresAt: s.expiresAt, createdAt: s.createdAt,
+        viewed, liked, viewCount: s._count.views, likeCount: s._count.likes, commentCount: s._count.comments,
+        comments: s.comments.map(c => ({ id: c.id, content: c.content, authorId: c.authorId, author: c.author, parentId: c.parentId, createdAt: c.createdAt })),
+      });
       if (!viewed) grouped[s.authorId].viewed = false;
     }
-    res.json({ data: Object.values(grouped) });
+
+    // Sort: own stories first, then unviewed, then viewed
+    const result = Object.values(grouped).sort((a: any, b: any) => {
+      if (a.isOwn) return -1;
+      if (b.isOwn) return 1;
+      if (!a.viewed && b.viewed) return -1;
+      if (a.viewed && !b.viewed) return 1;
+      return 0;
+    });
+
+    res.json({ data: result });
   } catch (e) { next(e); }
 });
 
+// GET /api/v1/stories/mine — Get own stories with insights
+app.get('/api/v1/stories/mine', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const stories = await prisma.story.findMany({
+      where: { authorId: req.userId! },
+      include: {
+        views: { include: { viewer: { select: { id: true, displayName: true, username: true } } } },
+        likes: { include: { user: { select: { id: true, displayName: true, username: true } } } },
+        comments: { include: { author: { select: { id: true, displayName: true, username: true } }, replies: { include: { author: { select: { id: true, displayName: true, username: true } } } } }, orderBy: { createdAt: 'asc' } },
+        _count: { select: { views: true, likes: true, comments: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ data: stories });
+  } catch (e) { next(e); }
+});
+
+// POST /api/v1/stories — Create story (with background color support)
 app.post('/api/v1/stories', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { type, content, mediaUrl, visibility, expiresInHours } = req.body;
+    const { type, content, mediaUrl, visibility, expiresInHours, background } = req.body;
     const expiresAt = new Date(Date.now() + (expiresInHours || 24) * 3600000);
-    const story = await prisma.story.create({ data: { authorId: req.userId!, type: type || 'text', content: content || '', mediaUrl, visibility: visibility || 'everyone', expiresAt } });
+    const storyContent = background ? JSON.stringify({ text: content || '', background }) : (content || '');
+    const story = await prisma.story.create({
+      data: { authorId: req.userId!, type: type || 'text', content: storyContent, mediaUrl, visibility: visibility || 'everyone', expiresAt },
+    });
     res.json({ data: story });
   } catch (e) { next(e); }
 });
 
+// POST /api/v1/stories/:id/view — Mark as viewed
 app.post('/api/v1/stories/:id/view', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     await prisma.storyView.upsert({ where: { storyId_viewerId: { storyId: req.params.id, viewerId: req.userId! } }, create: { storyId: req.params.id, viewerId: req.userId! }, update: {} });
@@ -147,6 +213,26 @@ app.post('/api/v1/stories/:id/view', authMiddleware, async (req: AuthRequest, re
   } catch (e) { next(e); }
 });
 
+// POST /api/v1/stories/:id/like — Toggle like
+app.post('/api/v1/stories/:id/like', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const existing = await prisma.storyLike.findUnique({ where: { storyId_userId: { storyId: req.params.id, userId: req.userId! } } });
+    if (existing) {
+      await prisma.storyLike.delete({ where: { id: existing.id } });
+      res.json({ data: { liked: false } });
+    } else {
+      await prisma.storyLike.create({ data: { storyId: req.params.id, userId: req.userId! } });
+      // Notify story author
+      const story = await prisma.story.findUnique({ where: { id: req.params.id }, select: { authorId: true } });
+      if (story && story.authorId !== req.userId) {
+        await prisma.notification.create({ data: { userId: story.authorId, type: 'like', title: '❤️ Story liked!', body: 'Someone liked your story' } });
+      }
+      res.json({ data: { liked: true } });
+    }
+  } catch (e) { next(e); }
+});
+
+// POST /api/v1/stories/:id/react — Legacy reaction (still supported)
 app.post('/api/v1/stories/:id/react', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     await prisma.storyView.upsert({ where: { storyId_viewerId: { storyId: req.params.id, viewerId: req.userId! } }, create: { storyId: req.params.id, viewerId: req.userId!, reaction: req.body.reaction }, update: { reaction: req.body.reaction } });
@@ -154,6 +240,69 @@ app.post('/api/v1/stories/:id/react', authMiddleware, async (req: AuthRequest, r
   } catch (e) { next(e); }
 });
 
+// GET /api/v1/stories/:id/comments — Get comments
+app.get('/api/v1/stories/:id/comments', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const comments = await prisma.storyComment.findMany({
+      where: { storyId: req.params.id, parentId: null },
+      include: {
+        author: { select: { id: true, displayName: true, username: true, photos: { take: 1, orderBy: { position: 'asc' } } } },
+        replies: {
+          include: { author: { select: { id: true, displayName: true, username: true, photos: { take: 1, orderBy: { position: 'asc' } } } } },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    res.json({ data: comments });
+  } catch (e) { next(e); }
+});
+
+// POST /api/v1/stories/:id/comments — Add comment (only matched users)
+app.post('/api/v1/stories/:id/comments', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const story = await prisma.story.findUnique({ where: { id: req.params.id }, select: { authorId: true } });
+    if (!story) return res.status(404).json({ error: { message: 'Story not found' } });
+
+    // Check if users are matched (or own story)
+    if (story.authorId !== userId) {
+      const isMatched = await prisma.match.findFirst({
+        where: { active: true, OR: [{ user1Id: userId, user2Id: story.authorId }, { user1Id: story.authorId, user2Id: userId }] },
+      });
+      if (!isMatched) return res.status(403).json({ error: { message: 'You can only comment on stories from your matches' } });
+    }
+
+    const { content, parentId } = req.body;
+    // If replying, verify parent comment exists and belongs to this story
+    if (parentId) {
+      const parentComment = await prisma.storyComment.findUnique({ where: { id: parentId } });
+      if (!parentComment || parentComment.storyId !== req.params.id) return res.status(400).json({ error: { message: 'Invalid parent comment' } });
+    }
+
+    const comment = await prisma.storyComment.create({
+      data: { storyId: req.params.id, authorId: userId, content, parentId },
+      include: { author: { select: { id: true, displayName: true, username: true, photos: { take: 1, orderBy: { position: 'asc' } } } } },
+    });
+
+    // Notify story author
+    if (story.authorId !== userId) {
+      await prisma.notification.create({ data: { userId: story.authorId, type: 'comment', title: '💬 New story comment', body: `"${content.substring(0, 50)}${content.length > 50 ? '...' : ''}"` } });
+    }
+
+    res.json({ data: comment });
+  } catch (e) { next(e); }
+});
+
+// DELETE /api/v1/stories/:id/comments/:commentId — Delete own comment
+app.delete('/api/v1/stories/:id/comments/:commentId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    await prisma.storyComment.delete({ where: { id: req.params.commentId, authorId: req.userId } });
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
+
+// GET /api/v1/stories/:id/viewers — Viewers list (story author only)
 app.get('/api/v1/stories/:id/viewers', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const views = await prisma.storyView.findMany({ where: { storyId: req.params.id }, include: { viewer: { select: { id: true, displayName: true, username: true } } } });
@@ -161,6 +310,26 @@ app.get('/api/v1/stories/:id/viewers', authMiddleware, async (req: AuthRequest, 
   } catch (e) { next(e); }
 });
 
+// POST /api/v1/stories/:id/post-to-feed — Convert story to feed post
+app.post('/api/v1/stories/:id/post-to-feed', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const story = await prisma.story.findUnique({ where: { id: req.params.id, authorId: req.userId } });
+    if (!story) return res.status(404).json({ error: { message: 'Story not found or not yours' } });
+
+    // Parse content (may contain background JSON)
+    let textContent = story.content;
+    try { const parsed = JSON.parse(story.content); textContent = parsed.text || story.content; } catch {}
+
+    const post = await prisma.feedPost.create({
+      data: { authorId: req.userId!, type: story.mediaUrl ? 'photo' : 'thought', content: textContent, mediaUrl: story.mediaUrl, visibility: 'everyone' },
+      include: { author: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } } },
+    });
+    const { passwordHash, ...author } = post.author;
+    res.json({ data: { ...post, author, liked: false, likeCount: 0, commentCount: 0 } });
+  } catch (e) { next(e); }
+});
+
+// DELETE /api/v1/stories/:id — Delete story
 app.delete('/api/v1/stories/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try { await prisma.story.delete({ where: { id: req.params.id, authorId: req.userId } }); res.json({ data: { success: true } }); } catch (e) { next(e); }
 });

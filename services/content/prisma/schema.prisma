@@ -52,6 +52,8 @@ model User {
 
   stories         Story[]
   storyViews      StoryView[]
+  storyLikes      StoryLike[]
+  storyComments   StoryComment[]
 
   videos          Video[]
   videoComments   VideoComment[]
@@ -371,6 +373,8 @@ model Story {
   createdAt  DateTime @default(now())
 
   views      StoryView[]
+  likes      StoryLike[]
+  comments   StoryComment[]
 
   @@index([authorId, createdAt])
   @@index([expiresAt])
@@ -387,6 +391,34 @@ model StoryView {
 
   @@unique([storyId, viewerId])
   @@index([storyId])
+}
+
+model StoryLike {
+  id        String   @id @default(uuid())
+  storyId   String
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([storyId, userId])
+  @@index([storyId])
+}
+
+model StoryComment {
+  id        String   @id @default(uuid())
+  storyId   String
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  parentId  String?
+  parent    StoryComment? @relation("StoryCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   StoryComment[] @relation("StoryCommentReplies")
+  createdAt DateTime @default(now())
+
+  @@index([storyId, createdAt])
+  @@index([parentId])
 }
 
 // ─── Videos ──────────────────────────────────────────

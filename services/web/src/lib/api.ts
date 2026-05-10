@@ -173,9 +173,15 @@ class ApiClient {
 
   // Stories
   async getStories() { return this.request<any>('/api/v1/stories'); }
+  async getMyStories() { return this.request<any>('/api/v1/stories/mine'); }
   async createStory(data: any) { return this.request<any>('/api/v1/stories', { method: 'POST', body: JSON.stringify(data) }); }
   async viewStory(id: string) { return this.request<any>(`/api/v1/stories/${id}/view`, { method: 'POST' }); }
+  async likeStory(id: string) { return this.request<any>(`/api/v1/stories/${id}/like`, { method: 'POST' }); }
   async reactToStory(id: string, reaction: string) { return this.request<any>(`/api/v1/stories/${id}/react`, { method: 'POST', body: JSON.stringify({ reaction }) }); }
+  async getStoryComments(id: string) { return this.request<any>(`/api/v1/stories/${id}/comments`); }
+  async commentOnStory(id: string, content: string, parentId?: string) { return this.request<any>(`/api/v1/stories/${id}/comments`, { method: 'POST', body: JSON.stringify({ content, parentId }) }); }
+  async deleteStoryComment(storyId: string, commentId: string) { return this.request<any>(`/api/v1/stories/${storyId}/comments/${commentId}`, { method: 'DELETE' }); }
+  async postStoryToFeed(id: string) { return this.request<any>(`/api/v1/stories/${id}/post-to-feed`, { method: 'POST' }); }
   async deleteStory(id: string) { return this.request<any>(`/api/v1/stories/${id}`, { method: 'DELETE' }); }
 
   // Videos
