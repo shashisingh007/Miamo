@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { NAV_MAIN, NAV_SECONDARY, APP_NAME } from '@/lib/constants';
 import { useAuthStore } from '@/stores';
@@ -74,29 +74,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   const displayUser = profile?.user || user || { displayName: 'User', username: 'user' };
   const profileScore = profile?.user?.profile?.profileScore || profile?.profile?.profileScore || 70;
-  const headerRef = useRef<HTMLElement>(null);
-  const [headerDebug, setHeaderDebug] = useState('');
-
-  // Debug: monitor header visibility
-  useEffect(() => {
-    const check = () => {
-      const el = headerRef.current;
-      if (!el) { setHeaderDebug('NO REF'); return; }
-      const rect = el.getBoundingClientRect();
-      const style = window.getComputedStyle(el);
-      setHeaderDebug(`h:${rect.height.toFixed(0)} y:${rect.y.toFixed(0)} d:${style.display} v:${style.visibility} o:${style.opacity}`);
-    };
-    check();
-    const id = setInterval(check, 500);
-    return () => clearInterval(id);
-  }, []);
 
   return (
     <div className="flex h-screen overflow-hidden bg-miamo-bg relative">
-      {/* Debug fixed indicator */}
-      <div style={{ position: 'fixed', top: 4, left: '50%', transform: 'translateX(-50%)', zIndex: 99999, background: 'red', color: 'white', padding: '2px 8px', borderRadius: 4, fontSize: 10, pointerEvents: 'none' }}>
-        HDR: {headerDebug}
-      </div>
       {/* Ambient gradient orbs */}
       <div className="orb-pink w-[300px] h-[300px] top-[-50px] right-[20%] opacity-50" />
       <div className="orb-gold w-[200px] h-[200px] bottom-[10%] left-[30%] opacity-40" />
@@ -228,10 +208,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       </aside>
 
       {/* ═══ MAIN CONTENT ═══ */}
-      <main className="flex-1 flex flex-col min-h-0 relative z-10">
-        {/* Premium Header — fixed to viewport, offset for sidebar on desktop */}
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden relative z-10">
+        {/* Premium Header */}
         <header
-          ref={headerRef}
           className="header-premium flex items-center px-6 gap-4 overflow-hidden shrink-0"
           style={{ height: '72px' }}
         >
