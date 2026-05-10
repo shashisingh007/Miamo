@@ -105,7 +105,7 @@ app.get('/api/v1/messages/chats', authMiddleware, async (req: AuthRequest, res: 
       result.push({
         id: c.id,
         otherUser,
-        lastMessage: lastMsg,
+        lastMessage: lastMsg ? { ...lastMsg, content: lastContent } : null,
         lastMessagePreview: lastContent ? (lastContent.length > 50 ? lastContent.substring(0, 50) + '…' : lastContent) : null,
         lastMessageAt: lastMsg?.createdAt || c.updatedAt,
         pinned: c.user1Id === userId ? c.pinned1 : c.pinned2,

@@ -6,8 +6,8 @@ import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
-// Fixed base date: 2026-05-15T12:00:00Z — all timestamps derive from this
-const SEED_DATE = new Date('2026-05-15T12:00:00.000Z').getTime();
+// Fixed base date: 2026-05-01T12:00:00Z — must be in the PAST so new messages sort after seed data
+const SEED_DATE = new Date('2026-05-01T12:00:00.000Z').getTime();
 
 // Simple seeded PRNG (mulberry32) — produces the same sequence every run
 function createRng(seed: number) {
