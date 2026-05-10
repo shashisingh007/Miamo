@@ -1117,7 +1117,6 @@ function BeatsPageInner() {
                           >
                             <Check className="w-3 h-3" /> {completing === beat.id ? '…' : 'Sent +'}
                           </Button>
-                          </Badge>
                         ) : (
                           <Button size="sm" variant={isUrgent ? 'default' : 'secondary'}
                             disabled={completing === beat.id}
