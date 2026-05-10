@@ -463,7 +463,7 @@ app.get('/api/v1/beats', authMiddleware, async (req: AuthRequest, res: Response,
     if (state) where.state = state;
     const beats = await prisma.beat.findMany({
       where,
-      include: { user1: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } }, user2: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } }, events: { take: 5, orderBy: { createdAt: 'desc' } } },
+      include: { user1: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } }, user2: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } }, events: { take: 50, orderBy: { createdAt: 'asc' } } },
       orderBy: { updatedAt: 'desc' },
     });
     const result = beats.map(b => {
@@ -516,6 +516,7 @@ app.post('/api/v1/beats/:id/complete', authMiddleware, async (req: AuthRequest, 
     const DAY = 86400000;
     // Did I already send today? (within 24h)
     const iAlreadySentToday = myLast && (now.getTime() - myLast.getTime()) < DAY;
+    if (iAlreadySentToday) return res.status(400).json({ error: { message: 'You already sent a beat today! Come back tomorrow.' }, data: { iSentToday: true } });
     // Did the other user send today?
     const otherCompletedToday = otherLast && (now.getTime() - otherLast.getTime()) < DAY;
     // Count increases ONLY when: both sent today AND this is my first send of the day

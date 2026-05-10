@@ -5,10 +5,12 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3200';
 class ApiError extends Error {
   public statusCode: number;
   public code: string;
-  constructor(message: string, statusCode: number, code?: string) {
+  public data: any;
+  constructor(message: string, statusCode: number, code?: string, data?: any) {
     super(message);
     this.statusCode = statusCode;
     this.code = code || 'UNKNOWN_ERROR';
+    this.data = data;
   }
 }
 
@@ -29,7 +31,7 @@ class ApiClient {
       const res = await fetch(`${this.baseUrl}${path}`, { ...options, headers, credentials: 'include' });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: { message: 'Network error' } }));
-        const apiErr = new ApiError(err.error?.message || 'Request failed', res.status, err.error?.code);
+        const apiErr = new ApiError(err.error?.message || 'Request failed', res.status, err.error?.code, err.data);
         // Only clear stale token — do NOT auto-redirect; let pages handle their own fallback
         if (typeof window !== 'undefined' && (res.status === 401 || (res.status === 404 && path.includes('/auth/me')))) {
           localStorage.removeItem('miamo_token');

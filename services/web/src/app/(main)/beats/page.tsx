@@ -459,26 +459,52 @@ function BeatEntryRow({ entry, onDelete, onToggleChat }: {
 }
 
 /* ═══════════════════════════════════════════════════════════
-   MATCH BEATS CHAT VIEW — shows beat history for one match
+   MATCH BEATS CHAT VIEW — full-window chat-style beat history
    ═══════════════════════════════════════════════════════════ */
-function MatchBeatsChatView({ beat, entries, onBack, onSendBeat, onDeleteEntry, onToggleChat, filter, setFilter }: {
+function MatchBeatsChatView({ beat, entries, onBack, onSendBeat, onDeleteEntry, onToggleChat, filter, setFilter, sending }: {
   beat: BeatMatch; entries: BeatEntry[]; onBack: () => void;
-  onSendBeat: (type: string) => void; onDeleteEntry: (id: string) => void;
+  onSendBeat: (type: string, content: string) => void; onDeleteEntry: (id: string) => void;
   onToggleChat: (id: string) => void; filter: 'all' | 'sent' | 'received';
-  setFilter: (f: 'all' | 'sent' | 'received') => void;
+  setFilter: (f: 'all' | 'sent' | 'received') => void; sending?: boolean;
 }) {
   const other = beat.matchedUser || { id: '', displayName: 'Unknown', photos: [], online: false, verified: false };
   const photo = other.photos?.[0]?.url || other.photos?.[0] || undefined;
   const filtered = entries.filter(e =>
     filter === 'all' ? true : filter === 'sent' ? e.sender === 'me' : e.sender === 'them'
   );
+  const [selectedType, setSelectedType] = useState<string | null>(null);
+  const [composeText, setComposeText] = useState('');
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-scroll on new entries
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el) el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }, [entries, filtered]);
+
+  // Focus input when compose opens
+  useEffect(() => {
+    if (selectedType && inputRef.current) inputRef.current.focus();
+  }, [selectedType]);
+
+  const handleComposeSend = () => {
+    if (!selectedType) return;
+    const content = composeText.trim();
+    if (!content) return;
+    onSendBeat(selectedType, content);
+    setComposeText('');
+    setSelectedType(null);
+  };
+
+  const alreadySent = beat.iSentToday;
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-pink-100/30">
-        <button onClick={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-gray-50 transition-all">
-          <ChevronLeft className="w-5 h-5 text-gray-500" />
+    <div className="flex flex-col" style={{ height: '100%' }}>
+      {/* ─── Header ─── */}
+      <div className="shrink-0 flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-pink-50/80 to-rose-50/60 border-b border-pink-100/40 backdrop-blur-sm">
+        <button onClick={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-white/60 transition-all">
+          <ChevronLeft className="w-5 h-5 text-gray-600" />
         </button>
         <Avatar src={photo} name={other.displayName} size="sm" online={other.online} verified={other.verified} />
         <div className="flex-1 min-w-0">
@@ -488,11 +514,11 @@ function MatchBeatsChatView({ beat, entries, onBack, onSendBeat, onDeleteEntry, 
           </h3>
           <p className="text-[11px] text-gray-400">{beat.count} day streak &bull; {beat.totalSent || 0} sent &bull; {beat.totalReceived || 0} received</p>
         </div>
-        <StreakFlame count={beat.count} size="sm" />
+        <StreakFlame count={beat.count} size="md" />
       </div>
 
-      {/* Filter pills */}
-      <div className="flex items-center gap-2 px-4 py-3 border-b border-pink-100/20">
+      {/* ─── Filter pills ─── */}
+      <div className="shrink-0 flex items-center gap-2 px-4 py-2.5 bg-pink-50/30 border-b border-pink-100/20">
         {([
           { key: 'all' as const, label: 'All Beats' },
           { key: 'sent' as const, label: 'Sent' },
@@ -500,7 +526,7 @@ function MatchBeatsChatView({ beat, entries, onBack, onSendBeat, onDeleteEntry, 
         ]).map(f => (
           <button key={f.key} onClick={() => setFilter(f.key)}
             className={cn('px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all',
-              filter === f.key ? 'bg-pink-100 text-pink-700 border border-pink-200' : 'text-gray-500 hover:bg-gray-50'
+              filter === f.key ? 'bg-pink-100 text-pink-700 border border-pink-200' : 'text-gray-500 hover:bg-white/60'
             )}>
             {f.label}
           </button>
@@ -508,35 +534,95 @@ function MatchBeatsChatView({ beat, entries, onBack, onSendBeat, onDeleteEntry, 
         <span className="ml-auto text-[10px] text-gray-400">{filtered.length} beats</span>
       </div>
 
-      {/* Beat entries */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-1">
+      {/* ─── Beat entries (scrollable area) ─── */}
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-1 bg-gradient-to-b from-pink-50/20 to-rose-50/10">
         {filtered.length === 0 ? (
-          <div className="text-center py-16">
-            <BeatsIcon size={40} className="mx-auto mb-3 opacity-30" />
-            <p className="text-sm text-gray-400">No beats yet. Send the first one!</p>
+          <div className="text-center py-20">
+            <BeatsIcon size={48} className="mx-auto mb-4 opacity-30" />
+            <p className="text-base font-semibold text-gray-400 mb-1">No beats yet</p>
+            <p className="text-sm text-gray-300">Send the first one below!</p>
           </div>
         ) : (
           filtered.map(entry => (
             <BeatEntryRow key={entry.id} entry={entry} onDelete={onDeleteEntry} onToggleChat={onToggleChat} />
           ))
         )}
+        {/* Day status indicator */}
+        <div className="pt-4 pb-2 flex justify-center">
+          <BeatDayStatus beat={beat} />
+        </div>
       </div>
 
-      {/* Quick send bar */}
-      <div className="border-t border-pink-100/30 p-3">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
-          {BEAT_TYPES.slice(0, 6).map(bt => {
-            const BtIcon = bt.icon;
-            return (
-            <button key={bt.type} onClick={() => onSendBeat(bt.type)}
-              className={cn('flex items-center gap-1.5 px-3 py-2 rounded-xl text-[11px] font-semibold whitespace-nowrap transition-all',
-                'bg-gradient-to-r from-white to-pink-50/50 border border-pink-100/30 text-gray-600 hover:border-pink-200 hover:shadow-sm active:scale-95'
-              )}>
-              <BtIcon className={cn('w-3.5 h-3.5', bt.color)} /> {bt.label}
-            </button>
-            );
-          })}
-        </div>
+      {/* ─── Compose / Send area ─── */}
+      <div className="shrink-0 border-t border-pink-100/40 bg-gradient-to-r from-white to-pink-50/30">
+        {alreadySent ? (
+          /* Already sent today — show status */
+          <div className="p-4 text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+              <CheckCheck className="w-4 h-4" />
+              <span className="text-sm font-semibold">
+                {beat.todayCompleted ? 'Both sent today! Streak saved!' : "You've sent today's beat — waiting for " + (other.displayName?.split(' ')[0] || 'them')}
+              </span>
+            </div>
+            <p className="text-[10px] text-gray-400 mt-2">Come back tomorrow to keep the streak alive!</p>
+          </div>
+        ) : selectedType ? (
+          /* Compose input for the selected beat type */
+          <div className="p-3 space-y-2">
+            <div className="flex items-center gap-2">
+              {(() => { const bt = BEAT_TYPES.find(b => b.type === selectedType); if (!bt) return null; const Icon = bt.icon; return <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', bt.bg)}><Icon className={cn('w-4 h-4', bt.color)} /></div>; })()}
+              <span className="text-xs font-semibold text-gray-600">
+                {BEAT_TYPES.find(b => b.type === selectedType)?.desc || 'Type your beat'}
+              </span>
+              <button onClick={() => { setSelectedType(null); setComposeText(''); }} className="ml-auto w-7 h-7 rounded-lg flex items-center justify-center hover:bg-gray-100 transition-all">
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                ref={inputRef}
+                value={composeText}
+                onChange={e => setComposeText(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleComposeSend(); } }}
+                placeholder={`Write your ${selectedType} beat...`}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-pink-50/50 border border-pink-100 text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-200 focus:border-pink-300 transition-all"
+              />
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={handleComposeSend}
+                disabled={!composeText.trim() || sending}
+                className={cn(
+                  'w-10 h-10 rounded-xl flex items-center justify-center transition-all shrink-0',
+                  composeText.trim() && !sending
+                    ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg shadow-pink-200'
+                    : 'bg-gray-100 text-gray-300'
+                )}
+              >
+                <Send className="w-4 h-4" />
+              </motion.button>
+            </div>
+          </div>
+        ) : (
+          /* Beat type selector */
+          <div className="p-3">
+            <p className="text-[10px] text-gray-400 font-medium mb-2 text-center">Choose a beat type to send</p>
+            <div className="flex items-center justify-center gap-2 flex-wrap">
+              {BEAT_TYPES.slice(0, 6).map(bt => {
+                const BtIcon = bt.icon;
+                return (
+                  <motion.button key={bt.type} whileTap={{ scale: 0.93 }}
+                    onClick={() => setSelectedType(bt.type)}
+                    className={cn(
+                      'flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all',
+                      'bg-white border border-pink-100 text-gray-600 hover:border-pink-300 hover:shadow-md hover:shadow-pink-100/30 active:bg-pink-50'
+                    )}>
+                    <BtIcon className={cn('w-4 h-4', bt.color)} /> {bt.label}
+                  </motion.button>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -792,6 +878,9 @@ function BeatsPageInner() {
 
   const handleSendBeat = async (beatId: string, type: string, content?: string) => {
     if (completing) return; // Prevent concurrent sends
+    // Check if already sent today
+    const beat = beats.find(b => b.id === beatId);
+    if (beat?.iSentToday) return; // Already sent today
 
     setCompleting(beatId);
     try {
@@ -816,17 +905,28 @@ function BeatsPageInner() {
           longestStreak: Math.max(b.longestStreak || 0, newCount),
         };
       }));
+      // Also update selectedBeat if we're in chat view
+      if (selectedBeat?.id === beatId) {
+        setSelectedBeat(prev => prev ? { ...prev, iSentToday: true, todayCompleted: serverData.todayCompleted ?? prev.theyCompletedToday, count: serverData.count ?? prev.count, totalSent: (prev.totalSent || 0) + 1 } : prev);
+        // Add the new entry to beatEntries
+        setBeatEntries(prev => [...prev, {
+          id: `new-${Date.now()}`,
+          type,
+          content: content || `Quick ${type} beat!`,
+          sender: 'me',
+          sentAt: new Date().toISOString(),
+          seen: false,
+          showInChat: false,
+        }]);
+      }
       // Refresh from server to stay in sync
       loadBeats();
-    } catch (e) {
-      // Fallback: optimistic update
-      setBeats(prev => prev.map(b => {
-        if (b.id !== beatId) return b;
-        const shouldIncrement = b.theyCompletedToday && !b.iSentToday;
-        const newCount = shouldIncrement ? (b.count || 0) + 1 : b.count;
-        if (shouldIncrement && MILESTONE_EMOJIS[newCount]) setCelebration(newCount);
-        return { ...b, iSentToday: true, todayCompleted: b.theyCompletedToday, count: newCount, totalSent: (b.totalSent || 0) + 1, lastBeatAt: new Date().toISOString() };
-      }));
+    } catch (e: any) {
+      // If "already sent today" error, mark iSentToday
+      if (e?.data?.iSentToday || e?.message?.includes('already sent')) {
+        setBeats(prev => prev.map(b => b.id !== beatId ? b : { ...b, iSentToday: true }));
+        if (selectedBeat?.id === beatId) setSelectedBeat(prev => prev ? { ...prev, iSentToday: true } : prev);
+      }
     }
     setCompleting(null);
   };
@@ -878,22 +978,24 @@ function BeatsPageInner() {
   // ── MATCH BEATS CHAT VIEW ──
   if (selectedBeat) {
     return (
-      <div className="max-w-3xl mx-auto h-full flex flex-col">
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <MatchBeatsChatView
           beat={selectedBeat}
           entries={beatEntries}
           onBack={() => setSelectedBeat(null)}
-          onSendBeat={(type) => handleSendBeat(selectedBeat.id, type)}
+          onSendBeat={(type, content) => handleSendBeat(selectedBeat.id, type, content)}
           onDeleteEntry={handleDeleteEntry}
           onToggleChat={handleToggleChat}
           filter={chatFilter}
           setFilter={setChatFilter}
+          sending={completing === selectedBeat.id}
         />
       </div>
     );
   }
 
   return (
+    <div style={{ height: '100%', overflow: 'auto' }}>
     <div className="max-w-3xl mx-auto p-6 space-y-5 pb-24">
       {/* HEADER */}
       <div className="flex items-center justify-between">
@@ -954,7 +1056,7 @@ function BeatsPageInner() {
             <BeatTypeButton key={bt.type} bt={bt} onClick={() => {
               if (beats.length === 0) return;
               if (beats.length === 1) {
-                handleSendBeat(beats[0].id, bt.type);
+                handleSelectMatch(beats[0]);
               } else {
                 setQuickBeatType(bt.type);
               }
@@ -992,9 +1094,9 @@ function BeatsPageInner() {
                     <motion.button
                       key={beat.id}
                       whileHover={{ x: 3 }}
-                      onClick={() => { handleSendBeat(beat.id, quickBeatType!); setQuickBeatType(null); }}
-                      disabled={completing === beat.id}
-                      className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-pink-50/40 transition-all text-left"
+                      onClick={() => { handleSelectMatch(beat); setQuickBeatType(null); }}
+                      disabled={beat.iSentToday}
+                      className={cn("flex items-center gap-3 w-full p-3 rounded-xl hover:bg-pink-50/40 transition-all text-left", beat.iSentToday && "opacity-50")}
                     >
                       <div className="relative">
                         <Avatar src={photo} name={other.displayName} size="sm" online={other.online} verified={other.verified} />
@@ -1041,9 +1143,9 @@ function BeatsPageInner() {
             <IceBreakerPanel onSend={(text) => {
               if (beats.length === 0) return;
               if (beats.length === 1) {
-                handleSendBeat(beats[0].id, 'text', text);
+                handleSelectMatch(beats[0]);
               } else {
-                // For ice breakers, send as text type with the modal
+                // For ice breakers, open match selection
                 setQuickBeatType('text');
               }
             }} />
@@ -1116,27 +1218,26 @@ function BeatsPageInner() {
                         </div>
                       </button>
 
-                      {/* Actions — 3 states: Done (both sent), Sent (I sent, waiting), Beat (not sent) */}
+                      {/* Actions — 2 states: Done (both sent), Waiting (I sent), Beat (not sent) */}
                       <div className="flex items-center gap-1.5 shrink-0">
                         {beat.todayCompleted ? (
                           <Button size="sm" variant="secondary"
                             disabled
                             className="text-[11px] gap-1 bg-emerald-50 text-emerald-600 border-emerald-100 cursor-default"
                           >
-                            <Check className="w-3 h-3" /> Done ✓
+                            <CheckCheck className="w-3 h-3" /> Done ✓
                           </Button>
                         ) : beat.iSentToday ? (
                           <Button size="sm" variant="secondary"
-                            disabled={completing === beat.id}
-                            onClick={() => handleSendBeat(beat.id, 'text')}
-                            className="text-[11px] gap-1 bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
+                            disabled
+                            className="text-[11px] gap-1 bg-blue-50 text-blue-600 border-blue-100 cursor-default"
                           >
-                            <Check className="w-3 h-3" /> {completing === beat.id ? '…' : 'Sent +'}
+                            <Clock className="w-3 h-3" /> Waiting
                           </Button>
                         ) : (
                           <Button size="sm" variant={isUrgent ? 'default' : 'secondary'}
                             disabled={completing === beat.id}
-                            onClick={() => handleSendBeat(beat.id, 'text')}
+                            onClick={() => handleSelectMatch(beat)}
                             className="text-[11px] gap-1"
                           >
                             <BeatsIcon size={14} /> {completing === beat.id ? '\u2026' : 'Beat'}
@@ -1246,6 +1347,7 @@ function BeatsPageInner() {
           <MilestoneCelebration count={celebration} onClose={() => setCelebration(null)} />
         )}
       </AnimatePresence>
+    </div>
     </div>
   );
 }
