@@ -69,8 +69,8 @@ class ApiClient {
   async sendComment(toUserId: string, message: string, type?: string, targetType?: string, targetId?: string) {
     return this.request<any>('/api/v1/discover/comment', { method: 'POST', body: JSON.stringify({ toUserId, message, type, targetType, targetId }) });
   }
-  async passUser() {
-    return this.request<any>('/api/v1/discover/pass', { method: 'POST' });
+  async passUser(userId: string) {
+    return this.request<any>('/api/v1/discover/pass', { method: 'POST', body: JSON.stringify({ userId }) });
   }
 
   // Miamo Move
@@ -154,6 +154,7 @@ class ApiClient {
   async missBeat(id: string) { return this.request<any>(`/api/v1/beats/${id}/miss`, { method: 'POST' }); }
   async expireBeat(id: string) { return this.request<any>(`/api/v1/beats/${id}/expire`, { method: 'POST' }); }
   async restoreBeat(id: string) { return this.request<any>(`/api/v1/beats/${id}/restore`, { method: 'POST' }); }
+  async archiveBeat(id: string) { return this.request<any>(`/api/v1/beats/${id}/archive`, { method: 'POST' }); }
 
   // Feed
   async getFeed(params?: Record<string, string>) {

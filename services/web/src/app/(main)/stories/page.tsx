@@ -14,7 +14,7 @@ function StoryViewer({ story, onClose }: { story: any; onClose: () => void }) {
   const [reacted, setReacted] = useState(false);
 
   useEffect(() => { api.viewStory(story.id).catch(() => {}); }, [story.id]);
-  const author = story.author || story.user || {};
+  const author = story.author || story.user || story._author || {};
   const photo = author.photos?.[0]?.url || author.photos?.[0];
 
   const handleReply = async () => {
@@ -119,13 +119,14 @@ export default function StoriesPage() {
           </div>
           <span className="text-xs text-text-secondary">Your story</span>
         </button>
-        {stories.map((story: any) => {
-          const author = story.author || story.user || {};
+        {stories.map((storyGroup: any) => {
+          const author = storyGroup.user || storyGroup.author || {};
           const photo = author.photos?.[0]?.url || author.photos?.[0];
+          const firstStory = storyGroup.stories?.[0] || storyGroup;
           return (
-            <button key={story.id} onClick={() => setViewingStory(story)} className="flex flex-col items-center gap-2 shrink-0 group">
+            <button key={firstStory.id || storyGroup.id || author.id} onClick={() => setViewingStory({ ...firstStory, _author: author })} className="flex flex-col items-center gap-2 shrink-0 group">
               <div className={cn('rounded-full p-[3px] transition-transform group-hover:scale-105',
-                story.viewed ? 'bg-miamo-elevated' : 'bg-gradient-to-br from-lavender-400 to-violet-deep')}>
+                storyGroup.viewed ? 'bg-miamo-elevated' : 'bg-gradient-to-br from-lavender-400 to-violet-deep')}>
                 <Avatar src={photo} name={author.displayName || 'User'} size="xl" className="border-[3px] border-miamo-bg" />
               </div>
               <span className="text-xs text-text-secondary w-16 truncate text-center">{(author.displayName || 'User').split(' ')[0]}</span>
@@ -150,13 +151,14 @@ export default function StoriesPage() {
           <div className="text-center py-12"><p className="text-sm text-text-muted">No stories yet</p></div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {stories.map((story: any) => {
-              const author = story.author || story.user || {};
+            {stories.map((storyGroup: any) => {
+              const author = storyGroup.user || storyGroup.author || {};
               const photo = author.photos?.[0]?.url || author.photos?.[0];
+              const firstStory = storyGroup.stories?.[0] || storyGroup;
               return (
-                <button key={story.id} onClick={() => setViewingStory(story)}
+                <button key={firstStory.id || storyGroup.id || author.id} onClick={() => setViewingStory({ ...firstStory, _author: author })}
                   className="relative aspect-[9/16] max-h-[240px] rounded-xl overflow-hidden bg-miamo-elevated group">
-                  {story.mediaUrl ? <img src={story.mediaUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" /> :
+                  {firstStory.mediaUrl ? <img src={firstStory.mediaUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" /> :
                     <div className="w-full h-full bg-gradient-to-br from-lavender-400/20 to-violet-deep/20" />}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
                   <div className="absolute bottom-3 left-3 flex items-center gap-2">

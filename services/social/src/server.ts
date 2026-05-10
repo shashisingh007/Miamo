@@ -135,7 +135,19 @@ app.post('/api/v1/discover/comment', authMiddleware, async (req: AuthRequest, re
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/discover/pass', authMiddleware, async (_req: AuthRequest, res: Response) => { res.json({ data: { success: true } }); });
+app.post('/api/v1/discover/pass', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const { userId: passedUserId } = req.body;
+    if (passedUserId) {
+      // Record feedback so this user doesn't appear again
+      try {
+        await (prisma as any).matchFeedback.create({ data: { userId, targetUserId: passedUserId, action: 'pass' } });
+      } catch {} // Ignore if already exists or table doesn't exist
+    }
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
 
 // ─── Send Miamo Move (stored in DB for algorithm analysis) ───
 app.post('/api/v1/discover/move', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {

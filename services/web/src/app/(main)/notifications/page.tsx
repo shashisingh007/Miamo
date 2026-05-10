@@ -6,6 +6,7 @@ import { Avatar, Badge, Card } from '@/components/ui';
 import { MiamoLoader } from '@/components/ui/miamo-logo';
 import { api } from '@/lib/api';
 import { cn, formatRelativeTime } from '@/lib/utils';
+import { useRouter } from 'next/navigation';
 
 
 
@@ -14,6 +15,12 @@ const typeIcons: Record<string, typeof Heart> = { match: Heart, comment: Message
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
+
+  const typeRoutes: Record<string, string> = {
+    match: '/matches', match_request: '/matches', like: '/discover',
+    message: '/messages', comment: '/feed', beat: '/beats', story: '/stories',
+  };
 
   useEffect(() => {
     api.getNotifications().then(res => {
@@ -48,6 +55,8 @@ export default function NotificationsPage() {
                   if (!n.read) {
                     try { await api.markNotificationRead(n.id); setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, read: true } : item)); } catch (e) {}
                   }
+                  const route = typeRoutes[n.type];
+                  if (route) router.push(route);
                 }}>
                 <div className="flex items-center gap-3">
                   <Avatar src={photo} name={sender.displayName || 'Miamo'} size="sm" />

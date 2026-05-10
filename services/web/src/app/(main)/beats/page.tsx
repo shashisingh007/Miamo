@@ -769,7 +769,8 @@ function BeatsPageInner() {
           longestStreak: b.count || 0,
           totalSent: sentEvents.length || 0,
           totalReceived: Math.max(0, events.length - sentEvents.length),
-        };
+          _events: events, // carry raw events for chat view
+        } as any;
       });
       const hasNames = mapped.some(b => b.matchedUser.displayName !== 'User' && b.matchedUser.displayName !== 'Unknown');
       setBeats(hasNames ? mapped : []);
@@ -832,7 +833,20 @@ function BeatsPageInner() {
 
   const handleSelectMatch = (beat: BeatMatch) => {
     setSelectedBeat(beat);
-    setBeatEntries([]);
+    // Load beat entries from stored events
+    const rawBeat = (beats as any).find((b: any) => b.id === beat.id);
+    const events = rawBeat?._events || [];
+    const entries: BeatEntry[] = events.map((e: any) => ({
+      id: e.id,
+      beatId: beat.id,
+      type: (e.type || 'text') as any,
+      content: e.content || '',
+      sender: e.userId === beat.matchedUser.id ? 'them' as const : 'me' as const,
+      sentAt: e.createdAt || new Date().toISOString(),
+      seen: true,
+      showInChat: false,
+    }));
+    setBeatEntries(entries);
     setChatFilter('all');
   };
 
@@ -844,13 +858,16 @@ function BeatsPageInner() {
     setBeatEntries(prev => prev.map(e => e.id === entryId ? { ...e, showInChat: !e.showInChat } : e));
   };
 
-  const handleRemoveBeat = (beatId: string) => {
+  const handleRemoveBeat = async (beatId: string) => {
+    try { await api.archiveBeat(beatId); } catch {}
     setBeats(prev => prev.filter(b => b.id !== beatId));
     setConfirmAction(null);
     if (selectedBeat?.id === beatId) setSelectedBeat(null);
   };
 
-  const handleBlockUser = (beatId: string) => {
+  const handleBlockUser = async (beatId: string) => {
+    const beat = beats.find(b => b.id === beatId);
+    if (beat?.matchedUser?.id) { try { await api.blockUser(beat.matchedUser.id); } catch {} }
     setBeats(prev => prev.filter(b => b.id !== beatId));
     setConfirmAction(null);
     if (selectedBeat?.id === beatId) setSelectedBeat(null);
@@ -1103,11 +1120,10 @@ function BeatsPageInner() {
                       <div className="flex items-center gap-1.5 shrink-0">
                         {beat.todayCompleted ? (
                           <Button size="sm" variant="secondary"
-                            disabled={completing === beat.id}
-                            onClick={() => handleSendBeat(beat.id, 'text')}
-                            className="text-[11px] gap-1 bg-emerald-50 text-emerald-600 border-emerald-100 hover:bg-emerald-100"
+                            disabled
+                            className="text-[11px] gap-1 bg-emerald-50 text-emerald-600 border-emerald-100 cursor-default"
                           >
-                            <Check className="w-3 h-3" /> {completing === beat.id ? '…' : 'Done ✓'}
+                            <Check className="w-3 h-3" /> Done ✓
                           </Button>
                         ) : beat.iSentToday ? (
                           <Button size="sm" variant="secondary"

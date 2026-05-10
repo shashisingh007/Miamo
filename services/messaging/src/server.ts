@@ -491,6 +491,9 @@ app.post('/api/v1/beats/start', authMiddleware, async (req: AuthRequest, res: Re
     const userId = req.userId!;
     const match = await prisma.match.findFirst({ where: { OR: [{ user1Id: userId, user2Id: matchedUserId }, { user1Id: matchedUserId, user2Id: userId }], active: true } });
     if (!match) return res.status(400).json({ error: { message: 'Must be matched first' } });
+    // Check for existing beat between these users
+    const existing = await prisma.beat.findFirst({ where: { OR: [{ user1Id: userId, user2Id: matchedUserId }, { user1Id: matchedUserId, user2Id: userId }], state: { not: 'archived' } } });
+    if (existing) return res.json({ data: existing });
     const beat = await prisma.beat.create({ data: { user1Id: userId, user2Id: matchedUserId, count: 1, state: 'active', lastUser1: new Date() } });
     await prisma.beatEvent.create({ data: { beatId: beat.id, userId, type: 'text', content: 'Beat started! ⚡' } });
     res.json({ data: beat });
@@ -502,6 +505,8 @@ app.post('/api/v1/beats/:id/complete', authMiddleware, async (req: AuthRequest, 
     const userId = req.userId!;
     const beat = await prisma.beat.findUnique({ where: { id: req.params.id } });
     if (!beat) return res.status(404).json({ error: { message: 'Beat not found' } });
+    if (beat.user1Id !== userId && beat.user2Id !== userId) return res.status(403).json({ error: { message: 'Not your beat' } });
+    if (beat.state === 'lost' || beat.state === 'archived') return res.status(400).json({ error: { message: 'Beat is not active' } });
     const isUser1 = beat.user1Id === userId;
     const lastField = isUser1 ? 'lastUser1' : 'lastUser2';
     const otherLastField = isUser1 ? 'lastUser2' : 'lastUser1';
@@ -527,19 +532,35 @@ app.post('/api/v1/beats/:id/complete', authMiddleware, async (req: AuthRequest, 
 });
 
 app.post('/api/v1/beats/:id/miss', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try { const updated = await prisma.beat.update({ where: { id: req.params.id }, data: { state: 'weak' } }); res.json({ data: updated }); } catch (e) { next(e); }
+  try {
+    const beat = await prisma.beat.findUnique({ where: { id: req.params.id } });
+    if (!beat || (beat.user1Id !== req.userId && beat.user2Id !== req.userId)) return res.status(403).json({ error: { message: 'Forbidden' } });
+    const updated = await prisma.beat.update({ where: { id: req.params.id }, data: { state: 'weak' } }); res.json({ data: updated });
+  } catch (e) { next(e); }
 });
 
 app.post('/api/v1/beats/:id/expire', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try { const updated = await prisma.beat.update({ where: { id: req.params.id }, data: { state: 'lost', count: 0 } }); res.json({ data: updated }); } catch (e) { next(e); }
+  try {
+    const beat = await prisma.beat.findUnique({ where: { id: req.params.id } });
+    if (!beat || (beat.user1Id !== req.userId && beat.user2Id !== req.userId)) return res.status(403).json({ error: { message: 'Forbidden' } });
+    const updated = await prisma.beat.update({ where: { id: req.params.id }, data: { state: 'lost', count: 0 } }); res.json({ data: updated });
+  } catch (e) { next(e); }
 });
 
 app.post('/api/v1/beats/:id/restore', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try { const updated = await prisma.beat.update({ where: { id: req.params.id }, data: { state: 'active', count: 1, lastUser1: new Date(), lastUser2: new Date() } }); res.json({ data: updated }); } catch (e) { next(e); }
+  try {
+    const beat = await prisma.beat.findUnique({ where: { id: req.params.id } });
+    if (!beat || (beat.user1Id !== req.userId && beat.user2Id !== req.userId)) return res.status(403).json({ error: { message: 'Forbidden' } });
+    const updated = await prisma.beat.update({ where: { id: req.params.id }, data: { state: 'active', count: 1, lastUser1: new Date(), lastUser2: new Date() } }); res.json({ data: updated });
+  } catch (e) { next(e); }
 });
 
 app.post('/api/v1/beats/:id/archive', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try { const updated = await prisma.beat.update({ where: { id: req.params.id }, data: { state: 'archived' } }); res.json({ data: updated }); } catch (e) { next(e); }
+  try {
+    const beat = await prisma.beat.findUnique({ where: { id: req.params.id } });
+    if (!beat || (beat.user1Id !== req.userId && beat.user2Id !== req.userId)) return res.status(403).json({ error: { message: 'Forbidden' } });
+    const updated = await prisma.beat.update({ where: { id: req.params.id }, data: { state: 'archived' } }); res.json({ data: updated });
+  } catch (e) { next(e); }
 });
 
 // Error Handler

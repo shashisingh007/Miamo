@@ -14,7 +14,7 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ bio: '', city: '', profession: '', intent: '' });
+  const [editForm, setEditForm] = useState({ bio: '', city: '', profession: '', datingIntent: '' });
   const [saving, setSaving] = useState(false);
   const [showAddInterest, setShowAddInterest] = useState(false);
   const [showAddPrompt, setShowAddPrompt] = useState(false);
@@ -41,7 +41,7 @@ export default function ProfilePage() {
     api.getMyProfile().then(res => {
       setProfile(res.data);
       const prof = res.data?.profile || res.data || {};
-      setEditForm({ bio: prof.bio || '', city: prof.city || '', profession: prof.profession || '', intent: prof.intent || '' });
+      setEditForm({ bio: prof.bio || '', city: prof.city || '', profession: prof.profession || '', datingIntent: prof.datingIntent || prof.intent || '' });
     }).catch(() => {}).finally(() => setLoading(false));
   };
 
@@ -123,7 +123,7 @@ export default function ProfilePage() {
                   <div><label className="text-xs text-text-muted">City</label><input value={editForm.city} onChange={e => setEditForm(f => ({...f, city: e.target.value}))} className="input-premium w-full mt-1 text-sm" /></div>
                   <div><label className="text-xs text-text-muted">Profession</label><input value={editForm.profession} onChange={e => setEditForm(f => ({...f, profession: e.target.value}))} className="input-premium w-full mt-1 text-sm" /></div>
                 </div>
-                <div><label className="text-xs text-text-muted">Relationship Intent</label><input value={editForm.intent} onChange={e => setEditForm(f => ({...f, intent: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. Long-term relationship" /></div>
+                <div><label className="text-xs text-text-muted">Relationship Intent</label><input value={editForm.datingIntent} onChange={e => setEditForm(f => ({...f, datingIntent: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. Long-term relationship" /></div>
               </div>
             ) : (
               <>

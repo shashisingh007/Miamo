@@ -966,7 +966,8 @@ export default function DiscoverPage() {
   }, [currentUser?.id]);
 
   const handlePass = () => {
-    api.passUser().catch(() => {});
+    const passedUser = profiles[currentIndex];
+    if (passedUser) api.passUser(passedUser.id).catch(() => {});
     if (currentIndex < profiles.length - 1) setCurrentIndex(i => i + 1);
     else setProfiles([]);
   };
