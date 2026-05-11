@@ -265,6 +265,21 @@ class ApiClient {
   async handleAccessRequest(id: string, action: 'grant' | 'deny' | 'revoke') {
     return this.request<any>(`/api/v1/matrimonial/access/${id}/${action}`, { method: 'POST' });
   }
+  async getMatrimonialNumerology() { return this.request<any>('/api/v1/matrimonial/numerology'); }
+  async getMatrimonialNumerologyCompat(userId: string) { return this.request<any>(`/api/v1/matrimonial/numerology/compatibility/${userId}`); }
+  async getMatrimonialCompatibility(userId: string) { return this.request<any>(`/api/v1/matrimonial/compatibility/${userId}`); }
+  async uploadKundli(data: { kundliUrl?: string; kundliData?: any; nakshatra?: string }) {
+    return this.request<any>('/api/v1/matrimonial/kundli', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async browseMatrimonialAdvanced(params?: Record<string, string>) {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return this.request<any>(`/api/v1/matrimonial/browse/advanced${qs}`);
+  }
+  async getDtmChats() { return this.request<any>('/api/v1/matrimonial/chat'); }
+  async getDtmChatMessages(userId: string) { return this.request<any>(`/api/v1/matrimonial/chat/${userId}`); }
+  async sendDtmMessage(recipientId: string, message: string, type?: string) {
+    return this.request<any>('/api/v1/matrimonial/chat/send', { method: 'POST', body: JSON.stringify({ recipientId, message, type }) });
+  }
 
   // Health
   async health() { return this.request<any>('/health'); }

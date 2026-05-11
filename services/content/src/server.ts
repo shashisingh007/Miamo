@@ -1085,6 +1085,168 @@ app.get('/api/v1/matrimonial/templates', authMiddleware, async (_req: AuthReques
   res.json({ data: templates });
 });
 
+/* ═══════════════════════════════════════════════════
+   NUMEROLOGY ENGINE
+   ═══════════════════════════════════════════════════ */
+function calculateNumerology(dateOfBirth: string, birthTime?: string) {
+  if (!dateOfBirth) return null;
+  const d = new Date(dateOfBirth);
+  const day = d.getDate(); const month = d.getMonth() + 1; const year = d.getFullYear();
+  const reduceToSingle = (n: number): number => {
+    while (n > 9 && n !== 11 && n !== 22 && n !== 33) { n = String(n).split('').reduce((s, c) => s + parseInt(c), 0); }
+    return n;
+  };
+  const lifePath = reduceToSingle(day + month + year);
+  const destiny = reduceToSingle(day);
+  const soul = reduceToSingle(day + month);
+  const PLANETS: Record<number, string> = { 1: 'Sun (Surya)', 2: 'Moon (Chandra)', 3: 'Jupiter (Guru)', 4: 'Rahu', 5: 'Mercury (Budh)', 6: 'Venus (Shukra)', 7: 'Ketu', 8: 'Saturn (Shani)', 9: 'Mars (Mangal)', 11: 'Neptune', 22: 'Pluto', 33: 'Vishnu' };
+  const COLORS: Record<number, string[]> = { 1: ['Gold', 'Orange'], 2: ['White', 'Green'], 3: ['Yellow', 'Purple'], 4: ['Blue', 'Grey'], 5: ['Green', 'White'], 6: ['Pink', 'Blue'], 7: ['White', 'Light Green'], 8: ['Black', 'Purple'], 9: ['Red', 'Crimson'], 11: ['Silver'], 22: ['Gold'], 33: ['Turquoise'] };
+  const COMPAT: Record<number, number[]> = { 1: [1,3,5,9], 2: [2,4,6,8], 3: [1,3,5,6,9], 4: [2,4,6,8], 5: [1,3,5,7,9], 6: [2,3,6,9], 7: [5,7], 8: [2,4,8], 9: [1,3,5,6,9] };
+  const TRAITS: Record<number, string[]> = { 1: ['Leader','Independent','Ambitious'], 2: ['Diplomatic','Sensitive','Cooperative'], 3: ['Creative','Optimistic','Social'], 4: ['Practical','Disciplined','Hardworking'], 5: ['Adventurous','Free-spirited','Dynamic'], 6: ['Nurturing','Responsible','Caring'], 7: ['Spiritual','Analytical','Introverted'], 8: ['Powerful','Authoritative','Material'], 9: ['Compassionate','Selfless','Humanitarian'], 11: ['Visionary','Intuitive'], 22: ['Master Builder','Practical Visionary'], 33: ['Master Teacher','Compassionate Healer'] };
+  const base = lifePath > 9 ? ((lifePath - 1) % 9 + 1) : lifePath;
+  return { lifePath, destiny, soul, rulingPlanet: PLANETS[lifePath] || PLANETS[base] || 'Unknown', luckyColors: COLORS[lifePath] || COLORS[base] || ['Gold'], traits: TRAITS[lifePath] || TRAITS[base] || ['Balanced'], compatibleNumbers: COMPAT[base] || [], birthDay: day, birthMonth: month, birthYear: year };
+}
+
+app.get('/api/v1/matrimonial/numerology', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const profile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
+    if (!profile?.dateOfBirth) return res.json({ data: null, message: 'Date of birth required' });
+    const result = calculateNumerology(profile.dateOfBirth.toISOString(), profile.birthTime);
+    if (result) { await prisma.matrimonialProfile.update({ where: { userId: req.userId! }, data: { numerologyNumber: result.lifePath, destinyNumber: result.destiny, soulNumber: result.soul } }); }
+    res.json({ data: result });
+  } catch (e) { next(e); }
+});
+
+app.get('/api/v1/matrimonial/numerology/compatibility/:userId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const myProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
+    const otherProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.params.userId } });
+    if (!myProfile?.dateOfBirth || !otherProfile?.dateOfBirth) return res.json({ data: null, message: 'Both need DOB' });
+    const myN = calculateNumerology(myProfile.dateOfBirth.toISOString()), otherN = calculateNumerology(otherProfile.dateOfBirth.toISOString());
+    if (!myN || !otherN) return res.json({ data: null });
+    const myBase = myN.lifePath > 9 ? ((myN.lifePath-1)%9+1) : myN.lifePath, otherBase = otherN.lifePath > 9 ? ((otherN.lifePath-1)%9+1) : otherN.lifePath;
+    let score = 50; const reasons: string[] = [];
+    if (myN.compatibleNumbers.includes(otherBase)) { score += 25; reasons.push(`Life Path ${myN.lifePath} & ${otherN.lifePath} compatible`); }
+    if (myN.destiny === otherN.destiny) { score += 15; reasons.push('Same destiny number'); }
+    if (myN.soul === otherN.soul) { score += 10; reasons.push('Soul alignment'); }
+    if ([11,22,33].includes(myN.lifePath) || [11,22,33].includes(otherN.lifePath)) { score += 5; reasons.push('Master number present'); }
+    score = Math.min(99, Math.max(20, score));
+    res.json({ data: { score, myNumerology: myN, partnerNumerology: otherN, reasons, analysis: score >= 80 ? 'Excellent compatibility!' : score >= 60 ? 'Good match.' : score >= 40 ? 'Moderate compatibility.' : 'Different energies.' } });
+  } catch (e) { next(e); }
+});
+
+/* ═══════════════════════════════════════════════════
+   KUNDLI / HOROSCOPE COMPATIBILITY (Ashtakoota)
+   ═══════════════════════════════════════════════════ */
+function analyzeKundliCompatibility(p1: any, p2: any) {
+  let total = 0; const koots: any[] = [];
+  const VARNA = ['Brahmin','Kshatriya','Vaishya','Shudra'];
+  const getVarna = (c: string) => c?.includes('Brahmin') ? 0 : c?.includes('Rajput') || c?.includes('Thakur') ? 1 : c?.includes('Vaishya') || c?.includes('Baniya') || c?.includes('Agarwal') || c?.includes('Gupta') ? 2 : 3;
+  const vs = getVarna(p1.caste) >= getVarna(p2.caste) ? 1 : 0; koots.push({ name: 'Varna', max: 1, score: vs, desc: 'Spiritual compatibility' }); total += vs;
+  const vashy = p1.religion === p2.religion ? 2 : p1.motherTongue === p2.motherTongue ? 1 : 0; koots.push({ name: 'Vashya', max: 2, score: vashy, desc: 'Mutual attraction' }); total += vashy;
+  const NAKSHATRAS = ['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Moola','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
+  const n1 = NAKSHATRAS.indexOf(p1.star || p1.nakshatra || ''), n2 = NAKSHATRAS.indexOf(p2.star || p2.nakshatra || '');
+  const ts = n1 >= 0 && n2 >= 0 ? ([1,3,5,7].includes(((n2-n1+27)%27)%9) ? 0 : 3) : 1; koots.push({ name: 'Tara', max: 3, score: ts, desc: 'Health & destiny' }); total += ts;
+  const ys = 3; koots.push({ name: 'Yoni', max: 4, score: ys, desc: 'Physical compatibility' }); total += ys;
+  const gs = p1.raasi === p2.raasi ? 5 : p1.raasi && p2.raasi ? 3 : 2; koots.push({ name: 'Graha Maitri', max: 5, score: gs, desc: 'Mental compatibility' }); total += gs;
+  const fv = ['Orthodox','Traditional','Moderate','Liberal'];
+  const ganaS = p1.familyValues === p2.familyValues ? 6 : Math.abs(fv.indexOf(p1.familyValues||'Moderate')-fv.indexOf(p2.familyValues||'Moderate'))<=1 ? 4 : 1; koots.push({ name: 'Gana', max: 6, score: ganaS, desc: 'Temperament' }); total += ganaS;
+  const bh = p1.religion===p2.religion && p1.caste===p2.caste ? 7 : p1.religion===p2.religion ? 5 : 2; koots.push({ name: 'Bhakoot', max: 7, score: bh, desc: 'Love & family' }); total += bh;
+  const NADI_MAP: Record<string,string> = { Brahmin:'Aadi', Rajput:'Madhya', Kshatriya:'Madhya', Vaishya:'Antya', Marwari:'Antya' };
+  const nd1 = NADI_MAP[p1.caste]||'Madhya', nd2 = NADI_MAP[p2.caste]||'Madhya';
+  const ns = nd1!==nd2 ? 8 : 0; koots.push({ name: 'Nadi', max: 8, score: ns, desc: 'Progeny health (most important)' }); total += ns;
+  const pct = Math.round((total/36)*100);
+  const manglikWarning = (p1.manglik==='Yes' && p2.manglik!=='Yes') || (p2.manglik==='Yes' && p1.manglik!=='Yes');
+  const gotraConflict = p1.gotra && p2.gotra && p1.gotra.toLowerCase()===p2.gotra.toLowerCase();
+  return { totalPoints: total, maxPoints: 36, percentage: pct, koots, manglikWarning, gotraConflict, verdict: pct>=75?'Excellent Match':pct>=55?'Good Match':pct>=40?'Average Match':'Below Average', level: pct>=75?'excellent':pct>=55?'good':pct>=40?'average':'low' };
+}
+
+app.get('/api/v1/matrimonial/compatibility/:userId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const myProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
+    const otherProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.params.userId } });
+    if (!myProfile || !otherProfile) return res.status(404).json({ error: { message: 'Profile not found' } });
+    const kundli = analyzeKundliCompatibility(myProfile, otherProfile);
+    let numResult: any = null;
+    if (myProfile.dateOfBirth && otherProfile.dateOfBirth) {
+      const myN = calculateNumerology(myProfile.dateOfBirth.toISOString()), oN = calculateNumerology(otherProfile.dateOfBirth.toISOString());
+      if (myN && oN) { const ob = oN.lifePath>9?((oN.lifePath-1)%9+1):oN.lifePath; let s=50; if(myN.compatibleNumbers.includes(ob))s+=25; if(myN.destiny===oN.destiny)s+=15; if(myN.soul===oN.soul)s+=10; numResult={score:Math.min(99,s),myNumber:myN.lifePath,partnerNumber:oN.lifePath}; }
+    }
+    const composite = Math.min(99, Math.round(kundli.percentage*0.6 + (numResult?.score||50)*0.2 + (myProfile.religion===otherProfile.religion?10:0) + (myProfile.gotra&&otherProfile.gotra&&myProfile.gotra.toLowerCase()!==otherProfile.gotra.toLowerCase()?5:0) + (!kundli.manglikWarning?5:0)));
+    res.json({ data: { compositeScore: composite, kundli, numerology: numResult, partnerName: otherProfile.fullName, partnerUserId: otherProfile.userId } });
+  } catch (e) { next(e); }
+});
+
+app.post('/api/v1/matrimonial/kundli', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { kundliUrl, kundliData, nakshatra } = req.body;
+    const profile = await prisma.matrimonialProfile.update({ where: { userId: req.userId! }, data: { ...(kundliUrl!==undefined?{kundliUrl}:{}), ...(kundliData!==undefined?{kundliData:typeof kundliData==='string'?kundliData:JSON.stringify(kundliData)}:{}), ...(nakshatra!==undefined?{nakshatra}:{}) } });
+    res.json({ data: profile });
+  } catch (e) { next(e); }
+});
+
+app.get('/api/v1/matrimonial/browse/advanced', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { religion, caste, city, education, income, manglik, maritalStatus, diet, motherTongue, minAge, maxAge, complexion, bodyType, gotra, numerologyMatch, sortBy, cursor } = req.query;
+    const where: any = { userId: { not: req.userId! }, fullName: { not: '' } };
+    if (religion) where.religion = { equals: religion as string, mode: 'insensitive' };
+    if (caste) where.caste = { equals: caste as string, mode: 'insensitive' };
+    if (city) where.workingCity = { contains: city as string, mode: 'insensitive' };
+    if (education) where.education = { contains: education as string, mode: 'insensitive' };
+    if (income) where.annualIncome = { not: '' };
+    if (manglik && manglik !== 'any') where.manglik = manglik as string;
+    if (maritalStatus) where.maritalStatus = maritalStatus as string;
+    if (diet) where.diet = diet as string;
+    if (motherTongue) where.motherTongue = { equals: motherTongue as string, mode: 'insensitive' };
+    if (complexion) where.complexion = complexion as string;
+    if (bodyType) where.bodyType = bodyType as string;
+    if (gotra) where.gotra = { not: gotra as string };
+    const profiles = await prisma.matrimonialProfile.findMany({ where, include: { user: { select: { id: true, displayName: true, username: true, verified: true, profile: { select: { age: true, gender: true, city: true, profession: true, avatarGradient: true, online: true, bio: true } }, photos: { take: 3, orderBy: { position: 'asc' } } } } }, orderBy: { updatedAt: 'desc' }, take: 40, ...(cursor ? { cursor: { id: cursor as string }, skip: 1 } : {}) });
+    let filtered = profiles;
+    if (minAge) filtered = filtered.filter(p => (p.user?.profile?.age || 0) >= parseInt(minAge as string));
+    if (maxAge) filtered = filtered.filter(p => (p.user?.profile?.age || 99) <= parseInt(maxAge as string));
+    const myProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
+    let myN: any = null;
+    if (myProfile?.dateOfBirth) myN = calculateNumerology(myProfile.dateOfBirth.toISOString());
+    const result = filtered.map(p => { const { phoneNumber, alternatePhone, linkedIn, contactEmail, ...safe } = p; let ns: number|null = null; if (myN && p.dateOfBirth) { const pN = calculateNumerology(p.dateOfBirth.toISOString()); if (pN) { const pb = pN.lifePath>9?((pN.lifePath-1)%9+1):pN.lifePath; ns = myN.compatibleNumbers.includes(pb)?85:50; } } return { ...safe, hasPhone: !!phoneNumber, hasLinkedIn: !!linkedIn, hasEmail: !!contactEmail, numerologyScore: ns }; });
+    let final = result;
+    if (numerologyMatch === 'true' && myN) final = result.filter(p => (p.numerologyScore||0) >= 70);
+    if (sortBy === 'numerology') final.sort((a, b) => (b.numerologyScore||0) - (a.numerologyScore||0));
+    res.json({ data: final, total: final.length, cursor: profiles[profiles.length-1]?.id });
+  } catch (e) { next(e); }
+});
+
+// DTM Chat (in-memory for now)
+const dtmMessages = new Map<string, any[]>();
+app.post('/api/v1/matrimonial/chat/send', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { recipientId, message, type = 'text' } = req.body;
+    const chatKey = [req.userId!, recipientId].sort().join('_');
+    if (!dtmMessages.has(chatKey)) dtmMessages.set(chatKey, []);
+    const msg = { id: `msg_${Date.now()}`, senderId: req.userId, recipientId, message, type, timestamp: new Date().toISOString(), read: false };
+    dtmMessages.get(chatKey)!.push(msg);
+    res.json({ data: msg });
+  } catch (e) { next(e); }
+});
+app.get('/api/v1/matrimonial/chat/:userId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const chatKey = [req.userId!, req.params.userId].sort().join('_');
+    const msgs = dtmMessages.get(chatKey) || [];
+    msgs.filter(m => m.recipientId === req.userId && !m.read).forEach(m => m.read = true);
+    res.json({ data: msgs });
+  } catch (e) { next(e); }
+});
+app.get('/api/v1/matrimonial/chat', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const chats: any[] = [];
+    dtmMessages.forEach((msgs) => {
+      const relevant = msgs.filter(m => m.senderId === req.userId || m.recipientId === req.userId);
+      if (relevant.length > 0) { const other = relevant[0].senderId === req.userId ? relevant[0].recipientId : relevant[0].senderId; const last = relevant[relevant.length-1]; const unread = relevant.filter(m => m.recipientId === req.userId && !m.read).length; chats.push({ userId: other, lastMessage: last, unreadCount: unread, totalMessages: relevant.length }); }
+    });
+    res.json({ data: chats });
+  } catch (e) { next(e); }
+});
+
 // Error Handler
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   // Prisma FK violation on userId means the user's session is stale (deleted after reseed)

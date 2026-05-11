@@ -3,10 +3,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Plus, X, Heart, MessageCircle, Eye, Trash2, Share2, Send,
+  Plus, X, Heart, MessageCircle, Eye, EyeOff, Trash2, Share2, Send,
   ChevronLeft, ChevronRight, MoreHorizontal, Upload,
   Sparkles, Type, Image, Clock, Lock, Users,
-  Check, AlertCircle, Smile, Reply,
+  Check, AlertCircle, Smile, Reply, MapPin, Shield, Flag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, Card } from '@/components/ui';
@@ -614,6 +614,7 @@ export default function StoriesPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [viewingGroup, setViewingGroup] = useState<any>(null);
   const [viewingIndex, setViewingIndex] = useState(0);
+  const [hideViewed, setHideViewed] = useState(true);
 
   const loadStories = useCallback(() => {
     setLoading(true);
@@ -629,7 +630,12 @@ export default function StoriesPage() {
   useEffect(() => { loadStories(); }, [loadStories]);
 
   const ownGroup = storyGroups.find((g: any) => g.isOwn);
-  const matchGroups = storyGroups.filter((g: any) => !g.isOwn);
+  const allMatchGroups = storyGroups.filter((g: any) => !g.isOwn);
+  // Sort: unviewed first, then viewed. Hide fully-viewed if toggle is on.
+  const matchGroups = allMatchGroups
+    .filter((g: any) => hideViewed ? !g.viewed : true)
+    .sort((a: any, b: any) => (a.viewed ? 1 : 0) - (b.viewed ? 1 : 0));
+  const viewedCount = allMatchGroups.filter((g: any) => g.viewed).length;
 
   const handleViewGroup = (group: any, idx = 0) => {
     setViewingGroup(group);
@@ -737,11 +743,23 @@ export default function StoriesPage() {
       </motion.div>
 
       {/* Story Grid — Match Stories */}
-      {matchGroups.length > 0 && (
+      {(matchGroups.length > 0 || viewedCount > 0) && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="relative z-10">
-          <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-            <Heart className="w-4 h-4 text-pink-400" /> From Your Matches
-          </h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+              <Heart className="w-4 h-4 text-pink-400" /> From Your Matches
+            </h3>
+            <div className="flex items-center gap-2">
+              {viewedCount > 0 && (
+                <button onClick={() => setHideViewed(!hideViewed)}
+                  className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition border',
+                    hideViewed ? 'bg-pink-50 text-pink-600 border-pink-200' : 'bg-gray-50 text-gray-500 border-gray-200')}>
+                  {hideViewed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  {hideViewed ? `${viewedCount} viewed hidden` : 'Show all'}
+                </button>
+              )}
+            </div>
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {matchGroups.map((group: any) => {
               const author = group.user || {};
@@ -835,8 +853,8 @@ export default function StoriesPage() {
             <div>
               <h4 className="font-bold text-sm text-gray-800">Story Tips</h4>
               <ul className="text-xs text-gray-500 mt-1 space-y-1">
-                <li className="flex items-start gap-1.5"><span className="text-pink-400 mt-0.5">&#9829;</span> Stories stay until your match sees them (up to 7 days)</li>
-                <li className="flex items-start gap-1.5"><span className="text-pink-400 mt-0.5">&#9829;</span> Popular stories can be posted to your feed</li>
+                <li className="flex items-start gap-1.5"><span className="text-pink-400 mt-0.5">&#9829;</span> Viewed stories auto-hide — toggle to see them again</li>
+                <li className="flex items-start gap-1.5"><span className="text-pink-400 mt-0.5">&#9829;</span> Stories expire after 7 days, even if unviewed</li>
                 <li className="flex items-start gap-1.5"><span className="text-pink-400 mt-0.5">&#9829;</span> Only matched users can comment on your stories</li>
               </ul>
             </div>

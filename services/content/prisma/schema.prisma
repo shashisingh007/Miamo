@@ -683,6 +683,12 @@ model MatrimonialProfile {
 
   // Horoscope
   horoscopeMatch    Boolean  @default(false)
+  kundliUrl         String   @default("")
+  kundliData        String   @default("")
+  nakshatra         String   @default("")
+  numerologyNumber  Int      @default(0)
+  destinyNumber     Int      @default(0)
+  soulNumber        Int      @default(0)
 
   // About
   aboutMe           String   @default("")

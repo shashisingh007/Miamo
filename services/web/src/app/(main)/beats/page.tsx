@@ -6,7 +6,7 @@ import {
   Zap, Camera, Mic, MessageSquare, Palette, Heart, Clock, Trophy, Flame, Shield,
   AlertTriangle, Send, MoreVertical, ChevronLeft, ChevronRight, Trash2, Ban,
   Flag, Eye, EyeOff, Film, Sparkles, Moon, Music, Lightbulb,
-  ChevronDown, Play, ArrowUp, ArrowDown, Users, Crown,
+  ChevronDown, Play, ArrowUp, ArrowDown, Users, Crown, Download,
   Check, CheckCheck, Volume2, Coffee, Activity, UserMinus, ThumbsUp, Filter, X,
   Hourglass, Timer,
 } from 'lucide-react';
@@ -445,6 +445,22 @@ function BeatEntryRow({ entry, onDelete, onToggleChat }: {
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
+        <button onClick={() => {
+          const el = document.createElement('a');
+          el.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(`Beat: ${entry.content}\nType: ${entry.type}\nSent: ${new Date(entry.sentAt).toLocaleString()}`));
+          el.setAttribute('download', `beat-${entry.id.slice(0,8)}.txt`);
+          el.click();
+        }} title="Download beat"
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-300 hover:text-blue-500 hover:bg-blue-50 transition-all">
+          <Download className="w-3.5 h-3.5" />
+        </button>
+        <button onClick={() => {
+          const text = `\u2764\ufe0f Beat from Miamo\n\n${entry.content}\n\nType: ${beatType.label}\nSent: ${new Date(entry.sentAt).toLocaleString()}`;
+          navigator.clipboard?.writeText(text).then(() => { /* copied */ });
+        }} title="Copy to clipboard"
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-300 hover:text-emerald-500 hover:bg-emerald-50 transition-all">
+          <Camera className="w-3.5 h-3.5" />
+        </button>
         <button onClick={() => onToggleChat(entry.id)} title={entry.showInChat ? 'Hide from chat' : 'Show in chat'}
           className="w-7 h-7 rounded-lg flex items-center justify-center text-gray-300 hover:text-pink-500 hover:bg-pink-50 transition-all">
           {entry.showInChat ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
