@@ -429,12 +429,18 @@ function CompatibilityModal({ data, onClose }: { data: any; onClose: () => void 
               {kundli.insights && kundli.insights.length > 0 && (
                 <div className="mt-3 space-y-2">
                   <h4 className="text-xs font-bold text-zinc-700 flex items-center gap-1.5">💡 Insights</h4>
-                  {kundli.insights.map((insight: string, idx: number) => (
-                    <div key={idx} className="flex items-start gap-2 bg-indigo-50 border border-indigo-100 rounded-xl p-3">
-                      <span className="text-indigo-500 text-xs mt-0.5">•</span>
-                      <p className="text-xs text-indigo-700 leading-relaxed">{insight}</p>
-                    </div>
-                  ))}
+                  {kundli.insights.map((insight: string, idx: number) => {
+                    const isWarning = insight.startsWith('⚠️');
+                    const isPositive = insight.startsWith('✨');
+                    return (
+                      <div key={idx} className={cn('flex items-start gap-2 rounded-xl p-3 border',
+                        isWarning ? 'bg-orange-50 border-orange-200' : isPositive ? 'bg-emerald-50 border-emerald-200' : 'bg-indigo-50 border-indigo-100'
+                      )}>
+                        <span className={cn('text-xs mt-0.5', isWarning ? 'text-orange-500' : isPositive ? 'text-emerald-500' : 'text-indigo-500')}>{isWarning ? '⚠️' : isPositive ? '✨' : '•'}</span>
+                        <p className={cn('text-xs leading-relaxed', isWarning ? 'text-orange-700' : isPositive ? 'text-emerald-700' : 'text-indigo-700')}>{isWarning || isPositive ? insight.slice(2).trim() : insight}</p>
+                      </div>
+                    );
+                  })}
                 </div>
               )}
 
@@ -961,17 +967,17 @@ export default function DateToMarryPage() {
               </div>
             )}
 
-            {/* Template Selection (shown when profile >= 60% complete) */}
-            {profileCompletion >= 60 && (
+            {/* Template Selection (shown when profile >= 60% complete AND on step 5) */}
+            {profileCompletion >= 60 && bioDataStep === 5 && (
               <div className="bg-gradient-to-br from-amber-50 to-rose-50 rounded-2xl border border-amber-200 p-5 space-y-4 shadow-sm">
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2">🎨 Choose Your BioData Template</h3>
                   <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-medium">Profile {profileCompletion}% complete</span>
                 </div>
-                <p className="text-xs text-zinc-500">Select a beautiful template for your matrimonial biodata. Premium templates marked with ⭐</p>
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-64 overflow-y-auto scrollbar-none">
+                <p className="text-xs text-zinc-500">Your profile is 60%+ complete! Choose a template to preview your Bio Data:</p>
+                <div className="grid grid-cols-3 gap-3 max-h-64 overflow-y-auto scrollbar-none">
                   {TEMPLATES.map(t => (
-                    <button key={t.id} onClick={() => { updateField('bioDataTemplate', t.id); setPreviewTemplate(t.id); }}
+                    <button key={t.id} onClick={() => { updateField('bioDataTemplate', t.id); setPreviewTemplate(t.id); setShowPreview(true); }}
                       className={cn('relative p-3 rounded-xl border-2 text-left transition-all hover:shadow-md',
                         myProfile?.bioDataTemplate === t.id ? 'border-amber-500 bg-white shadow-md ring-2 ring-amber-200' : 'border-zinc-200 bg-white hover:border-amber-300')}>
                       <div className="flex items-center gap-2 mb-1.5">
@@ -1022,10 +1028,10 @@ export default function DateToMarryPage() {
           <div className="space-y-5">
             <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Heart className="w-5 h-5 text-rose-500" /> My Matches</h2>
             {/* Tab bar */}
-            <div className="flex gap-1 bg-zinc-100 rounded-xl p-1">
-              {([['matches', 'Matches', matches.length], ['incoming', 'Incoming', incomingRequests.filter(r => r.status === 'pending').length], ['hold', 'On Hold', sentRequests.filter(r => r.status === 'pending').length]] as const).map(([key, label, count]) => (
-                <button key={key} onClick={() => setMatchTab(key as any)} className={cn('flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all', matchTab === key ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700')}>
-                  {label} {count > 0 && <span className="ml-1 px-1.5 py-0.5 bg-rose-100 text-rose-700 rounded-full text-[10px]">{count}</span>}
+            <div className="flex gap-1 bg-amber-50/60 rounded-xl p-1 border border-amber-100">
+              {([['matches', 'My Matches', matches.length], ['incoming', 'Incoming', incomingRequests.filter(r => r.status === 'pending').length], ['hold', 'On Hold', 0]] as const).map(([key, label, count]) => (
+                <button key={key} onClick={() => setMatchTab(key as any)} className={cn('flex-1 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all', matchTab === key ? 'bg-amber-50 text-amber-700 shadow-sm border border-amber-200' : 'text-zinc-500 hover:text-zinc-700')}>
+                  {label} {count > 0 && <span className="ml-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px]">{count}</span>}
                 </button>
               ))}
             </div>
@@ -1088,31 +1094,12 @@ export default function DateToMarryPage() {
               )
             )}
 
-            {/* Tab: On Hold (Sent pending) */}
+            {/* Tab: On Hold */}
             {matchTab === 'hold' && (
-              sentRequests.length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-2xl border border-zinc-200">
-                  <Send className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
-                  <p className="text-sm text-zinc-500">No pending requests sent</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {sentRequests.map(req => (
-                    <div key={req.id} className="bg-white rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-sm">
-                      <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center shrink-0">
-                        <span className="text-base font-bold text-white">{req.owner?.user?.displayName?.[0] || '?'}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-zinc-900">{req.owner?.user?.displayName || 'User'}</p>
-                        <p className="text-xs text-zinc-500">Requested: <span className="text-amber-600 font-medium">{req.accessType}</span></p>
-                      </div>
-                      <span className={cn('text-xs font-medium px-3 py-1.5 rounded-lg', req.status === 'pending' ? 'bg-amber-50 text-amber-700 border border-amber-200' : req.status === 'granted' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700')}>
-                        {req.status === 'pending' ? '⏳ Awaiting' : req.status === 'granted' ? '✓ Granted' : '✕ Denied'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )
+              <div className="text-center py-16 bg-white rounded-2xl border border-zinc-200">
+                <Send className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
+                <p className="text-sm text-zinc-500">Profiles you put on hold will appear here</p>
+              </div>
             )}
           </div>
         )}
@@ -1132,78 +1119,80 @@ export default function DateToMarryPage() {
               </div>
             ) : (
               <div className="space-y-5">
-                {/* Core Numbers */}
-                <div className="grid grid-cols-3 gap-4">
+                {/* 4-Card Grid: Life Path, Destiny, Soul, Personal Year */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
                   <div className="bg-purple-50 rounded-2xl p-5 text-center border border-purple-100">
                     <p className="text-4xl font-black text-purple-600">{numerologyData.lifePath}</p>
-                    <p className="text-xs text-purple-500 font-semibold mt-2">Life Path (Mulank)</p>
+                    <p className="text-xs text-purple-500 font-semibold mt-2">Life Path</p>
                   </div>
                   <div className="bg-indigo-50 rounded-2xl p-5 text-center border border-indigo-100">
                     <p className="text-4xl font-black text-indigo-600">{numerologyData.destiny}</p>
-                    <p className="text-xs text-indigo-500 font-semibold mt-2">Destiny (Bhagyank)</p>
+                    <p className="text-xs text-indigo-500 font-semibold mt-2">Destiny</p>
                   </div>
                   <div className="bg-violet-50 rounded-2xl p-5 text-center border border-violet-100">
                     <p className="text-4xl font-black text-violet-600">{numerologyData.soul}</p>
-                    <p className="text-xs text-violet-500 font-semibold mt-2">Soul Number</p>
+                    <p className="text-xs text-violet-500 font-semibold mt-2">Soul</p>
+                  </div>
+                  <div className="bg-fuchsia-50 rounded-2xl p-5 text-center border border-fuchsia-100">
+                    <p className="text-4xl font-black text-fuchsia-600">{numerologyData.personalYear || '—'}</p>
+                    <p className="text-xs text-fuchsia-500 font-semibold mt-2">Personal Year</p>
                   </div>
                 </div>
 
-                {/* Personal Year & Karmic */}
-                <div className="grid grid-cols-2 gap-4">
-                  {numerologyData.personalYear && (
-                    <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100">
-                      <p className="text-2xl font-black text-amber-600">{numerologyData.personalYear}</p>
-                      <p className="text-xs text-amber-500 font-semibold mt-1">Personal Year</p>
-                    </div>
-                  )}
-                  {numerologyData.hasKarmicDebt && (
-                    <div className="bg-red-50 rounded-2xl p-4 border border-red-100">
-                      <p className="text-lg font-bold text-red-600">⚠️ Karmic Debt</p>
-                      <p className="text-xs text-red-500 font-medium mt-1">Lesson: {numerologyData.karmicLesson || 'Self-discovery'}</p>
-                    </div>
-                  )}
-                  {!numerologyData.hasKarmicDebt && (
-                    <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
-                      <p className="text-lg font-bold text-emerald-600">✓ Clear Karma</p>
-                      <p className="text-xs text-emerald-500 font-medium mt-1">No karmic debt detected</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Vedic Details */}
+                {/* Info Rows */}
                 <div className="bg-white rounded-2xl border border-zinc-200 p-5 shadow-sm">
                   <h3 className="text-xs font-bold text-zinc-900 mb-3 flex items-center gap-2">🕉 Vedic Numerology Details</h3>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Ruling Planet</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.rulingPlanet}</span></div>
-                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Hora Lord</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.horaLord || '—'}</span></div>
                     <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Lucky Gem</span><span className="text-sm text-zinc-800 font-medium">💎 {numerologyData.luckyGem || '—'}</span></div>
+                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Mantra</span><span className="text-sm text-zinc-800 font-medium italic">{numerologyData.mantra || '—'}</span></div>
+                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Hora Lord</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.horaLord || '—'}</span></div>
+                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Elemental Energy</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.elementalEnergy || '—'}</span></div>
                     <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Lucky Day</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.luckyDay || '—'}</span></div>
-                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Element</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.elementalEnergy || '—'}</span></div>
-                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Lucky Colors</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.luckyColors?.join(', ')}</span></div>
                   </div>
                 </div>
 
-                {/* Mantra */}
-                {numerologyData.mantra && (
-                  <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-200 p-5 text-center">
-                    <p className="text-xs text-orange-500 font-medium mb-1">Your Mantra</p>
-                    <p className="text-lg font-bold text-orange-800 italic">{numerologyData.mantra}</p>
-                    <p className="text-[10px] text-orange-400 mt-2">Chant daily for positive vibrations</p>
+                {/* Karmic Debt Warning */}
+                {numerologyData.hasKarmicDebt && (
+                  <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-start gap-3">
+                    <span className="text-orange-500 text-lg mt-0.5">⚠️</span>
+                    <div>
+                      <p className="text-sm font-bold text-orange-800">Karmic Debt Detected</p>
+                      <p className="text-xs text-orange-600 mt-1">{numerologyData.karmicLesson || 'Past-life lessons require attention in this lifetime.'}</p>
+                    </div>
                   </div>
                 )}
 
-                {/* Traits & Compatibility */}
-                <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-3 shadow-sm">
-                  <div className="flex flex-wrap gap-2">
-                    {numerologyData.traits?.map((t: string, i: number) => (
-                      <span key={i} className="px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-700 rounded-full border border-purple-100">{t}</span>
-                    ))}
-                  </div>
-                  <div className="pt-3 border-t border-zinc-100">
+                {/* Compatible Numbers */}
+                <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
+                  <div>
                     <p className="text-xs text-zinc-500 font-semibold mb-2">Compatible Numbers</p>
                     <div className="flex gap-2">
                       {numerologyData.compatibleNumbers?.map((n: number) => (
                         <span key={n} className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm flex items-center justify-center border border-indigo-200">{n}</span>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Lucky Colors as dots */}
+                  <div>
+                    <p className="text-xs text-zinc-500 font-semibold mb-2">Lucky Colors</p>
+                    <div className="flex gap-2">
+                      {numerologyData.luckyColors?.map((color: string, i: number) => (
+                        <div key={i} className="flex items-center gap-1.5">
+                          <span className="w-4 h-4 rounded-full border border-zinc-200 shadow-sm" style={{ backgroundColor: color.toLowerCase().includes('gold') ? '#FFD700' : color.toLowerCase().includes('red') ? '#DC2626' : color.toLowerCase().includes('orange') ? '#EA580C' : color.toLowerCase().includes('yellow') ? '#EAB308' : color.toLowerCase().includes('green') ? '#16A34A' : color.toLowerCase().includes('blue') ? '#2563EB' : color.toLowerCase().includes('purple') ? '#9333EA' : color.toLowerCase().includes('white') ? '#F8FAFC' : color.toLowerCase().includes('pink') ? '#EC4899' : '#6B7280' }} />
+                          <span className="text-xs text-zinc-600">{color}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Traits as badges */}
+                  <div>
+                    <p className="text-xs text-zinc-500 font-semibold mb-2">Traits</p>
+                    <div className="flex flex-wrap gap-2">
+                      {numerologyData.traits?.map((t: string, i: number) => (
+                        <span key={i} className="px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-700 rounded-full border border-purple-100">{t}</span>
                       ))}
                     </div>
                   </div>
