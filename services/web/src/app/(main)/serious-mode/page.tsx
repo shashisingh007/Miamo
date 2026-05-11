@@ -700,8 +700,7 @@ export default function DateToMarryPage() {
         {section === 'browse' && (
           <div className="space-y-5">
             {/* Filters Toggle */}
-            <div className="flex items-center justify-between">
-              <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Search className="w-5 h-5 text-amber-500" /> Browse Profiles</h2>
+            <div className="flex items-center justify-end">
               <button onClick={() => setShowFilters(!showFilters)}
                 className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition border',
                   showFilters ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50')}>
@@ -727,6 +726,10 @@ export default function DateToMarryPage() {
                       <Select value={filters.bodyType || ''} onChange={v => setFilters(f => ({ ...f, bodyType: v }))} options={BODY_TYPES} placeholder="Body Type" />
                       <Input value={filters.minAge || ''} onChange={(v: string) => setFilters(f => ({ ...f, minAge: v }))} placeholder="Min Age" type="number" />
                       <Input value={filters.maxAge || ''} onChange={(v: string) => setFilters(f => ({ ...f, maxAge: v }))} placeholder="Max Age" type="number" />
+                      <Select value={filters.minHeight || ''} onChange={v => setFilters(f => ({ ...f, minHeight: v }))} options={HEIGHTS} placeholder="Min Height" />
+                      <Select value={filters.maxHeight || ''} onChange={v => setFilters(f => ({ ...f, maxHeight: v }))} options={HEIGHTS} placeholder="Max Height" />
+                      <Input value={filters.minWeight || ''} onChange={(v: string) => setFilters(f => ({ ...f, minWeight: v }))} placeholder="Min Weight (kg)" type="number" />
+                      <Input value={filters.maxWeight || ''} onChange={(v: string) => setFilters(f => ({ ...f, maxWeight: v }))} placeholder="Max Weight (kg)" type="number" />
                     </div>
                     {/* Special Filters */}
                     <div className="flex flex-wrap gap-2">
