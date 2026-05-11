@@ -247,6 +247,25 @@ class ApiClient {
   async unblockUser(blockedId: string) { return this.request<any>('/api/v1/safety/unblock', { method: 'POST', body: JSON.stringify({ blockedId }) }); }
   async getSafetyTips() { return this.request<any>('/api/v1/safety/tips'); }
 
+  // Matrimonial (Date to Marry)
+  async getMatrimonialProfile() { return this.request<any>('/api/v1/matrimonial/profile'); }
+  async updateMatrimonialProfile(data: any) { return this.request<any>('/api/v1/matrimonial/profile', { method: 'PUT', body: JSON.stringify(data) }); }
+  async browseMatrimonial(params?: Record<string, string>) {
+    const qs = params ? '?' + new URLSearchParams(params).toString() : '';
+    return this.request<any>(`/api/v1/matrimonial/browse${qs}`);
+  }
+  async getMatrimonialUserProfile(userId: string) { return this.request<any>(`/api/v1/matrimonial/profile/${userId}`); }
+  async getMatrimonialMatches() { return this.request<any>('/api/v1/matrimonial/matches'); }
+  async getMatrimonialTemplates() { return this.request<any>('/api/v1/matrimonial/templates'); }
+  async requestAccess(targetUserId: string, accessType: string, message?: string) {
+    return this.request<any>('/api/v1/matrimonial/access/request', { method: 'POST', body: JSON.stringify({ targetUserId, accessType, message }) });
+  }
+  async getIncomingAccessRequests() { return this.request<any>('/api/v1/matrimonial/access/incoming'); }
+  async getSentAccessRequests() { return this.request<any>('/api/v1/matrimonial/access/sent'); }
+  async handleAccessRequest(id: string, action: 'grant' | 'deny' | 'revoke') {
+    return this.request<any>(`/api/v1/matrimonial/access/${id}/${action}`, { method: 'POST' });
+  }
+
   // Health
   async health() { return this.request<any>('/health'); }
 }

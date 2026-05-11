@@ -17,7 +17,7 @@ export const NAV_MAIN = [
   { label: 'Beats', href: '/beats', icon: Zap },
   { label: 'Stories', href: '/stories', icon: Camera },
   { label: 'Creativity', href: '/creativity', icon: Sparkles },
-  { label: 'Ready to Marry', href: '/serious-mode', icon: HeartHandshake },
+  { label: 'Date to Marry', href: '/serious-mode', icon: HeartHandshake },
 ] as const;
 
 export const NAV_SECONDARY = [
@@ -48,7 +48,7 @@ export const FEATURES = {
   search: 'Search',
   aiMatch: 'AI Match',
   matchFilters: 'Match Filters',
-  seriousMode: 'Serious Mode',
+  dateToMarry: 'Date to Marry',
   verification: 'Verification',
   privacy: 'Privacy',
   safety: 'Safety',

@@ -796,6 +796,295 @@ async function recalcTrend(itemId: string) {
   } catch { /* ignore */ }
 }
 
+// ═══ DATE TO MARRY (Matrimonial) ═════════════════════
+// Get my matrimonial profile
+app.get('/api/v1/matrimonial/profile', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    let profile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
+    if (!profile) {
+      // Auto-create a blank profile
+      const user = await prisma.user.findUnique({ where: { id: req.userId! }, include: { profile: true } });
+      profile = await prisma.matrimonialProfile.create({
+        data: {
+          userId: req.userId!,
+          fullName: user?.displayName || '',
+          religion: '',
+          caste: '',
+        },
+      });
+    }
+    res.json({ data: profile });
+  } catch (e) { next(e); }
+});
+
+// Update my matrimonial profile
+app.put('/api/v1/matrimonial/profile', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const existing = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
+    const data = req.body;
+    // Remove fields that shouldn't be updated directly
+    delete data.id; delete data.userId; delete data.createdAt; delete data.updatedAt;
+    delete data.idVerified; delete data.incomeVerified; delete data.educationVerified; delete data.photoVerified;
+
+    let profile;
+    if (existing) {
+      profile = await prisma.matrimonialProfile.update({ where: { userId: req.userId! }, data });
+    } else {
+      profile = await prisma.matrimonialProfile.create({ data: { ...data, userId: req.userId! } });
+    }
+    res.json({ data: profile });
+  } catch (e) { next(e); }
+});
+
+// Browse matrimonial profiles with filters
+app.get('/api/v1/matrimonial/browse', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { religion, caste, city, ageMin, ageMax, education, income, manglik, maritalStatus, diet, motherTongue, cursor } = req.query;
+    const where: any = { userId: { not: req.userId! } };
+    if (religion) where.religion = { equals: religion as string, mode: 'insensitive' };
+    if (caste) where.caste = { equals: caste as string, mode: 'insensitive' };
+    if (city) where.workingCity = { contains: city as string, mode: 'insensitive' };
+    if (education) where.education = { contains: education as string, mode: 'insensitive' };
+    if (income) where.annualIncome = { not: '' };
+    if (manglik && manglik !== 'any') where.manglik = manglik as string;
+    if (maritalStatus) where.maritalStatus = maritalStatus as string;
+    if (diet) where.diet = diet as string;
+    if (motherTongue) where.motherTongue = { equals: motherTongue as string, mode: 'insensitive' };
+    // Require at least fullName or religion to be set (i.e. profile filled)
+    where.fullName = { not: '' };
+
+    const profiles = await prisma.matrimonialProfile.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            id: true, displayName: true, username: true, verified: true,
+            profile: { select: { age: true, gender: true, city: true, profession: true, avatarGradient: true, online: true, bio: true } },
+            photos: { take: 3, orderBy: { position: 'asc' } },
+          },
+        },
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 20,
+      ...(cursor ? { cursor: { id: cursor as string }, skip: 1 } : {}),
+    });
+
+    // Check access granted for each profile
+    const myProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
+    const result = profiles.map(p => {
+      const { phoneNumber, alternatePhone, linkedIn, contactEmail, ...safe } = p;
+      return {
+        ...safe,
+        // Only show contact info if public or access granted (checked later per-request)
+        hasPhone: !!phoneNumber,
+        hasLinkedIn: !!linkedIn,
+        hasEmail: !!contactEmail,
+      };
+    });
+    res.json({ data: result, cursor: profiles[profiles.length - 1]?.id });
+  } catch (e) { next(e); }
+});
+
+// Get a specific matrimonial profile (with access checks)
+app.get('/api/v1/matrimonial/profile/:userId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const profile = await prisma.matrimonialProfile.findUnique({
+      where: { userId: req.params.userId },
+      include: {
+        user: {
+          select: {
+            id: true, displayName: true, username: true, verified: true,
+            profile: { select: { age: true, gender: true, city: true, profession: true, avatarGradient: true, online: true, bio: true, profileScore: true } },
+            photos: { orderBy: { position: 'asc' } },
+            interests: true,
+          },
+        },
+      },
+    });
+    if (!profile) return res.status(404).json({ error: { message: 'Matrimonial profile not found' } });
+
+    // Check what access the requester has
+    const myProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
+    let accessGrants: any[] = [];
+    if (myProfile) {
+      accessGrants = await prisma.bioDataAccessRequest.findMany({
+        where: { ownerId: profile.id, requesterId: myProfile.id, status: 'granted' },
+      });
+    }
+    const grantedTypes = new Set(accessGrants.map(a => a.accessType));
+    const isOwn = req.params.userId === req.userId;
+
+    const { phoneNumber, alternatePhone, linkedIn, contactEmail, ...safe } = profile;
+
+    res.json({
+      data: {
+        ...safe,
+        // Show contact info only if own profile, public, or access granted
+        phoneNumber: isOwn || profile.phonePublic || grantedTypes.has('phone') ? phoneNumber : null,
+        alternatePhone: isOwn || profile.phonePublic || grantedTypes.has('phone') ? alternatePhone : null,
+        linkedIn: isOwn || profile.linkedInPublic || grantedTypes.has('linkedin') ? linkedIn : null,
+        contactEmail: isOwn || profile.emailPublic || grantedTypes.has('email') ? contactEmail : null,
+        hasPhone: !!phoneNumber,
+        hasLinkedIn: !!linkedIn,
+        hasEmail: !!contactEmail,
+        accessGrants: isOwn ? [] : accessGrants.map(a => ({ type: a.accessType, status: a.status })),
+        isOwn,
+      },
+    });
+  } catch (e) { next(e); }
+});
+
+// Request access to someone's info
+app.post('/api/v1/matrimonial/access/request', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { targetUserId, accessType, message } = req.body;
+    const myProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
+    const targetProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: targetUserId } });
+    if (!myProfile || !targetProfile) return res.status(400).json({ error: { message: 'Both users need matrimonial profiles' } });
+    if (myProfile.id === targetProfile.id) return res.status(400).json({ error: { message: 'Cannot request access to your own profile' } });
+
+    const request = await prisma.bioDataAccessRequest.upsert({
+      where: { ownerId_requesterId_accessType: { ownerId: targetProfile.id, requesterId: myProfile.id, accessType } },
+      create: { ownerId: targetProfile.id, requesterId: myProfile.id, accessType, message: message || '', status: 'pending' },
+      update: { status: 'pending', message: message || '' },
+    });
+    res.json({ data: request });
+  } catch (e) { next(e); }
+});
+
+// Get pending access requests (for me to approve/deny)
+app.get('/api/v1/matrimonial/access/incoming', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const myProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
+    if (!myProfile) return res.json({ data: [] });
+
+    const requests = await prisma.bioDataAccessRequest.findMany({
+      where: { ownerId: myProfile.id },
+      include: {
+        requester: {
+          include: {
+            user: {
+              select: { id: true, displayName: true, username: true, verified: true,
+                profile: { select: { age: true, gender: true, city: true, avatarGradient: true } },
+                photos: { take: 1, orderBy: { position: 'asc' } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ data: requests });
+  } catch (e) { next(e); }
+});
+
+// Get my sent access requests
+app.get('/api/v1/matrimonial/access/sent', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const myProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
+    if (!myProfile) return res.json({ data: [] });
+
+    const requests = await prisma.bioDataAccessRequest.findMany({
+      where: { requesterId: myProfile.id },
+      include: {
+        owner: {
+          include: {
+            user: {
+              select: { id: true, displayName: true, username: true,
+                profile: { select: { age: true, city: true, avatarGradient: true } },
+                photos: { take: 1, orderBy: { position: 'asc' } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ data: requests });
+  } catch (e) { next(e); }
+});
+
+// Grant or deny access
+app.post('/api/v1/matrimonial/access/:id/:action', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { id, action } = req.params;
+    if (!['grant', 'deny', 'revoke'].includes(action)) return res.status(400).json({ error: { message: 'Invalid action' } });
+
+    const request = await prisma.bioDataAccessRequest.findUnique({ where: { id }, include: { owner: true } });
+    if (!request) return res.status(404).json({ error: { message: 'Request not found' } });
+    if (request.owner.userId !== req.userId) return res.status(403).json({ error: { message: 'Not authorized' } });
+
+    const statusMap: Record<string, string> = { grant: 'granted', deny: 'denied', revoke: 'revoked' };
+    const updated = await prisma.bioDataAccessRequest.update({
+      where: { id },
+      data: { status: statusMap[action], ...(action === 'grant' ? { grantedAt: new Date() } : {}) },
+    });
+    res.json({ data: updated });
+  } catch (e) { next(e); }
+});
+
+// Get same-caste / matching profiles
+app.get('/api/v1/matrimonial/matches', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const myProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
+    if (!myProfile) return res.json({ data: [] });
+
+    const where: any = { userId: { not: req.userId! }, fullName: { not: '' } };
+    // Match by religion and optionally caste
+    if (myProfile.religion) where.religion = { equals: myProfile.religion, mode: 'insensitive' };
+    if (myProfile.partnerCaste) where.caste = { equals: myProfile.partnerCaste, mode: 'insensitive' };
+    else if (myProfile.caste) where.caste = { equals: myProfile.caste, mode: 'insensitive' };
+
+    const profiles = await prisma.matrimonialProfile.findMany({
+      where,
+      include: {
+        user: {
+          select: {
+            id: true, displayName: true, username: true, verified: true,
+            profile: { select: { age: true, gender: true, city: true, profession: true, avatarGradient: true, online: true } },
+            photos: { take: 2, orderBy: { position: 'asc' } },
+          },
+        },
+      },
+      take: 30,
+      orderBy: { updatedAt: 'desc' },
+    });
+
+    const result = profiles.map(p => {
+      const { phoneNumber, alternatePhone, linkedIn, contactEmail, ...safe } = p;
+      return { ...safe, hasPhone: !!phoneNumber, hasLinkedIn: !!linkedIn, hasEmail: !!contactEmail };
+    });
+    res.json({ data: result });
+  } catch (e) { next(e); }
+});
+
+// Get bio data templates list
+app.get('/api/v1/matrimonial/templates', authMiddleware, async (_req: AuthRequest, res: Response) => {
+  const templates = [
+    { id: 'royal-rajasthani', name: 'Royal Rajasthani', description: 'Rich gold & maroon with Rajput motifs', colors: ['#8B0000', '#FFD700', '#FFF8DC'], premium: false },
+    { id: 'south-indian-temple', name: 'South Indian Temple', description: 'Traditional green & gold with kolam patterns', colors: ['#006400', '#FFD700', '#FFF5E1'], premium: false },
+    { id: 'bengali-lal-paar', name: 'Bengali Lal Paar', description: 'Classic red-white with alpona border', colors: ['#DC143C', '#FFFFFF', '#FFE4E1'], premium: false },
+    { id: 'punjabi-phulkari', name: 'Punjabi Phulkari', description: 'Vibrant embroidery-style colorful design', colors: ['#FF6B00', '#FFD700', '#FF1493'], premium: false },
+    { id: 'gujarati-bandhani', name: 'Gujarati Bandhani', description: 'Tie-dye inspired with mirror work motifs', colors: ['#FF0000', '#008000', '#FFD700'], premium: false },
+    { id: 'marathi-paithani', name: 'Marathi Paithani', description: 'Orange & green with peacock motifs', colors: ['#FF8C00', '#006400', '#FFD700'], premium: false },
+    { id: 'kerala-kasavu', name: 'Kerala Kasavu', description: 'Elegant cream & gold with temple border', colors: ['#FFFFF0', '#FFD700', '#8B4513'], premium: false },
+    { id: 'lucknowi-chikan', name: 'Lucknowi Chikan', description: 'Delicate white embroidery with pastel tones', colors: ['#FFFFFF', '#F0E6FF', '#E8F5E9'], premium: false },
+    { id: 'mughal-royal', name: 'Mughal Royal', description: 'Regal blue & gold with Islamic geometric art', colors: ['#000080', '#FFD700', '#F5F5DC'], premium: true },
+    { id: 'kashmiri-pashmina', name: 'Kashmiri Pashmina', description: 'Warm tones with paisley & chinar patterns', colors: ['#800020', '#C19A6B', '#F5DEB3'], premium: true },
+    { id: 'assamese-mekhela', name: 'Assamese Mekhela', description: 'Red & gold with Assamese motifs', colors: ['#B22222', '#FFD700', '#FFFAF0'], premium: false },
+    { id: 'odia-bomkai', name: 'Odia Bomkai', description: 'Traditional maroon with tribal weave patterns', colors: ['#800000', '#FF8C00', '#FFFACD'], premium: false },
+    { id: 'manipuri-phanek', name: 'Manipuri Phanek', description: 'Striped pattern with northeast floral', colors: ['#FF69B4', '#8B008B', '#FFE4B5'], premium: false },
+    { id: 'hyderabadi-pearl', name: 'Hyderabadi Pearl', description: 'Pearl white & teal with Charminar motifs', colors: ['#FFFFF0', '#008080', '#FFD700'], premium: true },
+    { id: 'goan-catholic', name: 'Goan Christian', description: 'Serene white & blue Mediterranean style', colors: ['#FFFFFF', '#4169E1', '#FFD700'], premium: false },
+    { id: 'sikh-golden', name: 'Sikh Golden Temple', description: 'Divine gold & white with Khanda motifs', colors: ['#FFD700', '#FFFFFF', '#FF8C00'], premium: false },
+    { id: 'jain-peaceful', name: 'Jain Shanti', description: 'Peaceful white & saffron with Jain symbols', colors: ['#FFFFFF', '#FF8C00', '#006400'], premium: false },
+    { id: 'modern-minimal', name: 'Modern Minimal', description: 'Clean contemporary design with subtle elegance', colors: ['#2D3748', '#EDF2F7', '#A78BFA'], premium: false },
+    { id: 'rose-garden', name: 'Rose Garden', description: 'Romantic pink & blush with floral accents', colors: ['#FFC0CB', '#FF69B4', '#FFE4E1'], premium: true },
+    { id: 'midnight-royal', name: 'Midnight Royal', description: 'Dark luxury with gold accents', colors: ['#1A1A2E', '#FFD700', '#E94560'], premium: true },
+  ];
+  res.json({ data: templates });
+});
+
 // Error Handler
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   // Prisma FK violation on userId means the user's session is stale (deleted after reseed)

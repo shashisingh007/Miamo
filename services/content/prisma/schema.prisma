@@ -64,6 +64,8 @@ model User {
   creativityReactions CreativityReaction[]
   creativityComments  CreativityComment[]
 
+  matrimonialProfile MatrimonialProfile?
+
   searchLogs      SearchLog[]
   sentReports     Report[]        @relation("Reporter")
   receivedReports Report[]        @relation("Reported")
@@ -617,6 +619,144 @@ model Notification {
   createdAt DateTime @default(now())
 
   @@index([userId, read, createdAt])
+}
+
+// ─── Date to Marry (Matrimonial) ─────────────────────
+model MatrimonialProfile {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Personal
+  fullName          String   @default("")
+  dateOfBirth       DateTime?
+  birthTime         String   @default("")
+  birthPlace        String   @default("")
+  height            String   @default("")
+  weight            String   @default("")
+  complexion        String   @default("")
+  bloodGroup        String   @default("")
+  bodyType          String   @default("")
+  physicalStatus    String   @default("Normal")
+
+  // Religion & Caste
+  religion          String   @default("")
+  caste             String   @default("")
+  subCaste          String   @default("")
+  gotra             String   @default("")
+  manglik           String   @default("No")
+  star              String   @default("")
+  raasi             String   @default("")
+  dosham            String   @default("No")
+  motherTongue      String   @default("")
+
+  // Education & Career
+  education         String   @default("")
+  educationDetail   String   @default("")
+  college           String   @default("")
+  occupation        String   @default("")
+  company           String   @default("")
+  annualIncome      String   @default("")
+  workingCity       String   @default("")
+  workingCountry    String   @default("India")
+
+  // Family
+  fatherName        String   @default("")
+  fatherOccupation  String   @default("")
+  motherName        String   @default("")
+  motherOccupation  String   @default("")
+  brothers          Int      @default(0)
+  brothersMarried   Int      @default(0)
+  sisters           Int      @default(0)
+  sistersMarried    Int      @default(0)
+  familyType        String   @default("Nuclear")
+  familyStatus      String   @default("Middle Class")
+  familyValues      String   @default("Moderate")
+  nativePlace       String   @default("")
+  familyIncome      String   @default("")
+
+  // Lifestyle
+  maritalStatus     String   @default("Never Married")
+  diet              String   @default("Vegetarian")
+  drinking          String   @default("No")
+  smoking           String   @default("No")
+
+  // Horoscope
+  horoscopeMatch    Boolean  @default(false)
+
+  // About
+  aboutMe           String   @default("")
+  aboutFamily       String   @default("")
+
+  // Partner Preferences (stored as JSON)
+  partnerAgeMin     Int      @default(21)
+  partnerAgeMax     Int      @default(35)
+  partnerHeightMin  String   @default("")
+  partnerHeightMax  String   @default("")
+  partnerReligion   String   @default("")
+  partnerCaste      String   @default("")
+  partnerEducation  String   @default("")
+  partnerOccupation String   @default("")
+  partnerIncome     String   @default("")
+  partnerCity       String   @default("")
+  partnerManglik    String   @default("")
+  partnerMaritalStatus String @default("")
+  partnerMotherTongue String @default("")
+  partnerDiet       String   @default("")
+  partnerExpectation String  @default("")
+
+  // Bio Data
+  bioDataTemplate   String   @default("royal-rajasthani")
+  bioDataGenerated  Boolean  @default(false)
+
+  // Contact info (private - only shared via access control)
+  phoneNumber       String   @default("")
+  alternatePhone    String   @default("")
+  linkedIn          String   @default("")
+  contactEmail      String   @default("")
+
+  // Access defaults
+  bioDataPublic     Boolean  @default(false)
+  phonePublic       Boolean  @default(false)
+  linkedInPublic    Boolean  @default(false)
+  emailPublic       Boolean  @default(false)
+  photosPublic      Boolean  @default(true)
+
+  // Verification
+  idVerified        Boolean  @default(false)
+  incomeVerified    Boolean  @default(false)
+  educationVerified Boolean  @default(false)
+  photoVerified     Boolean  @default(false)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  accessRequests    BioDataAccessRequest[] @relation("AccessOwner")
+  sentRequests      BioDataAccessRequest[] @relation("AccessRequester")
+
+  @@index([religion, caste])
+  @@index([workingCity])
+  @@index([education])
+  @@index([annualIncome])
+  @@index([manglik])
+}
+
+model BioDataAccessRequest {
+  id            String   @id @default(uuid())
+  ownerId       String
+  owner         MatrimonialProfile @relation("AccessOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  requesterId   String
+  requester     MatrimonialProfile @relation("AccessRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  accessType    String   // bioData, phone, linkedin, email, photos, horoscope
+  status        String   @default("pending") // pending, granted, denied, revoked
+  message       String   @default("")
+  grantedAt     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([ownerId, requesterId, accessType])
+  @@index([ownerId, status])
+  @@index([requesterId])
 }
 
 // ─── Audit Log ───────────────────────────────────────

@@ -213,6 +213,7 @@ app.use('/api/v1/feed', requireAuth, createProxyMiddleware(proxyTo(SERVICES.cont
 app.use('/api/v1/stories', requireAuth, createProxyMiddleware(proxyTo(SERVICES.content)));
 app.use('/api/v1/videos', requireAuth, createProxyMiddleware(proxyTo(SERVICES.content)));
 app.use('/api/v1/creativity', requireAuth, createProxyMiddleware(proxyTo(SERVICES.content)));
+app.use('/api/v1/matrimonial', requireAuth, createProxyMiddleware(proxyTo(SERVICES.content)));
 
 // Notification routes (protected)
 app.use('/api/v1/notifications', requireAuth, createProxyMiddleware(proxyTo(SERVICES.notifications)));
