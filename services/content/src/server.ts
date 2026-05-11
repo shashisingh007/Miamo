@@ -1081,12 +1081,24 @@ app.get('/api/v1/matrimonial/templates', authMiddleware, async (_req: AuthReques
     { id: 'modern-minimal', name: 'Modern Minimal', description: 'Clean contemporary design with subtle elegance', colors: ['#2D3748', '#EDF2F7', '#A78BFA'], premium: false },
     { id: 'rose-garden', name: 'Rose Garden', description: 'Romantic pink & blush with floral accents', colors: ['#FFC0CB', '#FF69B4', '#FFE4E1'], premium: true },
     { id: 'midnight-royal', name: 'Midnight Royal', description: 'Dark luxury with gold accents', colors: ['#1A1A2E', '#FFD700', '#E94560'], premium: true },
+    { id: 'vedic-sunrise', name: 'Vedic Sunrise', description: 'Warm saffron & red with Sanskrit motifs', colors: ['#FF6600', '#8B0000', '#FFF5EE'], premium: false },
+    { id: 'lotus-pond', name: 'Lotus Pond', description: 'Soft pink & green like a lotus in bloom', colors: ['#FFB6C1', '#228B22', '#FFF0F5'], premium: false },
+    { id: 'temple-gold', name: 'Temple Gold', description: 'Pure gold & dark wood like ancient temples', colors: ['#B8860B', '#2F1B0E', '#FDF5E6'], premium: true },
+    { id: 'peacock-pride', name: 'Peacock Pride', description: 'Iridescent peacock blue & green with feather motifs', colors: ['#0047AB', '#00A86B', '#E0FFFF'], premium: false },
+    { id: 'bridal-red', name: 'Bridal Red', description: 'Auspicious marriage red with gold embellishments', colors: ['#CC0000', '#FFD700', '#FFF0F0'], premium: false },
+    { id: 'sandalwood', name: 'Sandalwood Classic', description: 'Earthy warm tones like sandalwood & turmeric', colors: ['#C19A6B', '#E8B04B', '#FAEBD7'], premium: false },
+    { id: 'celestial-blue', name: 'Celestial Blue', description: 'Night sky blue with silver star patterns', colors: ['#191970', '#C0C0C0', '#F0F8FF'], premium: true },
+    { id: 'marigold-festive', name: 'Marigold Festive', description: 'Bright marigold orange & green festive celebration', colors: ['#FFA500', '#228B22', '#FFFFF0'], premium: false },
+    { id: 'ivory-elegance', name: 'Ivory Elegance', description: 'Sophisticated ivory & champagne with subtle gold', colors: ['#FFFFF0', '#F7E7CE', '#D4AF37'], premium: false },
+    { id: 'rajwada-heritage', name: 'Rajwada Heritage', description: 'Deep purple & gold like royal palaces', colors: ['#4B0082', '#FFD700', '#F8F0FF'], premium: true },
+    { id: 'tulsi-green', name: 'Tulsi Green', description: 'Sacred tulsi green with earthy touches', colors: ['#2E8B57', '#8B4513', '#F0FFF0'], premium: false },
+    { id: 'diwali-lights', name: 'Diwali Lights', description: 'Sparkling colors of Diwali celebration', colors: ['#FF4500', '#FFD700', '#1A0033'], premium: true },
   ];
   res.json({ data: templates });
 });
 
 /* ═══════════════════════════════════════════════════
-   NUMEROLOGY ENGINE
+   ADVANCED NUMEROLOGY ENGINE (Pythagorean + Vedic)
    ═══════════════════════════════════════════════════ */
 function calculateNumerology(dateOfBirth: string, birthTime?: string) {
   if (!dateOfBirth) return null;
@@ -1096,15 +1108,53 @@ function calculateNumerology(dateOfBirth: string, birthTime?: string) {
     while (n > 9 && n !== 11 && n !== 22 && n !== 33) { n = String(n).split('').reduce((s, c) => s + parseInt(c), 0); }
     return n;
   };
-  const lifePath = reduceToSingle(day + month + year);
-  const destiny = reduceToSingle(day);
-  const soul = reduceToSingle(day + month);
-  const PLANETS: Record<number, string> = { 1: 'Sun (Surya)', 2: 'Moon (Chandra)', 3: 'Jupiter (Guru)', 4: 'Rahu', 5: 'Mercury (Budh)', 6: 'Venus (Shukra)', 7: 'Ketu', 8: 'Saturn (Shani)', 9: 'Mars (Mangal)', 11: 'Neptune', 22: 'Pluto', 33: 'Vishnu' };
-  const COLORS: Record<number, string[]> = { 1: ['Gold', 'Orange'], 2: ['White', 'Green'], 3: ['Yellow', 'Purple'], 4: ['Blue', 'Grey'], 5: ['Green', 'White'], 6: ['Pink', 'Blue'], 7: ['White', 'Light Green'], 8: ['Black', 'Purple'], 9: ['Red', 'Crimson'], 11: ['Silver'], 22: ['Gold'], 33: ['Turquoise'] };
-  const COMPAT: Record<number, number[]> = { 1: [1,3,5,9], 2: [2,4,6,8], 3: [1,3,5,6,9], 4: [2,4,6,8], 5: [1,3,5,7,9], 6: [2,3,6,9], 7: [5,7], 8: [2,4,8], 9: [1,3,5,6,9] };
-  const TRAITS: Record<number, string[]> = { 1: ['Leader','Independent','Ambitious'], 2: ['Diplomatic','Sensitive','Cooperative'], 3: ['Creative','Optimistic','Social'], 4: ['Practical','Disciplined','Hardworking'], 5: ['Adventurous','Free-spirited','Dynamic'], 6: ['Nurturing','Responsible','Caring'], 7: ['Spiritual','Analytical','Introverted'], 8: ['Powerful','Authoritative','Material'], 9: ['Compassionate','Selfless','Humanitarian'], 11: ['Visionary','Intuitive'], 22: ['Master Builder','Practical Visionary'], 33: ['Master Teacher','Compassionate Healer'] };
+  // Pythagorean method: reduce each component separately then add
+  const dayReduced = reduceToSingle(day);
+  const monthReduced = reduceToSingle(month);
+  const yearReduced = reduceToSingle(year);
+  const lifePath = reduceToSingle(dayReduced + monthReduced + yearReduced);
+  const destiny = reduceToSingle(day); // Birth Day number (Mulank)
+  const soul = reduceToSingle(day + month); // Bhagyank
+  // Personal Year cycle
+  const currentYear = new Date().getFullYear();
+  const personalYear = reduceToSingle(day + month + reduceToSingle(currentYear));
+  // Karmic Debt detection
+  const karmicDebtNumbers = [13, 14, 16, 19];
+  const rawLifePath = dayReduced + monthReduced + yearReduced;
+  const hasKarmicDebt = karmicDebtNumbers.includes(rawLifePath) || karmicDebtNumbers.includes(day);
+  const karmicLesson = hasKarmicDebt ? (rawLifePath === 13 ? 'Hard work & discipline needed' : rawLifePath === 14 ? 'Balance freedom with responsibility' : rawLifePath === 16 ? 'Rebuild ego through humility' : 'Independence without ego') : null;
+  // Birth time influence (Vedic hora)
+  let horaInfluence = '';
+  if (birthTime) {
+    const parts = birthTime.match(/(\d+):(\d+)\s*(AM|PM)?/i);
+    if (parts) {
+      let hour = parseInt(parts[1]);
+      if (parts[3]?.toUpperCase() === 'PM' && hour !== 12) hour += 12;
+      if (parts[3]?.toUpperCase() === 'AM' && hour === 12) hour = 0;
+      const horaLord = ['Saturn','Jupiter','Mars','Sun','Venus','Mercury','Moon'][(hour % 7)];
+      horaInfluence = horaLord;
+    }
+  }
+  const PLANETS: Record<number, string> = { 1: 'Sun (Surya)', 2: 'Moon (Chandra)', 3: 'Jupiter (Guru)', 4: 'Rahu (North Node)', 5: 'Mercury (Budh)', 6: 'Venus (Shukra)', 7: 'Ketu (South Node)', 8: 'Saturn (Shani)', 9: 'Mars (Mangal)', 11: 'Uranus (Higher Moon)', 22: 'Pluto (Higher Saturn)', 33: 'Neptune (Higher Jupiter)' };
+  const COLORS: Record<number, string[]> = { 1: ['Gold', 'Saffron', 'Orange'], 2: ['White', 'Pearl', 'Cream'], 3: ['Yellow', 'Purple', 'Violet'], 4: ['Blue', 'Electric Blue', 'Grey'], 5: ['Green', 'Turquoise', 'White'], 6: ['Pink', 'Royal Blue', 'Lavender'], 7: ['White', 'Light Green', 'Silver'], 8: ['Black', 'Dark Purple', 'Navy'], 9: ['Red', 'Crimson', 'Maroon'], 11: ['Silver', 'Iridescent'], 22: ['Gold', 'Earth Tones'], 33: ['Turquoise', 'Emerald'] };
+  const COMPAT: Record<number, number[]> = { 1: [1,2,3,5,9], 2: [1,2,4,6,7,8], 3: [1,3,5,6,9], 4: [2,4,6,8], 5: [1,3,5,7,9], 6: [2,3,4,6,8,9], 7: [2,5,7], 8: [2,4,6,8], 9: [1,3,5,6,9] };
+  const TRAITS: Record<number, string[]> = { 1: ['Natural Leader','Independent','Pioneering','Ambitious','Self-reliant'], 2: ['Diplomatic','Sensitive','Cooperative','Peacemaker','Intuitive'], 3: ['Creative','Optimistic','Social','Expressive','Joyful'], 4: ['Practical','Disciplined','Hardworking','Builder','Reliable'], 5: ['Adventurous','Free-spirited','Dynamic','Versatile','Explorer'], 6: ['Nurturing','Responsible','Caring','Harmonious','Protective'], 7: ['Spiritual','Analytical','Introverted','Seeker','Wise'], 8: ['Powerful','Authoritative','Material Success','Strategic','Achiever'], 9: ['Compassionate','Selfless','Humanitarian','Global','Generous'], 11: ['Visionary','Highly Intuitive','Inspirational','Spiritual Teacher'], 22: ['Master Builder','Practical Visionary','Architect of Dreams'], 33: ['Master Healer','Compassionate Guide','Universal Love'] };
+  const GEMS: Record<number, string> = { 1: 'Ruby (Manikya)', 2: 'Pearl (Moti)', 3: 'Yellow Sapphire (Pukhraj)', 4: 'Hessonite (Gomed)', 5: 'Emerald (Panna)', 6: 'Diamond (Heera)', 7: "Cat's Eye (Lehsunia)", 8: 'Blue Sapphire (Neelam)', 9: 'Red Coral (Moonga)' };
+  const MANTRAS: Record<number, string> = { 1: 'Om Suryaya Namaha', 2: 'Om Chandraya Namaha', 3: 'Om Gurave Namaha', 4: 'Om Rahave Namaha', 5: 'Om Budhaya Namaha', 6: 'Om Shukraya Namaha', 7: 'Om Ketave Namaha', 8: 'Om Shanaye Namaha', 9: 'Om Mangalaya Namaha' };
   const base = lifePath > 9 ? ((lifePath - 1) % 9 + 1) : lifePath;
-  return { lifePath, destiny, soul, rulingPlanet: PLANETS[lifePath] || PLANETS[base] || 'Unknown', luckyColors: COLORS[lifePath] || COLORS[base] || ['Gold'], traits: TRAITS[lifePath] || TRAITS[base] || ['Balanced'], compatibleNumbers: COMPAT[base] || [], birthDay: day, birthMonth: month, birthYear: year };
+  return {
+    lifePath, destiny, soul, personalYear, hasKarmicDebt, karmicLesson,
+    rulingPlanet: PLANETS[lifePath] || PLANETS[base] || 'Unknown',
+    horaLord: horaInfluence || null,
+    luckyColors: COLORS[lifePath] || COLORS[base] || ['Gold'],
+    traits: TRAITS[lifePath] || TRAITS[base] || ['Balanced'],
+    compatibleNumbers: COMPAT[base] || [],
+    luckyGem: GEMS[base] || 'Quartz',
+    mantra: MANTRAS[base] || 'Om Namah Shivaya',
+    luckyDay: ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][base % 7],
+    elementalEnergy: base <= 3 ? 'Fire (Agni)' : base <= 6 ? 'Earth (Prithvi)' : 'Water (Jal)',
+    birthDay: day, birthMonth: month, birthYear: year
+  };
 }
 
 app.get('/api/v1/matrimonial/numerology', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -1136,29 +1186,124 @@ app.get('/api/v1/matrimonial/numerology/compatibility/:userId', authMiddleware, 
 });
 
 /* ═══════════════════════════════════════════════════
-   KUNDLI / HOROSCOPE COMPATIBILITY (Ashtakoota)
+   KUNDLI / HOROSCOPE COMPATIBILITY (Full Ashtakoota with proper 8-koot scoring)
    ═══════════════════════════════════════════════════ */
 function analyzeKundliCompatibility(p1: any, p2: any) {
   let total = 0; const koots: any[] = [];
-  const VARNA = ['Brahmin','Kshatriya','Vaishya','Shudra'];
-  const getVarna = (c: string) => c?.includes('Brahmin') ? 0 : c?.includes('Rajput') || c?.includes('Thakur') ? 1 : c?.includes('Vaishya') || c?.includes('Baniya') || c?.includes('Agarwal') || c?.includes('Gupta') ? 2 : 3;
-  const vs = getVarna(p1.caste) >= getVarna(p2.caste) ? 1 : 0; koots.push({ name: 'Varna', max: 1, score: vs, desc: 'Spiritual compatibility' }); total += vs;
-  const vashy = p1.religion === p2.religion ? 2 : p1.motherTongue === p2.motherTongue ? 1 : 0; koots.push({ name: 'Vashya', max: 2, score: vashy, desc: 'Mutual attraction' }); total += vashy;
   const NAKSHATRAS = ['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Moola','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
-  const n1 = NAKSHATRAS.indexOf(p1.star || p1.nakshatra || ''), n2 = NAKSHATRAS.indexOf(p2.star || p2.nakshatra || '');
-  const ts = n1 >= 0 && n2 >= 0 ? ([1,3,5,7].includes(((n2-n1+27)%27)%9) ? 0 : 3) : 1; koots.push({ name: 'Tara', max: 3, score: ts, desc: 'Health & destiny' }); total += ts;
-  const ys = 3; koots.push({ name: 'Yoni', max: 4, score: ys, desc: 'Physical compatibility' }); total += ys;
-  const gs = p1.raasi === p2.raasi ? 5 : p1.raasi && p2.raasi ? 3 : 2; koots.push({ name: 'Graha Maitri', max: 5, score: gs, desc: 'Mental compatibility' }); total += gs;
-  const fv = ['Orthodox','Traditional','Moderate','Liberal'];
-  const ganaS = p1.familyValues === p2.familyValues ? 6 : Math.abs(fv.indexOf(p1.familyValues||'Moderate')-fv.indexOf(p2.familyValues||'Moderate'))<=1 ? 4 : 1; koots.push({ name: 'Gana', max: 6, score: ganaS, desc: 'Temperament' }); total += ganaS;
-  const bh = p1.religion===p2.religion && p1.caste===p2.caste ? 7 : p1.religion===p2.religion ? 5 : 2; koots.push({ name: 'Bhakoot', max: 7, score: bh, desc: 'Love & family' }); total += bh;
-  const NADI_MAP: Record<string,string> = { Brahmin:'Aadi', Rajput:'Madhya', Kshatriya:'Madhya', Vaishya:'Antya', Marwari:'Antya' };
-  const nd1 = NADI_MAP[p1.caste]||'Madhya', nd2 = NADI_MAP[p2.caste]||'Madhya';
-  const ns = nd1!==nd2 ? 8 : 0; koots.push({ name: 'Nadi', max: 8, score: ns, desc: 'Progeny health (most important)' }); total += ns;
-  const pct = Math.round((total/36)*100);
-  const manglikWarning = (p1.manglik==='Yes' && p2.manglik!=='Yes') || (p2.manglik==='Yes' && p1.manglik!=='Yes');
-  const gotraConflict = p1.gotra && p2.gotra && p1.gotra.toLowerCase()===p2.gotra.toLowerCase();
-  return { totalPoints: total, maxPoints: 36, percentage: pct, koots, manglikWarning, gotraConflict, verdict: pct>=75?'Excellent Match':pct>=55?'Good Match':pct>=40?'Average Match':'Below Average', level: pct>=75?'excellent':pct>=55?'good':pct>=40?'average':'low' };
+
+  // Get nakshatra indices
+  const n1 = NAKSHATRAS.indexOf(p1.star || p1.nakshatra || '');
+  const n2 = NAKSHATRAS.indexOf(p2.star || p2.nakshatra || '');
+
+  // 1. VARNA (1 point) — Spiritual compatibility based on nakshatra-derived varna
+  const getNakshatraVarna = (nIdx: number) => { if (nIdx < 0) return 3; return Math.floor(nIdx / 7) % 4; }; // 0=Brahmin,1=Kshatriya,2=Vaishya,3=Shudra
+  const v1 = getNakshatraVarna(n1), v2 = getNakshatraVarna(n2);
+  const vs = v1 >= v2 ? 1 : 0;
+  koots.push({ name: 'Varna', max: 1, score: vs, desc: 'Spiritual development & ego compatibility' }); total += vs;
+
+  // 2. VASHYA (2 points) — Control/dominance using nakshatra animal groups
+  const VASHYA_GROUPS = ['Chatushpada','Manushya','Jalachara','Vanachara','Keeta']; // 4-legged, human, water, forest, insect
+  const getVashyaGroup = (nIdx: number): number => { if (nIdx < 0) return 1; const groups = [0,1,0,1,3,1,1,0,4,0,1,1,3,4,3,3,1,1,0,1,1,1,0,2,1,0,2]; return groups[nIdx % 27]; };
+  const vg1 = getVashyaGroup(n1), vg2 = getVashyaGroup(n2);
+  const vashyaScore = vg1 === vg2 ? 2 : (vg1 === 1 || vg2 === 1) ? 1 : Math.abs(vg1 - vg2) <= 1 ? 1 : 0;
+  koots.push({ name: 'Vashya', max: 2, score: vashyaScore, desc: 'Mutual attraction & influence' }); total += vashyaScore;
+
+  // 3. TARA (3 points) — Birth star compatibility (Dina Koota)
+  let taraScore = 1;
+  if (n1 >= 0 && n2 >= 0) {
+    const diff = ((n2 - n1 + 27) % 27) + 1;
+    const tara = ((diff - 1) % 9) + 1; // 1-9 cycle
+    // Tara 3,5,7 are inauspicious; 1,2,4,6,8,9 are auspicious
+    taraScore = [3, 5, 7].includes(tara) ? 0 : 3;
+  }
+  koots.push({ name: 'Tara', max: 3, score: taraScore, desc: 'Health, longevity & destiny' }); total += taraScore;
+
+  // 4. YONI (4 points) — Physical/sexual compatibility (14 animal types from nakshatras)
+  const YONI_ANIMALS = ['Horse','Elephant','Sheep','Serpent','Dog','Cat','Rat','Cow','Buffalo','Tiger','Deer','Monkey','Mongoose','Lion'];
+  const getNakshatraYoni = (nIdx: number): number => { if (nIdx < 0) return 0; const yoniMap = [0,1,2,3,3,4,5,2,5,6,6,7,8,9,8,9,10,10,4,11,11,12,0,0,13,7,1]; return yoniMap[nIdx % 27]; };
+  const y1 = getNakshatraYoni(n1), y2 = getNakshatraYoni(n2);
+  // Same yoni = 4, friendly = 3, neutral = 2, unfriendly = 1, enemy = 0
+  const YONI_ENEMIES: [number,number][] = [[0,8],[1,13],[2,12],[3,11],[4,10],[5,6],[7,9]]; // natural enemies
+  let yoniScore = 2; // default neutral
+  if (y1 === y2) yoniScore = 4;
+  else if (YONI_ENEMIES.some(([a,b]) => (y1===a && y2===b) || (y1===b && y2===a))) yoniScore = 0;
+  else if (Math.abs(y1 - y2) <= 2) yoniScore = 3;
+  else yoniScore = 1;
+  koots.push({ name: 'Yoni', max: 4, score: yoniScore, desc: 'Physical & intimate compatibility' }); total += yoniScore;
+
+  // 5. GRAHA MAITRI (5 points) — Mental compatibility based on Rashi lords
+  const RAASHIS = ['Mesha (Aries)','Vrishabha (Taurus)','Mithuna (Gemini)','Karka (Cancer)','Simha (Leo)','Kanya (Virgo)','Tula (Libra)','Vrischika (Scorpio)','Dhanu (Sagittarius)','Makara (Capricorn)','Kumbha (Aquarius)','Meena (Pisces)'];
+  const RASHI_LORDS = [4,5,2,1,0,2,5,4,3,6,6,3]; // Mars,Venus,Mercury,Moon,Sun,Mercury,Venus,Mars,Jupiter,Saturn,Saturn,Jupiter → mapped to 0-6
+  const r1 = RAASHIS.indexOf(p1.raasi || ''), r2 = RAASHIS.indexOf(p2.raasi || '');
+  let grahaMaitriScore = 3; // default average
+  if (r1 >= 0 && r2 >= 0) {
+    const lord1 = RASHI_LORDS[r1], lord2 = RASHI_LORDS[r2];
+    if (lord1 === lord2) grahaMaitriScore = 5; // same lord
+    else {
+      // Planetary friendship table (simplified): Sun+Moon+Mars+Jupiter = friends, Saturn+Venus+Mercury = friends
+      const group1 = [0,1,4,3], group2 = [6,5,2];
+      const sameGroup = (group1.includes(lord1) && group1.includes(lord2)) || (group2.includes(lord1) && group2.includes(lord2));
+      grahaMaitriScore = sameGroup ? 4 : Math.abs(lord1 - lord2) <= 1 ? 3 : 1;
+    }
+  }
+  koots.push({ name: 'Graha Maitri', max: 5, score: grahaMaitriScore, desc: 'Mental wavelength & friendship' }); total += grahaMaitriScore;
+
+  // 6. GANA (6 points) — Temperament (Deva, Manushya, Rakshasa from nakshatra)
+  const getNakshatraGana = (nIdx: number): number => { if (nIdx < 0) return 1; const ganaMap = [0,1,2,0,0,1,0,0,2,2,1,0,0,2,0,2,0,2,2,0,1,0,2,2,1,0,1]; return ganaMap[nIdx % 27]; }; // 0=Deva, 1=Manushya, 2=Rakshasa
+  const g1 = getNakshatraGana(n1), g2 = getNakshatraGana(n2);
+  let ganaScore = 0;
+  if (g1 === g2) ganaScore = 6;
+  else if ((g1 === 0 && g2 === 1) || (g1 === 1 && g2 === 0)) ganaScore = 5;
+  else if (g1 === 1 && g2 === 2 || g2 === 1 && g1 === 2) ganaScore = 1;
+  else ganaScore = 0; // Deva-Rakshasa
+  koots.push({ name: 'Gana', max: 6, score: ganaScore, desc: 'Temperament & behavior compatibility' }); total += ganaScore;
+
+  // 7. BHAKOOT (7 points) — Love, family harmony (based on Rashi distance)
+  let bhakootScore = 7;
+  if (r1 >= 0 && r2 >= 0) {
+    const diff = ((r2 - r1 + 12) % 12) + 1;
+    const reverseDiff = ((r1 - r2 + 12) % 12) + 1;
+    // Inauspicious combinations: 2/12, 5/9, 6/8
+    if ((diff === 2 && reverseDiff === 12) || (diff === 12 && reverseDiff === 2)) bhakootScore = 0;
+    else if ((diff === 6 && reverseDiff === 8) || (diff === 8 && reverseDiff === 6)) bhakootScore = 0;
+    else if ((diff === 5 && reverseDiff === 9) || (diff === 9 && reverseDiff === 5)) bhakootScore = 0;
+    else bhakootScore = 7;
+  }
+  koots.push({ name: 'Bhakoot', max: 7, score: bhakootScore, desc: 'Love, harmony & financial prosperity' }); total += bhakootScore;
+
+  // 8. NADI (8 points) — Most important! Health & genetics (from nakshatra)
+  const getNakshatraNadi = (nIdx: number): string => {
+    if (nIdx < 0) return 'Madhya';
+    const nadiMap = ['Aadi','Madhya','Antya','Aadi','Madhya','Antya','Aadi','Madhya','Antya','Aadi','Madhya','Antya','Aadi','Madhya','Antya','Aadi','Madhya','Antya','Aadi','Madhya','Antya','Aadi','Madhya','Antya','Aadi','Madhya','Antya'];
+    return nadiMap[nIdx % 27];
+  };
+  const nadi1 = getNakshatraNadi(n1), nadi2 = getNakshatraNadi(n2);
+  const nadiScore = nadi1 !== nadi2 ? 8 : 0; // Same nadi = 0 points (Nadi Dosha)
+  koots.push({ name: 'Nadi', max: 8, score: nadiScore, desc: 'Progeny health & genetic compatibility (most critical)' }); total += nadiScore;
+
+  const pct = Math.round((total / 36) * 100);
+  const manglikWarning = (p1.manglik === 'Yes' && p2.manglik !== 'Yes') || (p2.manglik === 'Yes' && p1.manglik !== 'Yes');
+  const gotraConflict = p1.gotra && p2.gotra && p1.gotra.toLowerCase() === p2.gotra.toLowerCase();
+  const nadiDosha = nadiScore === 0;
+
+  // Detailed verdict
+  let verdict = '', level = '';
+  if (pct >= 75) { verdict = 'Excellent Match — शुभ विवाह! Highly recommended for marriage.'; level = 'excellent'; }
+  else if (pct >= 55) { verdict = 'Good Match — विवाह योग्य। Auspicious with minor remedies.'; level = 'good'; }
+  else if (pct >= 40) { verdict = 'Average Match — Consider with proper astrological remedies.'; level = 'average'; }
+  else { verdict = 'Below Average — Detailed analysis needed before proceeding.'; level = 'low'; }
+
+  // Additional insights
+  const insights: string[] = [];
+  if (nadiDosha) insights.push('⚠️ Nadi Dosha present — consult pandit for remedies (Nadi Nivaran Puja)');
+  if (bhakootScore === 0) insights.push('⚠️ Bhakoot Dosha — may affect financial harmony, remedies available');
+  if (ganaScore <= 1) insights.push('Different temperaments — communication & patience key');
+  if (yoniScore >= 4) insights.push('✨ Excellent physical compatibility indicated');
+  if (grahaMaitriScore >= 4) insights.push('✨ Strong mental wavelength — intellectual bond');
+  if (total >= 25) insights.push('✨ Above 25 Gunas — very auspicious for marriage');
+
+  return { totalPoints: total, maxPoints: 36, percentage: pct, koots, manglikWarning, gotraConflict, nadiDosha, verdict, level, insights };
 }
 
 app.get('/api/v1/matrimonial/compatibility/:userId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -1173,7 +1318,7 @@ app.get('/api/v1/matrimonial/compatibility/:userId', authMiddleware, async (req:
       if (myN && oN) { const ob = oN.lifePath>9?((oN.lifePath-1)%9+1):oN.lifePath; let s=50; if(myN.compatibleNumbers.includes(ob))s+=25; if(myN.destiny===oN.destiny)s+=15; if(myN.soul===oN.soul)s+=10; numResult={score:Math.min(99,s),myNumber:myN.lifePath,partnerNumber:oN.lifePath}; }
     }
     const composite = Math.min(99, Math.round(kundli.percentage*0.6 + (numResult?.score||50)*0.2 + (myProfile.religion===otherProfile.religion?10:0) + (myProfile.gotra&&otherProfile.gotra&&myProfile.gotra.toLowerCase()!==otherProfile.gotra.toLowerCase()?5:0) + (!kundli.manglikWarning?5:0)));
-    res.json({ data: { compositeScore: composite, kundli, numerology: numResult, partnerName: otherProfile.fullName, partnerUserId: otherProfile.userId } });
+    res.json({ data: { compositeScore: composite, kundli, numerology: numResult, partnerName: otherProfile.fullName, partnerUserId: otherProfile.userId, insights: kundli.insights || [] } });
   } catch (e) { next(e); }
 });
 
@@ -1205,6 +1350,13 @@ app.get('/api/v1/matrimonial/browse/advanced', authMiddleware, async (req: AuthR
     let filtered = profiles;
     if (minAge) filtered = filtered.filter(p => (p.user?.profile?.age || 0) >= parseInt(minAge as string));
     if (maxAge) filtered = filtered.filter(p => (p.user?.profile?.age || 99) <= parseInt(maxAge as string));
+    // Height filtering (parse height like 5'6" to inches for comparison)
+    const parseHeight = (h: string): number => { const m = h?.match(/(\d+)'(\d+)/); return m ? parseInt(m[1]) * 12 + parseInt(m[2]) : 0; };
+    const { minHeight, maxHeight, minWeight, maxWeight } = req.query;
+    if (minHeight) { const minH = parseHeight(minHeight as string); filtered = filtered.filter(p => parseHeight(p.height || '') >= minH); }
+    if (maxHeight) { const maxH = parseHeight(maxHeight as string); filtered = filtered.filter(p => { const h = parseHeight(p.height || ''); return h === 0 || h <= maxH; }); }
+    if (minWeight) { const minW = parseInt(minWeight as string); filtered = filtered.filter(p => { const w = parseInt(p.weight || '0'); return w >= minW; }); }
+    if (maxWeight) { const maxW = parseInt(maxWeight as string); filtered = filtered.filter(p => { const w = parseInt(p.weight || '0'); return w === 0 || w <= maxW; }); }
     const myProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
     let myN: any = null;
     if (myProfile?.dateOfBirth) myN = calculateNumerology(myProfile.dateOfBirth.toISOString());

@@ -65,6 +65,18 @@ const TEMPLATES = [
   { id: 'modern-minimal', name: 'Modern Minimal', colors: ['#2D3748','#EDF2F7','#A78BFA'], emoji: '✨', motif: '✨', premium: false },
   { id: 'rose-garden', name: 'Rose Garden', colors: ['#FFC0CB','#FF69B4','#FFE4E1'], emoji: '🌹', motif: '🌹', premium: true },
   { id: 'midnight-royal', name: 'Midnight Royal', colors: ['#1A1A2E','#FFD700','#E94560'], emoji: '🌙', motif: '🕉', premium: true },
+  { id: 'vedic-sunrise', name: 'Vedic Sunrise', colors: ['#FF6600','#8B0000','#FFF5EE'], emoji: '🌅', motif: '🕉', premium: false },
+  { id: 'lotus-pond', name: 'Lotus Pond', colors: ['#FFB6C1','#228B22','#FFF0F5'], emoji: '🪷', motif: '🌸', premium: false },
+  { id: 'temple-gold', name: 'Temple Gold', colors: ['#B8860B','#2F1B0E','#FDF5E6'], emoji: '🛕', motif: '⚱️', premium: true },
+  { id: 'peacock-pride', name: 'Peacock Pride', colors: ['#0047AB','#00A86B','#E0FFFF'], emoji: '🦚', motif: '🪶', premium: false },
+  { id: 'bridal-red', name: 'Bridal Red', colors: ['#CC0000','#FFD700','#FFF0F0'], emoji: '💍', motif: '🔴', premium: false },
+  { id: 'sandalwood', name: 'Sandalwood Classic', colors: ['#C19A6B','#E8B04B','#FAEBD7'], emoji: '🪵', motif: '🌿', premium: false },
+  { id: 'celestial-blue', name: 'Celestial Blue', colors: ['#191970','#C0C0C0','#F0F8FF'], emoji: '🌌', motif: '⭐', premium: true },
+  { id: 'marigold-festive', name: 'Marigold Festive', colors: ['#FFA500','#228B22','#FFFFF0'], emoji: '🌼', motif: '🎊', premium: false },
+  { id: 'ivory-elegance', name: 'Ivory Elegance', colors: ['#FFFFF0','#F7E7CE','#D4AF37'], emoji: '✨', motif: '💫', premium: false },
+  { id: 'rajwada-heritage', name: 'Rajwada Heritage', colors: ['#4B0082','#FFD700','#F8F0FF'], emoji: '🏯', motif: '👑', premium: true },
+  { id: 'tulsi-green', name: 'Tulsi Green', colors: ['#2E8B57','#8B4513','#F0FFF0'], emoji: '🌱', motif: '🍃', premium: false },
+  { id: 'diwali-lights', name: 'Diwali Lights', colors: ['#FF4500','#FFD700','#1A0033'], emoji: '🪔', motif: '✨', premium: true },
 ];
 
 /* ─── Ganesh SVG for templates ────────────────────── */
@@ -412,6 +424,20 @@ function CompatibilityModal({ data, onClose }: { data: any; onClose: () => void 
                   </div>
                 ))}
               </div>
+
+              {/* Insights from Ashtakoota analysis */}
+              {kundli.insights && kundli.insights.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <h4 className="text-xs font-bold text-zinc-700 flex items-center gap-1.5">💡 Insights</h4>
+                  {kundli.insights.map((insight: string, idx: number) => (
+                    <div key={idx} className="flex items-start gap-2 bg-indigo-50 border border-indigo-100 rounded-xl p-3">
+                      <span className="text-indigo-500 text-xs mt-0.5">•</span>
+                      <p className="text-xs text-indigo-700 leading-relaxed">{insight}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {kundli.manglikWarning && (
                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex items-start gap-2">
                   <AlertTriangle className="w-4 h-4 text-orange-500 mt-0.5 shrink-0" />
@@ -497,6 +523,7 @@ export default function DateToMarryPage() {
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [showFilters, setShowFilters] = useState(false);
   const [bioDataStep, setBioDataStep] = useState(0);
+  const [matchTab, setMatchTab] = useState<'matches' | 'incoming' | 'hold'>('matches');
 
   // Profile completion check
   const profileCompletion = myProfile ? Math.min(100, [myProfile.fullName, myProfile.religion, myProfile.caste, myProfile.education, myProfile.occupation, myProfile.fatherName, myProfile.dateOfBirth, myProfile.height, myProfile.motherTongue, myProfile.maritalStatus].filter(Boolean).length * 10) : 0;
@@ -934,6 +961,42 @@ export default function DateToMarryPage() {
               </div>
             )}
 
+            {/* Template Selection (shown when profile >= 60% complete) */}
+            {profileCompletion >= 60 && (
+              <div className="bg-gradient-to-br from-amber-50 to-rose-50 rounded-2xl border border-amber-200 p-5 space-y-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2">🎨 Choose Your BioData Template</h3>
+                  <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-medium">Profile {profileCompletion}% complete</span>
+                </div>
+                <p className="text-xs text-zinc-500">Select a beautiful template for your matrimonial biodata. Premium templates marked with ⭐</p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 max-h-64 overflow-y-auto scrollbar-none">
+                  {TEMPLATES.map(t => (
+                    <button key={t.id} onClick={() => { updateField('bioDataTemplate', t.id); setPreviewTemplate(t.id); }}
+                      className={cn('relative p-3 rounded-xl border-2 text-left transition-all hover:shadow-md',
+                        myProfile?.bioDataTemplate === t.id ? 'border-amber-500 bg-white shadow-md ring-2 ring-amber-200' : 'border-zinc-200 bg-white hover:border-amber-300')}>
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-sm" style={{ background: `linear-gradient(135deg, ${t.colors[0]}, ${t.colors[1]})` }}>
+                          <span className="text-xs">{t.emoji}</span>
+                        </div>
+                        {t.premium && <span className="text-[9px] px-1 py-0.5 bg-amber-100 text-amber-700 rounded font-bold">⭐</span>}
+                      </div>
+                      <p className="text-[11px] font-semibold text-zinc-800 truncate">{t.name}</p>
+                      <div className="flex gap-1 mt-1">
+                        {t.colors.map((c, i) => <div key={i} className="w-3 h-3 rounded-full border border-white shadow-sm" style={{ backgroundColor: c }} />)}
+                      </div>
+                      {myProfile?.bioDataTemplate === t.id && <div className="absolute top-1.5 right-1.5 w-4 h-4 bg-amber-500 rounded-full flex items-center justify-center"><span className="text-white text-[9px]">✓</span></div>}
+                    </button>
+                  ))}
+                </div>
+                {myProfile?.bioDataTemplate && (
+                  <button onClick={() => { setPreviewTemplate(myProfile.bioDataTemplate); setShowPreview(true); }}
+                    className="w-full py-2.5 rounded-xl text-xs font-semibold text-amber-700 bg-white border border-amber-200 hover:bg-amber-50 transition flex items-center justify-center gap-2">
+                    <Eye className="w-3.5 h-3.5" /> Preview &ldquo;{TEMPLATES.find(t => t.id === myProfile.bioDataTemplate)?.name}&rdquo;
+                  </button>
+                )}
+              </div>
+            )}
+
             {/* Nav Buttons */}
             <div className="flex items-center justify-between">
               <button onClick={() => setBioDataStep(Math.max(0, bioDataStep - 1))} disabled={bioDataStep === 0}
@@ -954,20 +1017,102 @@ export default function DateToMarryPage() {
           </div>
         )}
 
-        {/* ═══ MATCHES ═══════════════════════════════ */}
+        {/* ═══ MATCHES (3 TABS) ═══════════════════════════════ */}
         {section === 'matches' && (
           <div className="space-y-5">
             <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Heart className="w-5 h-5 text-rose-500" /> My Matches</h2>
-            {matches.length === 0 ? (
-              <div className="text-center py-16 bg-white rounded-2xl border border-zinc-200">
-                <Heart className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
-                <p className="text-sm text-zinc-500">No matches yet</p>
-                <p className="text-xs text-zinc-400 mt-1">Complete your profile for better matching</p>
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-                {matches.map(p => <MatrimonialCard key={p.id} profile={p} onView={() => viewProfile(p.user?.id || p.userId)} />)}
-              </div>
+            {/* Tab bar */}
+            <div className="flex gap-1 bg-zinc-100 rounded-xl p-1">
+              {([['matches', 'Matches', matches.length], ['incoming', 'Incoming', incomingRequests.filter(r => r.status === 'pending').length], ['hold', 'On Hold', sentRequests.filter(r => r.status === 'pending').length]] as const).map(([key, label, count]) => (
+                <button key={key} onClick={() => setMatchTab(key as any)} className={cn('flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all', matchTab === key ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-700')}>
+                  {label} {count > 0 && <span className="ml-1 px-1.5 py-0.5 bg-rose-100 text-rose-700 rounded-full text-[10px]">{count}</span>}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab: Matches */}
+            {matchTab === 'matches' && (
+              matches.length === 0 ? (
+                <div className="text-center py-16 bg-white rounded-2xl border border-zinc-200">
+                  <Heart className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
+                  <p className="text-sm text-zinc-500">No matches yet</p>
+                  <p className="text-xs text-zinc-400 mt-1">Complete your profile for better matching</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                  {matches.map(p => <MatrimonialCard key={p.id} profile={p} onView={() => viewProfile(p.user?.id || p.userId)} />)}
+                </div>
+              )
+            )}
+
+            {/* Tab: Incoming Requests */}
+            {matchTab === 'incoming' && (
+              incomingRequests.length === 0 ? (
+                <div className="text-center py-16 bg-white rounded-2xl border border-zinc-200">
+                  <Shield className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
+                  <p className="text-sm text-zinc-500">No incoming requests</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {incomingRequests.map(req => {
+                    const user = req.requester?.user;
+                    return (
+                      <div key={req.id} className="bg-white rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-sm">
+                        <div className="w-11 h-11 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center shrink-0">
+                          <span className="text-base font-bold text-white">{user?.displayName?.[0] || '?'}</span>
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-zinc-900">{user?.displayName || 'User'}</p>
+                          <p className="text-xs text-zinc-500">Wants: <span className="text-amber-600 font-medium">{req.accessType}</span></p>
+                          {req.message && <p className="text-xs text-zinc-400 mt-0.5 truncate">&ldquo;{req.message}&rdquo;</p>}
+                        </div>
+                        <div className="flex gap-1.5 shrink-0">
+                          {req.status === 'pending' ? (
+                            <>
+                              <button onClick={() => handleAccessAction(req.id, 'grant')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors">✓ Grant</button>
+                              <button onClick={() => handleAccessAction(req.id, 'deny')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors">✕ Deny</button>
+                            </>
+                          ) : req.status === 'granted' ? (
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-medium px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700">Granted</span>
+                              <button onClick={() => handleAccessAction(req.id, 'revoke')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-100 text-zinc-600 hover:bg-zinc-200 border border-zinc-200 transition-colors">Revoke</button>
+                            </div>
+                          ) : (
+                            <span className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-700">Denied</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            )}
+
+            {/* Tab: On Hold (Sent pending) */}
+            {matchTab === 'hold' && (
+              sentRequests.length === 0 ? (
+                <div className="text-center py-16 bg-white rounded-2xl border border-zinc-200">
+                  <Send className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
+                  <p className="text-sm text-zinc-500">No pending requests sent</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {sentRequests.map(req => (
+                    <div key={req.id} className="bg-white rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-sm">
+                      <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center shrink-0">
+                        <span className="text-base font-bold text-white">{req.owner?.user?.displayName?.[0] || '?'}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-zinc-900">{req.owner?.user?.displayName || 'User'}</p>
+                        <p className="text-xs text-zinc-500">Requested: <span className="text-amber-600 font-medium">{req.accessType}</span></p>
+                      </div>
+                      <span className={cn('text-xs font-medium px-3 py-1.5 rounded-lg', req.status === 'pending' ? 'bg-amber-50 text-amber-700 border border-amber-200' : req.status === 'granted' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700')}>
+                        {req.status === 'pending' ? '⏳ Awaiting' : req.status === 'granted' ? '✓ Granted' : '✕ Denied'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )
             )}
           </div>
         )}
@@ -980,13 +1125,14 @@ export default function DateToMarryPage() {
               <div className="bg-white rounded-2xl border border-zinc-200 p-8 text-center shadow-sm">
                 <div className="text-5xl mb-4">🔢</div>
                 <h3 className="text-base font-bold text-zinc-900 mb-2">Discover Your Numbers</h3>
-                <p className="text-sm text-zinc-500 mb-5">Calculate your Life Path, Destiny & Soul numbers based on your birth date.</p>
+                <p className="text-sm text-zinc-500 mb-5">Calculate your Life Path, Destiny & Soul numbers using Pythagorean + Vedic analysis.</p>
                 <button onClick={loadNumerology} className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-sm font-bold hover:shadow-lg transition">
                   Calculate My Numerology
                 </button>
               </div>
             ) : (
               <div className="space-y-5">
+                {/* Core Numbers */}
                 <div className="grid grid-cols-3 gap-4">
                   <div className="bg-purple-50 rounded-2xl p-5 text-center border border-purple-100">
                     <p className="text-4xl font-black text-purple-600">{numerologyData.lifePath}</p>
@@ -1001,12 +1147,68 @@ export default function DateToMarryPage() {
                     <p className="text-xs text-violet-500 font-semibold mt-2">Soul Number</p>
                   </div>
                 </div>
-                <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-3 shadow-sm">
-                  <div className="flex items-center gap-3"><span className="text-xs font-semibold text-zinc-500 w-32">Ruling Planet</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.rulingPlanet}</span></div>
-                  <div className="flex items-center gap-3"><span className="text-xs font-semibold text-zinc-500 w-32">Lucky Colors</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.luckyColors?.join(', ')}</span></div>
-                  <div className="flex items-center gap-3"><span className="text-xs font-semibold text-zinc-500 w-32">Traits</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.traits?.join(', ')}</span></div>
-                  <div className="flex items-center gap-3"><span className="text-xs font-semibold text-zinc-500 w-32">Compatible With</span><span className="text-sm text-zinc-800 font-medium">Numbers {numerologyData.compatibleNumbers?.join(', ')}</span></div>
+
+                {/* Personal Year & Karmic */}
+                <div className="grid grid-cols-2 gap-4">
+                  {numerologyData.personalYear && (
+                    <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100">
+                      <p className="text-2xl font-black text-amber-600">{numerologyData.personalYear}</p>
+                      <p className="text-xs text-amber-500 font-semibold mt-1">Personal Year</p>
+                    </div>
+                  )}
+                  {numerologyData.hasKarmicDebt && (
+                    <div className="bg-red-50 rounded-2xl p-4 border border-red-100">
+                      <p className="text-lg font-bold text-red-600">⚠️ Karmic Debt</p>
+                      <p className="text-xs text-red-500 font-medium mt-1">Lesson: {numerologyData.karmicLesson || 'Self-discovery'}</p>
+                    </div>
+                  )}
+                  {!numerologyData.hasKarmicDebt && (
+                    <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
+                      <p className="text-lg font-bold text-emerald-600">✓ Clear Karma</p>
+                      <p className="text-xs text-emerald-500 font-medium mt-1">No karmic debt detected</p>
+                    </div>
+                  )}
                 </div>
+
+                {/* Vedic Details */}
+                <div className="bg-white rounded-2xl border border-zinc-200 p-5 shadow-sm">
+                  <h3 className="text-xs font-bold text-zinc-900 mb-3 flex items-center gap-2">🕉 Vedic Numerology Details</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Ruling Planet</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.rulingPlanet}</span></div>
+                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Hora Lord</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.horaLord || '—'}</span></div>
+                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Lucky Gem</span><span className="text-sm text-zinc-800 font-medium">💎 {numerologyData.luckyGem || '—'}</span></div>
+                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Lucky Day</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.luckyDay || '—'}</span></div>
+                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Element</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.elementalEnergy || '—'}</span></div>
+                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Lucky Colors</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.luckyColors?.join(', ')}</span></div>
+                  </div>
+                </div>
+
+                {/* Mantra */}
+                {numerologyData.mantra && (
+                  <div className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-2xl border border-orange-200 p-5 text-center">
+                    <p className="text-xs text-orange-500 font-medium mb-1">Your Mantra</p>
+                    <p className="text-lg font-bold text-orange-800 italic">{numerologyData.mantra}</p>
+                    <p className="text-[10px] text-orange-400 mt-2">Chant daily for positive vibrations</p>
+                  </div>
+                )}
+
+                {/* Traits & Compatibility */}
+                <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-3 shadow-sm">
+                  <div className="flex flex-wrap gap-2">
+                    {numerologyData.traits?.map((t: string, i: number) => (
+                      <span key={i} className="px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-700 rounded-full border border-purple-100">{t}</span>
+                    ))}
+                  </div>
+                  <div className="pt-3 border-t border-zinc-100">
+                    <p className="text-xs text-zinc-500 font-semibold mb-2">Compatible Numbers</p>
+                    <div className="flex gap-2">
+                      {numerologyData.compatibleNumbers?.map((n: number) => (
+                        <span key={n} className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm flex items-center justify-center border border-indigo-200">{n}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
                 <button onClick={() => { setFilters({ numerologyMatch: 'true', sortBy: 'numerology' }); setSection('browse'); applyFilters(); }}
                   className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-sm font-bold hover:shadow-lg transition">
                   Browse Numerology-Compatible Profiles →
@@ -1094,47 +1296,60 @@ export default function DateToMarryPage() {
           </div>
         )}
 
-        {/* ═══ ACCESS CONTROL ══════════════════════════ */}
+        {/* ═══ ACCESS CONTROL (3-way: Grant / Deny / Revoke) ══════════════════════════ */}
         {section === 'access' && (
           <div className="space-y-6">
             <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Shield className="w-5 h-5 text-teal-500" /> Access Control</h2>
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-zinc-800">Incoming Requests</h3>
+            <p className="text-xs text-zinc-500 -mt-3">Manage who can see your biodata, photos, and contact details</p>
+
+            {/* Incoming Requests */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-zinc-800 flex items-center gap-2">📥 Incoming Requests <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">{incomingRequests.filter(r => r.status === 'pending').length} pending</span></h3>
               {incomingRequests.length === 0 ? (
-                <div className="text-center py-10 bg-white rounded-2xl border border-zinc-200"><Shield className="w-10 h-10 text-zinc-300 mx-auto mb-3" /><p className="text-sm text-zinc-500">No requests</p></div>
+                <div className="text-center py-10 bg-white rounded-2xl border border-zinc-200"><Shield className="w-10 h-10 text-zinc-300 mx-auto mb-3" /><p className="text-sm text-zinc-500">No incoming requests</p></div>
               ) : incomingRequests.map(req => {
                 const user = req.requester?.user;
                 return (
-                  <div key={req.id} className="bg-white rounded-xl border border-zinc-200 p-4 flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center shrink-0">
+                  <div key={req.id} className="bg-white rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center shrink-0">
                       <span className="text-base font-bold text-white">{user?.displayName?.[0] || '?'}</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-zinc-900">{user?.displayName || 'User'}</p>
                       <p className="text-xs text-zinc-500">Wants: <span className="text-amber-600 font-medium">{req.accessType}</span></p>
+                      {req.message && <p className="text-xs text-zinc-400 mt-0.5 truncate italic">&ldquo;{req.message}&rdquo;</p>}
                     </div>
                     <div className="flex gap-1.5 shrink-0">
                       {req.status === 'pending' ? (
-                        <><button onClick={() => handleAccessAction(req.id, 'grant')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200">Grant</button>
-                        <button onClick={() => handleAccessAction(req.id, 'deny')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 border border-red-200">Deny</button></>
+                        <>
+                          <button onClick={() => handleAccessAction(req.id, 'grant')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors">✓ Grant</button>
+                          <button onClick={() => handleAccessAction(req.id, 'deny')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors">✕ Deny</button>
+                        </>
+                      ) : req.status === 'granted' ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-medium px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">✓ Granted</span>
+                          <button onClick={() => handleAccessAction(req.id, 'revoke')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 transition-colors">⟲ Revoke</button>
+                        </div>
                       ) : (
-                        <span className={cn('text-xs font-medium px-3 py-1.5 rounded-lg', req.status === 'granted' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700')}>{req.status}</span>
+                        <span className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200">✕ Denied</span>
                       )}
                     </div>
                   </div>
                 );
               })}
             </div>
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-zinc-800">Sent Requests</h3>
+
+            {/* Sent Requests */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-zinc-800 flex items-center gap-2">📤 Sent Requests <span className="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">{sentRequests.filter(r => r.status === 'pending').length} awaiting</span></h3>
               {sentRequests.length === 0 ? (
                 <div className="text-center py-10 bg-white rounded-2xl border border-zinc-200"><Send className="w-10 h-10 text-zinc-300 mx-auto mb-3" /><p className="text-sm text-zinc-500">No sent requests</p></div>
               ) : sentRequests.map(req => (
-                <div key={req.id} className="bg-white rounded-xl border border-zinc-200 p-4 flex items-center gap-4">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center shrink-0"><span className="text-base font-bold text-white">{req.owner?.user?.displayName?.[0] || '?'}</span></div>
-                  <div className="flex-1"><p className="text-sm font-medium text-zinc-800">{req.owner?.user?.displayName || 'User'}</p><p className="text-xs text-zinc-500">Requested: <span className="text-amber-600">{req.accessType}</span></p></div>
-                  <span className={cn('text-xs font-medium px-3 py-1.5 rounded-lg', req.status === 'pending' ? 'bg-amber-50 text-amber-700' : req.status === 'granted' ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700')}>
-                    {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
+                <div key={req.id} className="bg-white rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-sm">
+                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center shrink-0"><span className="text-base font-bold text-white">{req.owner?.user?.displayName?.[0] || '?'}</span></div>
+                  <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-zinc-900">{req.owner?.user?.displayName || 'User'}</p><p className="text-xs text-zinc-500">Requested: <span className="text-amber-600 font-medium">{req.accessType}</span></p></div>
+                  <span className={cn('text-xs font-medium px-3 py-1.5 rounded-lg border', req.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' : req.status === 'granted' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200')}>
+                    {req.status === 'pending' ? '⏳ Awaiting' : req.status === 'granted' ? '✓ Granted' : '✕ Denied'}
                   </span>
                 </div>
               ))}
