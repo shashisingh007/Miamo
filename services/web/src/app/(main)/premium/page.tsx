@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Crown, Zap, Star, Eye, Rocket, Shield, Check } from 'lucide-react';
+import { Crown, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui';
 import Image from 'next/image';

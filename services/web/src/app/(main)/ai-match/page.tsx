@@ -2,14 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Brain, Sparkles, Heart, Zap, MessageCircle, Palette } from 'lucide-react';
+import { Brain, Sparkles, Heart, Zap, MessageCircle, Palette, UserPlus, ArrowRight } from 'lucide-react';
 import { Card, Badge, Avatar } from '@/components/ui';
+import { Button } from '@/components/ui/button';
 import { MiamoLoader } from '@/components/ui/miamo-logo';
 import { api } from '@/lib/api';
+import { useRouter } from 'next/navigation';
 
 export default function AIMatchPage() {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     api.getAiSuggestions().then(res => setSuggestions(res.data || [])).catch(() => {}).finally(() => setLoading(false));
@@ -70,6 +73,10 @@ export default function AIMatchPage() {
                             <span className="text-[10px] text-text-muted w-6 text-right">{breakdown[item.key] || '-'}</span>
                           </div>
                         ))}
+                      </div>
+                      <div className="flex gap-2 mt-3">
+                        <Button size="sm" variant="default" onClick={() => { api.likeUser(user.id).catch(() => {}); }}><Heart className="w-3 h-3 mr-1" /> Like</Button>
+                        <Button size="sm" variant="secondary" onClick={() => router.push(`/profile?id=${user.id}`)}><ArrowRight className="w-3 h-3 mr-1" /> View</Button>
                       </div>
                     </div>
                   </div>

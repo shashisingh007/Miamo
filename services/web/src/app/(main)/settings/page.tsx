@@ -182,12 +182,12 @@ export default function SettingsPage() {
           {activeSection === 'account' && (
             <div className="space-y-1">
               <h2 className="text-base font-semibold mb-4">Account</h2>
-              <SettingRow label="Email" description={user?.email || 'Not set'}><Button variant="ghost" size="sm">Change</Button></SettingRow>
-              <SettingRow label="Password" description="Last changed 30 days ago"><Button variant="ghost" size="sm">Update</Button></SettingRow>
-              <SettingRow label="Miamo ID" description={`@${user?.username || 'user'}`}><Button variant="ghost" size="sm">Edit</Button></SettingRow>
-              <SettingRow label="Phone" description="Not set"><Button variant="ghost" size="sm">Add</Button></SettingRow>
-              <SettingRow label="Two-factor authentication" description="Add extra security"><Button variant="ghost" size="sm">Enable</Button></SettingRow>
-              <SettingRow label="Active sessions" description="1 active session"><Button variant="ghost" size="sm">Manage</Button></SettingRow>
+              <SettingRow label="Email" description={user?.email || 'Not set'}><Button variant="ghost" size="sm" onClick={() => { const v = prompt('New email:', user?.email || ''); if (v) api.updateProfile({ email: v }).then(() => { setSaved(true); setTimeout(() => setSaved(false), 1500); }).catch(() => {}); }}>Change</Button></SettingRow>
+              <SettingRow label="Password" description="Last changed 30 days ago"><Button variant="ghost" size="sm" onClick={() => { const v = prompt('New password:'); if (v && v.length >= 6) api.updatePassword?.({ currentPassword: prompt('Current password:') || '', newPassword: v }).catch(() => alert('Failed to update password')); else if (v) alert('Password must be 6+ characters'); }}>Update</Button></SettingRow>
+              <SettingRow label="Miamo ID" description={`@${user?.username || 'user'}`}><Button variant="ghost" size="sm" onClick={() => { const v = prompt('New Miamo ID:', user?.username || ''); if (v) api.updateProfile({ username: v }).then(() => { setSaved(true); setTimeout(() => setSaved(false), 1500); }).catch(() => alert('Username taken or invalid')); }}>Edit</Button></SettingRow>
+              <SettingRow label="Phone" description="Not set"><Button variant="ghost" size="sm" onClick={() => { const v = prompt('Phone number:'); if (v) api.updateProfile({ phone: v }).then(() => { setSaved(true); setTimeout(() => setSaved(false), 1500); }).catch(() => {}); }}>Add</Button></SettingRow>
+              <SettingRow label="Two-factor authentication" description="Add extra security"><Button variant="ghost" size="sm" onClick={() => alert('Two-factor authentication setup coming in the next update.')}>Enable</Button></SettingRow>
+              <SettingRow label="Active sessions" description="1 active session"><Button variant="ghost" size="sm" onClick={() => alert('Session management coming soon.')}>Manage</Button></SettingRow>
             </div>
           )}
 
@@ -214,7 +214,7 @@ export default function SettingsPage() {
               <SettingRow label="Message notifications" description="New message alerts"><Toggle enabled={settings.messageNotifications} onToggle={() => toggle('messageNotifications')} /></SettingRow>
               <SettingRow label="Beat reminders" description="Daily streak reminder"><Toggle enabled={settings.beatReminders} onToggle={() => toggle('beatReminders')} /></SettingRow>
               <SettingRow label="Story notifications" description="When matches post stories"><Toggle enabled={settings.storyNotifications} onToggle={() => toggle('storyNotifications')} /></SettingRow>
-              <SettingRow label="Quiet hours" description="No notifications 11PM–7AM"><Button variant="ghost" size="sm">Configure</Button></SettingRow>
+              <SettingRow label="Quiet hours" description="No notifications 11PM–7AM"><Toggle enabled={settings.quietHours || false} onToggle={() => toggle('quietHours')} /></SettingRow>
             </div>
           )}
 
@@ -283,9 +283,9 @@ export default function SettingsPage() {
               <div className="pt-4 border-t border-border/30 mt-4">
                 <p className="text-xs text-text-muted">App version: 1.0.0 • Built with privacy first</p>
                 <div className="flex gap-3 mt-2 text-xs text-lavender-400">
-                  <button className="hover:underline">Privacy Policy</button>
-                  <button className="hover:underline">Terms of Service</button>
-                  <button className="hover:underline">Help & Support</button>
+                  <a href="/safety" className="hover:underline">Privacy Policy</a>
+                  <a href="/safety" className="hover:underline">Terms of Service</a>
+                  <a href="/safety" className="hover:underline">Help & Support</a>
                 </div>
               </div>
             </div>

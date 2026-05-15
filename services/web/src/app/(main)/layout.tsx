@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState, useCallback } from 'react';
 import { cn } from '@/lib/utils';
-import { NAV_MAIN, NAV_SECONDARY, APP_NAME } from '@/lib/constants';
+import { NAV_MAIN, NAV_SECONDARY } from '@/lib/constants';
 import { useAuthStore } from '@/stores';
 import { Avatar, ScoreRing } from '@/components/ui';
 import { api } from '@/lib/api';
@@ -17,7 +17,7 @@ import { useSSE, useSSEConnection } from '@/hooks/useSSE';
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, isAuthenticated, setAuth, clearAuth } = useAuthStore();
+  const { user, isAuthenticated, clearAuth } = useAuthStore();
   const [profile, setProfile] = useState<any>(null);
   const [notifCount, setNotifCount] = useState(0);
   const [unreadMsgCount, setUnreadMsgCount] = useState(0);
@@ -60,7 +60,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         }
       });
       api.getNotificationCount().then(res => {
-        setNotifCount(res.data?.count || res.count || 0);
+        setNotifCount(res.data?.count ?? res.count ?? 0);
       }).catch(() => {});
       refreshUnread();
     }
@@ -71,7 +71,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     if (!isAuthenticated) return;
     const interval = setInterval(() => {
       api.getNotificationCount().then(res => {
-        setNotifCount(res.data?.count || res.count || 0);
+        setNotifCount(res.data?.count ?? res.count ?? 0);
       }).catch(() => {});
       refreshUnread();
     }, 60000);

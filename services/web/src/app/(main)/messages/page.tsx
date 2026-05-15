@@ -192,7 +192,7 @@ function ChatListItem({ chat, active, onClick, onAction, selectMode, selected, o
                 <EyeOff className="w-3 h-3" /> Hide chat
               </button>
               <div className="h-px bg-border/30 my-0.5" />
-              <button onClick={() => router.push('/profile')} className="w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-miamo-elevated flex items-center gap-2">
+              <button onClick={() => router.push(`/profile?id=${other.id}`)} className="w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-miamo-elevated flex items-center gap-2">
                 <UserIcon className="w-3 h-3" /> View profile
               </button>
               <button onClick={() => handleAction('report')} className="w-full text-left px-3 py-2 text-xs text-amber-400 hover:bg-amber-400/10 flex items-center gap-2">
@@ -525,6 +525,7 @@ function CallOverlay({ type, user, onEnd }: { type: 'voice' | 'video'; user: any
           <button className="w-14 h-14 rounded-full bg-miamo-elevated border border-border flex items-center justify-center text-text-muted hover:text-text-primary"><VolumeX className="w-6 h-6" /></button>
         </div>
         <div className="flex items-center gap-2 mt-4"><Lock className="w-3 h-3 text-emerald-400" /><span className="text-[11px] text-text-muted">End-to-end encrypted</span></div>
+        <p className="text-[10px] text-text-muted/50 mt-2">Audio/video calls coming soon — this is a preview</p>
       </div>
     </motion.div>
   );
@@ -747,7 +748,7 @@ function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }
     try { const r = await api.getChatSuggestions(chat.id, context); setSuggestions(r.data || []); setShowSuggestions(true); } catch {}
   };
 
-  const goToProfile = () => router.push('/profile');
+  const goToProfile = () => router.push(`/profile?id=${other.id}`);
   const visibleMessages = messages.filter(m => !hiddenMsgIds.has(m.id));
 
   return (

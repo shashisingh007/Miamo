@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Plus, Lightbulb, Image, Video, Smile } from 'lucide-react';
+import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Lightbulb, Image, Video, Smile } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, Badge, Card, FilterChip } from '@/components/ui';
 import { MiamoLoader } from '@/components/ui/miamo-logo';
@@ -33,10 +33,10 @@ function ComposeBox({ onPost }: { onPost: () => void }) {
             className="input-premium w-full resize-none text-sm min-h-[60px]" rows={2} />
           <div className="flex items-center justify-between mt-3">
             <div className="flex gap-1">
-              <Button variant="ghost" size="icon-sm"><Image className="w-4 h-4" /></Button>
-              <Button variant="ghost" size="icon-sm"><Video className="w-4 h-4" /></Button>
-              <Button variant="ghost" size="icon-sm"><Lightbulb className="w-4 h-4" /></Button>
-              <Button variant="ghost" size="icon-sm"><Smile className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon-sm" title="Attach image" onClick={() => alert('Image upload coming in next update!')}><Image className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon-sm" title="Attach video" onClick={() => alert('Video attachment coming soon!')}><Video className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon-sm" title="Date idea" onClick={() => setContent(c => c + (c ? '\n' : '') + '💡 Date idea: ')}><Lightbulb className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon-sm" title="Add emoji" onClick={() => setContent(c => c + '❤️')}><Smile className="w-4 h-4" /></Button>
             </div>
             <Button size="sm" onClick={handlePost} disabled={posting || !content.trim()}>{posting ? 'Posting…' : 'Post'}</Button>
           </div>
@@ -125,7 +125,7 @@ function FeedPost({ post, onDelete }: { post: any; onDelete?: () => void }) {
         <p className="text-sm text-text-primary leading-relaxed">{post.content}</p>
         {post.mediaUrl && (
           <div className="mt-3 rounded-xl overflow-hidden bg-miamo-elevated aspect-video">
-            <img src={post.mediaUrl} alt="" className="w-full h-full object-contain" />
+            <img src={post.mediaUrl} alt="" className="w-full h-full object-cover" />
           </div>
         )}
       </div>

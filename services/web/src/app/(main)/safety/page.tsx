@@ -32,7 +32,7 @@ export default function SafetyPage() {
     { icon: Lock, title: 'Block & Privacy', desc: 'Block users, manage visibility, and control who can contact you.', color: 'text-amber-400', action: () => router.push('/settings') },
     { icon: Eye, title: 'Verification', desc: 'Verify your identity to build trust and get the verified badge.', color: 'text-lavender-400', action: () => router.push('/profile') },
     { icon: AlertTriangle, title: 'Scam Prevention', desc: 'Learn to recognize red flags and protect yourself from scams.', color: 'text-orange-400', action: loadTips },
-    { icon: Phone, title: 'Emergency Resources', desc: 'Quick access to local emergency contacts and helplines.', color: 'text-emerald-400', action: () => window.open('tel:911') },
+    { icon: Phone, title: 'Emergency Resources', desc: 'Quick access to local emergency contacts and helplines.', color: 'text-emerald-400', action: () => { if (confirm('This will open the phone dialer. Continue?')) window.open('tel:112'); } },
     { icon: FileText, title: 'Community Guidelines', desc: 'Read our rules for respectful and safe interactions.', color: 'text-sky-400', action: loadTips },
     { icon: Heart, title: 'Consent & Boundaries', desc: 'Understand consent-first design in messaging and media.', color: 'text-pink-400', action: loadTips },
     { icon: Users, title: 'Meeting Safely', desc: 'Tips for first dates and meeting matches in person.', color: 'text-violet-400', action: loadTips },

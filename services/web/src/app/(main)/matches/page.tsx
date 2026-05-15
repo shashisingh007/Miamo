@@ -208,7 +208,7 @@ function ProfileModal({
           <div className="relative">
             {photos.length > 0 ? (
               <div className="aspect-[3/4] max-h-[320px] overflow-hidden">
-                <img src={photos[0]?.url || photos[0]} alt={name} className="w-full h-full object-contain" />
+                <img src={photos[0]?.url || photos[0]} alt={name} className="w-full h-full object-cover" />
               </div>
             ) : (
               <div className="aspect-[3/4] max-h-[260px] bg-gradient-to-b from-white/[0.04] to-transparent flex items-center justify-center">
@@ -280,7 +280,7 @@ function ProfileModal({
               <div className="mb-4 grid grid-cols-3 gap-2">
                 {photos.slice(1, 4).map((p: any, idx: number) => (
                   <div key={idx} className="aspect-square rounded-xl overflow-hidden bg-gray-50">
-                    <img src={p.url || p} alt="" className="w-full h-full object-contain" />
+                    <img src={p.url || p} alt="" className="w-full h-full object-cover" />
                   </div>
                 ))}
               </div>
@@ -569,7 +569,7 @@ function IncomingCard({ item, onClick }: { item: any; onClick: () => void }) {
         <div className="relative flex-shrink-0">
           <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gray-50">
             {photo ? (
-              <img src={photo} alt={name} className="w-full h-full object-contain" />
+              <img src={photo} alt={name} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-xl font-black text-gray-300">{name[0]}</div>
             )}
@@ -634,7 +634,7 @@ function MatchCard({ match, onOpenMenu, onChat }: { match: any; onOpenMenu: (id:
       <div className="flex items-center gap-4 p-4">
         <div className="relative flex-shrink-0">
           <div className="w-14 h-14 rounded-2xl overflow-hidden bg-gray-50">
-            {photo ? <img src={photo} alt={name} className="w-full h-full object-contain" /> : <div className="w-full h-full flex items-center justify-center text-lg font-black text-gray-300">{name[0]}</div>}
+            {photo ? <img src={photo} alt={name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg font-black text-gray-300">{name[0]}</div>}
           </div>
           {online && <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-miamo-bg flex items-center justify-center"><div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" /></div>}
           {isPinned && <div className="absolute -top-1 -left-1 w-5 h-5 rounded-full bg-white flex items-center justify-center shadow-md"><Pin className="w-2.5 h-2.5 text-gray-900" /></div>}
@@ -1191,7 +1191,7 @@ export default function MatchesPage() {
                         )}
                         <button onClick={() => selectMode ? toggleHeldSelect(userId) : setSelectedIncoming(item)} className="relative flex-shrink-0">
                           <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-50">
-                            {photo ? <img src={photo} alt={name} className="w-full h-full object-contain" /> : <div className="w-full h-full flex items-center justify-center text-lg font-black text-gray-300">{name[0]}</div>}
+                            {photo ? <img src={photo} alt={name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg font-black text-gray-300">{name[0]}</div>}
                           </div>
                           {!selectMode && (
                             <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-amber-400/20 border border-amber-400/30 flex items-center justify-center">

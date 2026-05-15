@@ -48,7 +48,7 @@ export const useThemeStore = create<ThemeState>()(
   )
 );
 
-// ─── Discovery Store ─────────────────────────────────────
+// ─── Discovery Store (currently unused, kept for future use) ──
 interface DiscoveryState {
   currentIndex: number;
   filters: {

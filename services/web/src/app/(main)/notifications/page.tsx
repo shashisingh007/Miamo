@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Bell, Heart, MessageCircle, Zap, Users, Star } from 'lucide-react';
-import { Avatar, Badge, Card } from '@/components/ui';
+import { Avatar, Card } from '@/components/ui';
 import { MiamoLoader } from '@/components/ui/miamo-logo';
 import { api } from '@/lib/api';
 import { cn, formatRelativeTime } from '@/lib/utils';

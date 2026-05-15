@@ -7,8 +7,8 @@ import {
   ChevronDown, SlidersHorizontal, Sparkles, ArrowRight, Send,
   Zap, Eye, MessageSquare, Coffee, Wine, Cigarette, Dumbbell,
   GraduationCap, Baby, Dog, Moon, Globe, ChevronLeft, Check,
-  TrendingUp, Target, Lightbulb, Users, BarChart3, Flame, ThumbsUp,
-  CircleDot, Bookmark, Crown, Verified, Activity, Play,
+  TrendingUp, Target, Lightbulb, Users, Flame, ThumbsUp,
+  Crown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge, Card } from '@/components/ui';
@@ -311,7 +311,7 @@ function ProfileCard({
                 <div className="flex items-end justify-between">
                   <div>
                     <div className="flex items-center gap-2.5 mb-1">
-                      <h2 className="text-[28px] font-extrabold text-gray-900 tracking-tight leading-none">
+                      <h2 className="text-[28px] font-extrabold text-white tracking-tight leading-none">
                         {user.displayName}{profile.age ? `, ${profile.age}` : ''}
                       </h2>
                       {user.verified && (
@@ -325,7 +325,7 @@ function ProfileCard({
                         </motion.div>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 text-[13px] text-gray-700">
+                    <div className="flex items-center gap-3 text-[13px] text-white/80">
                       {profile.city && (
                         <span className="flex items-center gap-1">
                           <MapPin className="w-3 h-3" />{profile.city}

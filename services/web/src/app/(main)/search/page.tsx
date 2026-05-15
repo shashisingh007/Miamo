@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { Search as SearchIcon, Shield, User, Hash, MapPin, Globe, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,14 +16,21 @@ export default function SearchPage() {
   const [results, setResults] = useState<any[]>([]);
   const [searched, setSearched] = useState(false);
   const [liking, setLiking] = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
 
-  const doSearch = async (q: string) => {
+  const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) { setResults([]); setSearched(false); return; }
     setSearched(true);
     try {
       const res = await api.search(q.trim(), searchType);
       setResults(res.data || []);
     } catch (e) { setResults([]); }
+  }, [searchType]);
+
+  const handleSearchInput = (value: string) => {
+    setQuery(value);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => doSearch(value), 300);
   };
 
   return (
@@ -46,7 +53,7 @@ export default function SearchPage() {
       </div>
       <div className="relative">
         <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-text-muted" />
-        <input value={query} onChange={e => { setQuery(e.target.value); doSearch(e.target.value); }}
+        <input value={query} onChange={e => handleSearchInput(e.target.value)}
           placeholder={searchType === 'id' ? 'Enter Miamo ID' : searchType === 'city' ? 'Enter city…' : 'Search by name…'}
           className="input-premium w-full pl-12 text-base h-12" />
       </div>
@@ -63,7 +70,7 @@ export default function SearchPage() {
                     <p className="text-xs text-text-muted">{user.username ? `@${user.username}` : ''}{user.profile?.city ? ` • ${user.profile.city}` : ''}</p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="secondary" size="sm" onClick={() => router.push('/discover')}>View Profile</Button>
+                    <Button variant="secondary" size="sm" onClick={() => router.push(`/profile?id=${user.id}`)}>View Profile</Button>
                     <Button variant="ghost" size="sm" onClick={async () => {
                       setLiking(user.id);
                       try { await api.sendLike(user.id); } catch (e) {}
