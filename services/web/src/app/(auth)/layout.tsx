@@ -21,8 +21,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         <span className="heart">💖</span>
       </div>
 
-      <div className="relative z-10 mb-6">
-        <AnimatedMiamoLogo size={48} showWordmark={false} animated={true} />
+      <div className="relative z-10 mb-6 animate-fade-in-up">
+        <AnimatedMiamoLogo size={48} showWordmark={false} animated={false} />
       </div>
       <div className="relative z-10">
         {children}

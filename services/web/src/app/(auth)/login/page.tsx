@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { motion } from 'framer-motion';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -44,7 +43,7 @@ export default function LoginPage() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 w-full max-w-md">
+    <div className="relative z-10 w-full max-w-md animate-fade-in-up">
       <div className="card-premium p-8">
         <div className="text-center mb-8">
           <div className="w-12 h-12 rounded-xl overflow-hidden mx-auto mb-4">
@@ -55,9 +54,9 @@ export default function LoginPage() {
         </div>
 
         {error && (
-          <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+          <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-fade-in-up">
             {error}
-          </motion.div>
+          </div>
         )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -96,6 +95,6 @@ export default function LoginPage() {
           Demo: miamo1@miamo.test / miamo1
         </p>
       </div>
-    </motion.div>
+    </div>
   );
 }
