@@ -296,7 +296,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
         {/* Page content — fills remaining space */}
         <div className="flex-1 min-h-0 overflow-hidden">
-          {pathname.startsWith('/messages') || pathname.startsWith('/beats') ? children : (
+          {pathname.startsWith('/messages') || pathname.startsWith('/beats') || pathname.startsWith('/creativity') || pathname.startsWith('/videos') ? children : (
             <div style={{ height: '100%', overflow: 'auto' }}>
               <AnimatePresence mode="wait">
                 <motion.div
