@@ -203,6 +203,7 @@ app.use('/api/v1/discover', requireAuth, createProxyMiddleware(proxyTo(SERVICES.
 app.use('/api/v1/matches', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
 app.use('/api/v1/ai-match', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
 app.use('/api/v1/safety', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
+app.use('/api/v1/vibe-check', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
 
 // Messaging routes (protected)
 app.use('/api/v1/messages', requireAuth, createProxyMiddleware(proxyTo(SERVICES.messaging)));

@@ -98,23 +98,44 @@ export default function VibeCheckPage() {
   const [topics, setTopics] = useState<string[]>([]);
   const [intent, setIntent] = useState('');
   const [done, setDone] = useState(false);
-  const [matches, setMatches] = useState<any[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [vibeMatches, setVibeMatches] = useState<any[]>([]);
   const [vibeHistory, setVibeHistory] = useState<{ mood: string; energy: number; date: string; topics: string[] }[]>([]);
 
-  useEffect(() => { api.getMatches().then(r => setMatches(r.data || [])).catch(() => {}); }, []);
+  // Load vibe history and latest vibe on mount
+  useEffect(() => {
+    api.getVibeHistory().then(r => {
+      const data = r.data || [];
+      setVibeHistory(data.map((v: any) => ({ mood: v.mood, energy: v.energy, topics: v.topics || [], date: new Date(v.createdAt).toLocaleString() })));
+    }).catch(() => {});
+  }, []);
 
   const selectedMood = MOODS.find(m => m.id === mood);
 
   const nextStep = () => {
     if (step < VIBE_QUESTIONS.length - 1) setStep(s => s + 1);
     else {
-      setVibeHistory(prev => [{ mood, energy, date: new Date().toLocaleString(), topics }, ...prev]);
       setDone(true);
     }
   };
 
+  // Save vibe to backend + load vibe matches
+  const shareVibe = async () => {
+    setSaving(true);
+    try {
+      await api.saveVibeCheck({ mood, energy, topics, intent });
+      setVibeHistory(prev => [{ mood, energy, date: new Date().toLocaleString(), topics }, ...prev]);
+      // Load vibe-compatible users
+      const matchRes = await api.getVibeMatches();
+      setVibeMatches(matchRes.data || []);
+    } catch (e) {
+      console.error('Failed to save vibe:', e);
+    }
+    setSaving(false);
+  };
+
   const reset = () => {
-    setStep(0); setMood(''); setEnergy(0); setTopics([]); setIntent(''); setDone(false);
+    setStep(0); setMood(''); setEnergy(0); setTopics([]); setIntent(''); setDone(false); setVibeMatches([]);
   };
 
   const toggleTopic = (t: string) => setTopics(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
@@ -301,18 +322,48 @@ export default function VibeCheckPage() {
 
                 <div className="flex gap-3">
                   <Button variant="secondary" onClick={reset} className="flex-1 gap-2"><RotateCcw className="w-4 h-4" /> New Check</Button>
-                  <Button onClick={() => {}} className="flex-1 gap-2 bg-gradient-to-r from-indigo-500 to-violet-500">
-                    <Send className="w-4 h-4" /> Share Vibe
+                  <Button onClick={shareVibe} disabled={saving} className="flex-1 gap-2 bg-gradient-to-r from-indigo-500 to-violet-500">
+                    {saving ? <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity }} className="w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : <Send className="w-4 h-4" />}
+                    {saving ? 'Sharing...' : 'Share Vibe'}
                   </Button>
                 </div>
               </div>
             </Card>
 
+            {/* Vibe Matches */}
+            {vibeMatches.length > 0 && (
+              <div className="mt-6 space-y-2">
+                <h3 className="font-bold text-gray-800 flex items-center gap-2"><Zap className="w-4 h-4 text-indigo-400" /> Vibe Matches</h3>
+                <p className="text-xs text-gray-400 mb-2">People on your wavelength right now</p>
+                {vibeMatches.slice(0, 5).map((vm: any, i: number) => {
+                  const photo = vm.user?.photos?.[0]?.url || vm.user?.photos?.[0];
+                  const vmMood = MOODS.find(x => x.id === vm.mood);
+                  return (
+                    <motion.div key={i} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}>
+                      <Card hover className="p-3 flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-violet-500 flex items-center justify-center text-lg overflow-hidden">
+                          {photo ? <img src={photo} alt="" className="w-full h-full object-cover" /> : vmMood?.emoji || '✨'}
+                        </div>
+                        <div className="flex-1">
+                          <p className="font-semibold text-sm text-gray-800">{vm.user?.displayName || 'User'}</p>
+                          <p className="text-[10px] text-gray-400">{vmMood?.label || vm.mood} · Looking for {vm.intent}</p>
+                        </div>
+                        <div className="text-right">
+                          <span className="text-xs font-bold text-indigo-500">{vm.vibeScore}%</span>
+                          <p className="text-[9px] text-gray-400">vibe match</p>
+                        </div>
+                      </Card>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+
             {/* History */}
-            {vibeHistory.length > 1 && (
+            {vibeHistory.length > 0 && (
               <div className="mt-6 space-y-2">
                 <h3 className="font-bold text-gray-800 flex items-center gap-2"><Star className="w-4 h-4 text-amber-400" /> Vibe History</h3>
-                {vibeHistory.slice(1).map((v, i) => {
+                {vibeHistory.slice(0, 10).map((v, i) => {
                   const m = MOODS.find(x => x.id === v.mood);
                   return (
                     <motion.div key={i} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>

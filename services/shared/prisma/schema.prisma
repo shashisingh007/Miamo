@@ -79,6 +79,9 @@ model User {
   discoverFilter  DiscoverFilter?
   matchFeedback   MatchFeedback[] @relation("MatchFeedbackUser")
   matchFeedbackTargets MatchFeedback[] @relation("MatchFeedbackTarget")
+  vibeChecks      VibeCheck[]
+  sentDtmMessages DtmMessage[]    @relation("DtmSender")
+  receivedDtmMessages DtmMessage[] @relation("DtmRecipient")
 
   @@index([email])
   @@index([username])
@@ -859,4 +862,37 @@ model BioDataAccessRequest {
   @@unique([ownerId, requesterId, accessType])
   @@index([ownerId, status])
   @@index([requesterId])
+}
+
+// ─── Vibe Check ──────────────────────────────────────
+model VibeCheck {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mood      String
+  energy    Int      @default(3)
+  topics    String   @default("[]")
+  intent    String   @default("")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, active])
+  @@index([mood])
+}
+
+// ─── DTM Chat Messages (persistent) ─────────────────
+model DtmMessage {
+  id          String   @id @default(uuid())
+  senderId    String
+  sender      User     @relation("DtmSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   User     @relation("DtmRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  message     String
+  type        String   @default("text")
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([senderId, recipientId, createdAt])
+  @@index([recipientId, read])
 }

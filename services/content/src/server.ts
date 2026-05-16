@@ -1368,32 +1368,76 @@ app.get('/api/v1/matrimonial/browse/advanced', authMiddleware, async (req: AuthR
   } catch (e) { next(e); }
 });
 
-// DTM Chat (in-memory for now)
-const dtmMessages = new Map<string, any[]>();
+// DTM Chat (persistent — stored in DtmMessage table)
 app.post('/api/v1/matrimonial/chat/send', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { recipientId, message, type = 'text' } = req.body;
-    const chatKey = [req.userId!, recipientId].sort().join('_');
-    if (!dtmMessages.has(chatKey)) dtmMessages.set(chatKey, []);
-    const msg = { id: `msg_${Date.now()}`, senderId: req.userId, recipientId, message, type, timestamp: new Date().toISOString(), read: false };
-    dtmMessages.get(chatKey)!.push(msg);
+    if (!recipientId || !message) return res.status(400).json({ error: { message: 'recipientId and message are required' } });
+    const msg = await prisma.dtmMessage.create({
+      data: { senderId: req.userId!, recipientId, message, type },
+    });
     res.json({ data: msg });
   } catch (e) { next(e); }
 });
 app.get('/api/v1/matrimonial/chat/:userId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const chatKey = [req.userId!, req.params.userId].sort().join('_');
-    const msgs = dtmMessages.get(chatKey) || [];
-    msgs.filter(m => m.recipientId === req.userId && !m.read).forEach(m => m.read = true);
+    const userId = req.userId!;
+    const otherId = req.params.userId;
+    // Fetch all messages between these two users
+    const msgs = await prisma.dtmMessage.findMany({
+      where: {
+        OR: [
+          { senderId: userId, recipientId: otherId },
+          { senderId: otherId, recipientId: userId },
+        ],
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+    // Mark unread messages as read
+    await prisma.dtmMessage.updateMany({
+      where: { senderId: otherId, recipientId: userId, read: false },
+      data: { read: true },
+    });
     res.json({ data: msgs });
   } catch (e) { next(e); }
 });
 app.get('/api/v1/matrimonial/chat', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const chats: any[] = [];
-    dtmMessages.forEach((msgs) => {
-      const relevant = msgs.filter(m => m.senderId === req.userId || m.recipientId === req.userId);
-      if (relevant.length > 0) { const other = relevant[0].senderId === req.userId ? relevant[0].recipientId : relevant[0].senderId; const last = relevant[relevant.length-1]; const unread = relevant.filter(m => m.recipientId === req.userId && !m.read).length; chats.push({ userId: other, lastMessage: last, unreadCount: unread, totalMessages: relevant.length }); }
+    const userId = req.userId!;
+    // Get all unique chat partners
+    const sentTo = await prisma.dtmMessage.findMany({
+      where: { senderId: userId },
+      distinct: ['recipientId'],
+      select: { recipientId: true },
+    });
+    const receivedFrom = await prisma.dtmMessage.findMany({
+      where: { recipientId: userId },
+      distinct: ['senderId'],
+      select: { senderId: true },
+    });
+    const partnerIds = [...new Set([
+      ...sentTo.map(m => m.recipientId),
+      ...receivedFrom.map(m => m.senderId),
+    ])];
+
+    const chats = await Promise.all(partnerIds.map(async (partnerId) => {
+      const lastMessage = await prisma.dtmMessage.findFirst({
+        where: { OR: [{ senderId: userId, recipientId: partnerId }, { senderId: partnerId, recipientId: userId }] },
+        orderBy: { createdAt: 'desc' },
+      });
+      const unreadCount = await prisma.dtmMessage.count({
+        where: { senderId: partnerId, recipientId: userId, read: false },
+      });
+      const totalMessages = await prisma.dtmMessage.count({
+        where: { OR: [{ senderId: userId, recipientId: partnerId }, { senderId: partnerId, recipientId: userId }] },
+      });
+      return { userId: partnerId, lastMessage, unreadCount, totalMessages };
+    }));
+    // Sort by last message time
+    chats.sort((a, b) => {
+      const aTime = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
+      const bTime = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
+      return bTime - aTime;
     });
     res.json({ data: chats });
   } catch (e) { next(e); }

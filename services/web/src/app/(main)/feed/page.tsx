@@ -112,8 +112,8 @@ function FeedPost({ post, onDelete }: { post: any; onDelete?: () => void }) {
           <Button variant="ghost" size="icon-sm" onClick={() => setShowMenu(!showMenu)}><MoreHorizontal className="w-4 h-4" /></Button>
           {showMenu && (
             <>
-              <div className="fixed inset-0 z-10" onClick={() => setShowMenu(false)} />
-              <div className="absolute right-0 top-full mt-1 z-20 bg-miamo-card border border-border rounded-xl shadow-xl py-1 w-40">
+              <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+              <div className="absolute right-0 top-full mt-1 z-50 bg-miamo-card border border-border rounded-xl shadow-2xl py-1 w-40">
                 <button onClick={handleDelete} className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors">Delete post</button>
                 <button onClick={() => { setBookmarked(!bookmarked); setShowMenu(false); }} className="w-full text-left px-3 py-2 text-xs text-text-muted hover:bg-miamo-elevated transition-colors">{bookmarked ? 'Unsave' : 'Save post'}</button>
               </div>

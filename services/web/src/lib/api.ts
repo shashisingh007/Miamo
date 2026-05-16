@@ -224,6 +224,14 @@ class ApiClient {
   async getAiScore(targetId: string) { return this.request<any>(`/api/v1/ai-match/score/${targetId}`); }
   async getWhyThisMatch(targetId: string) { return this.request<any>(`/api/v1/ai-match/why/${targetId}`); }
 
+  // Vibe Check
+  async saveVibeCheck(data: { mood: string; energy: number; topics: string[]; intent: string }) {
+    return this.request<any>('/api/v1/vibe-check', { method: 'POST', body: JSON.stringify(data) });
+  }
+  async getVibeHistory() { return this.request<any>('/api/v1/vibe-check'); }
+  async getLatestVibe() { return this.request<any>('/api/v1/vibe-check/latest'); }
+  async getVibeMatches() { return this.request<any>('/api/v1/vibe-check/matches'); }
+
   // Notifications
   async getNotifications(unreadOnly?: boolean) { return this.request<any>(`/api/v1/notifications${unreadOnly ? '?unreadOnly=true' : ''}`); }
   async getNotificationCount() { return this.request<any>('/api/v1/notifications/count'); }

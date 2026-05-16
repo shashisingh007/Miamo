@@ -489,29 +489,27 @@ function FeedbackModal({
    ═══════════════════════════════════════════════════════ */
 function HeldItemMenu({ userId, onResume, onReport, onBlock, onUnmatch }: { userId: string; onResume: () => void; onReport: () => void; onBlock: () => void; onUnmatch: () => void }) {
   const [open, setOpen] = useState(false);
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const [pos, setPos] = useState({ top: 0, right: 0 });
+  const ref = useRef<HTMLDivElement>(null);
 
-  const handleOpen = () => {
-    if (btnRef.current) {
-      const rect = btnRef.current.getBoundingClientRect();
-      setPos({ top: rect.bottom + 4, right: window.innerWidth - rect.right });
-    }
-    setOpen(!open);
-  };
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   return (
-    <>
-      <button ref={btnRef} onClick={handleOpen} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition">
+    <div className="relative" ref={ref}>
+      <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }} className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition">
         <MoreVertical className="w-4 h-4" />
       </button>
       <AnimatePresence>
         {open && (
           <>
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[60]" onClick={() => setOpen(false)} />
+            <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
             <motion.div initial={{ opacity: 0, scale: 0.9, y: -5 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: -5 }}
-              style={{ top: pos.top, right: pos.right }}
-              className="fixed z-[70] w-52 py-1 rounded-xl bg-white border border-gray-200 shadow-[0_8px_40px_rgba(0,0,0,0.7)]"
+              className="absolute right-0 top-full mt-1 z-50 w-52 py-1 rounded-xl bg-white border border-gray-200 shadow-2xl"
             >
               <button onClick={() => { setOpen(false); onResume(); }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[12px] font-medium text-emerald-400 hover:bg-emerald-400/10 transition">
                 <Play className="w-3.5 h-3.5" /> Resume
@@ -530,7 +528,7 @@ function HeldItemMenu({ userId, onResume, onReport, onBlock, onUnmatch }: { user
           </>
         )}
       </AnimatePresence>
-    </>
+    </div>
   );
 }
 
@@ -980,7 +978,10 @@ export default function MatchesPage() {
   const openMenu = (matchId: string, event: React.MouseEvent) => {
     event.stopPropagation();
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    setMenuPosition({ x: rect.right - 192, y: rect.bottom + 4 });
+    // Clamp to viewport bounds
+    const y = Math.min(rect.bottom + 4, window.innerHeight - 300);
+    const x = Math.min(rect.right - 192, window.innerWidth - 210);
+    setMenuPosition({ x: Math.max(8, x), y: Math.max(8, y) });
     setMenuOpen(matchId);
   };
 
