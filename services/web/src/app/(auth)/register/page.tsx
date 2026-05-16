@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -32,7 +31,6 @@ const registerSchema = z.object({
 type RegisterData = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
-  const router = useRouter();
   const { setAuth } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -57,7 +55,7 @@ export default function RegisterPage() {
       setError('');
       const response = await api.register({ email: data.email, password: data.password, displayName: data.displayName });
       setAuth(response.data.user, response.data.accessToken);
-      router.push('/discover');
+      window.location.href = '/discover';
     } catch (err: any) {
       setError(err.message || 'Registration failed');
     }

@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -22,7 +21,6 @@ const loginSchema = z.object({
 type LoginData = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
-  const router = useRouter();
   const { setAuth } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
@@ -31,13 +29,21 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
+  const [success, setSuccess] = useState(false);
+
   const onSubmit = async (data: LoginData) => {
     try {
       setError('');
+      console.log('[Login] Submitting…');
       const response = await api.login(data);
+      console.log('[Login] API OK, setting auth…');
       setAuth(response.data.user, response.data.accessToken);
-      router.push('/discover');
+      setSuccess(true);
+      console.log('[Login] Navigating to /discover…');
+      // Use window.location for reliable full-page navigation (works in all browser contexts)
+      window.location.href = '/discover';
     } catch (err: any) {
+      console.error('[Login] Error:', err);
       setError(err.message || 'Invalid email or password');
     }
   };
@@ -56,6 +62,12 @@ export default function LoginPage() {
         {error && (
           <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-fade-in-up">
             {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="mb-4 p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-sm animate-fade-in-up">
+            Login successful! Redirecting…
           </div>
         )}
 

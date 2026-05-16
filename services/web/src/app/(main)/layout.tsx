@@ -26,9 +26,20 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
   // Wait for Zustand persist to hydrate from localStorage before deciding auth state
   useEffect(() => {
-    const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true));
+    const unsub = useAuthStore.persist.onFinishHydration(() => {
+      console.log('[Auth] Zustand persist hydrated');
+      setHydrated(true);
+    });
     // If already hydrated (e.g. client-side navigation), set immediately
-    if (useAuthStore.persist.hasHydrated()) setHydrated(true);
+    if (useAuthStore.persist.hasHydrated()) {
+      console.log('[Auth] Already hydrated');
+      setHydrated(true);
+    }
+    // Fallback: also check localStorage directly (in case persist is sluggish)
+    if (typeof window !== 'undefined' && localStorage.getItem('miamo_token')) {
+      console.log('[Auth] Token found in localStorage, marking hydrated');
+      setHydrated(true);
+    }
     return () => unsub();
   }, []);
 
@@ -65,7 +76,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       }).catch((err) => {
         if (err?.statusCode === 401 || err?.statusCode === 404) {
           clearAuth();
-          router.push('/login');
+          window.location.href = '/login';
         }
       });
       api.getNotificationCount().then(res => {
@@ -73,7 +84,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       }).catch(() => {});
       refreshUnread();
     }
-  }, [isAuthenticated, clearAuth, router, refreshUnread]);
+  }, [isAuthenticated, clearAuth, refreshUnread]);
 
   // Slow fallback poll every 60s (SSE handles real-time)
   useEffect(() => {
@@ -90,13 +101,16 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const handleLogout = async () => {
     try { await api.logout(); } catch (e) {}
     clearAuth();
-    router.push('/login');
+    window.location.href = '/login';
   };
 
   // Auth guard — redirect to login if not authenticated (only after hydration)
   useEffect(() => {
-    if (hydrated && !isAuthenticated) router.push('/login');
-  }, [hydrated, isAuthenticated, router]);
+    if (hydrated && !isAuthenticated) {
+      console.log('[Auth Guard] Not authenticated after hydration, redirecting to login');
+      window.location.href = '/login';
+    }
+  }, [hydrated, isAuthenticated]);
 
   if (!hydrated || !isAuthenticated) {
     return (
