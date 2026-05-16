@@ -103,6 +103,8 @@ async function main() {
     prisma.videoReaction.deleteMany(),
     prisma.videoComment.deleteMany(),
     prisma.video.deleteMany(),
+    prisma.storyComment.deleteMany(),
+    prisma.storyLike.deleteMany(),
     prisma.storyView.deleteMany(),
     prisma.story.deleteMany(),
     prisma.feedReaction.deleteMany(),
@@ -117,6 +119,8 @@ async function main() {
     prisma.miamoMove.deleteMany(),
     prisma.matchRequest.deleteMany(),
     prisma.like.deleteMany(),
+    prisma.bioDataAccessRequest.deleteMany(),
+    prisma.matrimonialProfile.deleteMany(),
     prisma.discoverFilter.deleteMany(),
     prisma.privacySettings.deleteMany(),
     prisma.settings.deleteMany(),
@@ -479,40 +483,523 @@ async function main() {
   }
   console.log('  ✓ Created 50 comments');
 
-  // Create notifications
+  // ── Story Views, Comments, Likes ──
+  const allStories = await prisma.story.findMany({ orderBy: { createdAt: 'desc' } });
+  for (let sv = 0; sv < allStories.length; sv++) {
+    const story = allStories[sv];
+    // Each story gets 3-8 views from random users (not the author)
+    const numViews = 3 + (sv % 6);
+    for (let v = 0; v < numViews; v++) {
+      const viewerIdx = (sv + v + 1) % 20;
+      if (userRecords[viewerIdx].id === story.authorId) continue;
+      try {
+        await prisma.storyView.create({
+          data: {
+            storyId: story.id,
+            viewerId: userRecords[viewerIdx].id,
+            reaction: v % 3 === 0 ? ['❤️', '😂', '🔥', '😮', '👏'][v % 5] : null,
+            createdAt: new Date(SEED_DATE - sv * 900000 + v * 60000),
+          },
+        });
+      } catch { /* skip duplicate */ }
+    }
+    // Half of stories get 1-2 comments
+    if (sv % 2 === 0) {
+      const commentCount = 1 + (sv % 2);
+      for (let c = 0; c < commentCount; c++) {
+        const commenterIdx = (sv + c + 3) % 20;
+        if (userRecords[commenterIdx].id === story.authorId) continue;
+        const storyCommentTexts = ['Love this! 💜', 'So pretty! ✨', 'Amazing vibes', 'This made my day!', 'Where is this?', 'Goals! 🙌', 'Beautiful!', 'Need more of this 🔥'];
+        await prisma.storyComment.create({
+          data: {
+            storyId: story.id,
+            authorId: userRecords[commenterIdx].id,
+            content: storyCommentTexts[(sv + c) % storyCommentTexts.length],
+            createdAt: new Date(SEED_DATE - sv * 900000 + c * 120000),
+          },
+        });
+      }
+    }
+    // 60% of stories get likes
+    if (sv % 5 < 3) {
+      const likeCount = 2 + (sv % 4);
+      for (let l = 0; l < likeCount; l++) {
+        const likerIdx = (sv + l + 5) % 20;
+        if (userRecords[likerIdx].id === story.authorId) continue;
+        try {
+          await prisma.storyLike.create({
+            data: {
+              storyId: story.id,
+              userId: userRecords[likerIdx].id,
+              createdAt: new Date(SEED_DATE - sv * 900000 + l * 30000),
+            },
+          });
+        } catch { /* skip duplicate */ }
+      }
+    }
+  }
+  console.log('  ✓ Created story views, comments, and likes');
+
+  // ── Video Comments & Reactions ──
+  const allVideos = await prisma.video.findMany({ orderBy: { createdAt: 'desc' } });
+  const videoCommentTexts = [
+    'This is so good! 🔥', 'Loved it!', 'More like this please', 'Incredible work!',
+    'How do you do this?', 'Subscribed!', 'Best one yet', 'Pure talent 👏',
+    'This is everything', 'Can\'t stop watching', 'So inspiring!', 'Absolutely beautiful',
+  ];
+  for (let vi = 0; vi < allVideos.length; vi++) {
+    const video = allVideos[vi];
+    // Each video gets 2-5 comments
+    const numComments = 2 + (vi % 4);
+    for (let c = 0; c < numComments; c++) {
+      const commenterIdx = (vi + c + 2) % 20;
+      if (userRecords[commenterIdx].id === video.authorId) continue;
+      await prisma.videoComment.create({
+        data: {
+          videoId: video.id,
+          authorId: userRecords[commenterIdx].id,
+          content: videoCommentTexts[(vi + c) % videoCommentTexts.length],
+          createdAt: new Date(SEED_DATE - vi * 1200000 + c * 180000),
+        },
+      });
+    }
+    // Each video gets 3-8 reactions
+    const numReactions = 3 + (vi % 6);
+    for (let r = 0; r < numReactions; r++) {
+      const reactorIdx = (vi + r + 4) % 20;
+      if (userRecords[reactorIdx].id === video.authorId) continue;
+      try {
+        await prisma.videoReaction.create({
+          data: {
+            videoId: video.id,
+            userId: userRecords[reactorIdx].id,
+            type: ['like', 'love', 'fire', 'wow', 'haha'][r % 5],
+            createdAt: new Date(SEED_DATE - vi * 1200000 + r * 60000),
+          },
+        });
+      } catch { /* skip duplicate */ }
+    }
+  }
+  console.log('  ✓ Created video comments and reactions');
+
+  // ── Creativity Comments, Reactions, Views ──
+  const allCreativity = await prisma.creativityItem.findMany({ orderBy: { createdAt: 'desc' } });
+  const creativityCommentTexts = [
+    'This is breathtaking!', 'I need to learn how you do this', 'Amazing talent 🎨',
+    'Inspiration goals!', 'Can we collab?', 'This belongs in a gallery',
+    'So much passion here', 'You make it look effortless', 'Absolutely stunning work',
+    'This gives me goosebumps', 'Take my heart ❤️', 'Next level creativity',
+  ];
+  for (let ci = 0; ci < allCreativity.length; ci++) {
+    const item = allCreativity[ci];
+    // Comments: 1-3 per item
+    const numComments = 1 + (ci % 3);
+    for (let c = 0; c < numComments; c++) {
+      const commenterIdx = (ci + c + 7) % 20;
+      if (userRecords[commenterIdx].id === item.authorId) continue;
+      await prisma.creativityComment.create({
+        data: {
+          itemId: item.id,
+          authorId: userRecords[commenterIdx].id,
+          content: creativityCommentTexts[(ci + c) % creativityCommentTexts.length],
+          createdAt: new Date(SEED_DATE - ci * 600000 + c * 120000),
+        },
+      });
+    }
+    // Reactions: 2-6 per item
+    const numReactions = 2 + (ci % 5);
+    for (let r = 0; r < numReactions; r++) {
+      const reactorIdx = (ci + r + 3) % 20;
+      if (userRecords[reactorIdx].id === item.authorId) continue;
+      try {
+        await prisma.creativityReaction.create({
+          data: {
+            itemId: item.id,
+            userId: userRecords[reactorIdx].id,
+            type: ['like', 'love', 'fire', 'wow'][r % 4],
+            createdAt: new Date(SEED_DATE - ci * 600000 + r * 30000),
+          },
+        });
+      } catch { /* skip duplicate */ }
+    }
+    // Views: 4-10 per item
+    const numViews = 4 + (ci % 7);
+    for (let v = 0; v < numViews; v++) {
+      const viewerIdx = (ci + v + 1) % 20;
+      if (userRecords[viewerIdx].id === item.authorId) continue;
+      try {
+        await prisma.creativityView.create({
+          data: {
+            itemId: item.id,
+            viewerId: userRecords[viewerIdx].id,
+            createdAt: new Date(SEED_DATE - ci * 600000 + v * 15000),
+          },
+        });
+      } catch { /* skip duplicate */ }
+    }
+  }
+  console.log('  ✓ Created creativity comments, reactions, and views');
+
+  // ── Likes (profile likes from various users) ──
+  const likePairs = [
+    [0,1],[0,3],[0,6],[1,0],[1,2],[1,5],[2,0],[2,4],[2,8],
+    [3,1],[3,7],[4,0],[4,2],[4,9],[5,1],[5,3],[5,10],
+    [6,2],[6,4],[7,0],[7,5],[7,11],[8,3],[8,6],[8,12],
+    [9,1],[9,4],[9,7],[10,0],[10,2],[10,5],[10,13],
+    [11,3],[11,6],[12,1],[12,7],[12,14],[13,0],[13,8],
+    [14,2],[14,5],[14,15],[15,1],[15,9],[15,16],
+    [16,3],[16,7],[17,0],[17,4],[17,18],[18,2],[18,6],
+    [19,1],[19,5],[19,8],
+  ];
+  for (const [from, to] of likePairs) {
+    try {
+      await prisma.like.create({
+        data: {
+          fromUserId: userRecords[from].id,
+          toUserId: userRecords[to].id,
+          targetType: 'profile',
+          createdAt: new Date(SEED_DATE - (from + to) * 1800000),
+        },
+      });
+    } catch { /* skip duplicate */ }
+  }
+  console.log(`  ✓ Created ${likePairs.length} profile likes`);
+
+  // ── Match Requests (pending, accepted, declined) ──
+  const matchRequestData = [
+    { from: 12, to: 0, type: 'comment', message: 'Your design work is incredible! Would love to connect.', status: 'pending' },
+    { from: 13, to: 1, type: 'like', message: 'Fellow creative soul! Let\'s chat.', status: 'pending' },
+    { from: 14, to: 3, type: 'comment', message: 'We both love tech and music!', status: 'pending' },
+    { from: 15, to: 2, type: 'super-like', message: 'Your architecture sketches are amazing.', status: 'accepted' },
+    { from: 16, to: 4, type: 'comment', message: 'Meditation and tech — we have a lot in common.', status: 'accepted' },
+    { from: 17, to: 6, type: 'like', message: 'A fellow foodie! I must try your recipes.', status: 'accepted' },
+    { from: 18, to: 9, type: 'comment', message: 'Your nature photography is breathtaking.', status: 'pending' },
+    { from: 19, to: 7, type: 'super-like', message: 'Your shayari gives me chills!', status: 'pending' },
+    { from: 0, to: 12, type: 'comment', message: 'Your startup journey is inspiring.', status: 'declined' },
+    { from: 1, to: 14, type: 'like', message: 'Music connects us all ♪', status: 'declined' },
+    { from: 5, to: 16, type: 'comment', message: 'Love your meditation guides.', status: 'pending' },
+    { from: 8, to: 15, type: 'like', message: 'Travel buddies?', status: 'pending' },
+    { from: 10, to: 17, type: 'comment', message: 'Your pastry art is next level!', status: 'pending' },
+    { from: 11, to: 18, type: 'super-like', message: 'Fellow nature lover here!', status: 'pending' },
+    { from: 7, to: 19, type: 'comment', message: 'I love your performances!', status: 'accepted' },
+  ];
+  for (const mr of matchRequestData) {
+    await prisma.matchRequest.create({
+      data: {
+        fromUserId: userRecords[mr.from].id,
+        toUserId: userRecords[mr.to].id,
+        type: mr.type,
+        message: mr.message,
+        status: mr.status,
+        createdAt: new Date(SEED_DATE - randInt(1, 100) * 3600000),
+      },
+    });
+  }
+  console.log(`  ✓ Created ${matchRequestData.length} match requests`);
+
+  // ── Miamo Moves (conversation starters) ──
+  const miamoMoveData = [
+    { from: 0, to: 5, message: 'Your fashion sense is on another level! What\'s your inspiration?', status: 'pending' },
+    { from: 1, to: 7, message: 'I\'d love to set your shayari to music. Interested?', status: 'accepted' },
+    { from: 2, to: 8, message: 'Your fitness journey is inspiring! Any tips for a beginner?', status: 'pending' },
+    { from: 3, to: 9, message: 'Your Berlin photography captures the city\'s soul.', status: 'accepted' },
+    { from: 4, to: 11, message: 'Your dance videos are mesmerizing!', status: 'pending' },
+    { from: 5, to: 12, message: 'I\'d love to hear about your startup journey over coffee.', status: 'pending' },
+    { from: 6, to: 13, message: 'Fellow book lover! What are you reading right now?', status: 'accepted' },
+    { from: 7, to: 14, message: 'Your guitar covers are amazing! Do you play live?', status: 'pending' },
+    { from: 8, to: 15, message: 'Fellow traveler! What\'s been your favorite destination?', status: 'accepted' },
+    { from: 9, to: 16, message: 'I\'d love to photograph your meditation sessions.', status: 'pending' },
+    { from: 10, to: 17, message: 'Can you teach me to make those incredible pastries?', status: 'pending' },
+    { from: 11, to: 18, message: 'Your mountain photography is breathtaking!', status: 'accepted' },
+    { from: 13, to: 19, message: 'Your acting range is incredible. Would love to chat!', status: 'pending' },
+    { from: 14, to: 0, message: 'Your design portfolio blew my mind!', status: 'pending' },
+    { from: 15, to: 1, message: 'Your jazz improv video gave me chills!', status: 'accepted' },
+    { from: 16, to: 2, message: 'Your architecture sketches are gallery worthy.', status: 'pending' },
+    { from: 17, to: 3, message: 'We should compare Tokyo vs Osaka food scenes!', status: 'pending' },
+    { from: 18, to: 4, message: 'Fellow keyboard enthusiast! Which switch do you prefer?', status: 'accepted' },
+    { from: 19, to: 6, message: 'I can do all the accents for your cooking show! 🎭', status: 'pending' },
+    { from: 12, to: 10, message: 'Your comedy sets look hilarious. Do you tour?', status: 'pending' },
+  ];
+  for (const mm of miamoMoveData) {
+    try {
+      await prisma.miamoMove.create({
+        data: {
+          fromUserId: userRecords[mm.from].id,
+          toUserId: userRecords[mm.to].id,
+          message: mm.message,
+          status: mm.status,
+          createdAt: new Date(SEED_DATE - randInt(1, 200) * 3600000),
+        },
+      });
+    } catch { /* skip duplicate */ }
+  }
+  console.log(`  ✓ Created ${miamoMoveData.length} Miamo Moves`);
+
+  // ── Match Feedback ──
+  for (let mfi = 0; mfi < matchRecords.length; mfi++) {
+    const match = matchRecords[mfi];
+    if (mfi % 3 === 0) {
+      // Every 3rd match gets positive feedback from user1
+      await prisma.matchFeedback.create({
+        data: {
+          matchId: match.id,
+          userId: match.user1Id,
+          targetUserId: match.user2Id,
+          type: 'positive',
+          reason: ['great_conversation', 'shared_interests', 'genuine_person', 'funny', 'kind'][mfi % 5],
+          details: ['Really enjoyed our conversations!', 'We have so much in common.', 'Such a genuine and warm person.', 'Made me laugh every time.', 'One of the kindest people on the app.'][mfi % 5],
+          createdAt: new Date(SEED_DATE - mfi * 7200000),
+        },
+      });
+    }
+    if (mfi % 4 === 0) {
+      // Every 4th match gets feedback from user2 too
+      await prisma.matchFeedback.create({
+        data: {
+          matchId: match.id,
+          userId: match.user2Id,
+          targetUserId: match.user1Id,
+          type: mfi >= 12 ? 'negative' : 'positive',
+          reason: mfi >= 12 ? 'inactive' : 'amazing_match',
+          details: mfi >= 12 ? 'Haven\'t heard back in a while.' : 'Best match on the app so far!',
+          createdAt: new Date(SEED_DATE - mfi * 5400000),
+        },
+      });
+    }
+  }
+  console.log('  ✓ Created match feedback');
+
+  // ── Discover Filters (one per user) ──
+  for (let dfi = 0; dfi < 20; dfi++) {
+    const u = USERS[dfi];
+    const oppositeGender = u.gender === 'female' ? 'male' : u.gender === 'male' ? 'female' : 'male,female';
+    await prisma.discoverFilter.create({
+      data: {
+        userId: userRecords[dfi].id,
+        minAge: Math.max(18, u.age - 5),
+        maxAge: u.age + 7,
+        distance: [25, 50, 100, 200][dfi % 4],
+        city: u.city,
+        genders: u.sexuality === 'bisexual' ? 'male,female' : u.sexuality === 'lesbian' ? 'female' : u.sexuality === 'gay' ? 'male' : oppositeGender,
+        lookingFor: u.lookingFor,
+        verified: u.verified,
+        hasPhotos: true,
+        activeToday: dfi % 3 === 0,
+        newHere: dfi % 5 === 0,
+      },
+    });
+  }
+  console.log('  ✓ Created discover filters for all 20 users');
+
+  // ── Search Logs ──
+  const searchQueries = [
+    { user: 0, query: 'musician', type: 'user', results: 3 },
+    { user: 0, query: 'photographer', type: 'user', results: 5 },
+    { user: 1, query: 'designer', type: 'user', results: 4 },
+    { user: 2, query: 'travel', type: 'user', results: 6 },
+    { user: 3, query: 'yoga', type: 'user', results: 2 },
+    { user: 4, query: 'fashion', type: 'user', results: 3 },
+    { user: 5, query: 'engineer', type: 'user', results: 4 },
+    { user: 6, query: 'poetry', type: 'user', results: 2 },
+    { user: 7, query: 'fitness', type: 'user', results: 3 },
+    { user: 8, query: 'art', type: 'user', results: 7 },
+    { user: 9, query: 'comedy', type: 'user', results: 2 },
+    { user: 10, query: 'cooking', type: 'user', results: 4 },
+    { user: 11, query: 'tech', type: 'user', results: 5 },
+    { user: 12, query: 'dance', type: 'user', results: 2 },
+    { user: 13, query: 'music production', type: 'user', results: 3 },
+    { user: 14, query: 'nature', type: 'user', results: 4 },
+    { user: 15, query: 'writing', type: 'user', results: 5 },
+    { user: 16, query: 'meditation', type: 'user', results: 2 },
+    { user: 17, query: 'sports', type: 'user', results: 3 },
+    { user: 18, query: 'hiking', type: 'user', results: 4 },
+    { user: 19, query: 'acting', type: 'user', results: 2 },
+    { user: 0, query: 'San Francisco', type: 'location', results: 1 },
+    { user: 1, query: 'New York', type: 'location', results: 1 },
+    { user: 2, query: 'Tokyo', type: 'location', results: 2 },
+    { user: 3, query: 'London', type: 'location', results: 1 },
+    { user: 4, query: 'Mumbai', type: 'location', results: 2 },
+    { user: 5, query: 'Berlin', type: 'location', results: 1 },
+    { user: 6, query: 'Paris', type: 'location', results: 1 },
+    { user: 7, query: 'Seoul', type: 'location', results: 1 },
+    { user: 8, query: 'Barcelona', type: 'location', results: 1 },
+  ];
+  for (const sl of searchQueries) {
+    await prisma.searchLog.create({
+      data: {
+        userId: userRecords[sl.user].id,
+        query: sl.query,
+        type: sl.type,
+        results: sl.results,
+        createdAt: new Date(SEED_DATE - randInt(1, 500) * 3600000),
+      },
+    });
+  }
+  console.log(`  ✓ Created ${searchQueries.length} search log entries`);
+
+  // ── Matrimonial Profiles (all 20 users) ──
+  const matriData = [
+    { num: 0, fullName: 'Aria Chen', dob: '1999-09-15', religion: 'Buddhist', caste: '', education: 'B.Des (NID)', occupation: 'Product Designer', company: 'Figma', income: '25-35 LPA', city: 'San Francisco', country: 'USA', mother: 'Lin Chen', father: 'Wei Chen', fOcc: 'Professor', mOcc: 'Doctor', brothers: 0, sisters: 1, familyType: 'Nuclear', diet: 'Non-Vegetarian', maritalStatus: 'Never Married', about: 'Creative soul with a passion for design and meaningful connections.', aboutFamily: 'Close-knit family that values education and creativity.' },
+    { num: 1, fullName: 'Marcus Rivera', dob: '1997-11-05', religion: 'Christian', caste: '', education: 'B.S. Astrophysics', occupation: 'Jazz Musician & Producer', company: 'Independent', income: '15-25 LPA', city: 'New York', country: 'USA', mother: 'Carmen Rivera', father: 'Diego Rivera', fOcc: 'Teacher', mOcc: 'Nurse', brothers: 1, sisters: 0, familyType: 'Nuclear', diet: 'Non-Vegetarian', maritalStatus: 'Never Married', about: 'Music is my language. Looking for someone who appreciates art and depth.', aboutFamily: 'Warm Puerto Rican family that celebrates through music and food.' },
+    { num: 2, fullName: 'Sofia Andersen', dob: '2002-03-10', religion: '', caste: '', education: 'M.Arch', occupation: 'Architect & Illustrator', company: 'BIG (Bjarke Ingels Group)', income: '20-30 LPA', city: 'Copenhagen', country: 'Denmark', mother: 'Ingrid Andersen', father: 'Lars Andersen', fOcc: 'Architect', mOcc: 'Interior Designer', brothers: 1, sisters: 1, familyType: 'Nuclear', diet: 'Vegetarian', maritalStatus: 'Never Married', about: 'Architecture is frozen music. I design spaces that inspire.', aboutFamily: 'A family of creatives who believe in sustainable living.' },
+    { num: 3, fullName: 'Kai Yamamoto', dob: '1999-06-02', religion: 'Shinto', caste: '', education: 'B.Tech (CS)', occupation: 'Software Engineer', company: 'Stripe', income: '40-50 LPA', city: 'Tokyo', country: 'Japan', mother: 'Yumi Yamamoto', father: 'Hiroshi Yamamoto', fOcc: 'Bank Manager', mOcc: 'Homemaker', brothers: 0, sisters: 2, familyType: 'Joint', diet: 'Non-Vegetarian', maritalStatus: 'Never Married', about: 'Tech enthusiast who believes in building things that matter.', aboutFamily: 'Traditional Japanese family that balances modernity with heritage.' },
+    { num: 4, fullName: 'Zara Okafor', dob: '1998-04-01', religion: 'Christian', caste: '', education: 'B.Des (Fashion)', occupation: 'Fashion Designer', company: 'Zara Atelier (Own Brand)', income: '20-30 LPA', city: 'Lagos', country: 'Nigeria', mother: 'Amara Okafor', father: 'Chinedu Okafor', fOcc: 'Business Owner', mOcc: 'School Principal', brothers: 2, sisters: 1, familyType: 'Joint', diet: 'Non-Vegetarian', maritalStatus: 'Never Married', about: 'Fashion tells stories. Mine is about African heritage meeting global style.', aboutFamily: 'Large, loving Nigerian family rooted in faith and entrepreneurship.' },
+    { num: 5, fullName: 'Liam O\'Connor', dob: '1995-05-14', religion: 'Catholic', caste: '', education: 'Culinary Arts (Le Cordon Bleu)', occupation: 'Chef & Food Writer', company: 'The Kitchen Table (Own)', income: '15-20 LPA', city: 'Dublin', country: 'Ireland', mother: 'Siobhan O\'Connor', father: 'Patrick O\'Connor', fOcc: 'Pub Owner', mOcc: 'Florist', brothers: 2, sisters: 0, familyType: 'Nuclear', diet: 'Non-Vegetarian', maritalStatus: 'Never Married', about: 'Michelin-trained rebel who believes food is love made visible.', aboutFamily: 'Classic Irish family: loud, loving, and always cooking together.' },
+    { num: 6, fullName: 'Priya Sharma', dob: '2001-07-20', religion: 'Hindu', caste: 'Brahmin', education: 'M.A. English Literature', occupation: 'Poet & Content Creator', company: 'Independent', income: '10-15 LPA', city: 'Mumbai', country: 'India', mother: 'Sunita Sharma', father: 'Rajesh Sharma', fOcc: 'Government Officer', mOcc: 'Teacher', brothers: 1, sisters: 0, familyType: 'Joint', diet: 'Vegetarian', maritalStatus: 'Never Married', about: 'Words are my love language. Shayari, poetry, and midnight chai.', aboutFamily: 'Traditional Indian family with modern values. Strong cultural roots.' },
+    { num: 7, fullName: 'Jake Morrison', dob: '1996-08-10', religion: '', caste: '', education: 'B.Sc (Sports Science)', occupation: 'Fitness Coach', company: 'Morrison Fitness', income: '15-20 LPA', city: 'Sydney', country: 'Australia', mother: 'Sarah Morrison', father: 'Tom Morrison', fOcc: 'Carpenter', mOcc: 'Real Estate Agent', brothers: 0, sisters: 1, familyType: 'Nuclear', diet: 'Non-Vegetarian', maritalStatus: 'Never Married', about: 'Beach runs, healthy meals, good vibes. Helping people be their strongest.', aboutFamily: 'Relaxed Aussie family that loves the outdoors.' },
+    { num: 8, fullName: 'Elena Petrova', dob: '1999-01-25', religion: '', caste: '', education: 'B.A. Fine Arts', occupation: 'Photographer & Visual Artist', company: 'Petrova Studio', income: '15-25 LPA', city: 'Berlin', country: 'Germany', mother: 'Natasha Petrova', father: 'Dmitri Petrov', fOcc: 'Engineer', mOcc: 'Classical Musician', brothers: 0, sisters: 0, familyType: 'Nuclear', diet: 'Vegetarian', maritalStatus: 'Never Married', about: 'Finding beauty in abandoned places and forgotten stories.', aboutFamily: 'Small Russian-German family with deep appreciation for arts.' },
+    { num: 9, fullName: 'Dante Williams', dob: '2000-12-08', religion: 'Christian', caste: '', education: 'B.A. Communications', occupation: 'Stand-up Comedian', company: 'Laugh Factory (Resident)', income: '10-15 LPA', city: 'Atlanta', country: 'USA', mother: 'Grace Williams', father: 'Jerome Williams', fOcc: 'Pastor', mOcc: 'Social Worker', brothers: 1, sisters: 2, familyType: 'Nuclear', diet: 'Non-Vegetarian', maritalStatus: 'Never Married', about: 'Serious about comedy, casual about everything else.', aboutFamily: 'Southern family with big hearts and bigger laughs.' },
+    { num: 10, fullName: 'Yuki Tanaka', dob: '2003-09-12', religion: '', caste: '', education: 'B.A. Performing Arts', occupation: 'Dance Student & Performer', company: 'Osaka Dance Company', income: '5-10 LPA', city: 'Osaka', country: 'Japan', mother: 'Keiko Tanaka', father: 'Takeshi Tanaka', fOcc: 'Salaryman', mOcc: 'Dance Teacher', brothers: 0, sisters: 1, familyType: 'Nuclear', diet: 'Non-Vegetarian', maritalStatus: 'Never Married', about: 'Contemporary dance is my prayer, movement is my language.', aboutFamily: 'Artistic family that encouraged creativity from childhood.' },
+    { num: 11, fullName: 'Omar Hassan', dob: '1994-01-15', religion: 'Muslim', caste: '', education: 'MBA (INSEAD)', occupation: 'Startup Founder', company: 'FinFlow Technologies', income: '50+ LPA', city: 'Dubai', country: 'UAE', mother: 'Fatima Hassan', father: 'Ahmed Hassan', fOcc: 'Businessman', mOcc: 'Homemaker', brothers: 1, sisters: 1, familyType: 'Joint', diet: 'Halal', maritalStatus: 'Never Married', about: 'Building the future of fintech. Ambitious + kind = my formula.', aboutFamily: 'Respected business family with roots in Egypt and UAE.' },
+    { num: 12, fullName: 'Maya Johnson', dob: '2004-06-15', religion: '', caste: '', education: 'B.A. English Literature (UCL)', occupation: 'Literature Student', company: 'UCL', income: '< 5 LPA', city: 'London', country: 'UK', mother: 'Helen Johnson', father: 'Richard Johnson', fOcc: 'Barrister', mOcc: 'Librarian', brothers: 0, sisters: 0, familyType: 'Nuclear', diet: 'Non-Vegetarian', maritalStatus: 'Never Married', about: 'Lost in fiction, found in conversation. Writing my thesis on love.', aboutFamily: 'London family of bookworms. Our home is 80% bookshelves.' },
+    { num: 13, fullName: 'Arjun Patel', dob: '1998-11-03', religion: 'Hindu', caste: 'Patel', education: 'M.Tech (IIT Bangalore)', occupation: 'Full Stack Developer & Musician', company: 'Razorpay', income: '30-40 LPA', city: 'Bangalore', country: 'India', mother: 'Nalini Patel', father: 'Suresh Patel', fOcc: 'Doctor', mOcc: 'Professor', brothers: 0, sisters: 1, familyType: 'Nuclear', diet: 'Vegetarian', maritalStatus: 'Never Married', about: 'Code by day, guitar by night. Building apps and melodies.', aboutFamily: 'Progressive Gujarati family that values education and music.' },
+    { num: 14, fullName: 'Luna Martinez', dob: '2001-12-06', religion: 'Catholic', caste: '', education: 'B.A. Journalism', occupation: 'Travel Blogger & Photographer', company: 'LunaExplores (Own)', income: '15-25 LPA', city: 'Barcelona', country: 'Spain', mother: 'Isabella Martinez', father: 'Carlos Martinez', fOcc: 'Wine Maker', mOcc: 'Chef', brothers: 1, sisters: 1, familyType: 'Nuclear', diet: 'Non-Vegetarian', maritalStatus: 'Never Married', about: 'Passport filled, heart open. 47 countries and counting.', aboutFamily: 'Catalonian family that lives for good food and travel.' },
+    { num: 15, fullName: 'Noah Kim', dob: '1997-09-22', religion: 'Buddhist', caste: '', education: 'M.Sc. Cognitive Psychology', occupation: 'UX Researcher & Meditation Guide', company: 'Samsung Design', income: '30-40 LPA', city: 'Seoul', country: 'South Korea', mother: 'Jisoo Kim', father: 'Minho Kim', fOcc: 'Professor', mOcc: 'Buddhist Teacher', brothers: 1, sisters: 0, familyType: 'Nuclear', diet: 'Vegetarian', maritalStatus: 'Never Married', about: 'Understanding minds professionally and personally. Zen in tech.', aboutFamily: 'Family rooted in Buddhist practice and academic pursuit.' },
+    { num: 16, fullName: 'Chloe Dubois', dob: '2002-10-08', religion: 'Catholic', caste: '', education: 'Culinary Arts (Ferrandi Paris)', occupation: 'Pastry Chef & Food Stylist', company: 'Pierre Hermé Paris', income: '15-20 LPA', city: 'Paris', country: 'France', mother: 'Camille Dubois', father: 'Jean Dubois', fOcc: 'Sommelier', mOcc: 'Art Gallery Owner', brothers: 0, sisters: 1, familyType: 'Nuclear', diet: 'Non-Vegetarian', maritalStatus: 'Never Married', about: 'Making art you can eat. Parisian by birth, creative by nature.', aboutFamily: 'A Parisian family living among wine, art, and croissants.' },
+    { num: 17, fullName: 'Ryan Brooks', dob: '2000-04-03', religion: '', caste: '', education: 'B.A. Environmental Science', occupation: 'Nature Photographer & Guide', company: 'Wild Brooks Media', income: '10-15 LPA', city: 'Denver', country: 'USA', mother: 'Lisa Brooks', father: 'Michael Brooks', fOcc: 'Park Ranger', mOcc: 'Veterinarian', brothers: 1, sisters: 0, familyType: 'Nuclear', diet: 'Non-Vegetarian', maritalStatus: 'Never Married', about: 'Mountains are my church. Capturing wild places and wilder sunsets.', aboutFamily: 'Outdoor family — grew up camping, hiking, and chasing sunsets.' },
+    { num: 18, fullName: 'Aaliya Khan', dob: '1999-03-12', religion: 'Muslim', caste: '', education: 'B.A. Theater Arts', occupation: 'Actress & Voice Artist', company: 'CBC / Independent', income: '20-30 LPA', city: 'Toronto', country: 'Canada', mother: 'Nadia Khan', father: 'Imran Khan', fOcc: 'Surgeon', mOcc: 'University Professor', brothers: 0, sisters: 2, familyType: 'Nuclear', diet: 'Halal', maritalStatus: 'Never Married', about: 'Playing characters on screen, being myself everywhere else.', aboutFamily: 'Supportive Pakistani-Canadian family that champions arts and education.' },
+    { num: 19, fullName: 'Leo Santos', dob: '1996-08-01', religion: 'Catholic', caste: '', education: 'B.Sc. Physical Education', occupation: 'Sports Coach & Athlete', company: 'São Paulo FC Academy', income: '15-25 LPA', city: 'São Paulo', country: 'Brazil', mother: 'Ana Santos', father: 'Roberto Santos', fOcc: 'Football Coach', mOcc: 'School Teacher', brothers: 1, sisters: 1, familyType: 'Nuclear', diet: 'Non-Vegetarian', maritalStatus: 'Never Married', about: 'Former pro soccer player turned coach. Teaching the beautiful game.', aboutFamily: 'Brazilian family that lives and breathes football and samba.' },
+  ];
+  for (const md of matriData) {
+    await prisma.matrimonialProfile.create({
+      data: {
+        userId: userRecords[md.num].id,
+        fullName: md.fullName,
+        dateOfBirth: new Date(md.dob),
+        religion: md.religion,
+        caste: md.caste,
+        education: md.education,
+        occupation: md.occupation,
+        company: md.company,
+        annualIncome: md.income,
+        workingCity: md.city,
+        workingCountry: md.country,
+        motherName: md.mother,
+        fatherName: md.father,
+        fatherOccupation: md.fOcc,
+        motherOccupation: md.mOcc,
+        brothers: md.brothers,
+        sisters: md.sisters ?? 0,
+        familyType: md.familyType,
+        diet: md.diet,
+        maritalStatus: md.maritalStatus,
+        aboutMe: md.about,
+        aboutFamily: md.aboutFamily,
+        bioDataGenerated: true,
+        bioDataTemplate: ['royal-rajasthani', 'modern-minimal', 'elegant-floral', 'classic-gold'][md.num % 4],
+        motherTongue: USERS[md.num].languages.split(',')[0],
+        height: USERS[md.num].height ? `${Math.floor(USERS[md.num].height! / 30.48)}'${Math.round((USERS[md.num].height! % 30.48) / 2.54)}"` : '',
+        smoking: USERS[md.num].smoking === 'never' ? 'No' : 'Occasionally',
+        drinking: USERS[md.num].drinking === 'never' ? 'No' : USERS[md.num].drinking === 'socially' ? 'Socially' : 'Yes',
+        idVerified: USERS[md.num].verified,
+        photoVerified: USERS[md.num].verified,
+      },
+    });
+  }
+  console.log('  ✓ Created 20 matrimonial profiles');
+
+  // ── Bio Data Access Requests ──
+  const matriProfiles = await prisma.matrimonialProfile.findMany();
+  const matriProfileMap: Record<string, string> = {};
+  for (const mp of matriProfiles) { matriProfileMap[mp.userId] = mp.id; }
+
+  const bioAccessData = [
+    { ownerIdx: 6, reqIdx: 13, type: 'biodata', status: 'approved' },   // Priya's biodata requested by Arjun
+    { ownerIdx: 13, reqIdx: 6, type: 'biodata', status: 'approved' },    // Arjun's biodata requested by Priya
+    { ownerIdx: 6, reqIdx: 11, type: 'phone', status: 'pending' },       // Priya's phone requested by Omar
+    { ownerIdx: 18, reqIdx: 11, type: 'biodata', status: 'approved' },   // Aaliya's biodata requested by Omar
+    { ownerIdx: 11, reqIdx: 18, type: 'biodata', status: 'pending' },    // Omar's biodata requested by Aaliya
+    { ownerIdx: 19, reqIdx: 6, type: 'phone', status: 'pending' },       // Leo's phone requested by Priya
+    { ownerIdx: 13, reqIdx: 11, type: 'contact', status: 'approved' },   // Arjun's contact requested by Omar
+    { ownerIdx: 6, reqIdx: 19, type: 'biodata', status: 'declined' },    // Priya's biodata requested by Leo (declined)
+    { ownerIdx: 18, reqIdx: 13, type: 'biodata', status: 'pending' },    // Aaliya's biodata requested by Arjun
+    { ownerIdx: 11, reqIdx: 6, type: 'linkedin', status: 'approved' },   // Omar's linkedin requested by Priya
+  ];
+  for (const ba of bioAccessData) {
+    const ownerId = matriProfileMap[userRecords[ba.ownerIdx].id];
+    const requesterId = matriProfileMap[userRecords[ba.reqIdx].id];
+    if (!ownerId || !requesterId) continue;
+    try {
+      await prisma.bioDataAccessRequest.create({
+        data: {
+          ownerId,
+          requesterId,
+          accessType: ba.type,
+          status: ba.status,
+          message: `Requesting access to ${ba.type} information.`,
+          grantedAt: ba.status === 'approved' ? new Date(SEED_DATE) : null,
+          createdAt: new Date(SEED_DATE - randInt(1, 300) * 3600000),
+        },
+      });
+    } catch { /* skip duplicate */ }
+  }
+  console.log('  ✓ Created bio data access requests');
+
+  // ── Audit Logs ──
+  const auditActions = [
+    'login', 'profile_update', 'settings_change', 'password_change', 'photo_upload',
+    'match_action', 'message_sent', 'story_posted', 'video_uploaded', 'report_filed',
+    'block_user', 'privacy_update', 'search', 'creativity_posted', 'beat_sent',
+  ];
+  for (let ai = 0; ai < 60; ai++) {
+    const userIdx = ai % 20;
+    const action = auditActions[ai % auditActions.length];
+    await prisma.auditLog.create({
+      data: {
+        userId: userRecords[userIdx].id,
+        action,
+        details: JSON.stringify({ action, timestamp: new Date(SEED_DATE - ai * 3600000).toISOString(), ip: '127.0.0.1' }),
+        createdAt: new Date(SEED_DATE - ai * 3600000),
+      },
+    });
+  }
+  console.log('  ✓ Created 60 audit log entries');
+
+  // ── Notifications (for all 20 users) ──
   const notifTypes = ['match', 'message', 'like', 'comment', 'beat', 'story', 'system'];
-  for (let ni = 0; ni < 30; ni++) {
+  for (let ni = 0; ni < 60; ni++) {
     const userIdx = ni % 20;
     const type = notifTypes[ni % notifTypes.length];
     await prisma.notification.create({
       data: {
         userId: userRecords[userIdx].id,
         type,
-        title: type === 'match' ? 'New Match! 🎉' : type === 'message' ? 'New Message' : type === 'like' ? 'Someone liked your profile' : type === 'beat' ? 'Beat reminder ⚡' : 'Notification',
-        body: type === 'match' ? 'You matched with someone!' : type === 'message' ? 'You have a new message' : type === 'like' ? 'Check who liked your profile' : type === 'beat' ? 'Don\'t lose your streak!' : 'Check your activity',
-        read: ni > 15,
+        title: type === 'match' ? 'New Match! 🎉' : type === 'message' ? 'New Message' : type === 'like' ? 'Someone liked your profile' : type === 'comment' ? 'New comment on your post' : type === 'beat' ? 'Beat reminder ⚡' : type === 'story' ? 'Someone viewed your story' : 'Welcome to Miamo!',
+        body: type === 'match' ? 'You matched with someone special!' : type === 'message' ? 'You have a new message waiting' : type === 'like' ? 'Check who liked your profile' : type === 'comment' ? 'Someone commented on your post' : type === 'beat' ? 'Don\'t lose your streak!' : type === 'story' ? 'Your story is getting attention' : 'Explore and connect!',
+        read: ni > 40,
         createdAt: new Date(SEED_DATE - ni * 1800000),
       },
     });
   }
-  console.log('  ✓ Created notifications');
+  console.log('  ✓ Created 60 notifications');
 
-  // Create reports/blocks sample
-  await prisma.report.create({
-    data: {
-      reporterId: userRecords[0].id,
-      reportedId: userRecords[19].id,
-      reason: 'spam',
-      details: 'Test report for seed data',
-      status: 'pending',
-    },
-  });
-  await prisma.block.create({
-    data: {
-      blockerId: userRecords[0].id,
-      blockedId: userRecords[19].id,
-    },
-  });
+  // ── Reports & Blocks ──
+  const reportData = [
+    { reporter: 0, reported: 19, reason: 'spam', details: 'Suspicious account activity', status: 'pending' },
+    { reporter: 2, reported: 10, reason: 'harassment', details: 'Inappropriate messages', status: 'reviewed' },
+    { reporter: 5, reported: 9, reason: 'fake-profile', details: 'Photos seem to be stolen', status: 'pending' },
+  ];
+  for (const rd of reportData) {
+    await prisma.report.create({
+      data: {
+        reporterId: userRecords[rd.reporter].id,
+        reportedId: userRecords[rd.reported].id,
+        reason: rd.reason,
+        details: rd.details,
+        status: rd.status,
+      },
+    });
+  }
+  // Block relationships
+  const blockPairs = [[0, 19], [2, 10]];
+  for (const [blocker, blocked] of blockPairs) {
+    await prisma.block.create({
+      data: {
+        blockerId: userRecords[blocker].id,
+        blockedId: userRecords[blocked].id,
+      },
+    });
+  }
   console.log('  ✓ Created reports and blocks');
 
   // Update trend scores for creativity items
@@ -569,7 +1056,13 @@ async function main() {
   console.log('✅ Seeding complete!');
   console.log('   20 users: miamo1@miamo.test to miamo20@miamo.test');
   console.log('   Password = username (e.g. miamo1/miamo1, miamo2/miamo2, etc.)');
-  console.log('   15 matches, 50 posts, 40 stories, 40 videos, 60+60 creativity items');
+  console.log('   15 matches, 50 posts, 40 stories, 40 videos, 120 creativity items');
+  console.log('   Story views/comments/likes, video comments/reactions');
+  console.log('   Creativity comments/reactions/views, 54 profile likes');
+  console.log('   15 match requests, 20 Miamo Moves, match feedback');
+  console.log('   20 discover filters, 30 search logs, 60 audit logs');
+  console.log('   20 matrimonial profiles, 10 bio data access requests');
+  console.log('   60 notifications, 3 reports, 2 blocks');
   console.log('   Dummy items: "dummy_Sports", "dummy_Music", etc. (3 per category)');
 }
 
