@@ -218,10 +218,15 @@ app.get('/api/v1/discover/filters', authMiddleware, async (req: AuthRequest, res
 app.put('/api/v1/discover/filters', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
+    // Convert any array values to comma-separated strings (schema uses String fields)
+    const data: Record<string, any> = {};
+    for (const [k, v] of Object.entries(req.body)) {
+      data[k] = Array.isArray(v) ? v.join(',') : v;
+    }
     const filter = await (prisma as any).discoverFilter.upsert({
       where: { userId },
-      create: { userId, ...req.body },
-      update: req.body,
+      create: { userId, ...data },
+      update: data,
     });
     res.json({ data: filter });
   } catch (e) { next(e); }

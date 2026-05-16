@@ -69,6 +69,9 @@ model User {
   receivedBlocks  Block[]         @relation("Blocked")
   notifications   Notification[]
   auditLogs       AuditLog[]
+  sentMoves       MiamoMove[]     @relation("MiamoMoveSent")
+  receivedMoves   MiamoMove[]     @relation("MiamoMoveReceived")
+  discoverFilter  DiscoverFilter?
 
   @@index([email])
   @@index([username])
@@ -597,4 +600,53 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
+}
+
+// ─── Miamo Move ──────────────────────────────────────
+model MiamoMove {
+  id         String   @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  fromUser   User     @relation("MiamoMoveSent", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("MiamoMoveReceived", fields: [toUserId], references: [id], onDelete: Cascade)
+  message    String   @default("")
+  targetType String   @default("profile")
+  targetId   String?
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([fromUserId, toUserId, targetType, targetId])
+  @@index([toUserId, status])
+  @@index([fromUserId, createdAt])
+}
+
+// ─── Discover Filters ────────────────────────────────
+model DiscoverFilter {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  minAge      Int      @default(18)
+  maxAge      Int      @default(99)
+  minHeight   Int?
+  maxHeight   Int?
+  distance    Int      @default(50)
+  city        String   @default("")
+  genders     String   @default("")
+  sexualities String   @default("")
+  lookingFor  String   @default("")
+  smoking     String   @default("")
+  drinking    String   @default("")
+  exercise    String   @default("")
+  education   String   @default("")
+  religion    String   @default("")
+  zodiac      String   @default("")
+  pets        String   @default("")
+  children    String   @default("")
+  activeToday Boolean  @default(false)
+  newHere     Boolean  @default(false)
+  verified    Boolean  @default(false)
+  hasPhotos   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

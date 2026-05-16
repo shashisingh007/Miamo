@@ -75,7 +75,7 @@ export default function AIMatchPage() {
                         ))}
                       </div>
                       <div className="flex gap-2 mt-3">
-                        <Button size="sm" variant="default" onClick={() => { api.likeUser(user.id).catch(() => {}); }}><Heart className="w-3 h-3 mr-1" /> Like</Button>
+                        <Button size="sm" variant="default" onClick={() => { api.sendLike(user.id).catch(() => {}); }}><Heart className="w-3 h-3 mr-1" /> Like</Button>
                         <Button size="sm" variant="secondary" onClick={() => router.push(`/profile?id=${user.id}`)}><ArrowRight className="w-3 h-3 mr-1" /> View</Button>
                       </div>
                     </div>
