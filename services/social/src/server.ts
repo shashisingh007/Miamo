@@ -41,7 +41,11 @@ app.get('/ready', async (_req, res) => {
 // ═══ DISCOVER ════════════════════════════════════════
 app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { seriousOnly, verifiedOnly, minAge, maxAge, city, cursor } = req.query;
+    const { seriousOnly, verifiedOnly, minAge, maxAge, city, cursor,
+      gender, sexuality, lookingFor, smoking, drinking, exercise,
+      education, religion, zodiac, pets, children,
+      minHeight, maxHeight, activeToday, newHere, hasPhotos,
+    } = req.query;
     const userId = req.userId!;
     const blocks = await prisma.block.findMany({ where: { OR: [{ blockerId: userId }, { blockedId: userId }] } });
     const blockedIds = blocks.map(b => b.blockerId === userId ? b.blockedId : b.blockerId);
@@ -64,8 +68,83 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
     if (minAge) profileWhere.age = { ...profileWhere.age, gte: parseInt(minAge as string) };
     if (maxAge) profileWhere.age = { ...profileWhere.age, lte: parseInt(maxAge as string) };
     if (city) profileWhere.city = { contains: city as string, mode: 'insensitive' };
+
+    // ── Gender (comma-separated, e.g. "male,female") ──
+    if (gender) {
+      const genders = (gender as string).split(',').map(g => g.trim()).filter(Boolean);
+      if (genders.length === 1) profileWhere.gender = { equals: genders[0], mode: 'insensitive' };
+      else if (genders.length > 1) profileWhere.gender = { in: genders, mode: 'insensitive' };
+    }
+    // ── Sexuality (comma-separated) ──
+    if (sexuality) {
+      const vals = (sexuality as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.sexuality = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.sexuality = { in: vals, mode: 'insensitive' };
+    }
+    // ── Looking For (comma-separated) ──
+    if (lookingFor) {
+      const vals = (lookingFor as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.lookingFor = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.lookingFor = { in: vals, mode: 'insensitive' };
+    }
+    // ── Lifestyle filters: smoking, drinking, exercise ──
+    if (smoking) {
+      const vals = (smoking as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.smoking = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.smoking = { in: vals, mode: 'insensitive' };
+    }
+    if (drinking) {
+      const vals = (drinking as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.drinking = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.drinking = { in: vals, mode: 'insensitive' };
+    }
+    if (exercise) {
+      const vals = (exercise as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.exercise = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.exercise = { in: vals, mode: 'insensitive' };
+    }
+    // ── Education, Religion, Zodiac, Pets, Children ──
+    if (education) {
+      const vals = (education as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.education = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.education = { in: vals, mode: 'insensitive' };
+    }
+    if (religion) {
+      const vals = (religion as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length > 0) profileWhere.religion = { contains: vals[0], mode: 'insensitive' };
+    }
+    if (zodiac) {
+      const vals = (zodiac as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.zodiac = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.zodiac = { in: vals, mode: 'insensitive' };
+    }
+    if (pets) {
+      const vals = (pets as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.pets = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.pets = { in: vals, mode: 'insensitive' };
+    }
+    if (children) {
+      const vals = (children as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.children = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.children = { in: vals, mode: 'insensitive' };
+    }
+    // ── Height range ──
+    if (minHeight) profileWhere.height = { ...profileWhere.height, gte: parseInt(minHeight as string) };
+    if (maxHeight) profileWhere.height = { ...profileWhere.height, lte: parseInt(maxHeight as string) };
+    // ── Active today (online or active within 24h) ──
+    if (activeToday === 'true') {
+      profileWhere.OR = [
+        { online: true },
+        { lastActive: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+      ];
+    }
+
     if (Object.keys(profileWhere).length > 0) where.profile = profileWhere;
     if (verifiedOnly === 'true') where.verified = true;
+    // ── New Here (joined within 7 days) ──
+    if (newHere === 'true') where.createdAt = { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+    // ── Has photos ──
+    if (hasPhotos === 'true') where.photos = { some: {} };
 
     const users = await prisma.user.findMany({
       where, include: { profile: true, photos: { orderBy: { position: 'asc' } }, prompts: { orderBy: { position: 'asc' } }, interests: true },

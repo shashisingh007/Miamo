@@ -90,6 +90,21 @@ model Profile {
   online          Boolean  @default(false)
   lastActive      DateTime @default(now())
   avatarGradient  String   @default("from-lavender-400 to-violet-deep")
+
+  // Lifestyle / dating preferences
+  height          Int?
+  sexuality       String   @default("straight")
+  lookingFor      String   @default("open")
+  smoking         String   @default("never")
+  drinking        String   @default("socially")
+  exercise        String   @default("sometimes")
+  education       String   @default("")
+  religion        String   @default("")
+  zodiac          String   @default("")
+  languages       String   @default("")
+  pets            String   @default("")
+  children        String   @default("")
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -97,6 +112,9 @@ model Profile {
   @@index([gender])
   @@index([datingIntent])
   @@index([seriousMode])
+  @@index([sexuality])
+  @@index([lookingFor])
+  @@index([height])
 }
 
 model ProfilePhoto {

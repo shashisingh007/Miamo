@@ -9,11 +9,17 @@ export const metadata: Metadata = {
   title: 'Miamo — Premium Dating App',
   description: 'A premium dating and social platform for meaningful connections, thoughtful matching, and authentic relationships.',
   keywords: ['dating', 'social', 'meaningful connections', 'relationships', 'AI matching'],
+  icons: {
+    icon: '/logo.png',
+    shortcut: '/logo.png',
+    apple: '/logo.png',
+  },
   openGraph: {
     title: 'Miamo — Premium Dating App',
     description: 'Premium dating and social platform',
     type: 'website',
     siteName: 'Miamo',
+    images: [{ url: '/logo.png', width: 512, height: 512 }],
   },
 };
 

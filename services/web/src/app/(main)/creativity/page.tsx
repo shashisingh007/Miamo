@@ -324,9 +324,9 @@ function ReelCard({
       {/* Background */}
       <div className="absolute inset-0">
         {hasImage ? (
-          <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-contain" />
+          <img src={item.mediaUrl} alt={item.title} className="w-full h-full object-cover" />
         ) : isVideo ? (
-          <video src={item.mediaUrl} className="w-full h-full object-contain" loop muted={!isActive} playsInline autoPlay={isActive} />
+          <video src={item.mediaUrl} className="w-full h-full object-cover" loop muted={!isActive} playsInline autoPlay={isActive} />
         ) : (
           <div className="w-full h-full" style={{ background: catGradient(catColor) }}>
             <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/20 to-black/90" />
@@ -350,7 +350,7 @@ function ReelCard({
         <button onClick={onProfileClick} className="relative mb-2">
           <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white/40 shadow-lg">
             {photo ? (
-              <img src={photo} alt={author.displayName} className="w-full h-full object-contain" />
+              <img src={photo} alt={author.displayName} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full bg-white/20 flex items-center justify-center text-sm font-bold text-white/70">
                 {(author.displayName || 'U')[0]}
@@ -404,7 +404,7 @@ function ReelCard({
         <button onClick={onProfileClick} className="flex items-center gap-2.5 mb-3">
           <div className="w-9 h-9 rounded-full overflow-hidden border border-white/30">
             {photo ? (
-              <img src={photo} alt={author.displayName} className="w-full h-full object-contain" />
+              <img src={photo} alt={author.displayName} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full bg-white/20 flex items-center justify-center text-xs font-bold text-white/70">
                 {(author.displayName || 'U')[0]}

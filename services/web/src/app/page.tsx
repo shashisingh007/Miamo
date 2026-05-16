@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ArrowRight, Compass, MessageCircle, Zap, Brain, Shield, Sparkles, Heart } from 'lucide-react';
+import { ArrowRight, Compass, MessageCircle, Zap, Brain, Shield, Sparkles, Heart, Star, Users, TrendingUp, Check, Globe, Lock, Eye, Flame } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { APP_NAME } from '@/lib/constants';
 import Image from 'next/image';
@@ -78,6 +78,26 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* Stats Bar */}
+      <section className="relative z-10 max-w-5xl mx-auto px-6 py-10">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {[
+            { value: '10K+', label: 'Active Users', icon: Users },
+            { value: '85%', label: 'Match Rate', icon: Heart },
+            { value: '50+', label: 'Cities', icon: Globe },
+            { value: '4.9', label: 'App Rating', icon: Star },
+          ].map((stat) => (
+            <div key={stat.label} className="text-center group">
+              <div className="w-12 h-12 rounded-2xl bg-pink-50 border border-pink-200/50 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                <stat.icon className="w-5 h-5 text-pink-500" />
+              </div>
+              <p className="text-2xl lg:text-3xl font-black text-gray-800">{stat.value}</p>
+              <p className="text-sm text-gray-500 mt-1">{stat.label}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* Features - Glass Cards */}
       <section className="relative z-10 max-w-6xl mx-auto px-6 py-16">
         <h2 className="text-2xl lg:text-4xl font-bold text-center mb-4 text-gray-800">
@@ -105,6 +125,121 @@ export default function LandingPage() {
               <p className="text-sm text-gray-500 leading-relaxed">{feature.desc}</p>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* How It Works */}
+      <section className="relative z-10 max-w-5xl mx-auto px-6 py-16">
+        <h2 className="text-2xl lg:text-4xl font-bold text-center mb-4 text-gray-800">
+          How {APP_NAME} Works
+        </h2>
+        <p className="text-center text-gray-500 mb-14">Three simple steps to finding your person</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {[
+            { step: '01', title: 'Create Your Profile', desc: 'Share your story through photos, prompts, and interests. Our AI helps you shine.', icon: Eye },
+            { step: '02', title: 'Discover & Connect', desc: 'Browse curated profiles, send thoughtful moves, and start meaningful conversations.', icon: Heart },
+            { step: '03', title: 'Build Something Real', desc: 'Keep the spark alive with daily beats, creativity sharing, and video dates.', icon: Flame },
+          ].map((item, idx) => (
+            <div key={item.step} className="relative text-center group">
+              {idx < 2 && (
+                <div className="hidden md:block absolute top-10 right-0 w-1/2 h-0.5 bg-gradient-to-r from-pink-300 to-transparent translate-x-full" />
+              )}
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-100 to-rose-50 border border-pink-200/50 flex items-center justify-center mx-auto mb-5 group-hover:scale-110 group-hover:shadow-lg transition-all">
+                <item.icon className="w-7 h-7 text-pink-500" />
+              </div>
+              <span className="text-[11px] font-black text-pink-400 uppercase tracking-[0.2em] mb-2 block">{item.step}</span>
+              <h3 className="text-lg font-bold text-gray-800 mb-2">{item.title}</h3>
+              <p className="text-sm text-gray-500 leading-relaxed">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* What Makes Us Different */}
+      <section className="relative z-10 max-w-6xl mx-auto px-6 py-16">
+        <h2 className="text-2xl lg:text-4xl font-bold text-center mb-4 text-gray-800">
+          What Makes {APP_NAME} Different
+        </h2>
+        <p className="text-center text-gray-500 mb-12">Built for people who want more than just another dating app</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+          {[
+            { title: 'AI-Powered Matching', desc: 'Our algorithm learns your preferences from every interaction — who you like, who you pass, and why matches work.', icon: Brain },
+            { title: 'Miamo Moves', desc: 'No more awkward first messages. Like a specific photo or prompt and add a thoughtful comment to stand out.', icon: Sparkles },
+            { title: 'Serious Mode', desc: 'Looking for something real? Toggle Serious Mode to connect only with people who are ready for commitment.', icon: Lock },
+            { title: 'Connection Streaks', desc: 'Daily Beats keep your connections warm. Share photos, moods, and moments to deepen your bond.', icon: TrendingUp },
+          ].map((item) => (
+            <div key={item.title} className="flex gap-4 p-5 rounded-2xl bg-white/60 border border-pink-100/60 backdrop-blur-sm hover:bg-white/80 hover:border-pink-200 transition-all group">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-pink-50 to-rose-50 border border-pink-200/40 flex items-center justify-center flex-shrink-0 group-hover:scale-105 transition-transform">
+                <item.icon className="w-5 h-5 text-pink-500" />
+              </div>
+              <div>
+                <h3 className="text-[15px] font-bold text-gray-800 mb-1">{item.title}</h3>
+                <p className="text-[13px] text-gray-500 leading-relaxed">{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Testimonials */}
+      <section className="relative z-10 max-w-6xl mx-auto px-6 py-16">
+        <h2 className="text-2xl lg:text-4xl font-bold text-center mb-4 text-gray-800">
+          Love Stories <Heart className="inline w-5 h-5 text-pink-500" fill="currentColor" />
+        </h2>
+        <p className="text-center text-gray-500 mb-12">Real connections made on {APP_NAME}</p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {[
+            { quote: "The AI matching is incredible — it found someone who loves hiking and photography just like me. We've been dating for 6 months now!", name: 'Sara K.', location: 'London', rating: 5 },
+            { quote: "I love the Creativity section. I posted my guitar covers and my now-boyfriend sent me a sweet Miamo Move about my playing. Best feature ever.", name: 'Priya R.', location: 'Mumbai', rating: 5 },
+            { quote: "Serious Mode changed everything for me. No more time-wasters — I matched with someone who actually wants the same things in life.", name: 'Alex T.', location: 'Berlin', rating: 5 },
+          ].map((testimonial) => (
+            <div key={testimonial.name} className="card-3d p-6 hover-lift hover:-translate-y-1 transition-all">
+              <div className="flex gap-0.5 mb-4">
+                {Array.from({ length: testimonial.rating }).map((_, i) => (
+                  <Star key={i} className="w-4 h-4 text-amber-400" fill="currentColor" />
+                ))}
+              </div>
+              <p className="text-[14px] text-gray-600 leading-relaxed mb-5 italic">&ldquo;{testimonial.quote}&rdquo;</p>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-pink-200 to-rose-200 flex items-center justify-center text-[13px] font-bold text-pink-600">
+                  {testimonial.name[0]}
+                </div>
+                <div>
+                  <p className="text-[13px] font-bold text-gray-800">{testimonial.name}</p>
+                  <p className="text-[11px] text-gray-400">{testimonial.location}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Safety & Trust */}
+      <section className="relative z-10 max-w-4xl mx-auto px-6 py-16">
+        <div className="card-3d p-8 lg:p-12 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-br from-emerald-50/50 to-teal-50/30 opacity-50" />
+          <div className="relative z-10 text-center">
+            <div className="w-14 h-14 rounded-2xl bg-emerald-100 border border-emerald-200/50 mx-auto mb-5 flex items-center justify-center">
+              <Shield className="w-7 h-7 text-emerald-500" />
+            </div>
+            <h2 className="text-xl lg:text-2xl font-bold mb-3 text-gray-800">Your Safety Is Our Priority</h2>
+            <p className="text-gray-500 mb-8 max-w-xl mx-auto">Every profile is moderated, every interaction is protected, and you're always in control.</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-2xl mx-auto">
+              {[
+                { text: 'Photo Verification', icon: Check },
+                { text: 'AI Content Moderation', icon: Shield },
+                { text: 'Block & Report Anytime', icon: Lock },
+              ].map((safety) => (
+                <div key={safety.text} className="flex items-center gap-2.5 justify-center px-4 py-3 rounded-xl bg-white/70 border border-emerald-100">
+                  <safety.icon className="w-4 h-4 text-emerald-500" />
+                  <span className="text-[13px] font-medium text-gray-700">{safety.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 
