@@ -18,10 +18,19 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const pathname = usePathname();
   const router = useRouter();
   const { user, isAuthenticated, clearAuth } = useAuthStore();
+  const [hydrated, setHydrated] = useState(false);
   const [profile, setProfile] = useState<any>(null);
   const [notifCount, setNotifCount] = useState(0);
   const [unreadMsgCount, setUnreadMsgCount] = useState(0);
   const [msgToast, setMsgToast] = useState<{ name: string; content: string } | null>(null);
+
+  // Wait for Zustand persist to hydrate from localStorage before deciding auth state
+  useEffect(() => {
+    const unsub = useAuthStore.persist.onFinishHydration(() => setHydrated(true));
+    // If already hydrated (e.g. client-side navigation), set immediately
+    if (useAuthStore.persist.hasHydrated()) setHydrated(true);
+    return () => unsub();
+  }, []);
 
   // ═══ SSE Connection ═══════════════════════════════
   useSSEConnection(isAuthenticated);
@@ -84,17 +93,17 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     router.push('/login');
   };
 
-  // Auth guard — redirect to login if not authenticated
+  // Auth guard — redirect to login if not authenticated (only after hydration)
   useEffect(() => {
-    if (!isAuthenticated) router.push('/login');
-  }, [isAuthenticated, router]);
+    if (hydrated && !isAuthenticated) router.push('/login');
+  }, [hydrated, isAuthenticated, router]);
 
-  if (!isAuthenticated) {
+  if (!hydrated || !isAuthenticated) {
     return (
       <div className="flex h-screen items-center justify-center bg-miamo-bg">
         <div className="text-center">
-          <AnimatedMiamoLogo />
-          <p className="text-text-muted mt-4 text-sm">Redirecting to login...</p>
+          <AnimatedMiamoLogo animated={false} />
+          <p className="text-text-muted mt-4 text-sm">{hydrated ? 'Redirecting to login...' : 'Loading...'}</p>
         </div>
       </div>
     );
