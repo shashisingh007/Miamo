@@ -147,7 +147,7 @@ export default function LandingPage() {
           <div className="absolute inset-0 bg-gradient-to-br from-pink-50 to-rose-50 opacity-50" />
           <div className="relative z-10">
             <div className="w-16 h-16 mx-auto mb-4">
-              <Image src="/logo-icon.png" alt="" width={64} height={64} className="w-full h-full object-contain" />
+              <Image src="/logo-icon.png" alt="Miamo" width={64} height={64} className="w-full h-full object-contain" />
             </div>
             <h2 className="text-2xl lg:text-3xl font-bold mb-4 text-gray-800">Ready to find your person?</h2>
             <p className="text-gray-500 mb-8">Join thousands already connecting on {APP_NAME}.</p>

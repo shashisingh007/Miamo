@@ -59,6 +59,9 @@ class ApiClient {
   async getMe() {
     return this.request<any>('/api/v1/auth/me');
   }
+  async updatePassword(data: { currentPassword: string; newPassword: string }) {
+    return this.request<any>('/api/v1/auth/password', { method: 'PUT', body: JSON.stringify(data) });
+  }
 
   // Discover
   async getDiscover(params?: Record<string, string>) {
@@ -214,7 +217,7 @@ class ApiClient {
   async getCreativityTrends(category?: string) { return this.request<any>(`/api/v1/creativity/trends${category ? `?category=${category}` : ''}`); }
 
   // Search
-  async search(q: string, type?: string) { return this.request<any>(`/api/v1/search?q=${encodeURIComponent(q)}${type ? `&type=${type}` : ''}`); }
+  async search(q: string, _type?: string) { return this.request<any>(`/api/v1/search?q=${encodeURIComponent(q)}&type=user`); }
 
   // AI Match
   async getAiSuggestions() { return this.request<any>('/api/v1/ai-match/suggestions'); }
@@ -232,6 +235,7 @@ class ApiClient {
   async updateSettings(data: any) { return this.request<any>('/api/v1/settings', { method: 'PUT', body: JSON.stringify(data) }); }
   async updatePrivacy(data: any) { return this.request<any>('/api/v1/settings/privacy', { method: 'PUT', body: JSON.stringify(data) }); }
   async deactivateAccount() { return this.request<any>('/api/v1/settings/deactivate', { method: 'POST' }); }
+  async deleteAccount() { return this.request<any>('/api/v1/settings/delete', { method: 'DELETE' }); }
   async exportData() { return this.request<any>('/api/v1/settings/export'); }
   async getBlockList() { return this.request<any>('/api/v1/settings/blocks'); }
 
@@ -240,6 +244,15 @@ class ApiClient {
   async updateProfile(data: any) { return this.request<any>('/api/v1/profiles/me', { method: 'PUT', body: JSON.stringify(data) }); }
   async updatePrompts(prompts: any[]) { return this.request<any>('/api/v1/profiles/me/prompts', { method: 'PUT', body: JSON.stringify({ prompts }) }); }
   async updateInterests(interests: string[]) { return this.request<any>('/api/v1/profiles/me/interests', { method: 'PUT', body: JSON.stringify({ interests }) }); }
+  async uploadPhoto(formData: FormData) {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('miamo_token') : null;
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${this.baseUrl}/api/v1/profiles/me/photos`, { method: 'POST', headers, body: formData });
+    if (!res.ok) throw new ApiError('Upload failed', res.status, 'UPLOAD_ERROR');
+    return res.json();
+  }
+  async deletePhoto(photoId: string) { return this.request<any>(`/api/v1/profiles/me/photos/${photoId}`, { method: 'DELETE' }); }
 
   // Safety
   async reportUser(data: any) { return this.request<any>('/api/v1/safety/report', { method: 'POST', body: JSON.stringify(data) }); }

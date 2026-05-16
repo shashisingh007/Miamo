@@ -143,6 +143,25 @@ app.post('/api/v1/auth/logout', authMiddleware, async (req: AuthRequest, res: Re
   } catch (e) { next(e); }
 });
 
+// Change password
+app.put('/api/v1/auth/password', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) throw new AppError('Both current and new password required', 400, 'VALIDATION_ERROR');
+    if (newPassword.length < 6) throw new AppError('New password must be at least 6 characters', 400, 'VALIDATION_ERROR');
+
+    const user = await prisma.user.findUnique({ where: { id: req.userId } });
+    if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
+
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) throw new AppError('Current password is incorrect', 401, 'INVALID_CREDENTIALS');
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({ where: { id: req.userId }, data: { passwordHash } });
+    res.json({ data: { success: true, message: 'Password updated successfully' } });
+  } catch (e) { next(e); }
+});
+
 // Get current user
 app.get('/api/v1/auth/me', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {

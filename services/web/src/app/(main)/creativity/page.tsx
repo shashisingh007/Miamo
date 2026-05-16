@@ -17,6 +17,13 @@ import { MiamoLoader } from '@/components/ui/miamo-logo';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 
+/* ─── Format large numbers (e.g., 1200 → 1.2k) ─── */
+const fmt = (n: number): string => {
+  if (n >= 1000000) return (n / 1000000).toFixed(1) + 'M';
+  if (n >= 1000) return (n / 1000).toFixed(1) + 'k';
+  return String(n);
+};
+
 /* ─── Category Definitions ──────────────────────────── */
 const CATEGORIES = [
   { id: 'general', name: 'general', label: 'For You', icon: Sparkles, color: '#EC407A' },

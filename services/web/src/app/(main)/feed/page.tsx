@@ -125,7 +125,7 @@ function FeedPost({ post, onDelete }: { post: any; onDelete?: () => void }) {
         <p className="text-sm text-text-primary leading-relaxed">{post.content}</p>
         {post.mediaUrl && (
           <div className="mt-3 rounded-xl overflow-hidden bg-miamo-elevated aspect-video">
-            <img src={post.mediaUrl} alt="" className="w-full h-full object-cover" />
+            <img src={post.mediaUrl} alt="Post media" className="w-full h-full object-cover" />
           </div>
         )}
       </div>
@@ -154,7 +154,7 @@ function FeedPost({ post, onDelete }: { post: any; onDelete?: () => void }) {
             <Button size="sm" onClick={submitComment} disabled={!commentText.trim()}>Post</Button>
           </div>
           {loadingComments ? (
-            <div className="flex justify-center py-3"><img src="/logo.png" alt="" className="w-5 h-5 rounded animate-pulse" /></div>
+            <div className="flex justify-center py-3"><img src="/logo.png" alt="Loading" className="w-5 h-5 rounded animate-pulse" /></div>
           ) : comments.length === 0 ? (
             <p className="text-xs text-text-muted text-center py-2">No comments yet. Be the first!</p>
           ) : (
@@ -180,7 +180,14 @@ export default function FeedPage() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const filters = ['All', 'Thoughts', 'Photos', 'Date Ideas', 'Moods', 'Milestones'];
+  const filters = [
+    { label: 'All', value: 'all' },
+    { label: 'Thoughts', value: 'thought' },
+    { label: 'Photos', value: 'image' },
+    { label: 'Date Ideas', value: 'date-idea' },
+    { label: 'Moods', value: 'mood' },
+    { label: 'Milestones', value: 'milestone' },
+  ];
 
   const loadPosts = () => {
     setLoading(true);
@@ -197,10 +204,9 @@ export default function FeedPage() {
     <div className="max-w-2xl mx-auto p-6 space-y-5">
       <ComposeBox onPost={loadPosts} />
       <div className="flex gap-2 overflow-x-auto no-scrollbar">
-        {filters.map(f => {
-          const id = f.toLowerCase().replace(' ', '-');
-          return <FilterChip key={f} label={f} active={activeFilter === id || (f === 'All' && activeFilter === 'all')} onClick={() => setActiveFilter(id)} />;
-        })}
+        {filters.map(f => (
+          <FilterChip key={f.value} label={f.label} active={activeFilter === f.value} onClick={() => setActiveFilter(f.value)} />
+        ))}
       </div>
       {loading ? (
         <MiamoLoader text="Loading feed..." />

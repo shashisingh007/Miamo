@@ -65,6 +65,7 @@ export default function SettingsPage() {
     messageNotifications: true,
     beatReminders: true,
     storyNotifications: false,
+    quietHours: false,
     darkMode: true,
     reduceMotion: false,
     disappearingMessages: false,
@@ -183,7 +184,7 @@ export default function SettingsPage() {
             <div className="space-y-1">
               <h2 className="text-base font-semibold mb-4">Account</h2>
               <SettingRow label="Email" description={user?.email || 'Not set'}><Button variant="ghost" size="sm" onClick={() => { const v = prompt('New email:', user?.email || ''); if (v) api.updateProfile({ email: v }).then(() => { setSaved(true); setTimeout(() => setSaved(false), 1500); }).catch(() => {}); }}>Change</Button></SettingRow>
-              <SettingRow label="Password" description="Last changed 30 days ago"><Button variant="ghost" size="sm" onClick={() => { const v = prompt('New password:'); if (v && v.length >= 6) api.updatePassword?.({ currentPassword: prompt('Current password:') || '', newPassword: v }).catch(() => alert('Failed to update password')); else if (v) alert('Password must be 6+ characters'); }}>Update</Button></SettingRow>
+              <SettingRow label="Password" description="Last changed 30 days ago"><Button variant="ghost" size="sm" onClick={() => { const v = prompt('New password:'); if (v && v.length >= 6) { const cur = prompt('Current password:'); if (cur) api.updatePassword({ currentPassword: cur, newPassword: v }).then(() => { setSaved(true); setTimeout(() => setSaved(false), 1500); }).catch(() => alert('Failed to update password')); } else if (v) alert('Password must be 6+ characters'); }}>Update</Button></SettingRow>
               <SettingRow label="Miamo ID" description={`@${user?.username || 'user'}`}><Button variant="ghost" size="sm" onClick={() => { const v = prompt('New Miamo ID:', user?.username || ''); if (v) api.updateProfile({ username: v }).then(() => { setSaved(true); setTimeout(() => setSaved(false), 1500); }).catch(() => alert('Username taken or invalid')); }}>Edit</Button></SettingRow>
               <SettingRow label="Phone" description="Not set"><Button variant="ghost" size="sm" onClick={() => { const v = prompt('Phone number:'); if (v) api.updateProfile({ phone: v }).then(() => { setSaved(true); setTimeout(() => setSaved(false), 1500); }).catch(() => {}); }}>Add</Button></SettingRow>
               <SettingRow label="Two-factor authentication" description="Add extra security"><Button variant="ghost" size="sm" onClick={() => alert('Two-factor authentication setup coming in the next update.')}>Enable</Button></SettingRow>
@@ -273,7 +274,7 @@ export default function SettingsPage() {
                 {showDeleteConfirm ? (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-red-400">Are you sure?</span>
-                    <Button variant="danger" size="sm" onClick={async () => { try { await api.deactivateAccount(); clearAuth(); router.push('/login'); } catch (e) {} }}>Yes, Delete</Button>
+                    <Button variant="danger" size="sm" onClick={async () => { try { await api.deleteAccount(); clearAuth(); router.push('/login'); } catch (e) { alert('Failed to delete account'); } }}>Yes, Delete</Button>
                     <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
                   </div>
                 ) : (

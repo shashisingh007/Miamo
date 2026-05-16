@@ -84,6 +84,22 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     router.push('/login');
   };
 
+  // Auth guard — redirect to login if not authenticated
+  useEffect(() => {
+    if (!isAuthenticated) router.push('/login');
+  }, [isAuthenticated, router]);
+
+  if (!isAuthenticated) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-miamo-bg">
+        <div className="text-center">
+          <AnimatedMiamoLogo />
+          <p className="text-text-muted mt-4 text-sm">Redirecting to login...</p>
+        </div>
+      </div>
+    );
+  }
+
   const displayUser = profile?.user || user || { displayName: 'User', username: 'user' };
   const profileScore = profile?.user?.profile?.profileScore || profile?.profile?.profileScore || 70;
 
@@ -278,7 +294,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
         {/* Mobile Nav — Glass Premium */}
         <nav className="lg:hidden shrink-0 border-t border-pink-100/30 px-2 py-2 flex items-center justify-around frosted">
-          {NAV_MAIN.slice(0, 5).map((item) => {
+          {NAV_MAIN.slice(0, 4).map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
             const Icon = item.icon;
             const isMessages = item.href === '/messages';
@@ -297,6 +313,18 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               </Link>
             );
           })}
+          {/* More menu item for remaining nav items */}
+          <Link href="/profile" className={cn('flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all', ['/profile', '/creativity', '/stories', '/serious-mode', '/settings', '/notifications'].some(p => pathname.startsWith(p)) ? 'text-lavender-500' : 'text-gray-400')}>
+            <div className="w-5 h-5 flex items-center justify-center">
+              <div className="grid grid-cols-2 gap-[2px]">
+                <div className="w-[5px] h-[5px] rounded-sm bg-current" />
+                <div className="w-[5px] h-[5px] rounded-sm bg-current" />
+                <div className="w-[5px] h-[5px] rounded-sm bg-current" />
+                <div className="w-[5px] h-[5px] rounded-sm bg-current" />
+              </div>
+            </div>
+            <span className="text-[10px] font-medium">More</span>
+          </Link>
         </nav>
       </main>
 

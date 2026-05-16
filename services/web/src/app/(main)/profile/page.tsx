@@ -27,12 +27,20 @@ export default function ProfilePage() {
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    // Preview immediately (in production, upload to storage then update profile)
+    // Preview immediately and upload to API
     const preview = URL.createObjectURL(file);
     setProfile((prev: any) => ({
       ...prev,
       user: { ...(prev?.user || prev), photos: [{ url: preview }, ...(prev?.user?.photos || prev?.photos || [])] },
     }));
+    // Upload via API (FormData for file upload)
+    const formData = new FormData();
+    formData.append('photo', file);
+    api.uploadPhoto(formData).then(() => {
+      loadProfile(); // Refresh with server data
+    }).catch(() => {
+      // Show preview locally even if upload fails for now
+    });
     e.target.value = '';
   };
 

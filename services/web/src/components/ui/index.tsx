@@ -1,7 +1,7 @@
 'use client';
 
+import React, { useState } from 'react';
 import { cn, getInitials } from '@/lib/utils';
-import { useState } from 'react';
 
 // ═══════════════════════════════════════════════════════════
 // AVATAR — PREMIUM WITH GRADIENT RING
@@ -32,12 +32,15 @@ export function Avatar({ src, name, size = 'md', online, verified, className, ri
 
   return (
     <div className={cn('relative shrink-0', className)}>
+      {/* Gradient ring for stories */}
+      {storyRing && (
+        <div className={cn('absolute inset-[-3px] rounded-full bg-gradient-to-r from-pink-400 via-rose-500 to-purple-500')} />
+      )}
       <div className={cn(
-        'rounded-full overflow-hidden flex items-center justify-center shadow-sm',
+        'rounded-full overflow-hidden flex items-center justify-center shadow-sm relative',
         sizeMap[size],
         ring && 'ring-2 ring-pink-300/50 ring-offset-2 ring-offset-white',
-        storyRing && 'ring-2 ring-offset-2 ring-offset-white',
-        storyRing && 'ring-gradient-to-r from-pink-400 to-rose-500',
+        storyRing && 'ring-2 ring-white ring-offset-0',
         !src || failed ? 'bg-gradient-to-br from-pink-100 to-rose-100' : ''
       )}>
         {src && !failed ? (
@@ -160,6 +163,7 @@ interface ScoreRingProps {
 }
 
 export function ScoreRing({ score, size = 48, strokeWidth = 3, className }: ScoreRingProps) {
+  const gradientId = React.useId();
   const radius = (size - strokeWidth) / 2;
   const circumference = radius * 2 * Math.PI;
   const offset = circumference - (score / 100) * circumference;
@@ -168,11 +172,11 @@ export function ScoreRing({ score, size = 48, strokeWidth = 3, className }: Scor
     <div className={cn('relative inline-flex items-center justify-center', className)}>
       <svg width={size} height={size} className="-rotate-90">
         <circle cx={size / 2} cy={size / 2} r={radius} stroke="currentColor" strokeWidth={strokeWidth} fill="none" className="text-pink-100" />
-        <circle cx={size / 2} cy={size / 2} r={radius} stroke="url(#scoreGradPremium)" strokeWidth={strokeWidth} fill="none"
+        <circle cx={size / 2} cy={size / 2} r={radius} stroke={`url(#${gradientId})`} strokeWidth={strokeWidth} fill="none"
           strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
           className="transition-all duration-1000 ease-out" />
         <defs>
-          <linearGradient id="scoreGradPremium" x1="0%" y1="0%" x2="100%" y2="100%">
+          <linearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="100%">
             <stop offset="0%" stopColor="#EC407A" />
             <stop offset="50%" stopColor="#D81B60" />
             <stop offset="100%" stopColor="#AD1457" />
