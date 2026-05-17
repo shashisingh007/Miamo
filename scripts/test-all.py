@@ -21,6 +21,10 @@ def req(path, method="GET", data=None, token=None):
 d, _ = req("/api/v1/auth/login", "POST", {"email":"miamo1@miamo.test","password":"miamo1"})
 token = d["data"]["accessToken"]
 
+# Discover a valid user ID for DTM tests (first profile in discover results)
+disc, _ = req("/api/v1/discover", "GET", None, token)
+dtm_recipient = disc["data"][0]["id"] if disc.get("data") else "unknown"
+
 tests = [
     ("Gateway Health", "GET", "/health", None, None),
     ("Discover (AI sorted)", "GET", "/api/v1/discover", None, token),
@@ -29,12 +33,12 @@ tests = [
     ("Vibe History", "GET", "/api/v1/vibe-check", None, token),
     ("Vibe Latest", "GET", "/api/v1/vibe-check/latest", None, token),
     ("Vibe Matches", "GET", "/api/v1/vibe-check/matches", None, token),
-    ("DTM Chat Send", "POST", "/api/v1/matrimonial/chat/send", {"recipientId":"3405256b-18f7-41b9-92e8-466ae52f7250","message":"Test persistent","type":"text"}, token),
-    ("DTM Messages", "GET", "/api/v1/matrimonial/chat/3405256b-18f7-41b9-92e8-466ae52f7250", None, token),
+    ("DTM Chat Send", "POST", "/api/v1/matrimonial/chat/send", {"recipientId": dtm_recipient, "message":"Test persistent","type":"text"}, token),
+    ("DTM Messages", "GET", "/api/v1/matrimonial/chat/" + dtm_recipient, None, token),
     ("DTM Chat List", "GET", "/api/v1/matrimonial/chat", None, token),
     ("Matches", "GET", "/api/v1/matches", None, token),
     ("Incoming", "GET", "/api/v1/matches/incoming", None, token),
-    ("Messages", "GET", "/api/v1/messages", None, token),
+    ("Messages", "GET", "/api/v1/messages/chats", None, token),
     ("Feed", "GET", "/api/v1/feed", None, token),
     ("Creativity", "GET", "/api/v1/creativity/feed", None, token),
     ("Notifications", "GET", "/api/v1/notifications", None, token),

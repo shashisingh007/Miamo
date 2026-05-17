@@ -8,6 +8,9 @@ import { MiamoLoader } from '@/components/ui/miamo-logo';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useTrackPageView, useTrackScrollDepth, trackContentEngage } from '@/hooks/useTrackActivity';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { useToast } from '@/components/ui/toast';
 
 function VideoCard({ video }: { video: any }) {
   const [liked, setLiked] = useState(video.liked || false);
@@ -39,7 +42,7 @@ function VideoCard({ video }: { video: any }) {
   return (
     <Card hover className="overflow-hidden group">
       <div className="relative aspect-[9/16] max-h-[320px] bg-miamo-elevated">
-        {video.thumbnailUrl ? <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" /> :
+        {video.thumbnailUrl ? <img loading="lazy" src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" /> :
           <div className="w-full h-full bg-gradient-to-br from-lavender-400/10 to-violet-deep/10" />}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
@@ -84,6 +87,9 @@ export default function VideosPage() {
   const [filter, setFilter] = useState('all');
   const [videos, setVideos] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useTrackPageView('videos');
+  useTrackScrollDepth('videos');
   const filters = ['All', 'For You', 'Trending', 'Music', 'Dance', 'Travel', 'Food'];
 
   useEffect(() => {
@@ -94,8 +100,9 @@ export default function VideosPage() {
   }, [filter]);
 
   return (
+    <ErrorBoundary>
     <div className="max-w-6xl mx-auto p-6 space-y-6">
-      <div><h1 className="text-xl font-bold">Videos</h1><p className="text-sm text-text-muted mt-0.5">Short-form videos from the community</p></div>
+      <div><h1 className="text-xl font-bold dark:text-white">Videos</h1><p className="text-sm text-text-muted mt-0.5 dark:text-gray-400">Short-form videos from the community</p></div>
       <div className="flex gap-2 overflow-x-auto no-scrollbar">
         {filters.map(f => (<FilterChip key={f} label={f} active={filter === f.toLowerCase()} onClick={() => setFilter(f.toLowerCase())} />))}
       </div>
@@ -114,5 +121,6 @@ export default function VideosPage() {
         </div>
       )}
     </div>
+    </ErrorBoundary>
   );
 }

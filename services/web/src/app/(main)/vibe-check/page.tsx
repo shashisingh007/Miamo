@@ -11,6 +11,9 @@ import { Button } from '@/components/ui/button';
 import { Card, Badge, Avatar } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { useTrackPageView, useTrackScrollDepth, trackClick } from '@/hooks/useTrackActivity';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { useToast } from '@/components/ui/toast';
 
 /* ═══ Mood Emojis ═══ */
 const MOODS = [
@@ -102,6 +105,9 @@ export default function VibeCheckPage() {
   const [vibeMatches, setVibeMatches] = useState<any[]>([]);
   const [vibeHistory, setVibeHistory] = useState<{ mood: string; energy: number; date: string; topics: string[] }[]>([]);
 
+  useTrackPageView('vibe-check');
+  useTrackScrollDepth('vibe-check');
+
   // Load vibe history and latest vibe on mount
   useEffect(() => {
     api.getVibeHistory().then(r => {
@@ -129,7 +135,7 @@ export default function VibeCheckPage() {
       const matchRes = await api.getVibeMatches();
       setVibeMatches(matchRes.data || []);
     } catch (e) {
-      console.error('Failed to save vibe:', e);
+      if (process.env.NODE_ENV === 'development') console.warn('Failed to save vibe:', e);
     }
     setSaving(false);
   };
@@ -141,6 +147,7 @@ export default function VibeCheckPage() {
   const toggleTopic = (t: string) => setTopics(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
 
   return (
+    <ErrorBoundary>
     <div className="max-w-3xl mx-auto p-6 pb-24 relative">
       <Particles />
 
@@ -155,8 +162,8 @@ export default function VibeCheckPage() {
             <AudioLines className="w-7 h-7 text-white" />
           </motion.div>
           <div>
-            <h1 className="text-2xl font-black text-gray-800">Vibe Check</h1>
-            <p className="text-sm text-gray-400">Share your vibe with your matches 🎯</p>
+            <h1 className="text-2xl font-black text-gray-800 dark:text-white">Vibe Check</h1>
+            <p className="text-sm text-gray-400 dark:text-gray-500">Share your vibe with your matches 🎯</p>
           </div>
         </div>
       </motion.div>
@@ -342,7 +349,7 @@ export default function VibeCheckPage() {
                     <motion.div key={i} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}>
                       <Card hover className="p-3 flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-violet-500 flex items-center justify-center text-lg overflow-hidden">
-                          {photo ? <img src={photo} alt="" className="w-full h-full object-cover" /> : vmMood?.emoji || '✨'}
+                          {photo ? <img loading="lazy" src={photo} alt="" className="w-full h-full object-cover" /> : vmMood?.emoji || '✨'}
                         </div>
                         <div className="flex-1">
                           <p className="font-semibold text-sm text-gray-800">{vm.user?.displayName || 'User'}</p>
@@ -386,5 +393,6 @@ export default function VibeCheckPage() {
         )}
       </AnimatePresence>
     </div>
+    </ErrorBoundary>
   );
 }

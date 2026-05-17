@@ -6,8 +6,14 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
+import { logger } from '../../shared/src/logger';
+import { sanitize } from '../../shared/src/sanitize';
 
-export const prisma = new PrismaClient();
+const DB_URL = process.env.DATABASE_URL || 'postgresql://miamo:miamo@localhost:5432/miamo?schema=public';
+export const prisma = new PrismaClient({
+  log: process.env.NODE_ENV === 'production' ? ['error'] : ['warn', 'error'],
+  datasources: { db: { url: DB_URL + (DB_URL.includes('?') ? '&' : '?') + 'connection_limit=5&pool_timeout=20' } },
+});
 export const app = express();
 const PORT = parseInt(process.env.PORT || '3206', 10);
 
@@ -77,6 +83,19 @@ app.post('/api/v1/notifications/read-all', authMiddleware, async (req: AuthReque
   try { await prisma.notification.updateMany({ where: { userId: req.userId!, read: false }, data: { read: true } }); res.json({ data: { success: true } }); } catch (e) { next(e); }
 });
 
+// Bulk mark-read by IDs
+app.post('/api/v1/notifications/mark-read', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { ids } = req.body;
+    if (ids && Array.isArray(ids) && ids.length > 0) {
+      await prisma.notification.updateMany({ where: { id: { in: ids }, userId: req.userId! }, data: { read: true } });
+    } else {
+      await prisma.notification.updateMany({ where: { userId: req.userId!, read: false }, data: { read: true } });
+    }
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
+
 // Internal endpoint for other services to create notifications
 app.post('/internal/notifications', async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -84,7 +103,9 @@ app.post('/internal/notifications', async (req: Request, res: Response, next: Ne
     if (key !== (process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key')) {
       return res.status(403).json({ error: { message: 'Forbidden' } });
     }
-    const { userId, type, title, body, data } = req.body;
+    const { userId, type, title: rawTitle, body: rawBody, data } = req.body;
+    const title = sanitize(rawTitle || '');
+    const body = sanitize(rawBody || '');
     const notification = await prisma.notification.create({ data: { userId, type, title, body, data: data || '{}' } });
     // Push real-time notification to user via SSE
     const unreadCount = await prisma.notification.count({ where: { userId, read: false } });
@@ -100,5 +121,17 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, '0.0.0.0', () => { console.log(`\n⚡ Miamo Notification Service on port ${PORT}\n`); });
+  const server = app.listen(PORT, '0.0.0.0', () => { logger.info(`Miamo Notification Service on port ${PORT}`); });
+
+  const shutdown = async (signal: string) => {
+    logger.info(`${signal} received — shutting down notifications service...`);
+    server.close(async () => {
+      await prisma.$disconnect();
+      logger.info('Notifications service stopped cleanly');
+      process.exit(0);
+    });
+    setTimeout(() => { process.exit(1); }, 10000);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }

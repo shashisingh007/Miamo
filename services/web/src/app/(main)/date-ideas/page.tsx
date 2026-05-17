@@ -12,6 +12,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, Badge, Avatar } from '@/components/ui';
 import { cn } from '@/lib/utils';
+import { useTrackPageView, useTrackScrollDepth, trackClick } from '@/hooks/useTrackActivity';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { useToast } from '@/components/ui/toast';
 
 /* ═══ Categories ═══ */
 const CATEGORIES = [
@@ -88,6 +91,9 @@ export default function DateIdeasPage() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [spotlight, setSpotlight] = useState<DateIdea | null>(null);
 
+  useTrackPageView('date-ideas');
+  useTrackScrollDepth('date-ideas');
+
   const filtered = cat === 'all' ? ideas : ideas.filter(i => i.category === cat);
 
   const toggleSave = (id: number) => setIdeas(prev => prev.map(i => i.id === id ? { ...i, saved: !i.saved } : i));
@@ -102,6 +108,7 @@ export default function DateIdeasPage() {
   const catInfo = CATEGORIES.find(c => c.id === cat) || CATEGORIES[0];
 
   return (
+    <ErrorBoundary>
     <div className="max-w-3xl mx-auto p-6 pb-24 relative">
       <FloatingSparkles />
 
@@ -114,8 +121,8 @@ export default function DateIdeasPage() {
             <Lightbulb className="w-7 h-7 text-white" />
           </motion.div>
           <div className="flex-1">
-            <h1 className="text-2xl font-black text-gray-800">Date Ideas</h1>
-            <p className="text-sm text-gray-400">{filtered.length} ideas to spark your next date ✨</p>
+            <h1 className="text-2xl font-black text-gray-800 dark:text-white">Date Ideas</h1>
+            <p className="text-sm text-gray-400 dark:text-gray-500">{filtered.length} ideas to spark your next date ✨</p>
           </div>
           <Button onClick={randomIdea} className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 shadow-lg shadow-orange-100">
             <RefreshCcw className="w-4 h-4" /> Surprise Me
@@ -262,5 +269,6 @@ export default function DateIdeasPage() {
         </motion.div>
       )}
     </div>
+    </ErrorBoundary>
   );
 }

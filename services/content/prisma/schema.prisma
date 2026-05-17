@@ -73,6 +73,9 @@ model User {
   receivedBlocks  Block[]         @relation("Blocked")
   notifications   Notification[]
   auditLogs       AuditLog[]
+  sessions        Session[]
+  bookmarks       Bookmark[]      @relation("BookmarkOwner")
+  bookmarkedBy    Bookmark[]      @relation("BookmarkTarget")
 
   sentMoves       MiamoMove[]     @relation("MiamoMoveSent")
   receivedMoves   MiamoMove[]     @relation("MiamoMoveReceived")
@@ -82,6 +85,7 @@ model User {
   vibeChecks      VibeCheck[]
   sentDtmMessages DtmMessage[]    @relation("DtmSender")
   receivedDtmMessages DtmMessage[] @relation("DtmRecipient")
+  activities      UserActivity[]
 
   @@index([email])
   @@index([username])
@@ -118,6 +122,9 @@ model Profile {
   pets            String   @default("")
   children        String   @default("")
 
+  politicalViews  String   @default("")
+  diet            String   @default("")
+
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
@@ -128,6 +135,9 @@ model Profile {
   @@index([sexuality])
   @@index([lookingFor])
   @@index([height])
+  @@index([gender, city])
+  @@index([age])
+  @@index([online])
 }
 
 model ProfilePhoto {
@@ -228,6 +238,8 @@ model Like {
 
   @@unique([fromUserId, toUserId, targetType, targetId])
   @@index([toUserId])
+  @@index([fromUserId])
+  @@index([fromUserId, createdAt])
 }
 
 model MatchRequest {
@@ -698,6 +710,9 @@ model Block {
   blockedId  String
   blocker    User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
   blocked    User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  reason     String   @default("")
+  details    String   @default("")
+  evidence   String   @default("")
   createdAt  DateTime @default(now())
 
   @@unique([blockerId, blockedId])
@@ -730,6 +745,45 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([userId, createdAt])
+}
+
+// ─── Sessions (device/IP tracking) ───────────────────
+model Session {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token        String    @unique
+  deviceType   String    @default("")
+  deviceName   String    @default("")
+  browser      String    @default("")
+  os           String    @default("")
+  ipAddress    String    @default("")
+  userAgent    String    @default("")
+  location     String    @default("")
+  lastActiveAt DateTime  @default(now())
+  expiresAt    DateTime?
+  revoked      Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+
+  @@index([userId, revoked])
+  @@index([token])
+  @@index([userId, lastActiveAt])
+}
+
+// ─── Bookmarks / Saved Profiles ──────────────────────
+model Bookmark {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation("BookmarkOwner", fields: [userId], references: [id], onDelete: Cascade)
+  targetId   String
+  target     User     @relation("BookmarkTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  targetType String   @default("profile")
+  note       String   @default("")
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, targetId, targetType])
+  @@index([userId, createdAt])
+  @@index([targetId])
 }
 
 // ─── Matrimonial / Serious Mode ──────────────────────
@@ -879,6 +933,26 @@ model VibeCheck {
   @@index([userId, createdAt])
   @@index([userId, active])
   @@index([mood])
+}
+
+// ─── User Activity Tracking (behavioral analytics) ──
+model UserActivity {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action      String   // view, like, pass, swipe, click, scroll, search, dwell, share, comment, match, unmatch, block, move
+  targetType  String   @default("profile") // profile, feed, story, video, creativity, chat, notification
+  targetId    String?
+  metadata    String?  @default("{}") // JSON: duration_ms, scroll_depth, search_query, etc.
+  durationMs  Int?     // time spent on target (dwell time)
+  sessionId   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, action, targetType])
+  @@index([targetType, targetId])
+  @@index([action, createdAt])
+  @@index([userId, targetType, createdAt])
 }
 
 // ─── DTM Chat Messages (persistent) ─────────────────

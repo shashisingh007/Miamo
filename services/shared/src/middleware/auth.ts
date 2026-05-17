@@ -3,12 +3,26 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'miamo-dev-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || 'miamo-dev-jwt-secret-change-in-production-2026';
 
+/**
+ * Express request type extended with authenticated user ID.
+ * Populated by `authMiddleware` after successful JWT verification.
+ */
 export interface AuthRequest extends Request {
   userId?: string;
 }
 
+/**
+ * JWT authentication middleware for all microservices.
+ *
+ * Two authentication paths:
+ * 1. **Internal service-to-service**: Trusts `x-user-id` header when accompanied
+ *    by a valid `x-internal-key` (set by the API Gateway).
+ * 2. **External client**: Verifies a `Bearer` JWT from the Authorization header.
+ *
+ * On success, sets `req.userId` and calls `next()`. On failure, returns 401.
+ */
 export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   // Internal service-to-service calls pass userId in header
   const internalUserId = req.headers['x-user-id'] as string;

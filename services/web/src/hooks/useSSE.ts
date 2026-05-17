@@ -7,7 +7,10 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3200';
 
 type SSEHandler = (data: any) => void;
 
-// Global singleton — shared across all components
+// ─── Global SSE Singleton ───────────────────────────
+// A single EventSource is shared across ALL components in the app.
+// This prevents multiple SSE connections per tab (which would waste server resources).
+// Components subscribe via useSSE() but don't own the connection lifecycle.
 let globalSource: EventSource | null = null;
 let globalHandlers = new Map<string, Set<SSEHandler>>();
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -32,8 +35,9 @@ function connectSSE() {
   currentToken = token;
   const url = `${API_URL}/api/v1/events/stream`;
 
-  // EventSource doesn't support custom headers, so we pass token as query param
-  // We'll need to update the gateway to accept token from query too
+  // EventSource doesn't support custom headers (browser limitation).
+  // We pass the JWT as a query parameter instead. The gateway's SSE endpoint
+  // accepts both Authorization header and ?token= for this reason.
   const source = new EventSource(`${url}?token=${encodeURIComponent(token)}`);
   globalSource = source;
 

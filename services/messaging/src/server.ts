@@ -9,35 +9,54 @@ import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
+import { LRUCache, TTL } from '../../shared/cache';
+import { logger } from '../../shared/src/logger';
+import { sanitize } from '../../shared/src/sanitize';
+import { auditLog, trackActivity } from '../../shared/src/audit';
+
+// ─── Chat Suggestion Cache ──────────────────────────
+const suggestionCache = new LRUCache(200);
 
 // ═══ AES-256-GCM ENCRYPTION ═════════════════════════
+// Derive a 32-byte key from the service key using scrypt (computationally expensive,
+// resistant to brute-force). The salt is static because the same key is needed across
+// service restarts to decrypt existing messages.
 const ENC_KEY = crypto.scryptSync(process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key', 'miamo-e2e-salt-2026', 32);
 const ENC_ALGO = 'aes-256-gcm';
 
+// Encrypt plaintext to format: "enc:<iv_hex>:<authTag_hex>:<ciphertext_hex>"
+// Each message gets a unique 16-byte random IV to prevent ciphertext pattern analysis.
+// The authTag (GCM authentication tag) ensures tamper detection on decryption.
 function encryptMessage(text: string): string {
-  const iv = crypto.randomBytes(16);
+  const iv = crypto.randomBytes(16); // Unique per message — CRITICAL for GCM security
   const cipher = crypto.createCipheriv(ENC_ALGO, ENC_KEY, iv);
   let encrypted = cipher.update(text, 'utf8', 'hex');
   encrypted += cipher.final('hex');
-  const tag = cipher.getAuthTag().toString('hex');
-  return `enc:${iv.toString('hex')}:${tag}:${encrypted}`;
+  const tag = cipher.getAuthTag().toString('hex'); // 16-byte auth tag for tamper detection
+  return `enc:${iv.toString('hex')}:${tag}:${encrypted}`; // Stored format in DB
 }
 
+// Decrypt a message. Falls back to returning raw text for legacy/system messages
+// (those not starting with "enc:"). Returns placeholder if decryption fails.
 function decryptMessage(data: string): string {
-  if (!data.startsWith('enc:')) return data; // plain text (legacy/system messages)
+  if (!data.startsWith('enc:')) return data; // Plain text — legacy or system-generated
   try {
     const [, ivHex, tagHex, encrypted] = data.split(':');
     const iv = Buffer.from(ivHex, 'hex');
     const tag = Buffer.from(tagHex, 'hex');
     const decipher = crypto.createDecipheriv(ENC_ALGO, ENC_KEY, iv);
-    decipher.setAuthTag(tag);
+    decipher.setAuthTag(tag); // Will throw if tag doesn't match (message tampered)
     let decrypted = decipher.update(encrypted, 'hex', 'utf8');
     decrypted += decipher.final('utf8');
     return decrypted;
-  } catch { return '[encrypted message]'; }
+  } catch { return '[encrypted message]'; } // Graceful degradation on key mismatch
 }
 
-export const prisma = new PrismaClient();
+const DB_URL = process.env.DATABASE_URL || 'postgresql://miamo:miamo@localhost:5432/miamo?schema=public';
+export const prisma = new PrismaClient({
+  log: process.env.NODE_ENV === 'production' ? ['error'] : ['warn', 'error'],
+  datasources: { db: { url: DB_URL + (DB_URL.includes('?') ? '&' : '?') + 'connection_limit=10&pool_timeout=20' } },
+});
 export const app = express();
 const PORT = parseInt(process.env.PORT || '3204', 10);
 
@@ -174,7 +193,8 @@ app.get('/api/v1/messages/chats/:chatId/messages', authMiddleware, async (req: A
 app.post('/api/v1/messages/chats/:chatId/messages', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { chatId } = req.params;
-    const { content, type, replyToId } = req.body;
+    const { content: rawContent, type, replyToId } = req.body;
+    const content = sanitize(rawContent || '');
     const userId = req.userId!;
     // Encrypt the message content before storing
     const encryptedContent = encryptMessage(content);
@@ -197,14 +217,16 @@ app.post('/api/v1/messages/chats/:chatId/messages', authMiddleware, async (req: 
     }
     // Return decrypted for the sender
     res.json({ data: { ...message, content, isOwn: true } });
+    trackActivity(prisma, userId, 'message', 'chat', chatId, { type: type || 'text', hasReply: !!replyToId });
   } catch (e) { next(e); }
 });
 
 app.put('/api/v1/messages/messages/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const encContent = encryptMessage(req.body.content);
+    const sanitizedContent = sanitize(req.body.content || '');
+    const encContent = encryptMessage(sanitizedContent);
     const message = await prisma.message.update({ where: { id: req.params.id, senderId: req.userId }, data: { content: encContent, editedAt: new Date() } });
-    res.json({ data: { ...message, content: req.body.content } });
+    res.json({ data: { ...message, content: sanitizedContent } });
   } catch (e) { next(e); }
 });
 
@@ -218,12 +240,7 @@ app.post('/api/v1/messages/messages/:id/delete-for-me', authMiddleware, async (r
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/messages/messages/:id/delete-for-all', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    await prisma.message.update({ where: { id: req.params.id, senderId: req.userId }, data: { deletedForAll: true, content: 'This message was deleted' } });
-    res.json({ data: { success: true } });
-  } catch (e) { next(e); }
-});
+// delete-for-all with 2-hour window is defined below (after chat search)
 
 app.post('/api/v1/messages/messages/:id/react', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -231,8 +248,9 @@ app.post('/api/v1/messages/messages/:id/react', authMiddleware, async (req: Auth
     if (!msg) return res.status(404).json({ error: { message: 'Not found' } });
     const reactions = msg.reactions ? JSON.parse(msg.reactions) : [];
     const idx = reactions.findIndex((r: any) => r.userId === req.userId);
-    if (idx >= 0) reactions[idx].emoji = req.body.emoji;
-    else reactions.push({ userId: req.userId, emoji: req.body.emoji });
+    const emoji = sanitize(req.body.emoji || '');
+    if (idx >= 0) reactions[idx].emoji = emoji;
+    else reactions.push({ userId: req.userId, emoji });
     await prisma.message.update({ where: { id: req.params.id }, data: { reactions: JSON.stringify(reactions) } });
     res.json({ data: { success: true } });
   } catch (e) { next(e); }
@@ -300,6 +318,7 @@ app.delete('/api/v1/messages/chats/:chatId/clear', authMiddleware, async (req: A
       const deletedFor = msg.deletedFor ? msg.deletedFor + ',' + userId : userId;
       await prisma.message.update({ where: { id: msg.id }, data: { deletedFor } });
     }
+    auditLog(prisma, userId, 'chat_clear', { chatId: req.params.chatId, messageCount: messages.length });
     res.json({ data: { success: true } });
   } catch (e) { next(e); }
 });
@@ -310,18 +329,23 @@ app.get('/api/v1/messages/chats/:chatId/search', authMiddleware, async (req: Aut
     const { q } = req.query;
     const userId = req.userId!;
     if (!q) return res.json({ data: [] });
+    // Fetch all messages, decrypt in-memory, then filter (encrypted content can't be searched via SQL)
     const messages = await prisma.message.findMany({
       where: {
         chatId: req.params.chatId,
-        content: { contains: q as string, mode: 'insensitive' },
         deletedForAll: false,
         NOT: { deletedFor: { contains: userId } },
       },
       include: { sender: { select: { id: true, displayName: true, username: true } } },
       orderBy: { createdAt: 'desc' },
-      take: 20,
+      take: 500, // cap to last 500 messages for performance
     });
-    res.json({ data: messages.map(m => ({ ...m, content: decryptMessage(m.content) })) });
+    const query = (q as string).toLowerCase();
+    const matched = messages
+      .map(m => ({ ...m, content: decryptMessage(m.content) }))
+      .filter(m => m.content.toLowerCase().includes(query))
+      .slice(0, 20);
+    res.json({ data: matched });
   } catch (e) { next(e); }
 });
 
@@ -335,81 +359,181 @@ app.post('/api/v1/messages/messages/:id/delete-for-all', authMiddleware, async (
     const twoHoursMs = 2 * 60 * 60 * 1000;
     if (ageMs > twoHoursMs) return res.status(400).json({ error: { message: 'Can only delete for everyone within 2 hours of sending' } });
     await prisma.message.update({ where: { id: req.params.id }, data: { deletedForAll: true, content: 'This message was deleted' } });
+    auditLog(prisma, req.userId!, 'message_delete_for_all', { messageId: req.params.id, chatId: msg.chatId });
     res.json({ data: { success: true } });
   } catch (e) { next(e); }
 });
 
 // ── AI Conversation Helpers ──
-// Get smart reply suggestions based on context
+// Get smart reply suggestions based on full conversation context, user behavior & relationship stage
 app.post('/api/v1/messages/chats/:chatId/suggestions', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
     const chat = await prisma.chat.findUnique({ where: { id: req.params.chatId } });
     if (!chat) return res.status(404).json({ error: { message: 'Not found' } });
     const otherId = chat.user1Id === userId ? chat.user2Id : chat.user1Id;
+
+    // Check suggestion cache
+    const cacheKey = `suggestions:${req.params.chatId}:${userId}:${req.body.context || 'auto'}`;
+    const cached = suggestionCache.get(cacheKey);
+    if (cached) return res.json({ data: cached });
+
     const otherUser = await prisma.user.findUnique({ where: { id: otherId }, include: { profile: true, interests: true } });
+
+    // Fetch last 20 messages for deep context analysis
     const recentMessages = await prisma.message.findMany({
       where: { chatId: req.params.chatId, deletedForAll: false },
       orderBy: { createdAt: 'desc' },
-      take: 5,
+      take: 20,
     });
-    const lastMsg = recentMessages[0]?.content || '';
+
+    // ── Conversation analysis ──
+    const totalMessages = recentMessages.length;
+    const myMessages = recentMessages.filter(m => m.senderId === userId);
+    const theirMessages = recentMessages.filter(m => m.senderId !== userId);
+    const lastMsg = recentMessages[0];
+    const lastMsgContent = lastMsg ? decryptMessage(lastMsg.content) : '';
+    const lastMsgIsFromMe = lastMsg?.senderId === userId;
     const otherInterests = otherUser?.interests?.map(i => i.name) || [];
     const otherCity = otherUser?.profile?.city || '';
     const otherProfession = otherUser?.profile?.profession || '';
 
-    // Context-aware suggestions
-    const suggestions: { text: string; type: string }[] = [];
+    // ── Relationship stage detection ──
+    let stage: 'new' | 'getting-to-know' | 'comfortable' | 'deep' = 'new';
+    if (totalMessages > 30) stage = 'deep';
+    else if (totalMessages > 15) stage = 'comfortable';
+    else if (totalMessages > 3) stage = 'getting-to-know';
+
+    // ── Sentiment analysis of last message ──
+    const positiveWords = ['love', 'great', 'amazing', 'awesome', 'wonderful', 'fun', 'happy', 'excited', 'beautiful', 'incredible', 'perfect', 'sweet', 'cute', 'haha', 'lol', '😊', '😍', '❤️', '💕', '🥰'];
+    const questionWords = ['what', 'how', 'where', 'when', 'why', 'who', 'which', 'do you', 'have you', 'are you', 'would you', 'could you', '?'];
+    const greetings = ['hey', 'hi', 'hello', 'sup', 'what\'s up', 'good morning', 'good evening', 'hola'];
+    const flirtyWords = ['cute', 'gorgeous', 'beautiful', 'handsome', 'attractive', 'hot', 'date', 'meet up', 'coffee', 'drinks', 'dinner'];
+    const sadWords = ['sad', 'tired', 'exhausted', 'stressed', 'anxious', 'worried', 'bad day', 'rough', 'struggling', 'miss'];
+
+    const lower = lastMsgContent.toLowerCase();
+    const isPositive = positiveWords.some(w => lower.includes(w));
+    const isQuestion = questionWords.some(w => lower.includes(w));
+    const isGreeting = greetings.some(w => lower.startsWith(w));
+    const isFlirty = flirtyWords.some(w => lower.includes(w));
+    const isSad = sadWords.some(w => lower.includes(w));
+
+    // ── Topic extraction from recent messages ──
+    const topicKeywords: Record<string, string[]> = {
+      travel: ['travel', 'trip', 'flight', 'vacation', 'visit', 'explore', 'country', 'city'],
+      food: ['food', 'eat', 'cook', 'restaurant', 'dinner', 'lunch', 'breakfast', 'recipe', 'cuisine'],
+      music: ['music', 'song', 'band', 'concert', 'playlist', 'album', 'singer', 'guitar'],
+      movies: ['movie', 'film', 'watch', 'netflix', 'show', 'series', 'cinema', 'actor'],
+      fitness: ['gym', 'workout', 'run', 'yoga', 'exercise', 'fitness', 'health', 'hike'],
+      work: ['work', 'job', 'office', 'project', 'meeting', 'career', 'business', 'deadline'],
+      hobbies: ['reading', 'book', 'art', 'paint', 'photo', 'dance', 'game', 'craft'],
+    };
+    const detectedTopics: string[] = [];
+    const allContent = recentMessages.map(m => decryptMessage(m.content).toLowerCase()).join(' ');
+    for (const [topic, keywords] of Object.entries(topicKeywords)) {
+      if (keywords.some(k => allContent.includes(k))) detectedTopics.push(topic);
+    }
+
+    // ── Generate contextual suggestions ──
+    const suggestions: { text: string; type: string; confidence: number }[] = [];
     const { context } = req.body;
 
-    if (!lastMsg || recentMessages.length < 2) {
-      // Conversation starters
+    if (!lastMsg || totalMessages === 0) {
+      // Brand new conversation
       suggestions.push(
-        { text: `Hey ${otherUser?.displayName?.split(' ')[0] || 'there'}! How's your day going? 😊`, type: 'starter' },
-        { text: `I noticed we both love ${otherInterests[0] || 'creative things'}! What got you into it?`, type: 'interest' },
+        { text: `Hey ${otherUser?.displayName?.split(' ')[0] || 'there'}! How's your day going? 😊`, type: 'starter', confidence: 0.95 },
+        { text: `I noticed we both love ${otherInterests[0] || 'creative things'}! What got you into it?`, type: 'interest', confidence: 0.90 },
       );
-      if (otherCity) suggestions.push({ text: `How's life in ${otherCity}? I've always been curious about it!`, type: 'location' });
-      if (otherProfession) suggestions.push({ text: `${otherProfession} sounds fascinating! What's the best part?`, type: 'career' });
+      if (otherCity) suggestions.push({ text: `How's life in ${otherCity}? I've always been curious about it!`, type: 'location', confidence: 0.85 });
+      if (otherProfession) suggestions.push({ text: `${otherProfession} sounds fascinating! What's the best part?`, type: 'career', confidence: 0.82 });
       suggestions.push(
-        { text: `If you could travel anywhere tomorrow, where would you go? ✈️`, type: 'fun' },
-        { text: `What's something you're passionate about that most people don't know?`, type: 'deep' },
+        { text: `If you could travel anywhere tomorrow, where would you go? ✈️`, type: 'fun', confidence: 0.78 },
+        { text: `What's something you're passionate about that most people don't know?`, type: 'deep', confidence: 0.75 },
       );
-    } else if (context === 'flirty') {
+    } else if (context === 'flirty' || (stage !== 'new' && isFlirty)) {
       suggestions.push(
-        { text: `You know what I like about you? Your energy is contagious 💜`, type: 'flirty' },
-        { text: `I have a feeling we'd have an amazing time together 😉`, type: 'flirty' },
-        { text: `Your profile made me smile. Tell me more about yourself!`, type: 'flirty' },
+        { text: `You know what I like about you? Your energy is contagious 💜`, type: 'flirty', confidence: 0.88 },
+        { text: `I have a feeling we'd have an amazing time together 😉`, type: 'flirty', confidence: 0.85 },
+        { text: `We should totally do something fun this weekend — any ideas?`, type: 'date', confidence: 0.90 },
       );
-    } else if (context === 'deep') {
+      if (stage === 'comfortable' || stage === 'deep') {
+        suggestions.push({ text: `I've been thinking about you all day 😊`, type: 'flirty', confidence: 0.80 });
+      }
+    } else if (context === 'deep' || stage === 'deep') {
       suggestions.push(
-        { text: `What's something you've learned about yourself recently?`, type: 'deep' },
-        { text: `If you could change one thing about the world, what would it be?`, type: 'deep' },
-        { text: `What does your ideal life look like 5 years from now?`, type: 'deep' },
+        { text: `What's something you've learned about yourself recently?`, type: 'deep', confidence: 0.88 },
+        { text: `If you could change one thing about the world, what would it be?`, type: 'deep', confidence: 0.85 },
+        { text: `What does your ideal life look like 5 years from now?`, type: 'deep', confidence: 0.82 },
       );
     } else if (context === 'fun') {
       suggestions.push(
-        { text: `Hot take: pineapple on pizza — yes or no? 🍕`, type: 'fun' },
-        { text: `If you won the lottery tomorrow, what's the first thing you'd do?`, type: 'fun' },
-        { text: `What's the most spontaneous thing you've ever done?`, type: 'fun' },
+        { text: `Hot take: pineapple on pizza — yes or no? 🍕`, type: 'fun', confidence: 0.90 },
+        { text: `If you won the lottery tomorrow, what's the first thing you'd do?`, type: 'fun', confidence: 0.87 },
+        { text: `What's the most spontaneous thing you've ever done?`, type: 'fun', confidence: 0.85 },
+      );
+    } else if (isSad) {
+      // Empathetic responses
+      suggestions.push(
+        { text: `I'm sorry you're going through that. Want to talk about it? I'm here 💙`, type: 'empathy', confidence: 0.95 },
+        { text: `Sending you positive vibes! What would make your day better?`, type: 'empathy', confidence: 0.90 },
+        { text: `That sounds tough. Remember, it's okay to not be okay sometimes.`, type: 'empathy', confidence: 0.85 },
+      );
+    } else if (isGreeting && !lastMsgIsFromMe) {
+      suggestions.push(
+        { text: `Hey! Great to hear from you 😊 What's going on?`, type: 'greeting', confidence: 0.92 },
+        { text: `Hi! How's your ${new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'} going?`, type: 'greeting', confidence: 0.88 },
+      );
+    } else if (isQuestion && !lastMsgIsFromMe) {
+      // They asked a question — help user answer + ask back
+      suggestions.push(
+        { text: `That's a great question! For me, I'd say...`, type: 'answer', confidence: 0.90 },
+        { text: `Hmm, let me think... I'd probably say...`, type: 'answer', confidence: 0.85 },
+        { text: `Oh that's interesting! What about you?`, type: 'deflect', confidence: 0.78 },
       );
     } else {
-      // Regular follow-up based on last message
+      // Regular follow-up based on context & detected topics
       suggestions.push(
-        { text: `That's really interesting! Tell me more 😊`, type: 'followup' },
-        { text: `I totally relate to that! For me it's similar because...`, type: 'relate' },
-        { text: `What else are you up to today?`, type: 'casual' },
+        { text: `That's really interesting! Tell me more 😊`, type: 'followup', confidence: 0.88 },
+        { text: `I totally relate to that! For me it's similar because...`, type: 'relate', confidence: 0.85 },
       );
-      if (otherInterests.length > 1) suggestions.push({ text: `By the way, I saw you're into ${otherInterests[1]}! Me too!`, type: 'interest' });
+      // Topic-aware suggestions
+      if (detectedTopics.includes('travel')) suggestions.push({ text: `Speaking of traveling, what's the best place you've been to?`, type: 'topic', confidence: 0.82 });
+      if (detectedTopics.includes('food')) suggestions.push({ text: `What's your go-to comfort food? I'm always looking for recommendations!`, type: 'topic', confidence: 0.82 });
+      if (detectedTopics.includes('music')) suggestions.push({ text: `What have you been listening to lately? I need new music recs!`, type: 'topic', confidence: 0.82 });
+      if (detectedTopics.includes('movies')) suggestions.push({ text: `Have you seen anything good recently? I'm looking for recommendations!`, type: 'topic', confidence: 0.80 });
+      if (detectedTopics.includes('fitness')) suggestions.push({ text: `How's your fitness journey going? I could use some motivation!`, type: 'topic', confidence: 0.80 });
+
+      // Interest-based fallback
+      if (otherInterests.length > 1) suggestions.push({ text: `By the way, I saw you're into ${otherInterests[Math.floor(Math.random() * otherInterests.length)]}! What's that like?`, type: 'interest', confidence: 0.78 });
+
+      // Stage-appropriate escalation
+      if (stage === 'comfortable') {
+        suggestions.push({ text: `We should totally hang out sometime! What do you think?`, type: 'escalate', confidence: 0.75 });
+      }
+      if (stage === 'getting-to-know') {
+        suggestions.push({ text: `What else are you up to today?`, type: 'casual', confidence: 0.80 });
+      }
     }
 
-    res.json({ data: suggestions.slice(0, 6) });
+    // Sort by confidence and return top 6
+    suggestions.sort((a, b) => b.confidence - a.confidence);
+    const result = suggestions.slice(0, 6);
+
+    // Track suggestion request
+    trackActivity(prisma, userId, 'view', 'chat', req.params.chatId, { action: 'suggestions', context: context || 'auto', stage });
+
+    // Cache for 2 minutes
+    suggestionCache.set(cacheKey, result, TTL.CHAT_SUGGESTIONS);
+
+    res.json({ data: result });
   } catch (e) { next(e); }
 });
 
 // ── Harsh Words Detection ──
 const HARSH_WORDS = ['fuck', 'shit', 'bitch', 'asshole', 'dick', 'pussy', 'slut', 'whore', 'cunt', 'nigger', 'faggot', 'retard', 'kill yourself', 'die', 'kys', 'stfu', 'wtf', 'rape', 'molest', 'abuse', 'threat', 'bomb', 'terror'];
 app.post('/api/v1/messages/check-content', authMiddleware, async (req: AuthRequest, res: Response) => {
-  const { content } = req.body;
+  const { content: rawCheckContent } = req.body;
+  const content = rawCheckContent ? sanitize(rawCheckContent) : '';
   if (!content) return res.json({ data: { safe: true, warnings: [] } });
   const lower = content.toLowerCase();
   const found = HARSH_WORDS.filter(w => lower.includes(w));
@@ -506,6 +630,11 @@ app.post('/api/v1/beats/:id/complete', authMiddleware, async (req: AuthRequest, 
     const beat = await prisma.beat.findUnique({ where: { id: req.params.id } });
     if (!beat) return res.status(404).json({ error: { message: 'Beat not found' } });
     if (beat.user1Id !== userId && beat.user2Id !== userId) return res.status(403).json({ error: { message: 'Not your beat' } });
+    // ── BEAT STREAK STATE MACHINE ──
+    // Beats track daily engagement streaks between two matched users.
+    // State transitions: active → weak (missed) → lost (expired, count resets to 0) → archived
+    //                    active → active (completed by both within 24h → count increments)
+    //                    weak/lost → active (restored, count resets to 1)
     if (beat.state === 'lost' || beat.state === 'archived') return res.status(400).json({ error: { message: 'Beat is not active' } });
     const isUser1 = beat.user1Id === userId;
     const lastField = isUser1 ? 'lastUser1' : 'lastUser2';
@@ -513,17 +642,23 @@ app.post('/api/v1/beats/:id/complete', authMiddleware, async (req: AuthRequest, 
     const myLast = beat[lastField as keyof typeof beat] as Date | null;
     const otherLast = beat[otherLastField as keyof typeof beat] as Date | null;
     const now = new Date();
-    const DAY = 86400000;
-    // Did I already send today? (within 24h)
+    const DAY = 86400000; // 24 hours in milliseconds
+
+    // Prevent double-sending: each user can only complete once per 24h window
     const iAlreadySentToday = myLast && (now.getTime() - myLast.getTime()) < DAY;
     if (iAlreadySentToday) return res.status(400).json({ error: { message: 'You already sent a beat today! Come back tomorrow.' }, data: { iSentToday: true } });
-    // Did the other user send today?
+
+    // Check if the OTHER user already completed today
     const otherCompletedToday = otherLast && (now.getTime() - otherLast.getTime()) < DAY;
-    // Count increases ONLY when: both sent today AND this is my first send of the day
+
+    // KEY BUSINESS RULE: The streak counter only increments when BOTH users have
+    // sent within the same 24h window. This prevents one-sided streak farming.
+    // The increment happens on the second user's completion (the one that makes it mutual).
     const shouldIncrement = otherCompletedToday && !iAlreadySentToday;
     const newCount = shouldIncrement ? beat.count + 1 : beat.count;
     const updated = await prisma.beat.update({ where: { id: req.params.id }, data: { [lastField]: now, count: newCount, state: 'active' } });
-    await prisma.beatEvent.create({ data: { beatId: beat.id, userId, type: req.body.type || 'snap', content: req.body.content || 'Daily beat! ⚡' } });
+    await prisma.beatEvent.create({ data: { beatId: beat.id, userId, type: req.body.type || 'snap', content: sanitize(req.body.content || 'Daily beat! ⚡') } });
+    trackActivity(prisma, userId, 'beat_complete', 'beat', beat.id, { count: newCount, incremented: shouldIncrement });
     // Push real-time beat update to both users
     const otherId = isUser1 ? beat.user2Id : beat.user1Id;
     pushToUser(otherId, 'beat-update', { beatId: beat.id, count: newCount, fromUserId: userId });
@@ -536,7 +671,9 @@ app.post('/api/v1/beats/:id/miss', authMiddleware, async (req: AuthRequest, res:
   try {
     const beat = await prisma.beat.findUnique({ where: { id: req.params.id } });
     if (!beat || (beat.user1Id !== req.userId && beat.user2Id !== req.userId)) return res.status(403).json({ error: { message: 'Forbidden' } });
-    const updated = await prisma.beat.update({ where: { id: req.params.id }, data: { state: 'weak' } }); res.json({ data: updated });
+    const updated = await prisma.beat.update({ where: { id: req.params.id }, data: { state: 'weak' } });
+    trackActivity(prisma, req.userId!, 'beat_miss', 'beat', req.params.id);
+    res.json({ data: updated });
   } catch (e) { next(e); }
 });
 
@@ -571,5 +708,17 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, '0.0.0.0', () => { console.log(`\n⚡ Miamo Messaging Service on port ${PORT}\n`); });
+  const server = app.listen(PORT, '0.0.0.0', () => { logger.info(`Miamo Messaging Service on port ${PORT}`); });
+
+  const shutdown = async (signal: string) => {
+    logger.info(`${signal} received — shutting down messaging service...`);
+    server.close(async () => {
+      await prisma.$disconnect();
+      logger.info('Messaging service stopped cleanly');
+      process.exit(0);
+    });
+    setTimeout(() => { process.exit(1); }, 10000);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }

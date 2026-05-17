@@ -8,6 +8,10 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
   variant?: 'default' | 'glass';
 }
 
+/**
+ * Form input with optional label, error message, leading icon, and glass variant.
+ * Focus ring uses pink-200 accent. Error state changes border to red.
+ */
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   ({ className, label, error, icon, type, variant = 'default', ...props }, ref) => {
     return (

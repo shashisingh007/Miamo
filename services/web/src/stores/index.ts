@@ -11,6 +11,11 @@ interface AuthState {
   clearAuth: () => void;
 }
 
+/**
+ * Zustand store for authentication state.
+ * Persisted to `localStorage` under key `"miamo-auth"`.
+ * Manages the current user object, JWT token, and authentication status.
+ */
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -38,6 +43,10 @@ interface ThemeState {
   setTheme: (t: 'dark' | 'light' | 'system') => void;
 }
 
+/**
+ * Zustand store for theme preference (dark/light/system).
+ * Persisted to `localStorage` under key `"miamo-theme"`.
+ */
 export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
@@ -62,6 +71,10 @@ interface DiscoveryState {
   setFilters: (f: Partial<DiscoveryState['filters']>) => void;
 }
 
+/**
+ * Zustand store for discovery page state (card index, filter preferences).
+ * Not persisted — resets on page reload. Reserved for future swipe-card UI.
+ */
 export const useDiscoveryStore = create<DiscoveryState>((set) => ({
   currentIndex: 0,
   filters: { ageRange: [21, 35], distance: 50, seriousOnly: false, verifiedOnly: false },

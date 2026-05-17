@@ -36,6 +36,13 @@ export interface ButtonProps
   loading?: boolean;
 }
 
+/**
+ * CVA-based button with 6 variants (default/secondary/ghost/outline/danger/link)
+ * and 6 size presets (sm/default/lg/xl/icon/icon-sm).
+ *
+ * Supports a `loading` prop that shows a spinner and disables interaction.
+ * Uses `active:scale-[0.97]` for tactile press feedback.
+ */
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant, size, loading, children, disabled, ...props }, ref) => {
     return (

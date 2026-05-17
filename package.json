@@ -1,0 +1,28 @@
+{
+  "name": "miamo",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Miamo — Next-generation dating & social platform",
+  "scripts": {
+    "start": "bash scripts/start-services.sh local start",
+    "stop": "bash scripts/start-services.sh local stop",
+    "restart": "bash scripts/start-services.sh local restart",
+    "status": "bash scripts/start-services.sh local status",
+    "test": "python3 scripts/test-all.py",
+    "logs": "bash scripts/start-services.sh local logs",
+    "docker:up": "bash scripts/start-services.sh docker up",
+    "docker:down": "bash scripts/start-services.sh docker down",
+    "docker:status": "bash scripts/start-services.sh docker status",
+    "k8s:dev": "bash scripts/start-services.sh k8s deploy dev",
+    "k8s:staging": "bash scripts/start-services.sh k8s deploy staging",
+    "k8s:prod": "bash scripts/start-services.sh k8s deploy prod",
+    "db:migrate": "cd services/shared && npx prisma migrate dev",
+    "db:push": "cd services/shared && npx prisma db push",
+    "db:seed": "cd services/shared && npx prisma db seed",
+    "db:studio": "cd services/shared && npx prisma studio",
+    "setup": "bash scripts/setup.sh"
+  },
+  "keywords": ["dating", "social", "microservices", "nextjs", "express", "prisma"],
+  "author": "Miamo Team",
+  "license": "UNLICENSED"
+}

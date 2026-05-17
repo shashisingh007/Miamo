@@ -9,6 +9,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, Badge } from '@/components/ui';
 import { cn } from '@/lib/utils';
+import { useTrackPageView, useTrackScrollDepth, trackClick } from '@/hooks/useTrackActivity';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { useToast } from '@/components/ui/toast';
 
 /* ═══ Love Languages ═══ */
 const LANGUAGES = [
@@ -183,6 +186,9 @@ export default function LoveLanguagePage() {
   const [scores, setScores] = useState<Record<string, number>>({ words: 0, acts: 0, time: 0, touch: 0, gifts: 0 });
   const [done, setDone] = useState(false);
 
+  useTrackPageView('love-language');
+  useTrackScrollDepth('love-language');
+
   const handleAnswer = (lang: string) => {
     const newScores = { ...scores, [lang]: (scores[lang] || 0) + 1 };
     setScores(newScores);
@@ -200,6 +206,7 @@ export default function LoveLanguagePage() {
   const reset = () => { setStarted(false); setQIdx(0); setScores({ words: 0, acts: 0, time: 0, touch: 0, gifts: 0 }); setDone(false); };
 
   return (
+    <ErrorBoundary>
     <div className="max-w-3xl mx-auto p-6 pb-24">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
@@ -209,8 +216,8 @@ export default function LoveLanguagePage() {
             <Heart className="w-7 h-7 text-white" fill="white" />
           </motion.div>
           <div>
-            <h1 className="text-2xl font-black text-gray-800">Love Language</h1>
-            <p className="text-sm text-gray-400">Discover how you give and receive love 💝</p>
+            <h1 className="text-2xl font-black text-gray-800 dark:text-white">Love Language</h1>
+            <p className="text-sm text-gray-400 dark:text-gray-500">Discover how you give and receive love 💝</p>
           </div>
         </div>
       </motion.div>
@@ -292,5 +299,6 @@ export default function LoveLanguagePage() {
         )}
       </AnimatePresence>
     </div>
+    </ErrorBoundary>
   );
 }

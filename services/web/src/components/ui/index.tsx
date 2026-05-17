@@ -26,6 +26,20 @@ const sizeMap = {
 };
 const dotSizeMap = { xs: 'w-2 h-2', sm: 'w-2.5 h-2.5', md: 'w-3 h-3', lg: 'w-3.5 h-3.5', xl: 'w-4 h-4' };
 
+/**
+ * Premium avatar component with gradient ring, online dot, and verified badge.
+ *
+ * Falls back to uppercase initials with a pink gradient background when
+ * the image fails to load or no `src` is provided.
+ *
+ * @param src - URL of the avatar image (nullable)
+ * @param name - User's display name (used for initials fallback)
+ * @param size - Avatar size preset: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
+ * @param online - Show green online indicator dot
+ * @param verified - Show pink checkmark badge
+ * @param ring - Show pink ring around avatar
+ * @param storyRing - Show gradient story ring (pink→rose→purple)
+ */
 export function Avatar({ src, name, size = 'md', online, verified, className, ring, storyRing }: AvatarProps) {
   const [failed, setFailed] = useState(false);
   const initials = getInitials(name);
@@ -44,7 +58,7 @@ export function Avatar({ src, name, size = 'md', online, verified, className, ri
         !src || failed ? 'bg-gradient-to-br from-pink-100 to-rose-100' : ''
       )}>
         {src && !failed ? (
-          <img src={src} alt={name} className="w-full h-full object-cover" onError={() => setFailed(true)} />
+          <img loading="lazy" src={src} alt={name} className="w-full h-full object-cover" onError={() => setFailed(true)} />
         ) : (
           <span className="font-bold text-pink-600">{initials}</span>
         )}
@@ -83,6 +97,11 @@ const badgeVariants: Record<string, string> = {
   muted: 'bg-gray-50 text-gray-600 border-gray-200/50',
 };
 
+/**
+ * Glass-morphism badge with color variant presets.
+ *
+ * @param variant - Visual style: 'default' (pink) | 'success' | 'warning' | 'danger' | 'info' | 'muted'
+ */
 export function Badge({ children, variant = 'default', className }: BadgeProps) {
   return (
     <span className={cn(
@@ -102,6 +121,7 @@ interface SkeletonProps {
   className?: string;
 }
 
+/** Shimmer loading placeholder. Apply width/height via `className`. */
 export function Skeleton({ className }: SkeletonProps) {
   return <div className={cn('skeleton h-4', className)} />;
 }
@@ -116,6 +136,10 @@ interface EmptyStateProps {
   action?: React.ReactNode;
 }
 
+/**
+ * Structured empty state with icon, title, optional description, and CTA.
+ * Centered layout, suitable for full-page or section-level empty states.
+ */
 export function EmptyState({ icon, title, description, action }: EmptyStateProps) {
   return (
     <div className="flex flex-col items-center justify-center py-20 px-6 text-center">
@@ -141,6 +165,10 @@ interface CardProps {
   onClick?: () => void;
 }
 
+/**
+ * Premium glass-morphism card with optional hover elevation effect.
+ * Uses `card-premium` and `card-hover` CSS utility classes.
+ */
 export function Card({ children, className, hover, onClick }: CardProps) {
   return (
     <div
@@ -162,6 +190,14 @@ interface ScoreRingProps {
   className?: string;
 }
 
+/**
+ * Circular score visualization using an SVG gradient ring.
+ * Animates from 0 to the given score with a 1-second ease-out transition.
+ *
+ * @param score - Score value 0–100 (displayed in center)
+ * @param size - SVG diameter in pixels (default: 48)
+ * @param strokeWidth - Ring thickness in pixels (default: 3)
+ */
 export function ScoreRing({ score, size = 48, strokeWidth = 3, className }: ScoreRingProps) {
   const gradientId = React.useId();
   const radius = (size - strokeWidth) / 2;
@@ -198,6 +234,14 @@ interface FilterChipProps {
   icon?: React.ReactNode;
 }
 
+/**
+ * Glass-style filter chip / toggle button.
+ * Switches between active (gradient) and inactive (glass) styles.
+ *
+ * @param label - Chip label text
+ * @param active - Whether the chip is in the active/selected state
+ * @param icon - Optional leading icon element
+ */
 export function FilterChip({ label, active, onClick, icon }: FilterChipProps) {
   return (
     <button

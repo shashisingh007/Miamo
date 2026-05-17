@@ -29,6 +29,11 @@ metadata:
     service: gateway
 spec:
   replicas: __REPLICAS__
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: miamo
@@ -39,6 +44,7 @@ spec:
         app: miamo
         service: gateway
     spec:
+      terminationGracePeriodSeconds: 30
       containers:
         - name: gateway
           image: __IMAGE_PREFIX__miamo-gateway:__IMAGE_TAG__
@@ -53,8 +59,6 @@ spec:
               value: "http://auth:__SERVICE_PORT__"
             - name: USER_SERVICE_URL
               value: "http://users:__SERVICE_PORT__"
-            - name: USERS_SERVICE_URL
-              value: "http://users:__SERVICE_PORT__"
             - name: SOCIAL_SERVICE_URL
               value: "http://social:__SERVICE_PORT__"
             - name: MESSAGING_SERVICE_URL
@@ -63,8 +67,6 @@ spec:
               value: "http://content:__SERVICE_PORT__"
             - name: NOTIFICATION_SERVICE_URL
               value: "http://notifications:__SERVICE_PORT__"
-            - name: NOTIFICATIONS_SERVICE_URL
-              value: "http://notifications:__SERVICE_PORT__"
           resources:
             requests:
               memory: "__REQ_MEM__"
@@ -72,6 +74,13 @@ spec:
             limits:
               memory: "__LIM_MEM__"
               cpu: "__LIM_CPU__"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: __GATEWAY_PORT__
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 12
           livenessProbe:
             httpGet:
               path: /health
@@ -79,12 +88,16 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 30
             timeoutSeconds: 5
-            failureThreshold: 5
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /health
               port: __GATEWAY_PORT__
             initialDelaySeconds: 10
-            periodSeconds: 15
+            periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]

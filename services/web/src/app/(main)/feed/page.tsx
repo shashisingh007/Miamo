@@ -5,10 +5,13 @@ import { motion } from 'framer-motion';
 import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Lightbulb, Image, Video, Smile } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, Badge, Card, FilterChip } from '@/components/ui';
-import { MiamoLoader } from '@/components/ui/miamo-logo';
+import { FeedSkeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { useAuthStore } from '@/stores';
+import { useTrackPageView, useTrackScrollDepth, trackContentEngage, trackFilterChange } from '@/hooks/useTrackActivity';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { useToast } from '@/components/ui/toast';
 
 
 
@@ -20,7 +23,7 @@ function ComposeBox({ onPost }: { onPost: () => void }) {
   const handlePost = async () => {
     if (!content.trim()) return;
     setPosting(true);
-    try { await api.createPost({ content: content.trim() }); setContent(''); onPost(); } catch (e) { console.error(e); }
+    try { await api.createPost({ content: content.trim() }); setContent(''); onPost(); } catch { /* post failed silently - form stays filled */ }
     setPosting(false);
   };
 
@@ -60,7 +63,10 @@ function FeedPost({ post, onDelete }: { post: any; onDelete?: () => void }) {
   const photo = author.photos?.[0]?.url || author.photos?.[0];
 
   const toggleLike = async () => {
-    try { await api.reactToPost(post.id); setLiked(!liked); setLikes(liked ? likes - 1 : likes + 1); } catch (e) {}
+    const wasLiked = liked;
+    setLiked(!wasLiked);
+    setLikes(wasLiked ? likes - 1 : likes + 1);
+    try { await api.reactToPost(post.id); } catch { setLiked(wasLiked); setLikes(wasLiked ? likes : likes - 1); }
   };
 
   const loadComments = async () => {
@@ -125,7 +131,7 @@ function FeedPost({ post, onDelete }: { post: any; onDelete?: () => void }) {
         <p className="text-sm text-text-primary leading-relaxed">{post.content}</p>
         {post.mediaUrl && (
           <div className="mt-3 rounded-xl overflow-hidden bg-miamo-elevated aspect-video">
-            <img src={post.mediaUrl} alt="Post media" className="w-full h-full object-cover" />
+            <img loading="lazy" src={post.mediaUrl} alt="Post media" className="w-full h-full object-cover" />
           </div>
         )}
       </div>
@@ -180,6 +186,9 @@ export default function FeedPage() {
   const [activeFilter, setActiveFilter] = useState('all');
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  useTrackPageView('feed');
+  useTrackScrollDepth('feed');
   const filters = [
     { label: 'All', value: 'all' },
     { label: 'Thoughts', value: 'thought' },
@@ -201,6 +210,7 @@ export default function FeedPage() {
   useEffect(() => { loadPosts(); }, [activeFilter]);
 
   return (
+    <ErrorBoundary>
     <div className="max-w-2xl mx-auto p-6 space-y-5">
       <ComposeBox onPost={loadPosts} />
       <div className="flex gap-2 overflow-x-auto no-scrollbar">
@@ -209,7 +219,7 @@ export default function FeedPage() {
         ))}
       </div>
       {loading ? (
-        <MiamoLoader text="Loading feed..." />
+        <FeedSkeleton />
       ) : posts.length === 0 ? (
         <div className="text-center py-12"><MessageCircle className="w-10 h-10 text-text-muted/30 mx-auto mb-3" /><p className="text-sm text-text-muted">No posts yet. Be the first to share!</p></div>
       ) : (
@@ -222,5 +232,6 @@ export default function FeedPage() {
         </div>
       )}
     </div>
+    </ErrorBoundary>
   );
 }

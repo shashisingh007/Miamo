@@ -12,6 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Card, Badge, Avatar, EmptyState } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { useTrackPageView, useTrackScrollDepth, trackClick } from '@/hooks/useTrackActivity';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { useToast } from '@/components/ui/toast';
 
 /* ═══ Types ═══ */
 interface DatePlan {
@@ -111,6 +114,9 @@ export default function DatePlannerPage() {
   const [plans, setPlans] = useState<DatePlan[]>([]);
   const [creating, setCreating] = useState(false);
   const [matches, setMatches] = useState<any[]>([]);
+
+  useTrackPageView('date-planner');
+  useTrackScrollDepth('date-planner');
   const [selectedMatch, setSelectedMatch] = useState<any>(null);
   const [selectedVibe, setSelectedVibe] = useState<string>('');
   const [selectedVenue, setSelectedVenue] = useState<string>('');
@@ -156,6 +162,7 @@ export default function DatePlannerPage() {
   const totalSteps = 5;
 
   return (
+    <ErrorBoundary>
     <div className="max-w-4xl mx-auto p-6 pb-24 relative">
       <FloatingHearts />
 
@@ -170,8 +177,8 @@ export default function DatePlannerPage() {
             <CalendarHeart className="w-7 h-7 text-white" />
           </motion.div>
           <div>
-            <h1 className="text-2xl font-black text-gray-800 tracking-tight">Date Planner</h1>
-            <p className="text-sm text-gray-400">Plan the perfect date experience ✨</p>
+            <h1 className="text-2xl font-black text-gray-800 dark:text-white tracking-tight">Date Planner</h1>
+            <p className="text-sm text-gray-400 dark:text-gray-500">Plan the perfect date experience ✨</p>
           </div>
           <div className="ml-auto">
             <Button onClick={() => { setCreating(true); resetForm(); }} className="gap-2 shadow-lg shadow-pink-200/40">
@@ -461,5 +468,6 @@ export default function DatePlannerPage() {
         )}
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

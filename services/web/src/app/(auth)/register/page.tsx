@@ -2,10 +2,12 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, User, Sparkles } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
@@ -31,9 +33,11 @@ const registerSchema = z.object({
 type RegisterData = z.infer<typeof registerSchema>;
 
 export default function RegisterPage() {
+  const router = useRouter();
   const { setAuth } = useAuthStore();
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState(false);
 
   const { register, handleSubmit, formState: { errors, isSubmitting }, watch } = useForm<RegisterData>({
     resolver: zodResolver(registerSchema),
@@ -55,29 +59,55 @@ export default function RegisterPage() {
       setError('');
       const response = await api.register({ email: data.email, password: data.password, displayName: data.displayName });
       setAuth(response.data.user, response.data.accessToken);
-      window.location.href = '/discover';
+      setSuccess(true);
+      router.push('/discover');
     } catch (err: any) {
       setError(err.message || 'Registration failed');
     }
   };
 
   const strength = getStrength();
+  const strengthLabel = strength <= 2 ? 'Weak' : strength <= 3 ? 'Fair' : strength <= 4 ? 'Strong' : 'Excellent';
 
   return (
-    <div className="relative z-10 w-full max-w-md animate-fade-in-up">
-      <div className="card-premium p-8">
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: 'easeOut' }}
+      className="relative z-10 w-full max-w-md"
+    >
+      <div className="card-premium p-8 backdrop-blur-xl">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 rounded-xl overflow-hidden mx-auto mb-4">
-            <Image src="/logo.png" alt="Miamo" width={48} height={48} className="w-full h-full object-contain" priority />
-          </div>
-          <h1 className="text-2xl font-bold">Create your account</h1>
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ delay: 0.1, type: 'spring', stiffness: 200 }}
+            className="w-14 h-14 rounded-2xl overflow-hidden mx-auto mb-4 shadow-lg"
+          >
+            <Image src="/logo.png" alt="Miamo" width={56} height={56} className="w-full h-full object-contain" priority />
+          </motion.div>
+          <h1 className="text-2xl font-bold tracking-tight">Create your account</h1>
           <p className="text-sm text-text-muted mt-1">Join {APP_NAME} and find real connections</p>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm animate-fade-in-up">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm"
+          >
             {error}
-          </div>
+          </motion.div>
+        )}
+
+        {success && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mb-4 p-3 rounded-xl bg-green-500/10 border border-green-500/20 text-green-400 text-sm flex items-center gap-2"
+          >
+            <Sparkles className="w-4 h-4" /> Welcome aboard! Redirecting…
+          </motion.div>
         )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -106,15 +136,20 @@ export default function RegisterPage() {
                 icon={<Lock className="w-4 h-4" />}
                 error={errors.password?.message}
               />
-              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-[38px] text-text-muted hover:text-text-secondary">
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-[38px] text-text-muted hover:text-text-secondary transition-colors">
                 {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
             {password && (
-              <div className="flex gap-1">
-                {[1, 2, 3, 4, 5].map((i) => (
-                  <div key={i} className={`flex-1 h-1 rounded-full transition-colors ${i <= strength ? (strength <= 2 ? 'bg-red-400' : strength <= 3 ? 'bg-amber-400' : 'bg-emerald-400') : 'bg-miamo-elevated'}`} />
-                ))}
+              <div className="space-y-1">
+                <div className="flex gap-1">
+                  {[1, 2, 3, 4, 5].map((i) => (
+                    <div key={i} className={`flex-1 h-1 rounded-full transition-colors ${i <= strength ? (strength <= 2 ? 'bg-red-400' : strength <= 3 ? 'bg-amber-400' : 'bg-emerald-400') : 'bg-miamo-elevated'}`} />
+                  ))}
+                </div>
+                <p className={`text-[11px] ${strength <= 2 ? 'text-red-400' : strength <= 3 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {strengthLabel}
+                </p>
               </div>
             )}
           </div>
@@ -127,15 +162,20 @@ export default function RegisterPage() {
             error={errors.confirmPassword?.message}
           />
           <Button type="submit" disabled={isSubmitting} className="w-full" size="lg">
-            {isSubmitting ? 'Creating account…' : 'Create Account'}
+            {isSubmitting ? (
+              <span className="flex items-center gap-2">
+                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Creating account…
+              </span>
+            ) : 'Create Account'}
           </Button>
         </form>
 
         <p className="text-center text-sm text-text-muted mt-6">
           Already have an account?{' '}
-          <Link href="/login" className="text-lavender-400 hover:text-lavender-300 font-medium">Sign in</Link>
+          <Link href="/login" className="text-lavender-400 hover:text-lavender-300 font-medium transition-colors">Sign in</Link>
         </p>
       </div>
-    </div>
+    </motion.div>
   );
 }

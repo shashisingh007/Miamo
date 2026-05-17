@@ -1,12 +1,21 @@
 // ─── Miamo API Client ────────────────────────────────
 // Connects to real backend API
+import type { ApiResponse, MiamoUser, MiamoMatch, MiamoChat, MiamoMessage, MiamoBeat, MiamoStory, MiamoNotification, MiamoSettings, MiamoBookmark, MiamoSession, DiscoverFilters, SearchResult } from './types';
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3200';
 
+/**
+ * Structured API error thrown by the `ApiClient` on non-2xx responses or network failures.
+ *
+ * @property statusCode - HTTP status code (0 for network errors)
+ * @property code - Machine-readable error code (e.g. 'UNAUTHORIZED', 'NETWORK_ERROR')
+ * @property data - Optional additional error data from the server
+ */
 class ApiError extends Error {
   public statusCode: number;
   public code: string;
-  public data: any;
-  constructor(message: string, statusCode: number, code?: string, data?: any) {
+  public data: unknown;
+  constructor(message: string, statusCode: number, code?: string, data?: unknown) {
     super(message);
     this.statusCode = statusCode;
     this.code = code || 'UNKNOWN_ERROR';
@@ -14,8 +23,20 @@ class ApiError extends Error {
   }
 }
 
+/**
+ * HTTP client for the Miamo backend API.
+ *
+ * Handles JWT authentication (reads from localStorage), automatic token
+ * cleanup on 401 responses, and structured error handling.
+ * All methods return typed API responses and throw `ApiError` on failure.
+ *
+ * Organized into sections: Auth, Discover, Matches, Messages, Beats,
+ * Feed, Stories, Videos, Creativity, Search, AI Match, Vibe Check,
+ * Notifications, Settings, Profiles, Safety, Matrimonial, and Activity.
+ */
 class ApiClient {
   private baseUrl: string;
+  /** @param baseUrl - Root URL of the API gateway (e.g. 'http://localhost:3200') */
   constructor(baseUrl: string) { this.baseUrl = baseUrl; }
 
   private getToken(): string | null {
@@ -25,14 +46,16 @@ class ApiClient {
 
   private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
     const token = this.getToken();
-    const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(options.headers as any || {}) };
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(options.headers as Record<string, string> || {}) };
     if (token) headers['Authorization'] = `Bearer ${token}`;
     try {
       const res = await fetch(`${this.baseUrl}${path}`, { ...options, headers, credentials: 'include' });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: { message: 'Network error' } }));
         const apiErr = new ApiError(err.error?.message || 'Request failed', res.status, err.error?.code, err.data);
-        // Only clear stale token — do NOT auto-redirect; let pages handle their own fallback
+        // On 401, clear the stale token from both legacy key and Zustand-persisted key.
+        // We do NOT auto-redirect here — each page handles its own auth fallback
+        // to avoid redirect loops and interrupting navigation flow.
         if (typeof window !== 'undefined' && (res.status === 401 || (res.status === 404 && path.includes('/auth/me')))) {
           localStorage.removeItem('miamo_token');
           try { localStorage.removeItem('miamo-auth'); } catch {}
@@ -77,6 +100,9 @@ class ApiClient {
   async passUser(userId: string) {
     return this.request<any>('/api/v1/discover/pass', { method: 'POST', body: JSON.stringify({ userId }) });
   }
+  async superLikeUser(userId: string) {
+    return this.request<any>(`/api/v1/discover/${userId}/superlike`, { method: 'POST' });
+  }
 
   // Miamo Move
   async sendMiamoMove(toUserId: string, message?: string, targetType?: string, targetId?: string) {
@@ -87,8 +113,8 @@ class ApiClient {
   async rejectMove(id: string) { return this.request<any>(`/api/v1/discover/moves/${id}/reject`, { method: 'POST' }); }
 
   // Discover Filters
-  async getDiscoverFilters() { return this.request<any>('/api/v1/discover/filters'); }
-  async saveDiscoverFilters(filters: any) { return this.request<any>('/api/v1/discover/filters', { method: 'PUT', body: JSON.stringify(filters) }); }
+  async getDiscoverFilters() { return this.request<ApiResponse<DiscoverFilters>>('/api/v1/discover/filters'); }
+  async saveDiscoverFilters(filters: Partial<DiscoverFilters>) { return this.request<ApiResponse<DiscoverFilters>>('/api/v1/discover/filters', { method: 'PUT', body: JSON.stringify(filters) }); }
 
   // Matches
   async getMatches(params?: Record<string, string>) {
@@ -217,7 +243,7 @@ class ApiClient {
   async getCreativityTrends(category?: string) { return this.request<any>(`/api/v1/creativity/trends${category ? `?category=${category}` : ''}`); }
 
   // Search
-  async search(q: string, _type?: string) { return this.request<any>(`/api/v1/search?q=${encodeURIComponent(q)}&type=user`); }
+  async search(q: string, type?: string) { return this.request<ApiResponse<SearchResult[]>>(`/api/v1/search?q=${encodeURIComponent(q)}&type=${type || 'all'}`); }
 
   // AI Match
   async getAiSuggestions() { return this.request<any>('/api/v1/ai-match/suggestions'); }
@@ -233,25 +259,25 @@ class ApiClient {
   async getVibeMatches() { return this.request<any>('/api/v1/vibe-check/matches'); }
 
   // Notifications
-  async getNotifications(unreadOnly?: boolean) { return this.request<any>(`/api/v1/notifications${unreadOnly ? '?unreadOnly=true' : ''}`); }
-  async getNotificationCount() { return this.request<any>('/api/v1/notifications/count'); }
+  async getNotifications(unreadOnly?: boolean) { return this.request<ApiResponse<MiamoNotification[]>>(`/api/v1/notifications${unreadOnly ? '?unreadOnly=true' : ''}`); }
+  async getNotificationCount() { return this.request<ApiResponse<{ count: number }>>('/api/v1/notifications/count'); }
   async markNotificationRead(id: string) { return this.request<any>(`/api/v1/notifications/${id}/read`, { method: 'POST' }); }
   async markAllNotificationsRead() { return this.request<any>('/api/v1/notifications/read-all', { method: 'POST' }); }
 
   // Settings
-  async getSettings() { return this.request<any>('/api/v1/settings'); }
-  async updateSettings(data: any) { return this.request<any>('/api/v1/settings', { method: 'PUT', body: JSON.stringify(data) }); }
-  async updatePrivacy(data: any) { return this.request<any>('/api/v1/settings/privacy', { method: 'PUT', body: JSON.stringify(data) }); }
+  async getSettings() { return this.request<ApiResponse<MiamoSettings>>('/api/v1/settings'); }
+  async updateSettings(data: Partial<MiamoSettings>) { return this.request<ApiResponse<MiamoSettings>>('/api/v1/settings', { method: 'PUT', body: JSON.stringify(data) }); }
+  async updatePrivacy(data: Record<string, boolean>) { return this.request<ApiResponse<Record<string, boolean>>>('/api/v1/settings/privacy', { method: 'PUT', body: JSON.stringify(data) }); }
   async deactivateAccount() { return this.request<any>('/api/v1/settings/deactivate', { method: 'POST' }); }
   async deleteAccount() { return this.request<any>('/api/v1/settings/delete', { method: 'DELETE' }); }
   async exportData() { return this.request<any>('/api/v1/settings/export'); }
   async getBlockList() { return this.request<any>('/api/v1/settings/blocks'); }
 
   // Profiles
-  async getMyProfile() { return this.request<any>('/api/v1/profiles/me'); }
-  async updateProfile(data: any) { return this.request<any>('/api/v1/profiles/me', { method: 'PUT', body: JSON.stringify(data) }); }
-  async updatePrompts(prompts: any[]) { return this.request<any>('/api/v1/profiles/me/prompts', { method: 'PUT', body: JSON.stringify({ prompts }) }); }
-  async updateInterests(interests: string[]) { return this.request<any>('/api/v1/profiles/me/interests', { method: 'PUT', body: JSON.stringify({ interests }) }); }
+  async getMyProfile() { return this.request<ApiResponse<MiamoProfile>>('/api/v1/profiles/me'); }
+  async updateProfile(data: Partial<MiamoProfile>) { return this.request<ApiResponse<MiamoProfile>>('/api/v1/profiles/me', { method: 'PUT', body: JSON.stringify(data) }); }
+  async updatePrompts(prompts: Array<{ question: string; answer: string; position: number }>) { return this.request<ApiResponse<unknown>>('/api/v1/profiles/me/prompts', { method: 'PUT', body: JSON.stringify({ prompts }) }); }
+  async updateInterests(interests: string[]) { return this.request<ApiResponse<unknown>>('/api/v1/profiles/me/interests', { method: 'PUT', body: JSON.stringify({ interests }) }); }
   async uploadPhoto(formData: FormData) {
     const token = typeof window !== 'undefined' ? localStorage.getItem('miamo_token') : null;
     const headers: Record<string, string> = {};
@@ -263,7 +289,7 @@ class ApiClient {
   async deletePhoto(photoId: string) { return this.request<any>(`/api/v1/profiles/me/photos/${photoId}`, { method: 'DELETE' }); }
 
   // Safety
-  async reportUser(data: any) { return this.request<any>('/api/v1/safety/report', { method: 'POST', body: JSON.stringify(data) }); }
+  async reportUser(data: { reportedId: string; reason: string; details?: string; targetType?: string; targetId?: string }) { return this.request<ApiResponse<unknown>>('/api/v1/safety/report', { method: 'POST', body: JSON.stringify(data) }); }
   async blockUser(blockedId: string) { return this.request<any>('/api/v1/safety/block', { method: 'POST', body: JSON.stringify({ blockedId }) }); }
   async unblockUser(blockedId: string) { return this.request<any>('/api/v1/safety/unblock', { method: 'POST', body: JSON.stringify({ blockedId }) }); }
   async getSafetyTips() { return this.request<any>('/api/v1/safety/tips'); }
@@ -304,6 +330,19 @@ class ApiClient {
 
   // Health
   async health() { return this.request<any>('/health'); }
+
+  // ─── Activity Tracking ─────────────────────────────
+  // Fire-and-forget behavioral tracking for recommendation algorithms.
+  // Intentionally does NOT await or throw — analytics failures should never
+  // block or degrade user-facing operations.
+  trackActivity(action: string, targetType: string, targetId?: string, metadata?: Record<string, unknown>, durationMs?: number) {
+    const body: Record<string, unknown> = { action, targetType };
+    if (targetId) body.targetId = targetId;
+    if (metadata) body.metadata = metadata;
+    if (durationMs) body.durationMs = durationMs;
+    // Non-blocking: don't await, don't throw
+    this.request('/api/v1/activity/track', { method: 'POST', body: JSON.stringify(body) }).catch(() => { /* fire-and-forget analytics */ });
+  }
 }
 
 export const api = new ApiClient(API_URL);

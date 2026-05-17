@@ -8,11 +8,17 @@ import { Button } from '@/components/ui/button';
 import { MiamoLoader } from '@/components/ui/miamo-logo';
 import { api } from '@/lib/api';
 import { useRouter } from 'next/navigation';
+import { useTrackPageView, useTrackScrollDepth, trackClick } from '@/hooks/useTrackActivity';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { useToast } from '@/components/ui/toast';
 
 export default function AIMatchPage() {
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
+
+  useTrackPageView('ai-match');
+  useTrackScrollDepth('ai-match');
 
   useEffect(() => {
     api.getAiSuggestions().then(res => setSuggestions(res.data || [])).catch(() => {}).finally(() => setLoading(false));
@@ -21,10 +27,11 @@ export default function AIMatchPage() {
   if (loading) return <MiamoLoader text="AI analyzing compatibility..." />;
 
   return (
+    <ErrorBoundary>
     <div className="max-w-3xl mx-auto p-6 space-y-6">
       <div>
-        <h1 className="text-xl font-bold flex items-center gap-2"><Brain className="w-5 h-5 text-lavender-400" /> AI Match</h1>
-        <p className="text-sm text-text-muted mt-1">Understand why people are recommended to you</p>
+        <h1 className="text-xl font-bold flex items-center gap-2 dark:text-white"><Brain className="w-5 h-5 text-lavender-400" /> AI Match</h1>
+        <p className="text-sm text-text-muted mt-1 dark:text-gray-400">Understand why people are recommended to you</p>
       </div>
       <Card className="p-5 border-lavender-400/20">
         <div className="flex items-start gap-3">
@@ -87,5 +94,6 @@ export default function AIMatchPage() {
         )}
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

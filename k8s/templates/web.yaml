@@ -28,6 +28,11 @@ metadata:
     service: web
 spec:
   replicas: __REPLICAS__
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: miamo
@@ -38,6 +43,7 @@ spec:
         app: miamo
         service: web
     spec:
+      terminationGracePeriodSeconds: 30
       containers:
         - name: web
           image: __IMAGE_PREFIX__miamo-web:__IMAGE_TAG__
@@ -54,6 +60,13 @@ spec:
             limits:
               memory: "__LIM_MEM__"
               cpu: "__LIM_CPU__"
+          startupProbe:
+            httpGet:
+              path: /
+              port: __WEB_PORT__
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 12
           livenessProbe:
             httpGet:
               path: /
@@ -61,12 +74,16 @@ spec:
             initialDelaySeconds: 30
             periodSeconds: 30
             timeoutSeconds: 5
-            failureThreshold: 5
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /
               port: __WEB_PORT__
             initialDelaySeconds: 10
-            periodSeconds: 15
+            periodSeconds: 10
             timeoutSeconds: 5
-            failureThreshold: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]

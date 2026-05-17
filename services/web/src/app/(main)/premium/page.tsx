@@ -5,6 +5,9 @@ import { Crown, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui';
 import Image from 'next/image';
+import { useTrackPageView, useTrackScrollDepth, trackClick } from '@/hooks/useTrackActivity';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { useToast } from '@/components/ui/toast';
 
 const plans = [
   {
@@ -32,14 +35,18 @@ const plans = [
 export default function PremiumPage() {
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
   const [purchasing, setPurchasing] = useState(false);
+
+  useTrackPageView('premium');
+  useTrackScrollDepth('premium');
   return (
+    <ErrorBoundary>
     <div className="max-w-4xl mx-auto p-6 space-y-8">
       <div className="text-center">
         <div className="w-14 h-14 rounded-2xl overflow-hidden mx-auto mb-4">
           <Image src="/logo.png" alt="Miamo Premium" width={56} height={56} className="w-full h-full object-contain" />
         </div>
-        <h1 className="text-2xl font-bold">Upgrade to Premium</h1>
-        <p className="text-sm text-text-muted mt-2 max-w-lg mx-auto">Get more from Miamo with advanced features, unlimited interactions, and priority visibility.</p>
+        <h1 className="text-2xl font-bold dark:text-white">Upgrade to Premium</h1>
+        <p className="text-sm text-text-muted mt-2 max-w-lg mx-auto dark:text-gray-400">Get more from Miamo with advanced features, unlimited interactions, and priority visibility.</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -82,5 +89,6 @@ export default function PremiumPage() {
         ))}
       </div>
     </div>
+    </ErrorBoundary>
   );
 }

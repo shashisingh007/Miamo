@@ -1,28 +1,39 @@
 // ─── Miamo API Gateway ───────────────────────────────
 // Instagram-style API Gateway — routes to microservices
-// Handles: rate limiting, CORS, auth validation, routing, SSE real-time
+// Handles: rate limiting, CORS, auth validation, routing, SSE real-time, security
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
+import compression from 'compression';
 import { createProxyMiddleware, Options } from 'http-proxy-middleware';
 import jwt from 'jsonwebtoken';
+import { logger } from '../../shared/src/logger';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3200', 10);
 const JWT_SECRET = process.env.JWT_SECRET || 'miamo-dev-jwt-secret-change-in-production-2026';
 
 // ═══ SSE: Real-time event connections per user ═══════
+// In-memory map of userId → Set of active SSE response objects.
+// Uses a Set per user to support multi-tab: one user can have multiple browser
+// tabs open, each with its own EventSource connection, and all receive events.
 const sseClients = new Map<string, Set<express.Response>>();
 
+/**
+ * Push a server-sent event to all active SSE connections for a user.
+ * Called by microservices via the /internal/push-event endpoint.
+ * Failed writes (broken connections) are automatically cleaned up.
+ */
 export function pushEvent(userId: string, event: string, data: any) {
   const clients = sseClients.get(userId);
   if (!clients) return;
+  // SSE wire format: "event: <name>\ndata: <json>\n\n"
   const payload = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const res of clients) {
-    try { res.write(payload); } catch { clients.delete(res); }
+    try { res.write(payload); } catch { clients.delete(res); } // Dead connection cleanup
   }
 }
 
@@ -39,32 +50,97 @@ const SERVICES = {
   notifications: process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3206',
 };
 
-// ─── Middleware ───────────────────────────────────────
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-// Note: compression disabled — http-proxy-middleware handles its own streams
-app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3100',
-  credentials: true,
+// ─── Security: Enhanced Helmet CSP ───────────────────
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+      connectSrc: ["'self'", 'http://localhost:*', 'ws://localhost:*'],
+      fontSrc: ["'self'", 'data:'],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+  noSniff: true,
+  xssFilter: true,
 }));
+
+// ─── Security: Strict CORS ──────────────────────────
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3100').split(',');
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || ALLOWED_ORIGINS.includes(origin) || process.env.NODE_ENV === 'development') {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+  maxAge: 86400, // Preflight cache 24h
+}));
+
+// ─── Performance: Response Compression ──────────────
+// Only compress non-proxy responses (health, SSE, internal)
+app.use(compression({ filter: (req) => !req.originalUrl.startsWith('/api/v1/') }));
+
 app.use(cookieParser());
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan('short'));
 }
 
-// Global rate limit
-app.use(rateLimit({
+// ─── Security: Request Size Limits ──────────────────
+// Limit body parsing for internal routes only (proxy handles its own)
+const internalBodyParser = express.json({ limit: '1mb' });
+
+// ─── Security: Request ID Tracking ──────────────────
+app.use((req, _res, next) => {
+  req.headers['x-request-id'] = req.headers['x-request-id'] || `${Date.now()}-${Math.random().toString(36).substring(7)}`;
+  next();
+});
+
+// ─── Rate Limiting: User-aware + IP-based ───────────
+const globalLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5000,
   standardHeaders: true,
   legacyHeaders: false,
-}));
+  keyGenerator: (req) => {
+    // Use user ID if authenticated, otherwise IP
+    return (req.headers['x-user-id'] as string) || req.ip || 'unknown';
+  },
+});
+app.use(globalLimiter);
 
 // Auth-specific stricter rate limit
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 50,
-  message: { error: { message: 'Too many auth attempts', code: 'RATE_LIMITED' } },
+  max: 30,
+  message: { error: { message: 'Too many auth attempts. Please try again later.', code: 'RATE_LIMITED' } },
+  keyGenerator: (req) => req.ip || 'unknown',
 });
+
+// ─── Security: Input Sanitization Middleware ─────────
+function sanitizeHeaders(req: express.Request, _res: express.Response, next: express.NextFunction) {
+  // Strip potentially dangerous headers from client requests
+  delete req.headers['x-forwarded-host'];
+  delete req.headers['x-original-url'];
+  delete req.headers['x-rewrite-url'];
+  // Validate authorization header format
+  const auth = req.headers.authorization;
+  if (auth && !auth.startsWith('Bearer ')) {
+    delete req.headers.authorization;
+  }
+  next();
+}
+app.use(sanitizeHeaders);
 
 // ─── Auth Validation Middleware ───────────────────────
 function extractUserId(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -127,24 +203,29 @@ app.get('/api/v1/events/stream', (req: express.Request, res: express.Response) =
   }
   if (!userId) return res.status(401).json({ error: { message: 'Authentication required' } });
 
+  // X-Accel-Buffering: no tells nginx to NOT buffer SSE responses.
+  // Without this, nginx holds data until the buffer fills, defeating real-time delivery.
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
     'Connection': 'keep-alive',
     'X-Accel-Buffering': 'no', // nginx
   });
+  // Send initial connection event so the client knows SSE is active
   res.write(`event: connected\ndata: {"userId":"${userId}"}\n\n`);
 
+  // Register this response in the SSE client map (supports multi-tab)
   if (!sseClients.has(userId)) sseClients.set(userId, new Set());
   sseClients.get(userId)!.add(res);
 
-  // Keep alive every 30s
+  // Keep alive every 30s to prevent proxy/firewall timeout (e.g., nginx default 60s)
   const keepAlive = setInterval(() => { try { res.write(': keepalive\n\n'); } catch {} }, 30000);
 
+  // Clean up on disconnect: remove this response from the map
   req.on('close', () => {
     clearInterval(keepAlive);
     sseClients.get(userId)?.delete(res);
-    if (sseClients.get(userId)?.size === 0) sseClients.delete(userId);
+    if (sseClients.get(userId)?.size === 0) sseClients.delete(userId); // Garbage collect empty sets
   });
 });
 
@@ -156,6 +237,20 @@ app.post('/internal/push-event', express.json({ limit: '1mb' }), (req: express.R
   }
   const { userId, event, data } = req.body;
   if (userId && event) pushEvent(userId, event, data);
+  res.json({ ok: true });
+});
+
+// ─── Activity Tracking Endpoint ──────────────────────
+// Frontend can post user activity for behavioral analysis
+app.post('/api/v1/activity/track', express.json({ limit: '50kb' }), (req: express.Request, res: express.Response) => {
+  const userId = req.headers['x-user-id'] as string;
+  if (!userId) return res.status(401).json({ error: { message: 'Auth required' } });
+  // Forward to the appropriate service (social handles activity storage)
+  fetch(`${SERVICES.social}/api/v1/activity/track`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'x-user-id': userId, 'x-internal-key': process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key' },
+    body: JSON.stringify(req.body),
+  }).catch((e: unknown) => logger.warn('Activity forward failed:', e));
   res.json({ ok: true });
 });
 
@@ -178,7 +273,7 @@ function proxyTo(target: string): Options {
         }
       },
       error: (err, _req, res: any) => {
-        console.error('Proxy error:', err.message);
+        logger.error('Proxy error:', err.message);
         if (res.writeHead) {
           res.writeHead(502, { 'Content-Type': 'application/json' });
           res.end(JSON.stringify({ error: { message: 'Service unavailable', code: 'SERVICE_UNAVAILABLE' } }));
@@ -197,6 +292,7 @@ app.use('/api/v1/users', requireAuth, createProxyMiddleware(proxyTo(SERVICES.use
 app.use('/api/v1/profiles', requireAuth, createProxyMiddleware(proxyTo(SERVICES.users)));
 app.use('/api/v1/search', requireAuth, createProxyMiddleware(proxyTo(SERVICES.users)));
 app.use('/api/v1/settings', requireAuth, createProxyMiddleware(proxyTo(SERVICES.users)));
+app.use('/api/v1/bookmarks', requireAuth, createProxyMiddleware(proxyTo(SERVICES.users)));
 
 // Social routes (protected)
 app.use('/api/v1/discover', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
@@ -204,6 +300,7 @@ app.use('/api/v1/matches', requireAuth, createProxyMiddleware(proxyTo(SERVICES.s
 app.use('/api/v1/ai-match', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
 app.use('/api/v1/safety', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
 app.use('/api/v1/vibe-check', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
+app.use('/api/v1/activity', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
 
 // Messaging routes (protected)
 app.use('/api/v1/messages', requireAuth, createProxyMiddleware(proxyTo(SERVICES.messaging)));
@@ -228,11 +325,26 @@ app.use((_req, res) => {
 export { app };
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`\n🚀 Miamo API Gateway running on port ${PORT}`);
-    console.log(`   Health: http://localhost:${PORT}/health`);
-    console.log(`   Services:`);
-    Object.entries(SERVICES).forEach(([name, url]) => console.log(`     ${name}: ${url}`));
-    console.log('');
+  const server = app.listen(PORT, '0.0.0.0', () => {
+    logger.info(`Miamo API Gateway running on port ${PORT}`);
+    logger.info(`Health: http://localhost:${PORT}/health`);
+    logger.info('Services:');
+    Object.entries(SERVICES).forEach(([name, url]) => logger.info(`  ${name}: ${url}`));
   });
+
+  const shutdown = (signal: string) => {
+    logger.info(`${signal} received — shutting down gateway...`);
+    // Close all SSE connections
+    for (const [, clients] of sseClients) {
+      for (const res of clients) { try { res.end(); } catch {} }
+    }
+    sseClients.clear();
+    server.close(() => {
+      logger.info('Gateway stopped cleanly');
+      process.exit(0);
+    });
+    setTimeout(() => { process.exit(1); }, 10000);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }

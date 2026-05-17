@@ -9,6 +9,7 @@ import { useAuthStore } from '@/stores';
 import { Avatar, ScoreRing } from '@/components/ui';
 import { api } from '@/lib/api';
 import { AnimatedMiamoLogo, MiamoCompactIcon } from '@/components/ui/miamo-logo';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { Bell, LogOut, Crown, Sparkles } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -27,17 +28,17 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   // Wait for Zustand persist to hydrate from localStorage before deciding auth state
   useEffect(() => {
     const unsub = useAuthStore.persist.onFinishHydration(() => {
-      console.log('[Auth] Zustand persist hydrated');
+      if (process.env.NODE_ENV === 'development') console.log('[Auth] Zustand persist hydrated');
       setHydrated(true);
     });
     // If already hydrated (e.g. client-side navigation), set immediately
     if (useAuthStore.persist.hasHydrated()) {
-      console.log('[Auth] Already hydrated');
+      if (process.env.NODE_ENV === 'development') console.log('[Auth] Already hydrated');
       setHydrated(true);
     }
     // Fallback: also check localStorage directly (in case persist is sluggish)
     if (typeof window !== 'undefined' && localStorage.getItem('miamo_token')) {
-      console.log('[Auth] Token found in localStorage, marking hydrated');
+      if (process.env.NODE_ENV === 'development') console.log('[Auth] Token found in localStorage, marking hydrated');
       setHydrated(true);
     }
     return () => unsub();
@@ -63,7 +64,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       const chats = res.data || [];
       const totalUnread = chats.reduce((sum: number, c: any) => sum + (c.unreadCount || 0), 0);
       setUnreadMsgCount(totalUnread);
-    }).catch(() => {});
+    }).catch(() => { /* non-critical: silently retry on next poll */ });
   }, []);
 
   useSSE('new-message', refreshUnread, isAuthenticated);
@@ -92,9 +93,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     const interval = setInterval(() => {
       api.getNotificationCount().then(res => {
         setNotifCount(res.data?.count ?? res.count ?? 0);
-      }).catch(() => {});
-      refreshUnread();
-    }, 60000);
+      }).catch(() => { /* non-critical poll */ });
     return () => clearInterval(interval);
   }, [isAuthenticated, refreshUnread]);
 
@@ -107,7 +106,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   // Auth guard — redirect to login if not authenticated (only after hydration)
   useEffect(() => {
     if (hydrated && !isAuthenticated) {
-      console.log('[Auth Guard] Not authenticated after hydration, redirecting to login');
+      if (process.env.NODE_ENV === 'development') console.log('[Auth Guard] Redirecting to login');
       window.location.href = '/login';
     }
   }, [hydrated, isAuthenticated]);
@@ -308,7 +307,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
                   exit={{ opacity: 0, y: -8, filter: 'blur(2px)' }}
                   transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
                 >
-                  {children}
+                  <ErrorBoundary>
+                    {children}
+                  </ErrorBoundary>
                 </motion.div>
               </AnimatePresence>
             </div>

@@ -7,8 +7,17 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
+import { LRUCache, MinHeap, BloomFilter, TTL, discoverCache, aiMatchCache, activityCache, profileCache } from '../../shared/cache';
+import { scoreForYou, scoreNew, scoreActive, scoreVerified, scoreSerious, scoreAiPicks, type BehaviorVector, type VibeData, type MatchHistoryInsights, type CandidateUser, type UserProfile } from '../../shared/algorithms';
+import { logger } from '../../shared/src/logger';
+import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
+import { auditLog, trackActivity } from '../../shared/src/audit';
 
-export const prisma = new PrismaClient();
+const DB_URL = process.env.DATABASE_URL || 'postgresql://miamo:miamo@localhost:5432/miamo?schema=public';
+export const prisma = new PrismaClient({
+  log: process.env.NODE_ENV === 'production' ? ['error'] : ['warn', 'error'],
+  datasources: { db: { url: DB_URL + (DB_URL.includes('?') ? '&' : '?') + 'connection_limit=15&pool_timeout=20' } },
+});
 export const app = express();
 const PORT = parseInt(process.env.PORT || '3203', 10);
 
@@ -19,6 +28,16 @@ app.use(cookieParser());
 if (process.env.NODE_ENV !== 'test') app.use(morgan('short'));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 2000, standardHeaders: true, legacyHeaders: false }));
 
+// ─── Shared Constants ────────────────────────────────
+const ZODIAC_COMPAT: Record<string, string[]> = {
+  Aries:['Leo','Sagittarius','Gemini','Aquarius'], Taurus:['Virgo','Capricorn','Cancer','Pisces'],
+  Gemini:['Libra','Aquarius','Aries','Leo'], Cancer:['Scorpio','Pisces','Taurus','Virgo'],
+  Leo:['Aries','Sagittarius','Gemini','Libra'], Virgo:['Taurus','Capricorn','Cancer','Scorpio'],
+  Libra:['Gemini','Aquarius','Leo','Sagittarius'], Scorpio:['Cancer','Pisces','Virgo','Capricorn'],
+  Sagittarius:['Aries','Leo','Libra','Aquarius'], Capricorn:['Taurus','Virgo','Scorpio','Pisces'],
+  Aquarius:['Gemini','Libra','Aries','Sagittarius'], Pisces:['Cancer','Scorpio','Taurus','Capricorn'],
+};
+
 interface AuthRequest extends Request { userId?: string; }
 function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   const userId = req.headers['x-user-id'] as string;
@@ -26,6 +45,56 @@ function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
     req.userId = userId; return next();
   }
   return res.status(401).json({ error: { message: 'Authentication required', code: 'UNAUTHORIZED' } });
+}
+
+// ─── User Behavior Vector Builder ───────────────────
+// Aggregates recent user actions into a weighted behavior profile for recommendations
+// Now powered by the UserActivityAnalyzer for comprehensive multi-signal analysis
+import { UserActivityAnalyzer, type RawActivity } from '../../shared/activity-analyzer';
+
+async function getUserBehaviorVector(userId: string): Promise<{
+  likedProfiles: Set<string>; passedProfiles: Set<string>; viewedProfiles: Map<string, number>;
+  preferredAge: { min: number; max: number } | null; preferredCities: string[];
+  preferredIntents: string[]; engagementLevel: number; interactionPatterns: Record<string, number>;
+}> {
+  const cacheKey = `behavior:${userId}`;
+  const cached = activityCache.get(cacheKey);
+  if (cached) return cached;
+
+  // Fetch last 500 activities (covers ~2 weeks of active usage)
+  const activities = await prisma.userActivity.findMany({
+    where: { userId, createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+    orderBy: { createdAt: 'desc' },
+    take: 500,
+  });
+
+  // Use the analyzer for comprehensive processing
+  const analyzer = new UserActivityAnalyzer(userId, activities as RawActivity[]);
+  const prefs = analyzer.buildPreferenceVector();
+  const engagement = analyzer.computeEngagementScore();
+
+  // Build interactionPatterns from raw data for backward compat
+  const patterns: Record<string, number> = {};
+  for (const a of activities) {
+    patterns[a.action] = (patterns[a.action] || 0) + 1;
+  }
+
+  const preferredCities = prefs.preferredCities.slice(0, 3).map(c => c.city);
+  const preferredIntents = prefs.preferredIntents.slice(0, 2).map(i => i.intent);
+  const preferredAge = prefs.preferredAge ? { min: prefs.preferredAge.min, max: prefs.preferredAge.max } : null;
+
+  const result = {
+    likedProfiles: prefs.likedProfiles,
+    passedProfiles: prefs.passedProfiles,
+    viewedProfiles: prefs.viewedProfiles,
+    preferredAge,
+    preferredCities,
+    preferredIntents,
+    engagementLevel: engagement.overall,
+    interactionPatterns: patterns,
+  };
+  activityCache.set(cacheKey, result, TTL.ACTIVITY_SUMMARY);
+  return result;
 }
 
 // Health
@@ -39,12 +108,55 @@ app.get('/ready', async (_req, res) => {
 });
 
 // ═══ DISCOVER ════════════════════════════════════════
+// ─── Activity Track Endpoint (receives from gateway) ──
+app.post('/api/v1/activity/track', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { action, targetType, targetId, metadata, durationMs } = req.body;
+    if (!action || !targetType) return res.status(400).json({ error: { message: 'action and targetType required' } });
+    trackActivity(prisma, req.userId!, action, targetType, targetId, metadata, durationMs);
+    res.json({ data: { tracked: true } });
+  } catch { res.json({ data: { tracked: false } }); }
+});
+
+// ─── Full User Activity Analysis (for advanced features) ──
+app.get('/api/v1/activity/analysis', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const activities = await prisma.userActivity.findMany({
+      where: { userId, createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+      orderBy: { createdAt: 'desc' },
+      take: 1000,
+    });
+    const analyzer = new UserActivityAnalyzer(userId, activities as RawActivity[]);
+    const analysis = analyzer.analyze();
+    // Convert Sets/Maps to serializable form
+    res.json({
+      data: {
+        userId: analysis.userId,
+        analyzedAt: analysis.analyzedAt,
+        activityCount: analysis.activityCount,
+        engagement: analysis.engagement,
+        cluster: analysis.cluster,
+        temporal: analysis.temporal,
+        contentTaste: {
+          ...analysis.contentTaste,
+          contentTypePrefs: Object.fromEntries(analysis.contentTaste.contentTypePrefs),
+        },
+        responseProfile: {
+          ...analysis.responseProfile,
+          responseByHour: Object.fromEntries(analysis.responseProfile.responseByHour),
+        },
+      },
+    });
+  } catch (err) { res.status(500).json({ error: { message: 'Analysis failed' } }); }
+});
+
 app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { seriousOnly, verifiedOnly, minAge, maxAge, city, cursor,
       gender, sexuality, lookingFor, smoking, drinking, exercise,
       education, religion, zodiac, pets, children,
-      minHeight, maxHeight, activeToday, newHere, hasPhotos,
+      minHeight, maxHeight, activeToday, newHere, hasPhotos, aiPicks,
     } = req.query;
     const userId = req.userId!;
     const blocks = await prisma.block.findMany({ where: { OR: [{ blockerId: userId }, { blockedId: userId }] } });
@@ -168,76 +280,121 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
       activeVibes.forEach(v => activeVibeMap.set(v.userId, v));
     } catch {}
 
-    // ── AI Compatibility Scoring ──
-    const profiles = users.map(u => {
-      const { passwordHash, ...userData } = u;
-      const commonInterests = u.interests.filter(i => myInterestNames.includes(i.name)).map(i => i.name);
-      let discoverScore = 0;
+    // ── Behavioral intelligence: analyze user's past actions ──
+    const behavior = await getUserBehaviorVector(userId);
 
-      if (myProfile && u.profile) {
-        const p = u.profile;
-        // Interest overlap (0-20)
-        discoverScore += Math.min(commonInterests.length * 4, 20);
-        // Dating intent alignment (0-15)
-        if (myProfile.datingIntent === p.datingIntent) discoverScore += 15;
-        else if (myProfile.seriousMode === p.seriousMode) discoverScore += 8;
-        // Location match (0-10)
-        if (myProfile.city?.toLowerCase() === p.city?.toLowerCase()) discoverScore += 10;
-        // Age proximity (0-10)
-        const ageDiff = Math.abs(myProfile.age - p.age);
-        if (ageDiff <= 3) discoverScore += 10;
-        else if (ageDiff <= 5) discoverScore += 7;
-        else if (ageDiff <= 8) discoverScore += 3;
-        // Profile completeness (0-10)
-        if (p.profileScore >= 80) discoverScore += 10;
-        else if (p.profileScore >= 60) discoverScore += 6;
-        else if (p.profileScore >= 40) discoverScore += 3;
-        // Activity recency (0-10)
-        if (p.online) discoverScore += 10;
-        else if (p.lastActive && (Date.now() - new Date(p.lastActive).getTime()) < 3600000) discoverScore += 8;
-        else if (p.lastActive && (Date.now() - new Date(p.lastActive).getTime()) < 86400000) discoverScore += 4;
-        // Lifestyle alignment (0-10)
-        let lifestyleMatch = 0;
-        if ((myProfile as any).smoking === (p as any).smoking) lifestyleMatch++;
-        if ((myProfile as any).drinking === (p as any).drinking) lifestyleMatch++;
-        if ((myProfile as any).exercise === (p as any).exercise) lifestyleMatch++;
-        if ((myProfile as any).children && (p as any).children && (myProfile as any).children === (p as any).children) lifestyleMatch++;
-        if ((myProfile as any).religion && (p as any).religion && (myProfile as any).religion === (p as any).religion) lifestyleMatch++;
-        discoverScore += Math.min(lifestyleMatch * 2, 10);
-        // Verified bonus (0-5)
-        if (u.verified) discoverScore += 5;
-        // Has photos (0-5)
-        if (u.photos.length >= 2) discoverScore += 5;
-        else if (u.photos.length === 1) discoverScore += 2;
-        // Has prompts filled out (0-5)
-        if (u.prompts.length >= 2) discoverScore += 5;
-        else if (u.prompts.length === 1) discoverScore += 2;
+    // ── Determine active algorithm from query params ──
+    type FilterAlgo = 'forYou' | 'new' | 'active' | 'verified' | 'serious' | 'aiPicks';
+    let activeAlgo: FilterAlgo = 'forYou';
+    if (aiPicks === 'true') activeAlgo = 'aiPicks';
+    else if (seriousOnly === 'true') activeAlgo = 'serious';
+    else if (verifiedOnly === 'true') activeAlgo = 'verified';
+    else if (newHere === 'true') activeAlgo = 'new';
+    else if (activeToday === 'true') activeAlgo = 'active';
 
-        // Vibe compatibility bonus (0-10)
-        if (myVibe) {
-          const theirVibe = activeVibeMap.get(u.id);
-          if (theirVibe) {
-            const myTopics: string[] = JSON.parse(myVibe.topics || '[]');
-            const theirTopics: string[] = JSON.parse(theirVibe.topics || '[]');
-            if (theirVibe.mood === myVibe.mood) discoverScore += 4;
-            if (theirVibe.intent === myVibe.intent) discoverScore += 3;
-            const topicOverlap = myTopics.filter((t: string) => theirTopics.includes(t)).length;
-            discoverScore += Math.min(topicOverlap * 1.5, 3);
+    // ── For AI Picks: fetch match history insights ──
+    let matchHistoryInsights: MatchHistoryInsights = { avgMatchDuration: 0, commonTraitsInSuccessful: [], unmatchReasons: {} };
+    if (activeAlgo === 'aiPicks') {
+      try {
+        const pastMatches = await prisma.match.findMany({
+          where: { OR: [{ user1Id: userId }, { user2Id: userId }] },
+          include: { user1: { include: { profile: true, interests: true } }, user2: { include: { profile: true, interests: true } } },
+        });
+        const successfulTraits: Record<string, number> = {};
+        let totalDuration = 0, activeLongMatches = 0;
+        for (const m of pastMatches) {
+          const other = m.user1Id === userId ? m.user2 : m.user1;
+          const matchAge = Date.now() - new Date(m.createdAt).getTime();
+          if (m.active && matchAge > 7 * 24 * 60 * 60 * 1000) {
+            activeLongMatches++; totalDuration += matchAge;
+            other.interests?.forEach(i => { successfulTraits[i.name] = (successfulTraits[i.name] || 0) + 2; });
+            if (other.profile?.datingIntent) successfulTraits[`intent:${other.profile.datingIntent}`] = (successfulTraits[`intent:${other.profile.datingIntent}`] || 0) + 3;
+            if (other.profile?.city) successfulTraits[`city:${other.profile.city.toLowerCase()}`] = (successfulTraits[`city:${other.profile.city.toLowerCase()}`] || 0) + 2;
           }
         }
+        if (activeLongMatches > 0) matchHistoryInsights.avgMatchDuration = totalDuration / activeLongMatches;
+        matchHistoryInsights.commonTraitsInSuccessful = Object.entries(successfulTraits).sort((a, b) => b[1] - a[1]).slice(0, 10).map(e => e[0]);
+      } catch {}
+    }
+
+    // ── For Verified filter: compute interest popularity for rarity weighting ──
+    let interestPopularity: Map<string, number> | undefined;
+    if (activeAlgo === 'verified') {
+      interestPopularity = new Map();
+      for (const u of users) {
+        for (const i of u.interests) {
+          interestPopularity.set(i.name, (interestPopularity.get(i.name) || 0) + 1);
+        }
+      }
+    }
+
+    // ── ALGORITHM DISPATCH ──
+    // Each discover filter tab uses a completely different scoring algorithm.
+    // The algorithm selection is driven by the "filter" query param from the client.
+    // All algorithms return a 0-100 score; the MinHeap retains only the top 20.
+    // See services/shared/algorithms.ts for full implementation of each scorer.
+    const topK = new MinHeap<any>(20);
+
+    for (const u of users) {
+      const { passwordHash, ...userData } = u;
+      const commonInterests = u.interests.filter(i => myInterestNames.includes(i.name)).map(i => i.name);
+
+      // Prepare vibe data for this candidate
+      const rawVibe = activeVibeMap.get(u.id);
+      const candidateVibe: VibeData | null = rawVibe ? {
+        mood: rawVibe.mood, intent: rawVibe.intent,
+        topics: rawVibe.topics ? JSON.parse(rawVibe.topics) : [],
+      } : null;
+      const myVibeData: VibeData | null = myVibe ? {
+        mood: myVibe.mood, intent: myVibe.intent,
+        topics: myVibe.topics ? JSON.parse(myVibe.topics) : [],
+      } : null;
+
+      // Cast profile for algorithm functions
+      const candidateUser: CandidateUser = {
+        id: u.id, verified: u.verified, createdAt: u.createdAt,
+        profile: u.profile as any, interests: u.interests, photos: u.photos, prompts: u.prompts,
+      };
+
+      // ── DISPATCH to the correct algorithm based on active filter ──
+      // Each algorithm emphasizes different signals:
+      //   forYou:   cosine similarity on learned preference vector
+      //   new:      exponential recency decay (fresh profiles first)
+      //   active:   responsiveness & engagement metrics
+      //   verified: rare-interest IDF weighting (verified pool only)
+      //   serious:  long-term compatibility (values, lifestyle, family goals)
+      //   aiPicks:  6-model ensemble with collaborative filtering
+      let discoverScore: number;
+      switch (activeAlgo) {
+        case 'new':
+          discoverScore = scoreNew(candidateUser, myInterestNames);
+          break;
+        case 'active':
+          discoverScore = scoreActive(myProfile as any, candidateUser, myInterestNames);
+          break;
+        case 'verified':
+          discoverScore = scoreVerified(myProfile as any, candidateUser, myInterestNames, interestPopularity);
+          break;
+        case 'serious':
+          discoverScore = scoreSerious(myProfile as any, candidateUser, myInterestNames);
+          break;
+        case 'aiPicks':
+          discoverScore = scoreAiPicks(myProfile as any, candidateUser, myInterestNames, behavior, matchHistoryInsights, myVibeData, candidateVibe);
+          break;
+        case 'forYou':
+        default:
+          discoverScore = scoreForYou(myProfile as any, candidateUser, myInterestNames, behavior, myVibeData, candidateVibe);
+          break;
       }
 
-      // Diversity: small random jitter (0-3) to avoid always showing same order
-      discoverScore += Math.random() * 3;
+      // Track profile view activity
+      trackActivity(prisma, userId, 'view', 'profile', u.id, { city: u.profile?.city, age: u.profile?.age, intent: u.profile?.datingIntent });
 
-      return { ...userData, commonInterests, discoverScore: Math.round(Math.min(discoverScore, 100)) };
-    });
+      topK.push(discoverScore, { ...userData, commonInterests, discoverScore, algorithm: activeAlgo });
+    }
 
-    // Sort by AI score descending
-    profiles.sort((a, b) => b.discoverScore - a.discoverScore);
-
-    // Return top 20
-    const result = profiles.slice(0, 20);
+    // Extract top 20 sorted by score descending via MinHeap drain
+    const result = topK.drain();
     res.json({ data: result, cursor: result[result.length - 1]?.id });
   } catch (e) { next(e); }
 });
@@ -256,25 +413,36 @@ app.post('/api/v1/discover/like', authMiddleware, async (req: AuthRequest, res: 
       data: { fromUserId, toUserId, targetType: tType, targetId: tId },
     });
 
+    // ── MUTUAL LIKE DETECTION → AUTO-MATCH CREATION ──
+    // When User A likes User B, check if User B previously liked User A.
+    // If mutual, automatically create a Match, Chat, and Notifications for both.
+    // This is the core matching mechanic — no manual "accept" step needed.
     const mutual = await prisma.like.findFirst({ where: { fromUserId: toUserId, toUserId: fromUserId } });
     let match = null;
     if (mutual) {
-      // Only create match if doesn't exist yet
+      // Prevent duplicate matches (e.g., from race conditions or retries)
       const existingMatch = await prisma.match.findFirst({ where: { OR: [{ user1Id: fromUserId, user2Id: toUserId }, { user1Id: toUserId, user2Id: fromUserId }] } });
       if (!existingMatch) {
+        // Create the match + chat + notifications atomically
         match = await prisma.match.create({ data: { user1Id: fromUserId, user2Id: toUserId } });
         await prisma.chat.create({ data: { matchId: match.id, user1Id: fromUserId, user2Id: toUserId } });
+        // Notify both users immediately — the SSE hub will push these in real-time
         await prisma.notification.create({ data: { userId: toUserId, type: 'match', title: 'New Match! 🎉', body: 'You have a new match! Start chatting now.' } });
         await prisma.notification.create({ data: { userId: fromUserId, type: 'match', title: 'New Match! 🎉', body: 'You have a new match! Start chatting now.' } });
+        // Track match event for both users (feeds into AI recommendation engine)
+        trackActivity(prisma, fromUserId, 'match', 'profile', toUserId);
+        trackActivity(prisma, toUserId, 'match', 'profile', fromUserId);
       } else { match = existingMatch; }
     }
+    trackActivity(prisma, fromUserId, 'like', 'profile', toUserId, { targetType: tType });
     res.json({ data: { like, match, isMutual: !!mutual } });
   } catch (e) { next(e); }
 });
 
 app.post('/api/v1/discover/comment', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { toUserId, message, type, targetType, targetId } = req.body;
+    const { toUserId, message: rawMessage, type, targetType, targetId } = req.body;
+    const message = rawMessage ? sanitize(rawMessage) : '';
     const fromUserId = req.userId!;
     const existing = await prisma.matchRequest.findUnique({ where: { fromUserId_toUserId: { fromUserId, toUserId } } });
     if (existing) {
@@ -303,6 +471,7 @@ app.post('/api/v1/discover/pass', authMiddleware, async (req: AuthRequest, res: 
       try {
         await (prisma as any).matchFeedback.create({ data: { userId, targetUserId: passedUserId, action: 'pass' } });
       } catch {} // Ignore if already exists or table doesn't exist
+      trackActivity(prisma, userId, 'pass', 'profile', passedUserId);
     }
     res.json({ data: { success: true } });
   } catch (e) { next(e); }
@@ -311,7 +480,8 @@ app.post('/api/v1/discover/pass', authMiddleware, async (req: AuthRequest, res: 
 // ─── Send Miamo Move (stored in DB for algorithm analysis) ───
 app.post('/api/v1/discover/move', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { toUserId, message, targetType, targetId } = req.body;
+    const { toUserId, message: rawMoveMsg, targetType, targetId } = req.body;
+    const message = rawMoveMsg ? sanitize(rawMoveMsg) : '';
     const fromUserId = req.userId!;
     if (!toUserId) return res.status(400).json({ error: { message: 'toUserId is required' } });
     const existing = await (prisma as any).miamoMove.findFirst({
@@ -492,7 +662,9 @@ app.post('/api/v1/matches/:id/pin', authMiddleware, async (req: AuthRequest, res
 app.post('/api/v1/matches/:id/report', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
-    const { reason, details } = req.body;
+    const { reason: rawReason, details: rawDetails } = req.body;
+    const reason = sanitize(rawReason || '');
+    const details = sanitize(rawDetails || '');
     const match = await prisma.match.findUnique({ where: { id: req.params.id } });
     if (!match) return res.status(404).json({ error: { message: 'Match not found' } });
     const targetUserId = match.user1Id === userId ? match.user2Id : match.user1Id;
@@ -548,7 +720,9 @@ app.post('/api/v1/matches/requests/:id/reject', authMiddleware, async (req: Auth
 app.delete('/api/v1/matches/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
-    const { reason, details } = req.body || {};
+    const { reason: rawReason, details: rawDetails } = req.body || {};
+    const reason = rawReason ? sanitize(rawReason) : undefined;
+    const details = rawDetails ? sanitize(rawDetails) : '';
     const match = await prisma.match.findUnique({ where: { id: req.params.id } });
     if (!match) return res.status(404).json({ error: { message: 'Match not found' } });
     const targetUserId = match.user1Id === userId ? match.user2Id : match.user1Id;
@@ -567,7 +741,9 @@ app.delete('/api/v1/matches/by-user/:userId', authMiddleware, async (req: AuthRe
   try {
     const userId = req.userId!;
     const targetUserId = req.params.userId;
-    const { reason, details } = req.body || {};
+    const { reason: rawReason, details: rawDetails } = req.body || {};
+    const reason = rawReason ? sanitize(rawReason) : undefined;
+    const details = rawDetails ? sanitize(rawDetails) : '';
     const match = await prisma.match.findFirst({
       where: { active: true, OR: [{ user1Id: userId, user2Id: targetUserId }, { user1Id: targetUserId, user2Id: userId }] },
     });
@@ -587,7 +763,9 @@ app.post('/api/v1/matches/by-user/:userId/report', authMiddleware, async (req: A
   try {
     const userId = req.userId!;
     const targetUserId = req.params.userId;
-    const { reason, details } = req.body || {};
+    const { reason: rawRptReason, details: rawRptDetails } = req.body || {};
+    const reason = rawRptReason ? sanitize(rawRptReason) : undefined;
+    const details = rawRptDetails ? sanitize(rawRptDetails) : '';
     const match = await prisma.match.findFirst({
       where: { OR: [{ user1Id: userId, user2Id: targetUserId }, { user1Id: targetUserId, user2Id: userId }] },
     });
@@ -605,7 +783,9 @@ app.post('/api/v1/matches/by-user/:userId/block', authMiddleware, async (req: Au
   try {
     const userId = req.userId!;
     const targetUserId = req.params.userId;
-    const { reason, details } = req.body || {};
+    const { reason: rawBlkReason, details: rawBlkDetails } = req.body || {};
+    const reason = rawBlkReason ? sanitize(rawBlkReason) : undefined;
+    const details = rawBlkDetails ? sanitize(rawBlkDetails) : '';
     // Save feedback
     const match = await prisma.match.findFirst({
       where: { OR: [{ user1Id: userId, user2Id: targetUserId }, { user1Id: targetUserId, user2Id: userId }] },
@@ -632,7 +812,10 @@ app.post('/api/v1/matches/by-user/:userId/block', authMiddleware, async (req: Au
 app.post('/api/v1/vibe-check', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
-    const { mood, energy, topics, intent } = req.body;
+    const { mood: rawMood, energy, topics: rawTopics, intent: rawIntent } = req.body;
+    const mood = sanitize(rawMood || '');
+    const intent = rawIntent ? sanitize(rawIntent) : '';
+    const topics = Array.isArray(rawTopics) ? rawTopics.map((t: string) => sanitize(t)) : [];
     if (!mood) return res.status(400).json({ error: { message: 'Mood is required', code: 'VALIDATION_ERROR' } });
     // Deactivate previous active vibes
     await prisma.vibeCheck.updateMany({ where: { userId, active: true }, data: { active: false } });
@@ -714,6 +897,12 @@ app.get('/api/v1/vibe-check/matches', authMiddleware, async (req: AuthRequest, r
 app.get('/api/v1/ai-match/suggestions', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
+
+    // Check cache first
+    const cacheKey = `ai-match:${userId}`;
+    const cached = aiMatchCache.get(cacheKey);
+    if (cached) return res.json({ data: cached });
+
     const myProfile = await prisma.profile.findUnique({ where: { userId } });
     const myInterests = await prisma.profileInterest.findMany({ where: { userId } });
     const myInterestNames = myInterests.map(i => i.name);
@@ -746,6 +935,53 @@ app.get('/api/v1/ai-match/suggestions', authMiddleware, async (req: AuthRequest,
       vibes.forEach(v => vibeMap.set(v.userId, v));
     } catch {}
 
+    // ── Deep behavioral analysis from UserActivity ──
+    const behavior = await getUserBehaviorVector(userId);
+
+    // ── Full match history analysis for collaborative filtering ──
+    let matchHistoryInsights: { avgMatchDuration: number; commonTraitsInSuccessful: string[]; unmatchReasons: Record<string, number> } = {
+      avgMatchDuration: 0, commonTraitsInSuccessful: [], unmatchReasons: {},
+    };
+    try {
+      // Analyze past matches — what made them successful?
+      const pastMatches = await prisma.match.findMany({
+        where: { OR: [{ user1Id: userId }, { user2Id: userId }] },
+        include: {
+          user1: { include: { profile: true, interests: true } },
+          user2: { include: { profile: true, interests: true } },
+          chat: { include: { messages: { select: { id: true, createdAt: true }, take: 1, orderBy: { createdAt: 'desc' } } } },
+        },
+      });
+      const successfulTraits: Record<string, number> = {};
+      let totalDuration = 0;
+      let activeLongMatches = 0;
+      for (const m of pastMatches) {
+        const other = m.user1Id === userId ? m.user2 : m.user1;
+        const msgCount = m.chat?.messages?.length || 0;
+        const matchAge = Date.now() - new Date(m.createdAt).getTime();
+        if (m.active && matchAge > 7 * 24 * 60 * 60 * 1000) {
+          // This is a successful long match — learn from it
+          activeLongMatches++;
+          totalDuration += matchAge;
+          other.interests?.forEach(i => {
+            successfulTraits[i.name] = (successfulTraits[i.name] || 0) + 2;
+          });
+          if (other.profile?.datingIntent) successfulTraits[`intent:${other.profile.datingIntent}`] = (successfulTraits[`intent:${other.profile.datingIntent}`] || 0) + 3;
+          if (other.profile?.city) successfulTraits[`city:${other.profile.city.toLowerCase()}`] = (successfulTraits[`city:${other.profile.city.toLowerCase()}`] || 0) + 2;
+        }
+      }
+      if (activeLongMatches > 0) matchHistoryInsights.avgMatchDuration = totalDuration / activeLongMatches;
+      matchHistoryInsights.commonTraitsInSuccessful = Object.entries(successfulTraits).sort((a, b) => b[1] - a[1]).slice(0, 10).map(e => e[0]);
+
+      // Analyze unmatch reasons
+      const feedback = await (prisma as any).matchFeedback.findMany({ where: { userId } });
+      for (const f of feedback || []) {
+        if (f.type === 'unmatch' && f.reason) {
+          matchHistoryInsights.unmatchReasons[f.reason] = (matchHistoryInsights.unmatchReasons[f.reason] || 0) + 1;
+        }
+      }
+    } catch {}
+
     // Get feedback history for collaborative filtering
     let feedbackPenalties = new Map<string, number>();
     try {
@@ -766,100 +1002,50 @@ app.get('/api/v1/ai-match/suggestions', authMiddleware, async (req: AuthRequest,
       }
     } catch {}
 
-    const zodiacCompat: Record<string, string[]> = {
-      Aries:['Leo','Sagittarius','Gemini','Aquarius'], Taurus:['Virgo','Capricorn','Cancer','Pisces'],
-      Gemini:['Libra','Aquarius','Aries','Leo'], Cancer:['Scorpio','Pisces','Taurus','Virgo'],
-      Leo:['Aries','Sagittarius','Gemini','Libra'], Virgo:['Taurus','Capricorn','Cancer','Scorpio'],
-      Libra:['Gemini','Aquarius','Leo','Sagittarius'], Scorpio:['Cancer','Pisces','Virgo','Capricorn'],
-      Sagittarius:['Aries','Leo','Libra','Aquarius'], Capricorn:['Taurus','Virgo','Scorpio','Pisces'],
-      Aquarius:['Gemini','Libra','Aries','Sagittarius'], Pisces:['Cancer','Scorpio','Taurus','Capricorn'],
-    };
+    // ── Score candidates using algorithm engine + MinHeap for O(n log k) top-20 ──
+    const topK = new MinHeap<any>(20);
 
-    const scored = candidates.map(c => {
-      let score = 0; const reasons: string[] = []; const concerns: string[] = [];
+    for (const c of candidates) {
       const cInterests = c.interests.map(i => i.name);
       const common = cInterests.filter(i => myInterestNames.includes(i));
 
-      // ── Interest Overlap (0-20) — weighted by total shared ──
-      const interestScore = common.length >= 5 ? 20 : common.length >= 3 ? 15 : common.length >= 1 ? common.length * 4 : 0;
-      score += interestScore;
-      if (common.length >= 3) reasons.push(`${common.length} shared interests including ${common.slice(0,2).join(' & ')}`);
-      else if (common.length > 0) reasons.push(`You both love ${common[0]}`);
+      // Prepare vibe data
+      const rawVibe = vibeMap.get(c.id);
+      const candidateVibeData: VibeData | null = rawVibe ? { mood: rawVibe.mood, intent: rawVibe.intent, topics: rawVibe.topics ? JSON.parse(rawVibe.topics) : [] } : null;
+      const myVibeData: VibeData | null = myVibe ? { mood: myVibe.mood, intent: myVibe.intent, topics: myVibe.topics ? JSON.parse(myVibe.topics) : [] } : null;
 
-      if (myProfile && c.profile) {
-        // ── Dating Intent (0-18) ──
-        if (myProfile.datingIntent === c.profile.datingIntent) { score += 18; reasons.push('Aligned dating goals'); }
-        else if (myProfile.seriousMode === c.profile.seriousMode) { score += 9; reasons.push('Similar relationship mindset'); }
-        else { concerns.push('Different relationship goals'); }
+      // Use scoreAiPicks from algorithm engine (enhanced with all signals)
+      const candidateUser: CandidateUser = {
+        id: c.id, verified: c.verified, createdAt: c.createdAt,
+        profile: c.profile as any, interests: c.interests, photos: c.photos as any[], prompts: c.prompts as any[],
+      };
 
-        // ── Location (0-10) ──
-        if (myProfile.city?.toLowerCase() === c.profile.city?.toLowerCase()) { score += 10; reasons.push(`Both in ${c.profile.city}`); }
-
-        // ── Age Compatibility (0-10) ──
-        const ageDiff = Math.abs(myProfile.age - c.profile.age);
-        if (ageDiff <= 2) { score += 10; reasons.push('Very similar age'); }
-        else if (ageDiff <= 5) { score += 7; }
-        else if (ageDiff <= 8) { score += 3; }
-        else { concerns.push('Notable age difference'); }
-
-        // ── Lifestyle Alignment (0-12) ──
-        let lifestyleScore = 0; const lifestyleDetails: string[] = [];
-        if ((myProfile as any).smoking === (c.profile as any).smoking) { lifestyleScore += 3; lifestyleDetails.push('smoking habits'); }
-        if ((myProfile as any).drinking === (c.profile as any).drinking) { lifestyleScore += 3; lifestyleDetails.push('drinking'); }
-        if ((myProfile as any).exercise === (c.profile as any).exercise) { lifestyleScore += 3; lifestyleDetails.push('fitness'); }
-        if ((myProfile as any).children && (c.profile as any).children && (myProfile as any).children === (c.profile as any).children) { lifestyleScore += 3; lifestyleDetails.push('family plans'); }
-        score += lifestyleScore;
-        if (lifestyleDetails.length >= 2) reasons.push(`Compatible ${lifestyleDetails.slice(0,2).join(' & ')}`);
-
-        // ── Values & Beliefs (0-8) ──
-        let valuesScore = 0;
-        if ((myProfile as any).religion && (c.profile as any).religion && (myProfile as any).religion === (c.profile as any).religion) { valuesScore += 5; reasons.push('Shared beliefs'); }
-        if ((myProfile as any).zodiac && (c.profile as any).zodiac && zodiacCompat[(myProfile as any).zodiac]?.includes((c.profile as any).zodiac)) { valuesScore += 3; }
-        score += valuesScore;
-
-        // ── Profile Quality (0-8) ──
-        if (c.profile.profileScore >= 80) { score += 8; reasons.push('Detailed, authentic profile'); }
-        else if (c.profile.profileScore >= 60) score += 5;
-        else if (c.profile.profileScore >= 40) score += 2;
-
-        // ── Activity Recency (0-7) — online users rank higher ──
-        if (c.profile.online) { score += 7; reasons.push('Currently online'); }
-        else if (c.profile.lastActive && (Date.now() - new Date(c.profile.lastActive).getTime()) < 3600000) score += 5;
-        else if (c.profile.lastActive && (Date.now() - new Date(c.profile.lastActive).getTime()) < 86400000) score += 3;
-        else score += 0;
-
-        // ── Photo & Prompt Quality (0-5) ──
-        if (c.photos.length >= 3) score += 3; else if (c.photos.length >= 1) score += 1;
-        if (c.prompts.length >= 2) score += 2; else if (c.prompts.length >= 1) score += 1;
-
-        // ── Vibe Compatibility (0-10) ──
-        if (myVibe) {
-          const theirVibe = vibeMap.get(c.id);
-          if (theirVibe) {
-            const myTopics: string[] = JSON.parse(myVibe.topics || '[]');
-            const theirTopics: string[] = JSON.parse(theirVibe.topics || '[]');
-            let vibeScore = 0;
-            if (theirVibe.mood === myVibe.mood) vibeScore += 4;
-            if (theirVibe.intent === myVibe.intent) vibeScore += 3;
-            const topicOverlap = myTopics.filter((t: string) => theirTopics.includes(t)).length;
-            vibeScore += Math.min(topicOverlap * 1.5, 3);
-            score += vibeScore;
-            if (vibeScore >= 7) reasons.push('Matching vibes right now');
-          }
-        }
-
-        // ── Serious Mode Bonus (0-5) ──
-        if (myProfile.seriousMode && c.profile.seriousMode) { score += 5; reasons.push('Both in Serious Mode'); }
-      }
-      // ── Verified (0-3) ──
-      if (c.verified) { score += 3; reasons.push('Verified'); }
-
-      // ── Feedback-based penalty ──
       const penalty = feedbackPenalties.get(c.id) || 0;
-      score = Math.max(0, score - penalty);
+      const score = scoreAiPicks(
+        myProfile as any, candidateUser, myInterestNames,
+        behavior, matchHistoryInsights as MatchHistoryInsights,
+        myVibeData, candidateVibeData, penalty,
+      );
 
-      // Cap at 100
-      score = Math.min(score, 100);
+      // ── Generate explanations (reasons & concerns) ──
+      const reasons: string[] = [];
+      const concerns: string[] = [];
+      if (common.length >= 3) reasons.push(`${common.length} shared interests including ${common.slice(0, 2).join(' & ')}`);
+      else if (common.length > 0) reasons.push(`You both love ${common[0]}`);
+      if (myProfile && c.profile) {
+        if (myProfile.datingIntent === c.profile.datingIntent) reasons.push('Aligned dating goals');
+        else concerns.push('Different relationship goals');
+        if (myProfile.city?.toLowerCase() === c.profile.city?.toLowerCase()) reasons.push(`Both in ${c.profile.city}`);
+        const ageDiff = Math.abs(myProfile.age - c.profile.age);
+        if (ageDiff <= 2) reasons.push('Very similar age');
+        else if (ageDiff > 8) concerns.push('Notable age difference');
+        if ((myProfile as any).religion && (c.profile as any).religion && (myProfile as any).religion === (c.profile as any).religion) reasons.push('Shared beliefs');
+        if (myProfile.seriousMode && c.profile.seriousMode) reasons.push('Both in Serious Mode');
+        if (c.profile.online) reasons.push('Currently online');
+        if (c.profile.profileScore >= 80) reasons.push('Detailed, authentic profile');
+      }
+      if (c.verified) reasons.push('Verified');
+      if (candidateVibeData && myVibeData && candidateVibeData.mood === myVibeData.mood) reasons.push('Matching vibes right now');
 
       // ── Smart Icebreakers ──
       const icebreakers: string[] = [];
@@ -878,34 +1064,24 @@ app.get('/api/v1/ai-match/suggestions', authMiddleware, async (req: AuthRequest,
       if (common.includes('Music')) dateIdeas.unshift('Live music night');
 
       const { passwordHash, ...userData } = c;
-      return {
-        user: userData, aiScore: score,
+      topK.push(score, {
+        user: userData, aiScore: score, algorithm: 'ai-picks-ensemble-v2',
         reasons: reasons.slice(0, 4), concerns: concerns.slice(0, 2),
         commonInterests: common, suggestedIcebreaker: icebreakers[0],
         suggestedComment: icebreakers[1] || icebreakers[0],
         suggestedDateIdea: dateIdeas[0],
         profileTip: score < 40 ? 'Complete more of your profile to get better matches' : score >= 75 ? 'Excellent compatibility!' : 'Your profile is looking great!',
-      };
-    });
-
-    // Sort by score with slight diversity: ensure not all results are from same city
-    scored.sort((a, b) => b.aiScore - a.aiScore);
-
-    // Apply diversity: interleave top matches with some variety
-    const topResults = scored.slice(0, 25);
-    const cities = new Set<string>();
-    const diversified: typeof topResults = [];
-    const remaining: typeof topResults = [];
-    for (const item of topResults) {
-      const city = item.user?.profile?.city?.toLowerCase() || '';
-      if (cities.size < 3 || !cities.has(city) || diversified.length < 5) {
-        diversified.push(item);
-        cities.add(city);
-      } else {
-        remaining.push(item);
-      }
+      });
     }
-    const finalResults = [...diversified, ...remaining].slice(0, 20);
+
+    // Extract top 20 via MinHeap drain (sorted by score desc)
+    const finalResults = topK.drain();
+
+    // Track AI match view activity
+    trackActivity(prisma, userId, 'view', 'ai-match', undefined, { resultCount: finalResults.length });
+
+    // Cache for 5 minutes
+    aiMatchCache.set(cacheKey, finalResults, TTL.AI_MATCH);
 
     res.json({ data: finalResults });
   } catch (e) { next(e); }
@@ -969,15 +1145,7 @@ app.get('/api/v1/ai-match/score/:targetId', authMiddleware, async (req: AuthRequ
       else if (cProfile.lastActive && (Date.now() - new Date(cProfile.lastActive).getTime()) < 86400000) { score += 5; breakdown.activity = 5; }
       else { breakdown.activity = 0; }
 
-      const zodiacCompat: Record<string, string[]> = {
-        Aries:['Leo','Sagittarius','Gemini','Aquarius'], Taurus:['Virgo','Capricorn','Cancer','Pisces'],
-        Gemini:['Libra','Aquarius','Aries','Leo'], Cancer:['Scorpio','Pisces','Taurus','Virgo'],
-        Leo:['Aries','Sagittarius','Gemini','Libra'], Virgo:['Taurus','Capricorn','Cancer','Scorpio'],
-        Libra:['Gemini','Aquarius','Leo','Sagittarius'], Scorpio:['Cancer','Pisces','Virgo','Capricorn'],
-        Sagittarius:['Aries','Leo','Libra','Aquarius'], Capricorn:['Taurus','Virgo','Scorpio','Pisces'],
-        Aquarius:['Gemini','Libra','Aries','Sagittarius'], Pisces:['Cancer','Scorpio','Taurus','Capricorn'],
-      };
-      if ((myProfile as any).zodiac && (cProfile as any).zodiac && zodiacCompat[(myProfile as any).zodiac]?.includes((cProfile as any).zodiac)) {
+      if ((myProfile as any).zodiac && (cProfile as any).zodiac && ZODIAC_COMPAT[(myProfile as any).zodiac]?.includes((cProfile as any).zodiac)) {
         score += 5; breakdown.zodiac = 5;
       } else { breakdown.zodiac = 0; }
     }
@@ -1079,23 +1247,30 @@ app.get('/api/v1/ai-match/score/:targetId', authMiddleware, async (req: AuthRequ
 // ═══ SAFETY ══════════════════════════════════════════
 app.post('/api/v1/safety/report', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { reportedId, reason, details, targetType, targetId } = req.body;
+    const { reportedId, reason: rawReason, details: rawDetails, targetType, targetId } = req.body;
+    const reason = sanitize(rawReason || '');
+    const details = sanitize(rawDetails || '');
     // If no reportedId provided, use a general/system report
     const actualReportedId = reportedId || req.userId!;
     const report = await prisma.report.create({
       data: { reporterId: req.userId!, reportedId: actualReportedId, reason: reason || 'general', details: details || '', targetType: targetType || 'user', targetId: targetId || null, status: 'pending' },
     });
+    auditLog(prisma, req.userId!, 'safety_report', { reportedId: actualReportedId, reason, targetType });
     res.json({ data: report });
   } catch (e) { next(e); }
 });
 
 app.post('/api/v1/safety/block', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { blockedId } = req.body;
+    const { blockedId, reason: rawBlockReason, details: rawBlockDetails, evidence: rawEvidence } = req.body;
+    const reason = sanitize(rawBlockReason || '');
+    const details = sanitize(rawBlockDetails || '');
+    const evidence = sanitize(rawEvidence || '');
     const userId = req.userId!;
-    const block = await prisma.block.create({ data: { blockerId: userId, blockedId } });
+    const block = await prisma.block.create({ data: { blockerId: userId, blockedId, reason, details, evidence } });
     await prisma.matchRequest.deleteMany({ where: { OR: [{ fromUserId: userId, toUserId: blockedId }, { fromUserId: blockedId, toUserId: userId }] } });
     await prisma.match.updateMany({ where: { OR: [{ user1Id: userId, user2Id: blockedId }, { user1Id: blockedId, user2Id: userId }] }, data: { active: false } });
+    auditLog(prisma, userId, 'safety_block', { blockedId, reason });
     res.json({ data: block });
   } catch (e) { next(e); }
 });
@@ -1103,6 +1278,7 @@ app.post('/api/v1/safety/block', authMiddleware, async (req: AuthRequest, res: R
 app.post('/api/v1/safety/unblock', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     await prisma.block.deleteMany({ where: { blockerId: req.userId!, blockedId: req.body.blockedId } });
+    auditLog(prisma, req.userId!, 'safety_unblock', { blockedId: req.body.blockedId });
     res.json({ data: { success: true } });
   } catch (e) { next(e); }
 });
@@ -1298,7 +1474,8 @@ app.post('/api/v1/matches/incoming/:userId/match-move', authMiddleware, async (r
   try {
     const myId = req.userId!;
     const targetUserId = req.params.userId;
-    const { message } = req.body;
+    const { message: rawMatchMoveMsg } = req.body;
+    const message = rawMatchMoveMsg ? sanitize(rawMatchMoveMsg) : '';
 
     // Match back first
     try { await prisma.like.create({ data: { fromUserId: myId, toUserId: targetUserId, targetType: 'profile' } }); } catch {}
@@ -1415,5 +1592,18 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, '0.0.0.0', () => { console.log(`\n⚡ Miamo Social Service on port ${PORT}\n`); });
+  const server = app.listen(PORT, '0.0.0.0', () => { logger.info(`Miamo Social Service on port ${PORT}`); });
+
+  // Graceful shutdown — close HTTP then disconnect Prisma pool
+  const shutdown = async (signal: string) => {
+    logger.info(`${signal} received — shutting down social service...`);
+    server.close(async () => {
+      await prisma.$disconnect();
+      logger.info('Social service stopped cleanly');
+      process.exit(0);
+    });
+    setTimeout(() => { process.exit(1); }, 10000);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }

@@ -7,8 +7,17 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
+import { LRUCache, MinHeap, TTL, feedCache, activityCache } from '../../shared/cache';
+import { scoreFeedItem, scoreDtm, type FeedItem, type FeedUserProfile, type DtmUser, type DtmCandidate } from '../../shared/algorithms';
+import { logger } from '../../shared/src/logger';
+import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
+import { auditLog, trackActivity } from '../../shared/src/audit';
 
-export const prisma = new PrismaClient();
+const DB_URL = process.env.DATABASE_URL || 'postgresql://miamo:miamo@localhost:5432/miamo?schema=public';
+export const prisma = new PrismaClient({
+  log: process.env.NODE_ENV === 'production' ? ['error'] : ['warn', 'error'],
+  datasources: { db: { url: DB_URL + (DB_URL.includes('?') ? '&' : '?') + 'connection_limit=15&pool_timeout=20' } },
+});
 export const app = express();
 const PORT = parseInt(process.env.PORT || '3205', 10);
 
@@ -67,7 +76,8 @@ app.get('/api/v1/feed', authMiddleware, async (req: AuthRequest, res: Response, 
 
 app.post('/api/v1/feed', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { type, content, mediaUrl, visibility } = req.body;
+    const { type, content: rawContent, mediaUrl, visibility } = req.body;
+    const content = sanitize(rawContent || '');
     const post = await prisma.feedPost.create({
       data: { authorId: req.userId!, type: type || 'thought', content, mediaUrl, visibility: visibility || 'everyone' },
       include: { author: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } } },
@@ -79,26 +89,30 @@ app.post('/api/v1/feed', authMiddleware, async (req: AuthRequest, res: Response,
 
 app.put('/api/v1/feed/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const post = await prisma.feedPost.update({ where: { id: req.params.id, authorId: req.userId }, data: { content: req.body.content, type: req.body.type, visibility: req.body.visibility } });
+    const post = await prisma.feedPost.update({ where: { id: req.params.id, authorId: req.userId }, data: { content: sanitize(req.body.content || ''), type: req.body.type, visibility: req.body.visibility } });
     res.json({ data: post });
   } catch (e) { next(e); }
 });
 
 app.delete('/api/v1/feed/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try { await prisma.feedPost.delete({ where: { id: req.params.id, authorId: req.userId } }); res.json({ data: { success: true } }); } catch (e) { next(e); }
+  try { await prisma.feedPost.delete({ where: { id: req.params.id, authorId: req.userId } }); auditLog(prisma, req.userId!, 'feed_post_delete', { postId: req.params.id }); res.json({ data: { success: true } }); } catch (e) { next(e); }
 });
 
 app.post('/api/v1/feed/:id/react', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const existing = await prisma.feedReaction.findUnique({ where: { postId_userId: { postId: req.params.id, userId: req.userId! } } });
     if (existing) { await prisma.feedReaction.delete({ where: { id: existing.id } }); res.json({ data: { liked: false } }); }
-    else { await prisma.feedReaction.create({ data: { postId: req.params.id, userId: req.userId!, type: req.body.type || 'like' } }); res.json({ data: { liked: true } }); }
+    else {
+      await prisma.feedReaction.create({ data: { postId: req.params.id, userId: req.userId!, type: req.body.type || 'like' } });
+      trackActivity(prisma, req.userId!, 'like', 'feed', req.params.id);
+      res.json({ data: { liked: true } });
+    }
   } catch (e) { next(e); }
 });
 
 app.post('/api/v1/feed/:id/comments', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const comment = await prisma.feedComment.create({ data: { postId: req.params.id, authorId: req.userId!, content: req.body.content }, include: { author: { select: { id: true, displayName: true, username: true } } } });
+    const comment = await prisma.feedComment.create({ data: { postId: req.params.id, authorId: req.userId!, content: sanitize(req.body.content || '') }, include: { author: { select: { id: true, displayName: true, username: true } } } });
     res.json({ data: comment });
   } catch (e) { next(e); }
 });
@@ -195,9 +209,10 @@ app.get('/api/v1/stories/mine', authMiddleware, async (req: AuthRequest, res: Re
 // POST /api/v1/stories — Create story (with background color support)
 app.post('/api/v1/stories', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { type, content, mediaUrl, visibility, expiresInHours, background } = req.body;
+    const { type, content: rawStoryContent, mediaUrl, visibility, expiresInHours, background } = req.body;
+    const content = sanitize(rawStoryContent || '');
     const expiresAt = new Date(Date.now() + (expiresInHours || 24) * 3600000);
-    const storyContent = background ? JSON.stringify({ text: content || '', background }) : (content || '');
+    const storyContent = background ? JSON.stringify({ text: content, background }) : content;
     const story = await prisma.story.create({
       data: { authorId: req.userId!, type: type || 'text', content: storyContent, mediaUrl, visibility: visibility || 'everyone', expiresAt },
     });
@@ -209,6 +224,7 @@ app.post('/api/v1/stories', authMiddleware, async (req: AuthRequest, res: Respon
 app.post('/api/v1/stories/:id/view', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     await prisma.storyView.upsert({ where: { storyId_viewerId: { storyId: req.params.id, viewerId: req.userId! } }, create: { storyId: req.params.id, viewerId: req.userId! }, update: {} });
+    trackActivity(prisma, req.userId!, 'view', 'story', req.params.id);
     res.json({ data: { success: true } });
   } catch (e) { next(e); }
 });
@@ -222,6 +238,7 @@ app.post('/api/v1/stories/:id/like', authMiddleware, async (req: AuthRequest, re
       res.json({ data: { liked: false } });
     } else {
       await prisma.storyLike.create({ data: { storyId: req.params.id, userId: req.userId! } });
+      trackActivity(prisma, req.userId!, 'like', 'story', req.params.id);
       // Notify story author
       const story = await prisma.story.findUnique({ where: { id: req.params.id }, select: { authorId: true } });
       if (story && story.authorId !== req.userId) {
@@ -273,7 +290,8 @@ app.post('/api/v1/stories/:id/comments', authMiddleware, async (req: AuthRequest
       if (!isMatched) return res.status(403).json({ error: { message: 'You can only comment on stories from your matches' } });
     }
 
-    const { content, parentId } = req.body;
+    const { content: rawCommentContent, parentId } = req.body;
+    const content = sanitize(rawCommentContent || '');
     // If replying, verify parent comment exists and belongs to this story
     if (parentId) {
       const parentComment = await prisma.storyComment.findUnique({ where: { id: parentId } });
@@ -298,6 +316,7 @@ app.post('/api/v1/stories/:id/comments', authMiddleware, async (req: AuthRequest
 app.delete('/api/v1/stories/:id/comments/:commentId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     await prisma.storyComment.delete({ where: { id: req.params.commentId, authorId: req.userId } });
+    auditLog(prisma, req.userId!, 'story_comment_delete', { storyId: req.params.id, commentId: req.params.commentId });
     res.json({ data: { success: true } });
   } catch (e) { next(e); }
 });
@@ -331,7 +350,7 @@ app.post('/api/v1/stories/:id/post-to-feed', authMiddleware, async (req: AuthReq
 
 // DELETE /api/v1/stories/:id — Delete story
 app.delete('/api/v1/stories/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try { await prisma.story.delete({ where: { id: req.params.id, authorId: req.userId } }); res.json({ data: { success: true } }); } catch (e) { next(e); }
+  try { await prisma.story.delete({ where: { id: req.params.id, authorId: req.userId } }); auditLog(prisma, req.userId!, 'story_delete', { storyId: req.params.id }); res.json({ data: { success: true } }); } catch (e) { next(e); }
 });
 
 // ═══ VIDEOS ══════════════════════════════════════════
@@ -353,7 +372,9 @@ app.get('/api/v1/videos', authMiddleware, async (req: AuthRequest, res: Response
 
 app.post('/api/v1/videos', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { title, description, url, thumbnailUrl, category, visibility } = req.body;
+    const { title: rawTitle, description: rawDescription, url, thumbnailUrl, category, visibility } = req.body;
+    const title = sanitize(rawTitle || '');
+    const description = sanitize(rawDescription || '');
     const video = await prisma.video.create({ data: { authorId: req.userId!, title, description, url, thumbnailUrl, category: category || 'general', visibility: visibility || 'everyone' } });
     res.json({ data: video });
   } catch (e) { next(e); }
@@ -363,13 +384,14 @@ app.post('/api/v1/videos/:id/react', authMiddleware, async (req: AuthRequest, re
   try {
     const existing = await prisma.videoReaction.findUnique({ where: { videoId_userId: { videoId: req.params.id, userId: req.userId! } } });
     if (existing) { await prisma.videoReaction.delete({ where: { id: existing.id } }); res.json({ data: { liked: false } }); }
-    else { await prisma.videoReaction.create({ data: { videoId: req.params.id, userId: req.userId!, type: req.body.type || 'like' } }); await prisma.video.update({ where: { id: req.params.id }, data: { views: { increment: 1 } } }); res.json({ data: { liked: true } }); }
+    else { await prisma.videoReaction.create({ data: { videoId: req.params.id, userId: req.userId!, type: req.body.type || 'like' } }); await prisma.video.update({ where: { id: req.params.id }, data: { views: { increment: 1 } } }); trackActivity(prisma, req.userId!, 'like', 'video', req.params.id); res.json({ data: { liked: true } }); }
   } catch (e) { next(e); }
 });
 
 app.post('/api/v1/videos/:id/comments', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const comment = await prisma.videoComment.create({ data: { videoId: req.params.id, authorId: req.userId!, content: req.body.content }, include: { author: { select: { id: true, displayName: true } } } });
+    const comment = await prisma.videoComment.create({ data: { videoId: req.params.id, authorId: req.userId!, content: sanitize(req.body.content || '') }, include: { author: { select: { id: true, displayName: true } } } });
+    trackActivity(prisma, req.userId!, 'comment', 'video', req.params.id);
     res.json({ data: comment });
   } catch (e) { next(e); }
 });
@@ -401,7 +423,7 @@ app.get('/api/v1/creativity/feed', authMiddleware, async (req: AuthRequest, res:
     const { category, cursor } = req.query;
     const isGeneral = !category || category === 'general' || category === 'all';
 
-    // 1. Build user interest profile from: their interests, their reaction history, their view history
+    // 1. Build user interest profile from: their interests, their reaction history, their view history, AND their UserActivity data
     const userInterests = await prisma.profileInterest.findMany({ where: { userId }, select: { name: true } });
     const interestNames = userInterests.map(i => i.name.toLowerCase());
 
@@ -412,6 +434,27 @@ app.get('/api/v1/creativity/feed', authMiddleware, async (req: AuthRequest, res:
       orderBy: { createdAt: 'desc' },
       take: 100,
     });
+
+    // ── User Activity behavioral signals (what they view, how long, what they search) ──
+    let activitySignals: { viewedCategories: Record<string, number>; searchTerms: string[]; dwellPatterns: Record<string, number> } = { viewedCategories: {}, searchTerms: [], dwellPatterns: {} };
+    try {
+      const recentActivities = await prisma.userActivity.findMany({
+        where: { userId, targetType: { in: ['creativity', 'feed', 'video'] }, createdAt: { gte: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000) } },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      });
+      for (const a of recentActivities) {
+        const meta = a.metadata ? JSON.parse(a.metadata) : {};
+        if (meta.category) {
+          const weight = a.action === 'like' ? 3 : a.action === 'share' ? 4 : a.action === 'comment' ? 3 : 1;
+          activitySignals.viewedCategories[meta.category] = (activitySignals.viewedCategories[meta.category] || 0) + weight;
+        }
+        if (a.action === 'search' && meta.query) activitySignals.searchTerms.push(meta.query);
+        if (a.durationMs && a.targetId) {
+          activitySignals.dwellPatterns[a.targetId] = (activitySignals.dwellPatterns[a.targetId] || 0) + a.durationMs;
+        }
+      }
+    } catch {} // Graceful if UserActivity table isn't ready
 
     // Build engagement-weighted category scores
     const categoryEngagement: Record<string, number> = {};
@@ -429,6 +472,11 @@ app.get('/api/v1/creativity/feed', authMiddleware, async (req: AuthRequest, res:
       if (interestNames.some(i => catName.toLowerCase().includes(i) || i.includes(catName.toLowerCase()))) {
         categoryEngagement[catName] = (categoryEngagement[catName] || 0) + 2;
       }
+    }
+
+    // ── Merge behavioral activity signals into category engagement ──
+    for (const [cat, weight] of Object.entries(activitySignals.viewedCategories)) {
+      categoryEngagement[cat] = (categoryEngagement[cat] || 0) + weight * 0.5;
     }
 
     // 2. Build exclusion set: already viewed items (to avoid repeats)
@@ -469,44 +517,35 @@ app.get('/api/v1/creativity/feed', authMiddleware, async (req: AuthRequest, res:
       ...(cursor ? { cursor: { id: cursor as string }, skip: 1 } : {}),
     });
 
-    // 5. Score each candidate using AI signals
+    // 5. Score each candidate using algorithm engine
+    // Build user profile for feed scoring
+    const feedUserProfile: FeedUserProfile = {
+      interestNames,
+      categoryEngagement,
+      followedAuthors: new Set<string>(), // TODO: populate from social graph
+      activitySignals,
+    };
+
     const scored = candidates.map(item => {
-      let score = 0;
       const catName = item.category?.name || '';
 
-      // A) Trend score (normalized 0-30)
-      score += Math.min(item.trendScore / 3, 30);
+      // Build FeedItem for algorithm engine
+      const feedItem: FeedItem = {
+        id: item.id,
+        authorId: item.authorId,
+        authorVerified: item.author.verified,
+        authorFollowedByUser: feedUserProfile.followedAuthors.has(item.authorId),
+        categoryName: catName,
+        trendScore: item.trendScore,
+        views: item.views,
+        reactionCount: item._count.reactions,
+        commentCount: item._count.comments,
+        createdAt: item.createdAt,
+        alreadyViewed: viewedIds.has(item.id),
+      };
 
-      // B) Engagement rate (likes+comments / views) — high-quality signal
-      const engagementRate = item.views > 0
-        ? (item._count.reactions + item._count.comments * 2) / item.views
-        : 0;
-      score += engagementRate * 20; // up to ~20 points
-
-      // C) Category affinity (collaborative filtering)
-      if (isGeneral) {
-        const catAffinity = categoryEngagement[catName] || 0;
-        score += catAffinity * 5; // heavy weight on user's preferred categories
-      }
-
-      // D) Interest match — content from categories matching user's interests
-      const interestMatch = interestNames.some(
-        i => catName.toLowerCase().includes(i) || i.includes(catName.toLowerCase())
-      );
-      if (interestMatch) score += 15;
-
-      // E) Recency boost (newer content gets a boost)
-      const ageHours = (Date.now() - item.createdAt.getTime()) / 3600000;
-      score += Math.max(0, 20 - ageHours / 2); // decays over 40 hours
-
-      // F) Verified author boost
-      if (item.author.verified) score += 5;
-
-      // G) Freshness penalty for already-viewed content
-      if (viewedIds.has(item.id)) score -= 40;
-
-      // H) Diverse content — slight penalty if multiple from same author
-      // (handled via sorting diversity below)
+      // Use the algorithm engine for scoring
+      const score = scoreFeedItem(feedItem, feedUserProfile);
 
       const { passwordHash, ...author } = item.author;
       return {
@@ -596,7 +635,8 @@ app.post('/api/v1/creativity/items/:id/move', authMiddleware, async (req: AuthRe
     if (!item) return res.status(404).json({ error: { message: 'Item not found' } });
     if (item.authorId === req.userId) return res.status(400).json({ error: { message: 'Cannot send move to yourself' } });
 
-    const { message } = req.body;
+    const { message: rawMoveMessage } = req.body;
+    const message = rawMoveMessage ? sanitize(rawMoveMessage) : '';
     // Create a like to track interest
     try {
       await prisma.like.create({
@@ -705,6 +745,10 @@ app.get('/api/v1/creativity/items', authMiddleware, async (req: AuthRequest, res
 app.post('/api/v1/creativity/items', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     let { categoryId, category, type, title, content, description, mediaUrl, visibility, featured } = req.body;
+    title = sanitize(title || '');
+    content = sanitize(content || '');
+    description = sanitize(description || '');
+    if (category) category = sanitize(category);
     // Accept 'category' name and look up categoryId
     if (!categoryId && category) {
       const cat = await prisma.creativityCategory.findUnique({ where: { name: category } });
@@ -729,7 +773,11 @@ app.post('/api/v1/creativity/items/:id/react', authMiddleware, async (req: AuthR
   try {
     const existing = await prisma.creativityReaction.findUnique({ where: { itemId_userId: { itemId: req.params.id, userId: req.userId! } } });
     if (existing) { await prisma.creativityReaction.delete({ where: { id: existing.id } }); res.json({ data: { liked: false } }); }
-    else { await prisma.creativityReaction.create({ data: { itemId: req.params.id, userId: req.userId!, type: req.body.type || 'like' } }); res.json({ data: { liked: true } }); }
+    else {
+      await prisma.creativityReaction.create({ data: { itemId: req.params.id, userId: req.userId!, type: req.body.type || 'like' } });
+      trackActivity(prisma, req.userId!, 'like', 'creativity', req.params.id);
+      res.json({ data: { liked: true } });
+    }
     await recalcTrend(req.params.id);
   } catch (e) { next(e); }
 });
@@ -737,7 +785,7 @@ app.post('/api/v1/creativity/items/:id/react', authMiddleware, async (req: AuthR
 app.post('/api/v1/creativity/items/:id/comments', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const comment = await prisma.creativityComment.create({
-      data: { itemId: req.params.id, authorId: req.userId!, content: req.body.content },
+      data: { itemId: req.params.id, authorId: req.userId!, content: sanitize(req.body.content || '') },
       include: { author: { select: { id: true, displayName: true, username: true, verified: true, photos: { take: 1, orderBy: { position: 'asc' } } } } },
     });
     await recalcTrend(req.params.id);
@@ -750,6 +798,7 @@ app.post('/api/v1/creativity/items/:id/view', authMiddleware, async (req: AuthRe
     await prisma.creativityView.upsert({ where: { itemId_viewerId: { itemId: req.params.id, viewerId: req.userId! } }, create: { itemId: req.params.id, viewerId: req.userId! }, update: {} });
     await prisma.creativityItem.update({ where: { id: req.params.id }, data: { views: { increment: 1 } } });
     await recalcTrend(req.params.id);
+    trackActivity(prisma, req.userId!, 'view', 'creativity', req.params.id);
     res.json({ data: { success: true } });
   } catch (e) { next(e); }
 });
@@ -821,7 +870,7 @@ app.get('/api/v1/matrimonial/profile', authMiddleware, async (req: AuthRequest, 
 app.put('/api/v1/matrimonial/profile', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const existing = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
-    const data = req.body;
+    const data = sanitizeObject(req.body);
     // Remove fields that shouldn't be updated directly
     delete data.id; delete data.userId; delete data.createdAt; delete data.updatedAt;
     delete data.idVerified; delete data.incomeVerified; delete data.educationVerified; delete data.photoVerified;
@@ -871,16 +920,55 @@ app.get('/api/v1/matrimonial/browse', authMiddleware, async (req: AuthRequest, r
 
     // Check access granted for each profile
     const myProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
+
+    // Score each profile using DTM algorithm engine
     const result = profiles.map(p => {
       const { phoneNumber, alternatePhone, linkedIn, contactEmail, ...safe } = p;
+
+      // Build DTM scoring inputs
+      let dtmScore: number | null = null;
+      if (myProfile) {
+        const myDtm: DtmUser = {
+          religion: myProfile.religion || undefined, caste: myProfile.caste || undefined,
+          gotra: myProfile.gotra || undefined, manglik: myProfile.manglik || undefined,
+          motherTongue: myProfile.motherTongue || undefined, diet: myProfile.diet || undefined,
+          education: myProfile.education || undefined, annualIncome: myProfile.annualIncome || undefined,
+          workingCity: myProfile.workingCity || undefined, height: myProfile.height || undefined,
+          bodyType: myProfile.bodyType || undefined, familyType: myProfile.familyType || undefined,
+          familyValues: myProfile.familyValues || undefined,
+          maritalStatus: myProfile.maritalStatus || undefined,
+          partnerAgeMin: (myProfile as any).partnerAgeMin, partnerAgeMax: (myProfile as any).partnerAgeMax,
+          partnerReligion: myProfile.partnerReligion || undefined, partnerCaste: myProfile.partnerCaste || undefined,
+          userAge: p.user?.profile?.age,
+        };
+        const candDtm: DtmCandidate = {
+          religion: p.religion || undefined, caste: p.caste || undefined,
+          gotra: p.gotra || undefined, manglik: p.manglik || undefined,
+          motherTongue: p.motherTongue || undefined, diet: p.diet || undefined,
+          education: p.education || undefined, annualIncome: p.annualIncome || undefined,
+          workingCity: p.workingCity || undefined, height: p.height || undefined,
+          bodyType: p.bodyType || undefined, familyType: p.familyType || undefined,
+          familyValues: p.familyValues || undefined,
+          maritalStatus: p.maritalStatus || undefined,
+          userAge: p.user?.profile?.age,
+        };
+        dtmScore = scoreDtm(myDtm, candDtm);
+      }
+
       return {
         ...safe,
-        // Only show contact info if public or access granted (checked later per-request)
         hasPhone: !!phoneNumber,
         hasLinkedIn: !!linkedIn,
         hasEmail: !!contactEmail,
+        dtmScore,
       };
     });
+
+    // Sort by DTM score if available
+    if (myProfile) {
+      result.sort((a, b) => (b.dtmScore || 0) - (a.dtmScore || 0));
+    }
+
     res.json({ data: result, cursor: profiles[profiles.length - 1]?.id });
   } catch (e) { next(e); }
 });
@@ -937,7 +1025,8 @@ app.get('/api/v1/matrimonial/profile/:userId', authMiddleware, async (req: AuthR
 // Request access to someone's info
 app.post('/api/v1/matrimonial/access/request', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { targetUserId, accessType, message } = req.body;
+    const { targetUserId, accessType, message: rawAccessMessage } = req.body;
+    const message = rawAccessMessage ? sanitize(rawAccessMessage) : '';
     const myProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
     const targetProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: targetUserId } });
     if (!myProfile || !targetProfile) return res.status(400).json({ error: { message: 'Both users need matrimonial profiles' } });
@@ -1052,8 +1141,34 @@ app.get('/api/v1/matrimonial/matches', authMiddleware, async (req: AuthRequest, 
 
     const result = profiles.map(p => {
       const { phoneNumber, alternatePhone, linkedIn, contactEmail, ...safe } = p;
-      return { ...safe, hasPhone: !!phoneNumber, hasLinkedIn: !!linkedIn, hasEmail: !!contactEmail };
+
+      // DTM scoring for matches
+      const myDtm: DtmUser = {
+        religion: myProfile.religion || undefined, caste: myProfile.caste || undefined,
+        gotra: myProfile.gotra || undefined, manglik: myProfile.manglik || undefined,
+        motherTongue: myProfile.motherTongue || undefined, diet: myProfile.diet || undefined,
+        education: myProfile.education || undefined, annualIncome: myProfile.annualIncome || undefined,
+        workingCity: myProfile.workingCity || undefined, familyType: myProfile.familyType || undefined,
+        familyValues: myProfile.familyValues || undefined, maritalStatus: myProfile.maritalStatus || undefined,
+        partnerReligion: myProfile.partnerReligion || undefined, partnerCaste: myProfile.partnerCaste || undefined,
+        userAge: p.user?.profile?.age,
+      };
+      const candDtm: DtmCandidate = {
+        religion: p.religion || undefined, caste: p.caste || undefined,
+        gotra: p.gotra || undefined, manglik: p.manglik || undefined,
+        motherTongue: p.motherTongue || undefined, diet: p.diet || undefined,
+        education: p.education || undefined, annualIncome: p.annualIncome || undefined,
+        workingCity: p.workingCity || undefined, familyType: p.familyType || undefined,
+        familyValues: p.familyValues || undefined, maritalStatus: p.maritalStatus || undefined,
+        userAge: p.user?.profile?.age,
+      };
+      const dtmScore = scoreDtm(myDtm, candDtm);
+
+      return { ...safe, hasPhone: !!phoneNumber, hasLinkedIn: !!linkedIn, hasEmail: !!contactEmail, dtmScore };
     });
+
+    // Sort by DTM compatibility score descending
+    result.sort((a, b) => (b.dtmScore || 0) - (a.dtmScore || 0));
     res.json({ data: result });
   } catch (e) { next(e); }
 });
@@ -1371,8 +1486,9 @@ app.get('/api/v1/matrimonial/browse/advanced', authMiddleware, async (req: AuthR
 // DTM Chat (persistent — stored in DtmMessage table)
 app.post('/api/v1/matrimonial/chat/send', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { recipientId, message, type = 'text' } = req.body;
-    if (!recipientId || !message) return res.status(400).json({ error: { message: 'recipientId and message are required' } });
+    const { recipientId, message: rawDtmMessage, type = 'text' } = req.body;
+    if (!recipientId || !rawDtmMessage) return res.status(400).json({ error: { message: 'recipientId and message are required' } });
+    const message = sanitize(rawDtmMessage);
     const msg = await prisma.dtmMessage.create({
       data: { senderId: req.userId!, recipientId, message, type },
     });
@@ -1454,5 +1570,17 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 });
 
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, '0.0.0.0', () => { console.log(`\n⚡ Miamo Content Service on port ${PORT}\n`); });
+  const server = app.listen(PORT, '0.0.0.0', () => { logger.info(`Miamo Content Service on port ${PORT}`); });
+
+  const shutdown = async (signal: string) => {
+    logger.info(`${signal} received — shutting down content service...`);
+    server.close(async () => {
+      await prisma.$disconnect();
+      logger.info('Content service stopped cleanly');
+      process.exit(0);
+    });
+    setTimeout(() => { process.exit(1); }, 10000);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }

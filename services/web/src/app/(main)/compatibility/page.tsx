@@ -12,6 +12,9 @@ import { Button } from '@/components/ui/button';
 import { Card, Badge, Avatar, EmptyState } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { useTrackPageView, useTrackScrollDepth, trackClick } from '@/hooks/useTrackActivity';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { useToast } from '@/components/ui/toast';
 
 /* ═══ Quiz Questions ═══ */
 const QUIZ_SECTIONS = [
@@ -74,6 +77,9 @@ export default function CompatibilityPage() {
   const [matches, setMatches] = useState<any[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<any>(null);
   const [quizActive, setQuizActive] = useState(false);
+
+  useTrackPageView('compatibility');
+  useTrackScrollDepth('compatibility');
   const [sectionIdx, setSectionIdx] = useState(0);
   const [questionIdx, setQuestionIdx] = useState(0);
   const [myAnswers, setMyAnswers] = useState<number[]>([]);
@@ -126,6 +132,7 @@ export default function CompatibilityPage() {
   const progress = ((sectionIdx * 4 + questionIdx) / totalQ) * 100;
 
   return (
+    <ErrorBoundary>
     <div className="max-w-4xl mx-auto p-6 pb-24">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
@@ -135,8 +142,8 @@ export default function CompatibilityPage() {
             <Puzzle className="w-7 h-7 text-white" />
           </motion.div>
           <div>
-            <h1 className="text-2xl font-black text-gray-800">Compatibility</h1>
-            <p className="text-sm text-gray-400">Discover how well you match with someone 💜</p>
+            <h1 className="text-2xl font-black text-gray-800 dark:text-white">Compatibility</h1>
+            <p className="text-sm text-gray-400 dark:text-gray-500">Discover how well you match with someone 💜</p>
           </div>
         </div>
       </motion.div>
@@ -271,5 +278,6 @@ export default function CompatibilityPage() {
         </div>
       )}
     </div>
+    </ErrorBoundary>
   );
 }

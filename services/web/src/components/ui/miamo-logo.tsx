@@ -18,6 +18,16 @@ interface AnimatedMiamoLogoProps {
   onClick?: () => void;
 }
 
+/**
+ * Animated Miamo logo component with pulsing glow, hover/tap feedback,
+ * and optional wordmark. Renders the `logo.png` image asset.
+ *
+ * @param size - Logo dimension in pixels (default: 36)
+ * @param showWordmark - Whether to display the "Miamo" text alongside the logo
+ * @param animated - Enable hover/tap scale and glow pulse animations
+ * @param variant - Layout variant: 'full' | 'compact' | 'sidebar'
+ * @param onClick - Optional click handler (adds pointer cursor)
+ */
 export function AnimatedMiamoLogo({
   size = 36,
   showWordmark = false,
@@ -76,6 +86,7 @@ export function AnimatedMiamoLogo({
   );
 }
 
+/** Miamo wordmark text ("Miamo") with bold tracking. */
 export function MiamoWordmark({
   className = '',
   animated = true,
@@ -90,6 +101,7 @@ export function MiamoWordmark({
   );
 }
 
+/** Static wordmark with a gradient-colored "M" and plain text "iamo". */
 export function MiamoStaticWordmark({ className = '' }: { className?: string }) {
   return (
     <span className={`font-extrabold tracking-tight ${className}`}>
@@ -99,6 +111,7 @@ export function MiamoStaticWordmark({ className = '' }: { className?: string }) 
   );
 }
 
+/** Small non-animated Miamo logo icon for compact display (e.g. headers). */
 export function MiamoCompactIcon({
   size = 28,
   className = '',

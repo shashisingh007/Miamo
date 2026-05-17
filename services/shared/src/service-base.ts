@@ -9,10 +9,24 @@ import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
 import { errorHandler } from './middleware/error';
 
+/**
+ * Shared Prisma client singleton used across all microservices.
+ * Logs warnings and errors in development; errors only in production.
+ */
 export const prisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' ? ['warn', 'error'] : ['error'],
 });
 
+/**
+ * Create a pre-configured Express app for a microservice.
+ *
+ * Applies security middleware (Helmet, CORS), JSON parsing (10MB limit),
+ * cookie parsing, request logging (Morgan), rate limiting (2000/15min),
+ * and standard health (`/health`) + readiness (`/ready`) endpoints.
+ *
+ * @param serviceName - Name of the service (used in health check responses)
+ * @returns Configured Express application
+ */
 export function createServiceApp(serviceName: string): Express {
   const app = express();
 
@@ -66,6 +80,14 @@ export function createServiceApp(serviceName: string): Express {
   return app;
 }
 
+/**
+ * Start listening on the given port and attach the global error handler.
+ * Does not start the server in test environments.
+ *
+ * @param app - Express application to start
+ * @param serviceName - Service name for console output
+ * @param port - TCP port to listen on
+ */
 export function startService(app: Express, serviceName: string, port: number) {
   app.use(errorHandler);
 

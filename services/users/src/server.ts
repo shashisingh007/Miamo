@@ -7,8 +7,16 @@ import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
+import { scoreSearch } from '../../shared/algorithms';
+import { logger } from '../../shared/src/logger';
+import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
+import { auditLog } from '../../shared/src/audit';
 
-export const prisma = new PrismaClient();
+const DB_URL = process.env.DATABASE_URL || 'postgresql://miamo:miamo@localhost:5432/miamo?schema=public';
+export const prisma = new PrismaClient({
+  log: process.env.NODE_ENV === 'production' ? ['error'] : ['warn', 'error'],
+  datasources: { db: { url: DB_URL + (DB_URL.includes('?') ? '&' : '?') + 'connection_limit=10&pool_timeout=20' } },
+});
 export const app = express();
 
 const PORT = parseInt(process.env.PORT || '3202', 10);
@@ -79,7 +87,10 @@ app.get('/api/v1/profiles/me', authMiddleware, async (req: AuthRequest, res: Res
 
 app.put('/api/v1/profiles/me', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { age, gender, city, profession, bio, datingIntent, seriousMode, avatarGradient } = req.body;
+    const sanitizedBody = sanitizeObject(req.body);
+    const { age, gender, city, profession, bio, datingIntent, seriousMode, avatarGradient,
+      height, sexuality, lookingFor, smoking, drinking, exercise, education,
+      religion, zodiac, languages, pets, children, politicalViews, diet } = sanitizedBody;
     const data: any = {};
     if (age !== undefined) data.age = age;
     if (gender !== undefined) data.gender = gender;
@@ -89,6 +100,20 @@ app.put('/api/v1/profiles/me', authMiddleware, async (req: AuthRequest, res: Res
     if (datingIntent !== undefined) data.datingIntent = datingIntent;
     if (seriousMode !== undefined) data.seriousMode = seriousMode;
     if (avatarGradient !== undefined) data.avatarGradient = avatarGradient;
+    if (height !== undefined) data.height = typeof height === 'string' ? parseInt(height) || null : height;
+    if (sexuality !== undefined) data.sexuality = sexuality;
+    if (lookingFor !== undefined) data.lookingFor = lookingFor;
+    if (smoking !== undefined) data.smoking = smoking;
+    if (drinking !== undefined) data.drinking = drinking;
+    if (exercise !== undefined) data.exercise = exercise;
+    if (education !== undefined) data.education = education;
+    if (religion !== undefined) data.religion = religion;
+    if (zodiac !== undefined) data.zodiac = zodiac;
+    if (languages !== undefined) data.languages = languages;
+    if (pets !== undefined) data.pets = pets;
+    if (children !== undefined) data.children = children;
+    if (politicalViews !== undefined) data.politicalViews = politicalViews;
+    if (diet !== undefined) data.diet = diet;
 
     const profile = await prisma.profile.update({ where: { userId: req.userId }, data });
 
@@ -108,6 +133,7 @@ app.put('/api/v1/profiles/me', authMiddleware, async (req: AuthRequest, res: Res
     score = Math.min(score, 100);
 
     const updated = await prisma.profile.update({ where: { userId: req.userId }, data: { profileScore: score } });
+    auditLog(prisma, req.userId!, 'profile_update', { fields: Object.keys(data) });
     res.json({ data: updated });
   } catch (e) { next(e); }
 });
@@ -117,7 +143,7 @@ app.put('/api/v1/profiles/me/prompts', authMiddleware, async (req: AuthRequest, 
     const { prompts } = req.body;
     await prisma.profilePrompt.deleteMany({ where: { userId: req.userId } });
     for (let i = 0; i < prompts.length; i++) {
-      await prisma.profilePrompt.create({ data: { userId: req.userId!, question: prompts[i].question, answer: prompts[i].answer, position: i } });
+      await prisma.profilePrompt.create({ data: { userId: req.userId!, question: sanitize(prompts[i].question || ''), answer: sanitize(prompts[i].answer || ''), position: i } });
     }
     res.json({ data: { success: true } });
   } catch (e) { next(e); }
@@ -128,7 +154,7 @@ app.put('/api/v1/profiles/me/interests', authMiddleware, async (req: AuthRequest
     const { interests } = req.body;
     await prisma.profileInterest.deleteMany({ where: { userId: req.userId } });
     for (const name of interests) {
-      await prisma.profileInterest.create({ data: { userId: req.userId!, name } });
+      await prisma.profileInterest.create({ data: { userId: req.userId!, name: sanitize(name) } });
     }
     res.json({ data: { success: true } });
   } catch (e) { next(e); }
@@ -159,6 +185,7 @@ app.put('/api/v1/settings', authMiddleware, async (req: AuthRequest, res: Respon
     const data: any = {};
     for (const key of validFields) { if (body[key] !== undefined) data[key] = body[key]; }
     const settings = await prisma.settings.update({ where: { userId: req.userId }, data });
+    auditLog(prisma, req.userId!, 'settings_update', { fields: Object.keys(data) });
     res.json({ data: settings });
   } catch (e) { next(e); }
 });
@@ -195,6 +222,7 @@ app.post('/api/v1/settings/deactivate', authMiddleware, async (req: AuthRequest,
   try {
     await prisma.user.update({ where: { id: req.userId }, data: { deactivated: true } });
     await prisma.profile.update({ where: { userId: req.userId }, data: { online: false } });
+    auditLog(prisma, req.userId!, 'account_deactivate');
     res.json({ data: { success: true, message: 'Account deactivated' } });
   } catch (e) { next(e); }
 });
@@ -202,6 +230,7 @@ app.post('/api/v1/settings/deactivate', authMiddleware, async (req: AuthRequest,
 app.post('/api/v1/settings/reactivate', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     await prisma.user.update({ where: { id: req.userId }, data: { deactivated: false } });
+    auditLog(prisma, req.userId!, 'account_reactivate');
     res.json({ data: { success: true } });
   } catch (e) { next(e); }
 });
@@ -240,29 +269,99 @@ app.get('/api/v1/search', authMiddleware, async (req: AuthRequest, res: Response
     const blockedIds = blocks.map(b => b.blockerId === userId ? b.blockedId : b.blockerId);
     blockedIds.push(userId);
 
-    const searchType = type as string || 'all';
+    const searchType = (type as string || 'all');
     let results: any[] = [];
 
-    if (searchType === 'all' || searchType === 'user') {
+    if (['all', 'user', 'name', 'city', 'id'].includes(searchType)) {
+      // Fetch a broader set of candidates for algorithm-based ranking
+      const dbWhere: any = {
+        id: { notIn: blockedIds }, active: true,
+        privacySettings: { disableSearch: false },
+      };
+      // For city-specific search, narrow DB results
+      if (searchType === 'city') {
+        dbWhere.profile = { city: { contains: query, mode: 'insensitive' } };
+      } else if (searchType === 'id') {
+        dbWhere.OR = [
+          { miamoId: { contains: query, mode: 'insensitive' } },
+          { username: { contains: query, mode: 'insensitive' } },
+        ];
+      } else {
+        // For 'all' / 'name' / 'user': broad text search
+        dbWhere.OR = [
+          { displayName: { contains: query, mode: 'insensitive' } },
+          { username: { contains: query, mode: 'insensitive' } },
+          { miamoId: { contains: query, mode: 'insensitive' } },
+          { profile: { city: { contains: query, mode: 'insensitive' } } },
+        ];
+      }
+
       const users = await prisma.user.findMany({
-        where: {
-          id: { notIn: blockedIds }, active: true,
-          privacySettings: { disableSearch: false },
-          OR: [
-            { displayName: { contains: query, mode: 'insensitive' } },
-            { username: { contains: query, mode: 'insensitive' } },
-            { miamoId: { contains: query, mode: 'insensitive' } },
-            { profile: { city: { contains: query, mode: 'insensitive' } } },
-          ],
-        },
+        where: dbWhere,
         include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } }, interests: true },
-        take: 20,
+        take: 50, // Fetch more candidates for algorithm ranking
       });
-      results = users.map(u => { const { passwordHash, ...rest } = u; return { type: 'user', ...rest }; });
+
+      // Score each result using the search algorithm engine
+      const algoType = (searchType === 'user' ? 'all' : searchType) as 'name' | 'city' | 'id' | 'all';
+      const scored = users.map(u => {
+        const { passwordHash, ...rest } = u;
+        const searchScore = scoreSearch(
+          query,
+          algoType,
+          u.displayName,
+          u.username,
+          u.miamoId || undefined,
+          u.profile?.city || undefined,
+        );
+        return { type: 'user', ...rest, searchScore };
+      });
+
+      // Sort by algorithm score descending, filter out zero-score results
+      scored.sort((a, b) => b.searchScore - a.searchScore);
+      results = scored.filter(r => r.searchScore > 0).slice(0, 20);
     }
 
     await prisma.searchLog.create({ data: { userId, query, type: searchType, results: results.length } });
     res.json({ data: results });
+  } catch (e) { next(e); }
+});
+
+// ─── Bookmarks ───────────────────────────────────────
+app.get('/api/v1/bookmarks', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const bookmarks = await prisma.bookmark.findMany({
+      where: { userId: req.userId },
+      orderBy: { createdAt: 'desc' },
+      include: { target: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } } },
+    });
+    res.json({ data: bookmarks });
+  } catch (e) { next(e); }
+});
+
+app.post('/api/v1/bookmarks', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { targetId, targetType = 'profile', note: rawNote = '' } = req.body;
+    if (!targetId) return res.status(400).json({ error: { message: 'targetId is required' } });
+    const note = sanitize(rawNote);
+
+    const bookmark = await prisma.bookmark.upsert({
+      where: { userId_targetId_targetType: { userId: req.userId!, targetId, targetType } },
+      update: { note },
+      create: { userId: req.userId!, targetId, targetType, note },
+    });
+    auditLog(prisma, req.userId!, 'bookmark_create', { targetId, targetType });
+    res.status(201).json({ data: bookmark });
+  } catch (e) { next(e); }
+});
+
+app.delete('/api/v1/bookmarks/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const bookmark = await prisma.bookmark.findFirst({ where: { id: req.params.id, userId: req.userId } });
+    if (!bookmark) return res.status(404).json({ error: { message: 'Bookmark not found' } });
+    await prisma.bookmark.delete({ where: { id: req.params.id } });
+    auditLog(prisma, req.userId!, 'bookmark_delete', { targetId: bookmark.targetId });
+    res.json({ data: { success: true } });
   } catch (e) { next(e); }
 });
 
@@ -274,5 +373,17 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
 // ─── Start ───────────────────────────────────────────
 if (process.env.NODE_ENV !== 'test') {
-  app.listen(PORT, '0.0.0.0', () => { console.log(`\n⚡ Miamo User Service on port ${PORT}\n`); });
+  const server = app.listen(PORT, '0.0.0.0', () => { logger.info(`Miamo User Service on port ${PORT}`); });
+
+  const shutdown = async (signal: string) => {
+    logger.info(`${signal} received — shutting down users service...`);
+    server.close(async () => {
+      await prisma.$disconnect();
+      logger.info('Users service stopped cleanly');
+      process.exit(0);
+    });
+    setTimeout(() => { process.exit(1); }, 10000);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }

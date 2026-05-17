@@ -89,6 +89,8 @@ async function main() {
 
   // Clean existing data
   await prisma.$transaction([
+    prisma.session.deleteMany(),
+    prisma.bookmark.deleteMany(),
     prisma.auditLog.deleteMany(),
     prisma.notification.deleteMany(),
     prisma.block.deleteMany(),
@@ -954,6 +956,59 @@ async function main() {
     });
   }
   console.log('  ✓ Created 60 audit log entries');
+
+  // ── Sessions (login sessions for first 10 users) ──
+  const devices = [
+    { deviceType: 'mobile', browser: 'Safari', os: 'iOS 17.4' },
+    { deviceType: 'desktop', browser: 'Chrome', os: 'Mac OS X 14.3' },
+    { deviceType: 'mobile', browser: 'Chrome', os: 'Android 14' },
+    { deviceType: 'tablet', browser: 'Safari', os: 'iPadOS 17.4' },
+    { deviceType: 'desktop', browser: 'Firefox', os: 'Windows 11' },
+  ];
+  for (let si = 0; si < 20; si++) {
+    const userIdx = si % 10;
+    const device = devices[si % devices.length];
+    await prisma.session.create({
+      data: {
+        userId: userRecords[userIdx].id,
+        token: `seed-session-token-${si}-${Date.now()}`,
+        ...device,
+        ipAddress: `192.168.1.${100 + si}`,
+        userAgent: `Mozilla/5.0 (${device.os}) ${device.browser}`,
+        lastActiveAt: new Date(SEED_DATE - si * 3600000),
+        revoked: si > 14,
+        createdAt: new Date(SEED_DATE - si * 86400000),
+      },
+    });
+  }
+  console.log('  ✓ Created 20 sessions');
+
+  // ── Bookmarks (users bookmarking profiles) ──
+  const bookmarkPairs = [
+    { from: 0, to: 5, note: 'Interesting profile!' },
+    { from: 0, to: 8, note: '' },
+    { from: 1, to: 3, note: 'Great photos' },
+    { from: 2, to: 7, note: 'Similar interests' },
+    { from: 3, to: 0, note: 'Want to match later' },
+    { from: 4, to: 1, note: '' },
+    { from: 5, to: 9, note: 'Funny prompts' },
+    { from: 6, to: 2, note: '' },
+    { from: 7, to: 4, note: 'Creative person' },
+    { from: 8, to: 6, note: '' },
+    { from: 9, to: 0, note: 'Beautiful photos' },
+    { from: 10, to: 3, note: '' },
+  ];
+  for (const bp of bookmarkPairs) {
+    await prisma.bookmark.create({
+      data: {
+        userId: userRecords[bp.from].id,
+        targetId: userRecords[bp.to].id,
+        targetType: 'profile',
+        note: bp.note,
+      },
+    });
+  }
+  console.log('  ✓ Created 12 bookmarks');
 
   // ── Notifications (for all 20 users) ──
   const notifTypes = ['match', 'message', 'like', 'comment', 'beat', 'story', 'system'];
