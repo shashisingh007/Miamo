@@ -477,6 +477,25 @@ app.post('/api/v1/discover/pass', authMiddleware, async (req: AuthRequest, res: 
   } catch (e) { next(e); }
 });
 
+// ─── Super Like ───────────────────────────────────────
+app.post('/api/v1/discover/:userId/superlike', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const targetId = req.params.userId;
+    // Record the super-like
+    const request = await prisma.matchRequest.create({ data: { fromUserId: userId, toUserId: targetId, type: 'SUPER_LIKE', status: 'PENDING' } });
+    await prisma.notification.create({ data: { userId: targetId, type: 'super_like', title: 'You got a Super Like! ⭐', body: 'Someone super liked your profile — they really stand out!' } });
+    // Check if already liked back → instant match
+    const existing = await prisma.matchRequest.findFirst({ where: { fromUserId: targetId, toUserId: userId, status: 'PENDING' } });
+    if (existing) {
+      await prisma.match.create({ data: { user1Id: userId, user2Id: targetId, matchedAt: new Date() } });
+      await prisma.matchRequest.updateMany({ where: { id: { in: [request.id, existing.id] } }, data: { status: 'MATCHED' } });
+      return res.json({ data: { matched: true, matchRequest: request } });
+    }
+    res.json({ data: { matched: false, matchRequest: request } });
+  } catch (e) { next(e); }
+});
+
 // ─── Send Miamo Move (stored in DB for algorithm analysis) ───
 app.post('/api/v1/discover/move', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -1241,6 +1260,38 @@ app.get('/api/v1/ai-match/score/:targetId', authMiddleware, async (req: AuthRequ
     moveRecs.sort((a, b) => b.confidence - a.confidence);
 
     res.json({ data: { score, commonInterests: common, breakdown, whyThisMatch, moveRecommendations: moveRecs.slice(0, 5) } });
+  } catch (e) { next(e); }
+});
+
+// ─── Why This Match (lightweight alias) ──────────────
+app.get('/api/v1/ai-match/why/:targetId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  // Proxy to the full score endpoint — just returns the whyThisMatch portion
+  try {
+    const fakeRes = { status: () => fakeRes, json: (d: any) => d } as any;
+    // Re-use score logic inline for efficiency
+    const userId = req.userId!;
+    const myInterests = await prisma.profileInterest.findMany({ where: { userId } });
+    const myInterestNames = myInterests.map(i => i.name);
+    const myProfile = await prisma.profile.findUnique({ where: { userId } });
+    const target = await prisma.user.findUnique({
+      where: { id: req.params.targetId },
+      include: { profile: true, interests: true, prompts: { orderBy: { position: 'asc' } } },
+    });
+    if (!target) return res.status(404).json({ error: { message: 'User not found' } });
+    const cProfile = target.profile;
+    const cInterests = target.interests.map(i => i.name);
+    const common = cInterests.filter(i => myInterestNames.includes(i));
+    const whyPoints: { text: string; weight: number }[] = [];
+    if (common.length >= 3) whyPoints.push({ text: `You both love ${common.slice(0,3).join(', ')} — ${common.length} interests in common`, weight: common.length * 3 });
+    else if (common.length > 0) whyPoints.push({ text: `A shared passion for ${common[0]} could spark something special`, weight: 8 });
+    if (myProfile && cProfile) {
+      if (myProfile.datingIntent === cProfile.datingIntent) whyPoints.push({ text: `Both looking for ${cProfile.datingIntent?.toLowerCase()} — aligned intentions`, weight: 15 });
+      if (myProfile.city?.toLowerCase() === cProfile.city?.toLowerCase()) whyPoints.push({ text: `Both in ${cProfile.city} — easy to meet up`, weight: 10 });
+    }
+    whyPoints.sort((a, b) => b.weight - a.weight);
+    const reasons = whyPoints.slice(0, 3).map(p => p.text);
+    while (reasons.length < 3) reasons.push(['Shared values and depth', 'Compatible communication styles', 'Similar relationship intent'][reasons.length] || 'Compatible profiles');
+    res.json({ data: { reasons } });
   } catch (e) { next(e); }
 });
 

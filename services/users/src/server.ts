@@ -160,6 +160,35 @@ app.put('/api/v1/profiles/me/interests', authMiddleware, async (req: AuthRequest
   } catch (e) { next(e); }
 });
 
+// ─── Photo Upload & Delete ───────────────────────────
+app.post('/api/v1/profiles/me/photos', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    // Count existing photos
+    const existing = await prisma.photo.count({ where: { userId } });
+    if (existing >= 9) return res.status(400).json({ error: { message: 'Maximum 9 photos allowed' } });
+    // In production this would save to object storage; here we store a placeholder URL
+    const photo = await prisma.photo.create({
+      data: { userId, url: `/uploads/photos/${userId}_${Date.now()}.jpg`, position: existing + 1 },
+    });
+    res.json({ data: photo });
+  } catch (e) { next(e); }
+});
+
+app.delete('/api/v1/profiles/me/photos/:photoId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const photo = await prisma.photo.findFirst({ where: { id: req.params.photoId, userId: req.userId } });
+    if (!photo) return res.status(404).json({ error: { message: 'Photo not found' } });
+    await prisma.photo.delete({ where: { id: req.params.photoId } });
+    // Reorder remaining photos
+    const remaining = await prisma.photo.findMany({ where: { userId: req.userId }, orderBy: { position: 'asc' } });
+    for (let i = 0; i < remaining.length; i++) {
+      await prisma.photo.update({ where: { id: remaining[i].id }, data: { position: i + 1 } });
+    }
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
+
 // ─── Settings Routes ─────────────────────────────────
 app.get('/api/v1/settings', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
@@ -254,6 +283,25 @@ app.get('/api/v1/settings/blocks', authMiddleware, async (req: AuthRequest, res:
       include: { blocked: { select: { id: true, displayName: true, username: true } } },
     });
     res.json({ data: blocks });
+  } catch (e) { next(e); }
+});
+
+// ─── Account Deletion (GDPR right to erasure) ───────
+app.delete('/api/v1/settings/delete', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    auditLog(prisma, userId, 'account_delete');
+    // Cascade delete user data
+    await prisma.profileInterest.deleteMany({ where: { userId } });
+    await prisma.profilePrompt.deleteMany({ where: { userId } });
+    await prisma.photo.deleteMany({ where: { userId } });
+    await prisma.notification.deleteMany({ where: { userId } });
+    await prisma.profile.deleteMany({ where: { userId } });
+    await prisma.settings.deleteMany({ where: { userId } });
+    await prisma.privacySettings.deleteMany({ where: { userId } });
+    await prisma.session.deleteMany({ where: { userId } });
+    await prisma.user.delete({ where: { id: userId } });
+    res.json({ data: { success: true, message: 'Account permanently deleted' } });
   } catch (e) { next(e); }
 });
 

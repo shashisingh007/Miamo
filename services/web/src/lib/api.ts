@@ -332,17 +332,29 @@ class ApiClient {
   async health() { return this.request<any>('/health'); }
 
   // ─── Activity Tracking ─────────────────────────────
-  // Fire-and-forget behavioral tracking for recommendation algorithms.
-  // Intentionally does NOT await or throw — analytics failures should never
-  // block or degrade user-facing operations.
   trackActivity(action: string, targetType: string, targetId?: string, metadata?: Record<string, unknown>, durationMs?: number) {
     const body: Record<string, unknown> = { action, targetType };
     if (targetId) body.targetId = targetId;
     if (metadata) body.metadata = metadata;
     if (durationMs) body.durationMs = durationMs;
-    // Non-blocking: don't await, don't throw
-    this.request('/api/v1/activity/track', { method: 'POST', body: JSON.stringify(body) }).catch(() => { /* fire-and-forget analytics */ });
+    this.request('/api/v1/activity/track', { method: 'POST', body: JSON.stringify(body) }).catch(() => {});
   }
+
+  // ─── Additional Backend Endpoints ──────────────────
+  async refreshToken() { return this.request<any>('/api/v1/auth/refresh', { method: 'POST' }); }
+  async getSessions() { return this.request<ApiResponse<MiamoSession[]>>('/api/v1/auth/sessions'); }
+  async revokeSession(id: string) { return this.request<any>(`/api/v1/auth/sessions/${id}/revoke`, { method: 'POST' }); }
+  async reactivateAccount() { return this.request<any>('/api/v1/settings/reactivate', { method: 'POST' }); }
+  async getBookmarks() { return this.request<ApiResponse<MiamoBookmark[]>>('/api/v1/bookmarks'); }
+  async createBookmark(targetId: string) { return this.request<ApiResponse<MiamoBookmark>>('/api/v1/bookmarks', { method: 'POST', body: JSON.stringify({ targetId }) }); }
+  async deleteBookmark(id: string) { return this.request<any>(`/api/v1/bookmarks/${id}`, { method: 'DELETE' }); }
+  async getActivityAnalysis() { return this.request<any>('/api/v1/activity/analysis'); }
+  async getMyReports() { return this.request<any>('/api/v1/safety/reports'); }
+  async editPost(id: string, data: { content: string }) { return this.request<any>(`/api/v1/feed/${id}`, { method: 'PUT', body: JSON.stringify(data) }); }
+  async viewVideo(id: string) { return this.request<any>(`/api/v1/videos/${id}/view`, { method: 'POST' }); }
+  async getVideoComments(id: string) { return this.request<any>(`/api/v1/videos/${id}/comments`); }
+  async getStoryViewers(id: string) { return this.request<any>(`/api/v1/stories/${id}/viewers`); }
+  async getUserById(id: string) { return this.request<any>(`/api/v1/users/${id}`); }
 }
 
 export const api = new ApiClient(API_URL);
