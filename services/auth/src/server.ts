@@ -22,8 +22,8 @@ export const prisma = new PrismaClient({
 export const app = express();
 
 const PORT = parseInt(process.env.PORT || '3201', 10);
-const JWT_SECRET = process.env.JWT_SECRET || 'miamo-dev-jwt-secret-change-in-production-2026';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'miamo-refresh-secret-change';
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('FATAL: JWT_SECRET must be set in production'); })() : 'miamo-dev-jwt-secret-change-in-production-2026') as string;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('FATAL: JWT_REFRESH_SECRET must be set in production'); })() : 'miamo-refresh-secret-change') as string;
 
 // ─── Middleware ───────────────────────────────────────
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
@@ -51,14 +51,14 @@ function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   const token = req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null;
   if (!token) return res.status(401).json({ error: { message: 'Authentication required', code: 'UNAUTHORIZED' } });
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as { userId: string };
+    const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string };
     req.userId = payload.userId; next();
   } catch { return res.status(401).json({ error: { message: 'Invalid or expired token', code: 'TOKEN_INVALID' } }); }
 }
 
 function generateTokens(userId: string) {
-  const accessToken = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '7d' });
-  const refreshToken = jwt.sign({ userId }, JWT_REFRESH_SECRET, { expiresIn: '30d' });
+  const accessToken = jwt.sign({ userId }, JWT_SECRET, { expiresIn: '15m', algorithm: 'HS256' });
+  const refreshToken = jwt.sign({ userId }, JWT_REFRESH_SECRET, { expiresIn: '30d', algorithm: 'HS256' });
   return { accessToken, refreshToken };
 }
 
@@ -102,6 +102,7 @@ app.post('/api/v1/auth/register', async (req: Request, res: Response, next: Next
   try {
     const { email: rawEmail, password, displayName: rawDisplayName } = req.body;
     if (!rawEmail || !password || !rawDisplayName) throw new AppError('Missing required fields', 400, 'VALIDATION_ERROR');
+    if (password.length < 8) throw new AppError('Password must be at least 8 characters', 400, 'VALIDATION_ERROR');
     const email = sanitize(rawEmail);
     const displayName = sanitize(rawDisplayName);
 
@@ -202,7 +203,7 @@ app.put('/api/v1/auth/password', authMiddleware, async (req: AuthRequest, res: R
   try {
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) throw new AppError('Both current and new password required', 400, 'VALIDATION_ERROR');
-    if (newPassword.length < 6) throw new AppError('New password must be at least 6 characters', 400, 'VALIDATION_ERROR');
+    if (newPassword.length < 8) throw new AppError('New password must be at least 8 characters', 400, 'VALIDATION_ERROR');
 
     const user = await prisma.user.findUnique({ where: { id: req.userId } });
     if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');

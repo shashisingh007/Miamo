@@ -14,7 +14,7 @@ import { logger } from '../../shared/src/logger';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3200', 10);
-const JWT_SECRET = process.env.JWT_SECRET || 'miamo-dev-jwt-secret-change-in-production-2026';
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('FATAL: JWT_SECRET must be set in production'); })() : 'miamo-dev-jwt-secret-change-in-production-2026') as string;
 
 // ═══ SSE: Real-time event connections per user ═══════
 // In-memory map of userId → Set of active SSE response objects.
@@ -75,7 +75,7 @@ app.use(helmet({
 const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || process.env.FRONTEND_URL || 'http://localhost:3100').split(',');
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || ALLOWED_ORIGINS.includes(origin) || process.env.NODE_ENV === 'development') {
+    if (!origin || ALLOWED_ORIGINS.includes(origin) || (process.env.NODE_ENV === 'development' && process.env.CORS_BYPASS === 'true')) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));
@@ -149,7 +149,7 @@ function extractUserId(req: express.Request, res: express.Response, next: expres
 
   if (token) {
     try {
-      const payload = jwt.verify(token, JWT_SECRET) as { userId: string };
+      const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string };
       // Pass user ID to downstream services
       req.headers['x-user-id'] = payload.userId;
       req.headers['x-internal-key'] = process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key';
@@ -197,7 +197,7 @@ app.get('/api/v1/events/stream', (req: express.Request, res: express.Response) =
   let userId = req.headers['x-user-id'] as string;
   if (!userId && req.query.token) {
     try {
-      const payload = jwt.verify(req.query.token as string, JWT_SECRET) as { userId: string };
+      const payload = jwt.verify(req.query.token as string, JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string };
       userId = payload.userId;
     } catch {}
   }
