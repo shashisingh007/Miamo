@@ -53,19 +53,22 @@ class ApiClient {
       if (!res.ok) {
         const err = await res.json().catch(() => ({ error: { message: 'Network error' } }));
         const apiErr = new ApiError(err.error?.message || 'Request failed', res.status, err.error?.code, err.data);
-        // On 401, clear the stale token from both legacy key and Zustand-persisted key.
-        // We do NOT auto-redirect here — each page handles its own auth fallback
-        // to avoid redirect loops and interrupting navigation flow.
+        // On 401, clear the stale token and auth state entirely
         if (typeof window !== 'undefined' && (res.status === 401 || (res.status === 404 && path.includes('/auth/me')))) {
           localStorage.removeItem('miamo_token');
           try { localStorage.removeItem('miamo-auth'); } catch {}
+          // Clear Zustand auth store to sync isAuthenticated state
+          try {
+            const { useAuthStore } = require('@/stores');
+            useAuthStore.getState().clearAuth();
+          } catch {}
         }
         throw apiErr;
       }
       return res.json();
     } catch (err) {
       if (err instanceof ApiError) throw err;
-      throw new ApiError('Network error — is the API server running?', 0, 'NETWORK_ERROR');
+      throw new ApiError(`Network error — ${(err as Error).message || 'is the API server running?'}`, 0, 'NETWORK_ERROR');
     }
   }
 

@@ -51,7 +51,17 @@ export const useThemeStore = create<ThemeState>()(
   persist(
     (set) => ({
       theme: 'dark',
-      setTheme: (theme) => set({ theme }),
+      setTheme: (theme) => {
+        if (typeof window !== 'undefined') {
+          const root = document.documentElement;
+          if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+            root.classList.add('dark');
+          } else {
+            root.classList.remove('dark');
+          }
+        }
+        set({ theme });
+      },
     }),
     { name: 'miamo-theme' }
   )

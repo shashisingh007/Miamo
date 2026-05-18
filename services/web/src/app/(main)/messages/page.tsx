@@ -304,14 +304,14 @@ function MessagesPageInner() {
                     className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] font-medium hover:bg-red-500/20 transition-colors">
                     <Unlink className="w-3 h-3" /> Unmatch
                   </button>
-                  <button onClick={async () => { for (const id of Array.from(selectedChats)) { try { await api.archiveChat(id); } catch {} } setSelectedChats(new Set()); setSelectMode(false); loadChats(); }}
+                  <button onClick={async () => { for (const id of Array.from(selectedChats)) { try { await api.clearChat(id); } catch {} } setSelectedChats(new Set()); setSelectMode(false); loadChats(); }}
                     className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] font-medium hover:bg-red-500/20 transition-colors">
                     <Trash2 className="w-3 h-3" /> Delete
                   </button>
                 </>
               ) : (
                 <>
-                  <button onClick={async () => { for (const id of Array.from(selectedChats)) { try { await api.archiveChat(id); } catch {} } setSelectedChats(new Set()); setSelectMode(false); loadChats(); }}
+                  <button onClick={async () => { for (const id of Array.from(selectedChats)) { try { await api.clearChat(id); } catch {} } setSelectedChats(new Set()); setSelectMode(false); loadChats(); }}
                     className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-[11px] font-medium hover:bg-red-500/20 transition-colors">
                     <Trash2 className="w-3 h-3" /> Delete
                   </button>

@@ -72,7 +72,12 @@ export default function DiscoverPage() {
       const data = res.data || [];
       setProfiles(data);
       setCurrentIndex(0);
-    } catch { setProfiles([]); }
+    } catch (err) {
+      setProfiles([]);
+      if (typeof window !== 'undefined') {
+        console.error('[Discover] Failed to load profiles:', err);
+      }
+    }
     finally { setLoading(false); }
   }, [filters, activeQuickFilter, buildParams]);
 
