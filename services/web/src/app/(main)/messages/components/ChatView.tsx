@@ -52,7 +52,7 @@ function BackgroundPicker({ chatId, currentBg, onClose, onSelect }: { chatId: st
                   className={cn('aspect-[3/4] rounded-xl border-2 overflow-hidden flex flex-col items-center justify-end p-2',
                     currentBg === bg.value ? 'border-lavender-400 ring-2 ring-lavender-400/30' : 'border-border/30 hover:border-lavender-400/50'
                   )} style={{ background: bg.value }}>
-                  <span className="text-[10px] text-gray-800 font-medium bg-black/30 backdrop-blur-sm px-2 py-0.5 rounded-full">{bg.name}</span>
+                  <span className="text-[10px] text-gray-800 dark:text-gray-200 font-medium bg-black/30 backdrop-blur-sm px-2 py-0.5 rounded-full">{bg.name}</span>
                 </button>
               ))}
             </div>
@@ -63,7 +63,7 @@ function BackgroundPicker({ chatId, currentBg, onClose, onSelect }: { chatId: st
                 <input value={customColor} onChange={e => setCustomColor(e.target.value)} className="input-premium flex-1 text-sm font-mono" placeholder="#EC407A" />
               </div>
               <div className="aspect-[4/3] rounded-xl border border-border/30 flex items-end p-3" style={{ background: customColor }}>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-1.5"><span className="text-xs text-gray-800">Preview</span></div>
+                <div className="bg-white/10 backdrop-blur-sm rounded-xl px-3 py-1.5"><span className="text-xs text-gray-800 dark:text-gray-200">Preview</span></div>
               </div>
               <Button className="w-full" onClick={() => handleSelect(customColor, 'Custom Color')}>Apply Custom Color</Button>
               <div className="flex flex-wrap gap-2">
@@ -143,7 +143,7 @@ function CallOverlay({ type, user, onEnd }: { type: 'voice' | 'video'; user: any
             <button className="w-14 h-14 rounded-full bg-miamo-elevated border border-border flex items-center justify-center text-text-muted hover:text-text-primary"><Video className="w-6 h-6" /></button>
           )}
           <button className="w-14 h-14 rounded-full bg-miamo-elevated border border-border flex items-center justify-center text-text-muted hover:text-text-primary"><Mic className="w-6 h-6" /></button>
-          <button onClick={onEnd} className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-gray-900 hover:bg-red-600 shadow-lg shadow-red-500/30"><Phone className="w-7 h-7 rotate-[135deg]" /></button>
+          <button onClick={onEnd} className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-gray-900 dark:text-white hover:bg-red-600 shadow-lg shadow-red-500/30"><Phone className="w-7 h-7 rotate-[135deg]" /></button>
           <button className="w-14 h-14 rounded-full bg-miamo-elevated border border-border flex items-center justify-center text-text-muted hover:text-text-primary"><VolumeX className="w-6 h-6" /></button>
         </div>
         <div className="flex items-center gap-2 mt-4"><Lock className="w-3 h-3 text-emerald-400" /><span className="text-[11px] text-text-muted">End-to-end encrypted</span></div>

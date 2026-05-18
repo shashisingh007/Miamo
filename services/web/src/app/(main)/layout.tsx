@@ -81,7 +81,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         }
       });
       api.getNotificationCount().then(res => {
-        setNotifCount(res.data?.count ?? res.count ?? 0);
+        setNotifCount(res.data?.count ?? 0);
       }).catch(() => {});
       refreshUnread();
     }
@@ -92,8 +92,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     if (!isAuthenticated) return;
     const interval = setInterval(() => {
       api.getNotificationCount().then(res => {
-        setNotifCount(res.data?.count ?? res.count ?? 0);
+        setNotifCount(res.data?.count ?? 0);
       }).catch(() => { /* non-critical poll */ });
+    }, 60000);
     return () => clearInterval(interval);
   }, [isAuthenticated, refreshUnread]);
 
@@ -158,8 +159,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </div>
           <div className="ml-auto">
             <Link href="/premium" className="relative group">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-amber-100 to-amber-50 border border-amber-200/50 group-hover:border-amber-300 transition-all group-hover:shadow-[0_0_12px_rgba(212,175,55,0.3)]">
-                <Crown className="w-4 h-4 text-amber-600 group-hover:text-amber-500 transition-colors" />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-amber-100 to-amber-50 dark:from-amber-900/50 dark:to-amber-800/50 border border-amber-200/50 dark:border-amber-700/50 group-hover:border-amber-300 transition-all group-hover:shadow-[0_0_12px_rgba(212,175,55,0.3)]">
+                <Crown className="w-4 h-4 text-amber-600 dark:text-amber-400 group-hover:text-amber-500 transition-colors" />
               </div>
             </Link>
           </div>
@@ -238,20 +239,20 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         {/* User profile section */}
         <div className="p-4 space-y-3 relative">
           <div className="divider-premium mb-3" />
-          <Link href="/profile" className="flex items-center gap-3 group p-2 rounded-xl hover:bg-pink-50/50 transition-all">
+          <Link href="/profile" className="flex items-center gap-3 group p-2 rounded-xl hover:bg-pink-50/50 dark:hover:bg-pink-950/30 transition-all">
             <div className="relative">
               <Avatar name={displayUser.displayName || 'User'} size="sm" online />
-              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-gradient-to-r from-emerald-400 to-green-400 border-2 border-white shadow-sm" />
+              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-gradient-to-r from-emerald-400 to-green-400 border-2 border-white dark:border-gray-900 shadow-sm" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-semibold text-gray-800 truncate group-hover:text-lavender-500 transition-colors">
+              <p className="text-[13px] font-semibold text-gray-800 dark:text-gray-200 truncate group-hover:text-lavender-500 transition-colors">
                 {displayUser.displayName || 'Your Profile'}
               </p>
-              <p className="text-[11px] text-gray-400 font-medium">@{displayUser.username || 'user'}</p>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">@{displayUser.username || 'user'}</p>
             </div>
             <ScoreRing score={profileScore} size={34} strokeWidth={2.5} />
           </Link>
-          <button onClick={handleLogout} className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-[12px] text-gray-400 hover:text-red-500 hover:bg-red-50/60 transition-all font-medium">
+          <button onClick={handleLogout} className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-[12px] text-gray-400 dark:text-gray-500 hover:text-red-500 hover:bg-red-50/60 dark:hover:bg-red-950/40 transition-all font-medium">
             <LogOut className="w-3.5 h-3.5" /> Sign Out
           </button>
         </div>
@@ -268,21 +269,21 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             <MiamoCompactIcon size={28} />
           </div>
           <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold text-gray-800 capitalize tracking-tight">
+            <h1 className="text-lg font-bold text-gray-800 dark:text-gray-100 capitalize tracking-tight">
               {pathname === '/' ? 'Home' : pathname.split('/').filter(Boolean)[0]?.replace(/-/g, ' ')}
             </h1>
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-pink-50 to-rose-50 border border-pink-100/50">
+            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-gradient-to-r from-pink-50 to-rose-50 dark:from-pink-950/30 dark:to-rose-950/30 border border-pink-100/50 dark:border-pink-800/50">
               <Sparkles className="w-3 h-3 text-pink-400" />
-              <span className="text-[10px] font-bold text-pink-500 uppercase tracking-wider">Elite</span>
+              <span className="text-[10px] font-bold text-pink-500 dark:text-pink-400 uppercase tracking-wider">Elite</span>
             </div>
           </div>
           <div className="ml-auto flex items-center gap-3">
             <Link href="/notifications" className="relative group">
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/60 border border-pink-100/40 backdrop-blur-sm group-hover:bg-white/80 group-hover:border-pink-200/60 transition-all group-hover:shadow-[0_4px_12px_rgba(236,64,122,0.08)]">
-                <Bell className="w-[18px] h-[18px] text-gray-500 group-hover:text-pink-500 transition-colors" />
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-white/60 dark:bg-gray-800/60 border border-pink-100/40 dark:border-pink-900/40 backdrop-blur-sm group-hover:bg-white/80 dark:group-hover:bg-gray-700/80 group-hover:border-pink-200/60 transition-all group-hover:shadow-[0_4px_12px_rgba(236,64,122,0.08)]">
+                <Bell className="w-[18px] h-[18px] text-gray-500 dark:text-gray-400 group-hover:text-pink-500 transition-colors" />
               </div>
               {notifCount > 0 && (
-                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center px-1 shadow-[0_2px_8px_rgba(236,64,122,0.4)] border-2 border-white">
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-gradient-to-r from-pink-500 to-rose-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center px-1 shadow-[0_2px_8px_rgba(236,64,122,0.4)] border-2 border-white dark:border-gray-900">
                   {notifCount > 99 ? '99+' : notifCount}
                 </span>
               )}
@@ -317,7 +318,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         </div>
 
         {/* Mobile Nav — Glass Premium */}
-        <nav className="lg:hidden shrink-0 border-t border-pink-100/30 px-2 py-2 flex items-center justify-around frosted">
+        <nav className="lg:hidden shrink-0 border-t border-pink-100/30 dark:border-pink-900/30 px-2 py-2 flex items-center justify-around frosted">
           {NAV_MAIN.slice(0, 4).map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
             const Icon = item.icon;
@@ -359,16 +360,16 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
             initial={{ opacity: 0, y: -20, x: 20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, x: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="fixed top-4 right-4 z-50 frosted rounded-2xl shadow-xl p-4 max-w-xs cursor-pointer border border-pink-100/50"
+            className="fixed top-4 right-4 z-50 frosted rounded-2xl shadow-xl p-4 max-w-xs cursor-pointer border border-pink-100/50 dark:border-pink-900/50"
             onClick={() => { setMsgToast(null); router.push('/notifications'); }}
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-100 to-rose-100 flex items-center justify-center shrink-0 shadow-inner">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-pink-100 to-rose-100 dark:from-pink-900/40 dark:to-rose-900/40 flex items-center justify-center shrink-0 shadow-inner">
                 <Bell className="w-5 h-5 text-pink-500" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-800">{msgToast.name}</p>
-                <p className="text-xs text-gray-500 truncate">{msgToast.content}</p>
+                <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{msgToast.name}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{msgToast.content}</p>
               </div>
             </div>
           </motion.div>

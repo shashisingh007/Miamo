@@ -31,8 +31,8 @@ function MoreMenu({
   if (!isOpen) return null;
 
   const menuItems = [
-    { label: 'View Profile', icon: ExternalLink, color: 'text-gray-600', onClick: () => { router.push(`/profile?id=${item.authorId}`); onClose(); } },
-    { label: "Don't show this", icon: EyeOff, color: 'text-gray-600', onClick: () => { onHide(); onClose(); } },
+    { label: 'View Profile', icon: ExternalLink, color: 'text-gray-600 dark:text-gray-400', onClick: () => { router.push(`/profile?id=${item.authorId}`); onClose(); } },
+    { label: "Don't show this", icon: EyeOff, color: 'text-gray-600 dark:text-gray-400', onClick: () => { onHide(); onClose(); } },
     { divider: true },
     { label: 'Report Content', icon: Flag, color: 'text-orange-400', onClick: () => { api.reportUser({ reportedId: item.authorId, reason: 'inappropriate', targetType: 'creativity', targetId: item.id }); onClose(); } },
     { label: 'Block Creator', icon: Ban, color: 'text-red-400', onClick: () => { api.blockUser(item.authorId); onClose(); } },
@@ -45,16 +45,16 @@ function MoreMenu({
       <motion.div
         initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 rounded-t-[20px] z-50 px-4 py-3 pb-8"
+        className="fixed bottom-0 inset-x-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 rounded-t-[20px] z-50 px-4 py-3 pb-8"
       >
         <div className="w-10 h-1 rounded-full bg-white/10 mx-auto mb-4" />
         <div className="space-y-0.5">
           {menuItems.map((item, i) => {
-            if ('divider' in item) return <div key={i} className="my-2 h-px bg-gray-50" />;
+            if ('divider' in item) return <div key={i} className="my-2 h-px bg-gray-50 dark:bg-gray-800" />;
             const Icon = item.icon;
             return (
               <button key={i} onClick={item.onClick}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 transition-colors">
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
                 <Icon className={cn('w-5 h-5', item.color)} />
                 <span className={cn('text-[14px] font-medium', item.color)}>{item.label}</span>
               </button>
@@ -218,17 +218,17 @@ export default function CreativityPage() {
         />
         <div className="flex-1 flex items-center justify-center">
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center px-8">
-            <div className="w-20 h-20 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-5">
+            <div className="w-20 h-20 rounded-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center mx-auto mb-5">
               <Sparkles className="w-8 h-8 text-gray-300" />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">No content yet</h3>
-            <p className="text-[13px] text-gray-400 mb-6 leading-relaxed">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No content yet</h3>
+            <p className="text-[13px] text-gray-400 dark:text-gray-500 mb-6 leading-relaxed">
               {activeCategory === 'general'
                 ? 'Be the first to share something creative!'
                 : `No ${activeCategory} content yet — be the pioneer!`}
             </p>
             <button onClick={() => setUploadOpen(true)}
-              className="h-11 px-6 rounded-xl bg-white text-gray-900 text-sm font-bold hover:bg-white/90 transition-all inline-flex items-center gap-2">
+              className="h-11 px-6 rounded-xl bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm font-bold hover:bg-white/90 transition-all inline-flex items-center gap-2">
               <Plus className="w-4 h-4" /> Create
             </button>
           </motion.div>
@@ -297,7 +297,7 @@ export default function CreativityPage() {
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
         onClick={() => setUploadOpen(true)}
-        className="absolute bottom-6 right-4 z-30 w-12 h-12 rounded-full bg-white text-gray-900 flex items-center justify-center shadow-[0_4px_24px_rgba(236,64,122,0.2)]"
+        className="absolute bottom-6 right-4 z-30 w-12 h-12 rounded-full bg-white dark:bg-gray-900 text-gray-900 dark:text-white flex items-center justify-center shadow-[0_4px_24px_rgba(236,64,122,0.2)]"
       >
         <Plus className="w-6 h-6" />
       </motion.button>
@@ -371,8 +371,8 @@ function CategoryBar({
             className={cn(
               'flex items-center gap-1.5 h-8 px-3.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all border flex-shrink-0',
               isActive
-                ? 'bg-white text-gray-900 border-white shadow-[0_0_12px_rgba(236,64,122,0.15)]'
-                : 'bg-gray-50 border-gray-200 text-gray-400 hover:text-gray-600 hover:bg-gray-100',
+                ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white border-white shadow-[0_0_12px_rgba(236,64,122,0.15)]'
+                : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800',
             )}
           >
             <Icon className="w-3 h-3" />
@@ -381,7 +381,7 @@ function CategoryBar({
         );
       })}
       <button onClick={onShowAll}
-        className="flex items-center gap-1 h-8 px-3 rounded-full card-premium text-gray-400 text-[11px] font-semibold whitespace-nowrap hover:text-gray-400 flex-shrink-0">
+        className="flex items-center gap-1 h-8 px-3 rounded-full card-premium text-gray-400 dark:text-gray-500 text-[11px] font-semibold whitespace-nowrap hover:text-gray-400 flex-shrink-0">
         All <ChevronDown className="w-3 h-3" />
       </button>
     </div>
@@ -408,12 +408,12 @@ function CategoryPickerSheet({
           <motion.div
             initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed bottom-0 inset-x-0 max-h-[75vh] bg-white border-t border-gray-200 rounded-t-[20px] z-50 flex flex-col"
+            className="fixed bottom-0 inset-x-0 max-h-[75vh] bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 rounded-t-[20px] z-50 flex flex-col"
           >
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <h3 className="text-[14px] font-bold text-gray-900">Browse Categories</h3>
-              <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center">
-                <X className="w-4 h-4 text-gray-500" />
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-[14px] font-bold text-gray-900 dark:text-white">Browse Categories</h3>
+              <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center">
+                <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
               </button>
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -426,8 +426,8 @@ function CategoryPickerSheet({
                       className={cn(
                         'flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all text-left',
                         isActive
-                          ? 'bg-gray-100 border-pink-200 shadow-[0_0_12px_rgba(255,255,255,0.03)]'
-                          : 'bg-gray-50/50 border-gray-100 hover:bg-gray-50',
+                          ? 'bg-gray-100 dark:bg-gray-800 border-pink-200 shadow-[0_0_12px_rgba(255,255,255,0.03)]'
+                          : 'bg-gray-50/50 dark:bg-gray-800 border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700',
                       )}
                     >
                       <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
@@ -435,14 +435,14 @@ function CategoryPickerSheet({
                         <Icon className="w-4 h-4" style={{ color: cat.color }} />
                       </div>
                       <div className="min-w-0">
-                        <p className={cn('text-[12px] font-semibold truncate', isActive ? 'text-gray-900' : 'text-gray-500')}>{cat.label}</p>
+                        <p className={cn('text-[12px] font-semibold truncate', isActive ? 'text-gray-900 dark:text-white' : 'text-gray-500 dark:text-gray-400')}>{cat.label}</p>
                         {cat.count !== undefined && cat.count > 0 && (
                           <p className="text-[10px] text-gray-300">{cat.count} items</p>
                         )}
                       </div>
                       {isActive && (
-                        <div className="ml-auto w-5 h-5 rounded-full bg-white flex items-center justify-center flex-shrink-0">
-                          <Check className="w-3 h-3 text-gray-900" />
+                        <div className="ml-auto w-5 h-5 rounded-full bg-white dark:bg-gray-900 flex items-center justify-center flex-shrink-0">
+                          <Check className="w-3 h-3 text-gray-900 dark:text-white" />
                         </div>
                       )}
                     </button>

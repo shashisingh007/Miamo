@@ -19,7 +19,7 @@ import { Input, Select, Textarea } from './FormWidgets';
 function Field({ label, icon: Icon, children, required }: { label: string; icon?: any; children: React.ReactNode; required?: boolean }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-xs font-medium text-zinc-500 flex items-center gap-1.5">
+      <label className="text-xs font-medium text-zinc-500 dark:text-gray-400 flex items-center gap-1.5">
         {Icon && <Icon className="w-3.5 h-3.5" />} {label} {required && <span className="text-rose-400">*</span>}
       </label>
       {children}
@@ -56,7 +56,7 @@ export function ProfileEditor({
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><FileText className="w-5 h-5 text-blue-500" /> My Bio Data</h2>
+        <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2"><FileText className="w-5 h-5 text-blue-500" /> My Bio Data</h2>
         <div className="flex gap-2">
           <button onClick={saveProfile} disabled={saving}
             className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-rose-500 text-white hover:shadow-lg transition disabled:opacity-50">
@@ -76,7 +76,7 @@ export function ProfileEditor({
         {BIO_DATA_STEPS.map((step, i) => (
           <button key={i} onClick={() => setBioDataStep(i)}
             className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition whitespace-nowrap border',
-              i === bioDataStep ? 'bg-amber-50 text-amber-700 border-amber-200' : i < bioDataStep ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'text-zinc-500 border-zinc-200 hover:border-zinc-300')}>
+              i === bioDataStep ? 'bg-amber-50 text-amber-700 border-amber-200' : i < bioDataStep ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'text-zinc-500 dark:text-gray-400 border-zinc-200 dark:border-gray-700 hover:border-zinc-300 dark:hover:border-gray-600')}>
             <step.icon className="w-3.5 h-3.5" /> {step.title}
           </button>
         ))}
@@ -84,8 +84,8 @@ export function ProfileEditor({
 
       {/* Step 0: Personal */}
       {bioDataStep === 0 && (
-        <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
-          <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2"><Users className="w-4 h-4 text-amber-500" /> Personal Details</h3>
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700 p-5 space-y-4 shadow-sm">
+          <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2"><Users className="w-4 h-4 text-amber-500" /> Personal Details</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Full Name" icon={Users} required><Input value={myProfile.fullName} onChange={(v: string) => updateField('fullName', v)} placeholder="Enter full name" /></Field>
             <Field label="Date of Birth" icon={Clock} required><Input type="date" value={myProfile.dateOfBirth ? new Date(myProfile.dateOfBirth).toISOString().split('T')[0] : ''} onChange={(v: string) => updateField('dateOfBirth', v ? new Date(v).toISOString() : null)} /></Field>
@@ -103,8 +103,8 @@ export function ProfileEditor({
 
       {/* Step 1: Religion */}
       {bioDataStep === 1 && (
-        <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
-          <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2"><Moon className="w-4 h-4 text-amber-500" /> Religion & Caste</h3>
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700 p-5 space-y-4 shadow-sm">
+          <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2"><Moon className="w-4 h-4 text-amber-500" /> Religion & Caste</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Religion" icon={Moon} required><Select value={myProfile.religion} onChange={(v: string) => updateField('religion', v)} options={RELIGIONS} /></Field>
             <Field label="Caste" required><Select value={myProfile.caste} onChange={(v: string) => updateField('caste', v)} options={myProfile.religion ? (CASTES_BY_RELIGION[myProfile.religion] || ['Other']) : []} /></Field>
@@ -118,7 +118,7 @@ export function ProfileEditor({
             <Field label="Horoscope Match Required">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={myProfile.horoscopeMatch || false} onChange={(e: any) => updateField('horoscopeMatch', e.target.checked)} className="w-4 h-4 rounded bg-zinc-200 text-amber-500 focus:ring-amber-500/40" />
-                <span className="text-sm text-zinc-700">Required</span>
+                <span className="text-sm text-zinc-700 dark:text-gray-300">Required</span>
               </label>
             </Field>
           </div>
@@ -127,8 +127,8 @@ export function ProfileEditor({
 
       {/* Step 2: Education */}
       {bioDataStep === 2 && (
-        <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
-          <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2"><GraduationCap className="w-4 h-4 text-amber-500" /> Education & Career</h3>
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700 p-5 space-y-4 shadow-sm">
+          <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2"><GraduationCap className="w-4 h-4 text-amber-500" /> Education & Career</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Highest Education" required><Select value={myProfile.education} onChange={(v: string) => updateField('education', v)} options={EDUCATION_LEVELS} /></Field>
             <Field label="Education Detail"><Input value={myProfile.educationDetail} onChange={(v: string) => updateField('educationDetail', v)} placeholder="e.g., B.Tech CSE from IIT" /></Field>
@@ -144,8 +144,8 @@ export function ProfileEditor({
 
       {/* Step 3: Family */}
       {bioDataStep === 3 && (
-        <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
-          <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2"><Home className="w-4 h-4 text-amber-500" /> Family Details</h3>
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700 p-5 space-y-4 shadow-sm">
+          <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2"><Home className="w-4 h-4 text-amber-500" /> Family Details</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Father's Name"><Input value={myProfile.fatherName} onChange={(v: string) => updateField('fatherName', v)} placeholder="Father's name" /></Field>
             <Field label="Father's Occupation"><Input value={myProfile.fatherOccupation} onChange={(v: string) => updateField('fatherOccupation', v)} placeholder="e.g., Government Officer" /></Field>
@@ -166,8 +166,8 @@ export function ProfileEditor({
 
       {/* Step 4: Lifestyle */}
       {bioDataStep === 4 && (
-        <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
-          <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2"><Sun className="w-4 h-4 text-amber-500" /> Lifestyle & About</h3>
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700 p-5 space-y-4 shadow-sm">
+          <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2"><Sun className="w-4 h-4 text-amber-500" /> Lifestyle & About</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Marital Status"><Select value={myProfile.maritalStatus} onChange={(v: string) => updateField('maritalStatus', v)} options={MARITAL_STATUSES} /></Field>
             <Field label="Diet"><Select value={myProfile.diet} onChange={(v: string) => updateField('diet', v)} options={DIETS} /></Field>
@@ -184,8 +184,8 @@ export function ProfileEditor({
       {/* Step 5: Contact & Privacy */}
       {bioDataStep === 5 && (
         <div className="space-y-5">
-          <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
-            <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2"><Lock className="w-4 h-4 text-amber-500" /> Contact & Privacy</h3>
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700 p-5 space-y-4 shadow-sm">
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2"><Lock className="w-4 h-4 text-amber-500" /> Contact & Privacy</h3>
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-3">
               <p className="text-xs text-amber-700 flex items-start gap-2"><Shield className="w-4 h-4 shrink-0 mt-0.5" /> Your contact info is never shown publicly. Others must request access.</p>
             </div>
@@ -195,8 +195,8 @@ export function ProfileEditor({
               <Field label="LinkedIn" icon={Linkedin}><Input value={myProfile.linkedIn} onChange={(v: string) => updateField('linkedIn', v)} placeholder="linkedin.com/in/..." /></Field>
               <Field label="Email" icon={Mail}><Input value={myProfile.contactEmail} onChange={(v: string) => updateField('contactEmail', v)} placeholder="email@example.com" /></Field>
             </div>
-            <div className="space-y-3 pt-3 border-t border-zinc-100">
-              <h4 className="text-xs font-semibold text-zinc-500">Privacy Defaults</h4>
+            <div className="space-y-3 pt-3 border-t border-zinc-100 dark:border-gray-700">
+              <h4 className="text-xs font-semibold text-zinc-500 dark:text-gray-400">Privacy Defaults</h4>
               {[
                 { key: 'bioDataPublic', label: 'Bio data visible to everyone' },
                 { key: 'phonePublic', label: 'Phone visible to everyone (not recommended)' },
@@ -204,9 +204,9 @@ export function ProfileEditor({
                 { key: 'emailPublic', label: 'Email visible to everyone' },
                 { key: 'photosPublic', label: 'All photos visible to everyone' },
               ].map(item => (
-                <label key={item.key} className="flex items-center gap-3 cursor-pointer bg-zinc-50 rounded-xl p-3 hover:bg-zinc-100 transition border border-zinc-100">
+                <label key={item.key} className="flex items-center gap-3 cursor-pointer bg-zinc-50 dark:bg-gray-800 rounded-xl p-3 hover:bg-zinc-100 dark:hover:bg-gray-700 transition border border-zinc-100 dark:border-gray-700">
                   <input type="checkbox" checked={myProfile[item.key] || false} onChange={(e: any) => updateField(item.key, e.target.checked)} className="w-4 h-4 rounded bg-zinc-200 text-amber-500 focus:ring-amber-500/40" />
-                  <span className="text-sm text-zinc-700">{item.label}</span>
+                  <span className="text-sm text-zinc-700 dark:text-gray-300">{item.label}</span>
                 </label>
               ))}
             </div>
@@ -218,22 +218,22 @@ export function ProfileEditor({
       {profileCompletion >= 60 && bioDataStep === 5 && (
         <div className="bg-gradient-to-br from-amber-50 to-rose-50 rounded-2xl border border-amber-200 p-5 space-y-4 shadow-sm">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2">🎨 Choose Your BioData Template</h3>
+            <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">🎨 Choose Your BioData Template</h3>
             <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full font-medium">Profile {profileCompletion}% complete</span>
           </div>
-          <p className="text-xs text-zinc-500">Your profile is 60%+ complete! Choose a template to preview your Bio Data:</p>
+          <p className="text-xs text-zinc-500 dark:text-gray-400">Your profile is 60%+ complete! Choose a template to preview your Bio Data:</p>
           <div className="grid grid-cols-3 gap-3 max-h-64 overflow-y-auto scrollbar-none">
             {TEMPLATES.map(t => (
               <button key={t.id} onClick={() => { updateField('bioDataTemplate', t.id); setPreviewTemplate(t.id); setShowPreview(true); }}
                 className={cn('relative p-3 rounded-xl border-2 text-left transition-all hover:shadow-md',
-                  myProfile?.bioDataTemplate === t.id ? 'border-amber-500 bg-white shadow-md ring-2 ring-amber-200' : 'border-zinc-200 bg-white hover:border-amber-300')}>
+                  myProfile?.bioDataTemplate === t.id ? 'border-amber-500 bg-white dark:bg-gray-900 shadow-md ring-2 ring-amber-200' : 'border-zinc-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:border-amber-300')}>
                 <div className="flex items-center gap-2 mb-1.5">
                   <div className="w-6 h-6 rounded-full flex items-center justify-center text-sm" style={{ background: `linear-gradient(135deg, ${t.colors[0]}, ${t.colors[1]})` }}>
                     <span className="text-xs">{t.emoji}</span>
                   </div>
                   {t.premium && <span className="text-[9px] px-1 py-0.5 bg-amber-100 text-amber-700 rounded font-bold">⭐</span>}
                 </div>
-                <p className="text-[11px] font-semibold text-zinc-800 truncate">{t.name}</p>
+                <p className="text-[11px] font-semibold text-zinc-800 dark:text-gray-200 truncate">{t.name}</p>
                 <div className="flex gap-1 mt-1">
                   {t.colors.map((c, i) => <div key={i} className="w-3 h-3 rounded-full border border-white shadow-sm" style={{ backgroundColor: c }} />)}
                 </div>
@@ -243,7 +243,7 @@ export function ProfileEditor({
           </div>
           {myProfile?.bioDataTemplate && (
             <button onClick={() => { setPreviewTemplate(myProfile.bioDataTemplate); setShowPreview(true); }}
-              className="w-full py-2.5 rounded-xl text-xs font-semibold text-amber-700 bg-white border border-amber-200 hover:bg-amber-50 transition flex items-center justify-center gap-2">
+              className="w-full py-2.5 rounded-xl text-xs font-semibold text-amber-700 bg-white dark:bg-gray-900 border border-amber-200 hover:bg-amber-50 transition flex items-center justify-center gap-2">
               <Eye className="w-3.5 h-3.5" /> Preview &ldquo;{TEMPLATES.find(t => t.id === myProfile.bioDataTemplate)?.name}&rdquo;
             </button>
           )}
@@ -253,7 +253,7 @@ export function ProfileEditor({
       {/* Nav Buttons */}
       <div className="flex items-center justify-between">
         <button onClick={() => setBioDataStep(Math.max(0, bioDataStep - 1))} disabled={bioDataStep === 0}
-          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-medium text-zinc-500 bg-zinc-100 hover:bg-zinc-200 transition disabled:opacity-30">
+          className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-medium text-zinc-500 dark:text-gray-400 bg-zinc-100 dark:bg-gray-800 hover:bg-zinc-200 dark:hover:bg-gray-700 transition disabled:opacity-30">
           <ArrowLeft className="w-3.5 h-3.5" /> Previous
         </button>
         <div className="flex gap-2">
@@ -261,7 +261,7 @@ export function ProfileEditor({
             {saving ? 'Saving...' : 'Save'}
           </button>
           {bioDataStep < 5 && (
-            <button onClick={() => setBioDataStep(bioDataStep + 1)} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-medium text-zinc-700 bg-zinc-100 hover:bg-zinc-200 transition">
+            <button onClick={() => setBioDataStep(bioDataStep + 1)} className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-medium text-zinc-700 dark:text-gray-300 bg-zinc-100 dark:bg-gray-800 hover:bg-zinc-200 dark:hover:bg-gray-700 transition">
               Next <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}

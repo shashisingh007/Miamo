@@ -177,7 +177,7 @@ export default function DateIdeasPage() {
           <motion.button key={c.id} whileHover={{ y: -2 }} whileTap={{ scale: 0.95 }}
             onClick={() => setCat(c.id)}
             className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl border-2 text-sm font-bold whitespace-nowrap transition-all',
-              cat === c.id ? `border-transparent bg-gradient-to-r ${c.color} text-white shadow-lg` : 'border-gray-100 text-gray-600 hover:bg-gray-50')}>
+              cat === c.id ? `border-transparent bg-gradient-to-r ${c.color} text-white shadow-lg` : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700')}>
             <span>{c.emoji}</span> {c.label}
           </motion.button>
         ))}
@@ -214,22 +214,22 @@ export default function DateIdeasPage() {
                       <motion.div whileHover={{ rotate: 15, scale: 1.2 }} className="text-3xl flex-shrink-0 mt-1">{idea.vibe}</motion.div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
-                          <h3 className="font-black text-gray-800 group-hover:text-indigo-600 transition-colors">{idea.title}</h3>
+                          <h3 className="font-black text-gray-800 dark:text-gray-200 group-hover:text-indigo-600 transition-colors">{idea.title}</h3>
                           <motion.button whileTap={{ scale: 0.8 }}
                             onClick={e => { e.stopPropagation(); toggleSave(idea.id); }}
                             className="flex-shrink-0 mt-0.5">
                             {idea.saved ?
                               <BookmarkCheck className="w-5 h-5 text-amber-500" /> :
-                              <Bookmark className="w-5 h-5 text-gray-300 group-hover:text-gray-400" />}
+                              <Bookmark className="w-5 h-5 text-gray-300 group-hover:text-gray-400 dark:text-gray-500" />}
                           </motion.button>
                         </div>
-                        <p className={cn('text-sm text-gray-500 mt-1', !isExpanded && 'line-clamp-2')}>{idea.desc}</p>
+                        <p className={cn('text-sm text-gray-500 dark:text-gray-400 mt-1', !isExpanded && 'line-clamp-2')}>{idea.desc}</p>
                         <div className="flex items-center gap-2 mt-3 flex-wrap">
                           <span className={cn('px-2 py-0.5 rounded-md text-[10px] font-bold bg-gradient-to-r text-white', catItem?.color)}>
                             {catItem?.label}
                           </span>
-                          <span className="px-2 py-0.5 rounded-md bg-gray-100 text-[10px] font-bold text-gray-500">⏱️ {idea.time}</span>
-                          <span className="px-2 py-0.5 rounded-md bg-gray-100 text-[10px] font-bold text-gray-500">💰 {idea.budget}</span>
+                          <span className="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-[10px] font-bold text-gray-500 dark:text-gray-400">⏱️ {idea.time}</span>
+                          <span className="px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 text-[10px] font-bold text-gray-500 dark:text-gray-400">💰 {idea.budget}</span>
                           <span className={cn('px-2 py-0.5 rounded-md text-[10px] font-bold',
                             idea.difficulty === 'easy' ? 'bg-green-50 text-green-600' :
                             idea.difficulty === 'medium' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600')}>
@@ -243,7 +243,7 @@ export default function DateIdeasPage() {
                     <AnimatePresence>
                       {isExpanded && (
                         <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                          className="mt-4 pt-4 border-t border-gray-100 flex gap-2">
+                          className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700 flex gap-2">
                           <Button variant="secondary" size="sm" className="flex-1 gap-1 text-xs" onClick={e => e.stopPropagation()}>
                             <Share2 className="w-3 h-3" /> Share with match
                           </Button>
@@ -265,7 +265,7 @@ export default function DateIdeasPage() {
       {filtered.length === 0 && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-16">
           <span className="text-5xl block mb-4">🔍</span>
-          <p className="text-gray-500 font-semibold">No ideas in this category yet!</p>
+          <p className="text-gray-500 dark:text-gray-400 font-semibold">No ideas in this category yet!</p>
         </motion.div>
       )}
     </div>

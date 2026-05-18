@@ -1,6 +1,6 @@
 // ─── Miamo API Client ────────────────────────────────
 // Connects to real backend API
-import type { ApiResponse, MiamoUser, MiamoMatch, MiamoChat, MiamoMessage, MiamoBeat, MiamoStory, MiamoNotification, MiamoSettings, MiamoBookmark, MiamoSession, DiscoverFilters, SearchResult } from './types';
+import type { ApiResponse, MiamoUser, MiamoMatch, MiamoChat, MiamoMessage, MiamoBeat, MiamoStory, MiamoNotification, MiamoSettings, MiamoBookmark, MiamoSession, DiscoverFilters, SearchResult, MiamoProfile } from './types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3200';
 
@@ -267,7 +267,7 @@ class ApiClient {
   // Settings
   async getSettings() { return this.request<ApiResponse<MiamoSettings>>('/api/v1/settings'); }
   async updateSettings(data: Partial<MiamoSettings>) { return this.request<ApiResponse<MiamoSettings>>('/api/v1/settings', { method: 'PUT', body: JSON.stringify(data) }); }
-  async updatePrivacy(data: Record<string, boolean>) { return this.request<ApiResponse<Record<string, boolean>>>('/api/v1/settings/privacy', { method: 'PUT', body: JSON.stringify(data) }); }
+  async updatePrivacy(data: Record<string, boolean | string>) { return this.request<ApiResponse<Record<string, any>>>('/api/v1/settings/privacy', { method: 'PUT', body: JSON.stringify(data) }); }
   async deactivateAccount() { return this.request<any>('/api/v1/settings/deactivate', { method: 'POST' }); }
   async deleteAccount() { return this.request<any>('/api/v1/settings/delete', { method: 'DELETE' }); }
   async exportData() { return this.request<any>('/api/v1/settings/export'); }

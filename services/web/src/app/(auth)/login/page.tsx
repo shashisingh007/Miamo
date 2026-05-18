@@ -62,7 +62,7 @@ export default function LoginPage() {
           >
             <Image src="/logo.png" alt="Miamo" width={56} height={56} className="w-full h-full object-contain" priority />
           </motion.div>
-          <h1 className="text-2xl font-bold tracking-tight">Welcome back</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Welcome back</h1>
           <p className="text-sm text-text-muted mt-1">Sign in to your {APP_NAME} account</p>
         </div>
 

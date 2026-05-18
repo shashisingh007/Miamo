@@ -90,10 +90,10 @@ export function StreakCountdown({ deadline }: { deadline: string }) {
         'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold',
         critical ? 'bg-red-50 text-red-600 border border-red-200' :
         urgent ? 'bg-amber-50 text-amber-600 border border-amber-200' :
-        'bg-gray-50 text-gray-500 border border-gray-100'
+        'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-gray-700'
       )}
     >
-      <Hourglass className={cn('w-3 h-3', critical ? 'text-red-500' : urgent ? 'text-amber-500' : 'text-gray-400')} />
+      <Hourglass className={cn('w-3 h-3', critical ? 'text-red-500' : urgent ? 'text-amber-500' : 'text-gray-400 dark:text-gray-500')} />
       {h > 0 ? `${h}h ${m}m` : `${m}m`}
     </motion.div>
   );
@@ -123,7 +123,7 @@ export function BeatDayStatus({ beat }: { beat: BeatMatch }) {
   if (!iSentToday && theyCompletedToday) {
     return (
       <motion.div animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 2, repeat: Infinity }}
-        className="flex items-center gap-1.5 text-[10px] font-semibold text-pink-600 bg-pink-50 px-2.5 py-1 rounded-lg border border-pink-200">
+        className="flex items-center gap-1.5 text-[10px] font-semibold text-pink-600 bg-pink-50 dark:bg-pink-950/30 px-2.5 py-1 rounded-lg border border-pink-200">
         <Zap className="w-3 h-3" /> {name} sent — your turn!
       </motion.div>
     );
@@ -158,8 +158,8 @@ export function MilestoneCelebration({ count, onClose }: { count: number; onClos
           <motion.div animate={{ scale: [1, 1.3, 1], rotate: [0, 10, -10, 0] }} transition={{ duration: 1, repeat: 2 }}
             className="text-6xl mb-4">{data.emoji}</motion.div>
           <h2 className={cn('text-2xl font-black mb-2', data.color)}>{data.label}</h2>
-          <p className="text-gray-500 text-sm mb-1">{count} day streak achieved!</p>
-          <p className="text-xs text-gray-400 mb-6">You&apos;re building something special. Keep the connection alive!</p>
+          <p className="text-gray-500 dark:text-gray-400 text-sm mb-1">{count} day streak achieved!</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mb-6">You&apos;re building something special. Keep the connection alive!</p>
           <Button onClick={onClose} size="lg" className="shimmer-glass">Amazing!</Button>
         </div>
       </motion.div>
@@ -181,8 +181,8 @@ export function ConfirmPopup({ title, message, confirmText, danger, onConfirm, o
       <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} onClick={(e: React.MouseEvent) => e.stopPropagation()}
         className="card-premium p-6 max-w-sm mx-4"
       >
-        <h3 className="text-lg font-bold text-gray-800 mb-2">{title}</h3>
-        <p className="text-sm text-gray-500 mb-6">{message}</p>
+        <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">{title}</h3>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">{message}</p>
         <div className="flex gap-3">
           <Button variant="secondary" className="flex-1" onClick={onCancel}>Cancel</Button>
           <Button variant={danger ? 'danger' : 'default'} className="flex-1" onClick={onConfirm}>{confirmText}</Button>
@@ -219,7 +219,7 @@ export function BeatMenu({ onRemove, onBlock, onReport, onMute }: {
   return (
     <div className="relative" ref={ref}>
       <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
-        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-all">
+        className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all">
         <MoreVertical className="w-4 h-4" />
       </button>
       <AnimatePresence>
@@ -227,14 +227,14 @@ export function BeatMenu({ onRemove, onBlock, onReport, onMute }: {
           <>
             <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
             <motion.div initial={{ opacity: 0, scale: 0.95, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -4 }}
-              className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 py-1 overflow-visible"
+              className="absolute right-0 top-full mt-1 w-52 bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 z-50 py-1 overflow-visible"
             >
               {items.map(item => {
                 const ItemIcon = item.icon;
                 return (
                   <button key={item.label} onClick={(e) => { e.stopPropagation(); setOpen(false); item.action(); }}
                     className={cn('flex items-center gap-2.5 w-full px-4 py-2.5 text-[13px] font-medium transition-colors',
-                      item.danger ? 'text-red-500 hover:bg-red-50' : 'text-gray-600 hover:bg-gray-50'
+                      item.danger ? 'text-red-500 hover:bg-red-50' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
                     )}>
                     <ItemIcon className="w-4 h-4" /> {item.label}
                   </button>
@@ -260,7 +260,7 @@ export function BeatListView({ beats, direction, onSelectMatch }: {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-gray-700 flex items-center gap-2">
+        <h3 className="text-sm font-bold text-gray-700 dark:text-gray-300 flex items-center gap-2">
           {direction === 'sent' ? <ArrowUp className="w-4 h-4 text-pink-500" /> : <ArrowDown className="w-4 h-4 text-emerald-500" />}
           Total {direction === 'sent' ? 'Sent' : 'Received'}: <span className="text-pink-600">{total}</span>
         </h3>
@@ -272,15 +272,15 @@ export function BeatListView({ beats, direction, onSelectMatch }: {
           const count = direction === 'sent' ? (beat.totalSent || 0) : (beat.totalReceived || 0);
           return (
             <motion.button key={beat.id} whileHover={{ x: 3 }} onClick={() => onSelectMatch(beat)}
-              className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-pink-50/40 transition-all text-left"
+              className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-pink-50/40 dark:hover:bg-pink-950/30 transition-all text-left"
             >
               <Avatar src={photo} name={other.displayName} size="sm" online={other.online} verified={other.verified} />
               <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-gray-800 truncate">{other.displayName}</p>
-                <p className="text-[11px] text-gray-400">{count} {direction} &bull; Last: {beat.lastBeatAt ? formatRelativeTime(beat.lastBeatAt) : 'Never'}</p>
+                <p className="text-[13px] font-semibold text-gray-800 dark:text-gray-200 truncate">{other.displayName}</p>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">{count} {direction} &bull; Last: {beat.lastBeatAt ? formatRelativeTime(beat.lastBeatAt) : 'Never'}</p>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-gray-700">{count}</span>
+                <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{count}</span>
                 <ChevronRight className="w-4 h-4 text-gray-300" />
               </div>
             </motion.button>
@@ -305,8 +305,8 @@ export function IceBreakerPanel({ onSend }: { onSend: (text: string) => void }) 
           <Lightbulb className="w-4 h-4 text-amber-600" />
         </div>
         <div>
-          <h3 className="text-sm font-bold text-gray-800">Ice Breakers</h3>
-          <p className="text-[10px] text-gray-400">Don&apos;t know what to say? Try these!</p>
+          <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200">Ice Breakers</h3>
+          <p className="text-[10px] text-gray-400 dark:text-gray-500">Don&apos;t know what to say? Try these!</p>
         </div>
       </div>
       <div className="flex gap-1.5 mb-3 overflow-x-auto" style={{ scrollbarWidth: 'none' }}>
@@ -315,7 +315,7 @@ export function IceBreakerPanel({ onSend }: { onSend: (text: string) => void }) 
           return (
             <button key={cat.category} onClick={() => setActiveCategory(i)}
               className={cn('flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold whitespace-nowrap transition-all',
-                activeCategory === i ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                activeCategory === i ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
               )}>
               <CatIcon className="w-3 h-3" /> {cat.category}
             </button>
@@ -327,7 +327,7 @@ export function IceBreakerPanel({ onSend }: { onSend: (text: string) => void }) 
           <motion.button key={i} whileHover={{ x: 4 }} onClick={() => onSend(prompt)}
             className="flex items-center gap-2 w-full text-left p-2.5 rounded-lg hover:bg-amber-50/50 transition-all group"
           >
-            <span className="text-[12px] text-gray-600 leading-relaxed flex-1">{prompt}</span>
+            <span className="text-[12px] text-gray-600 dark:text-gray-400 leading-relaxed flex-1">{prompt}</span>
             <Send className="w-3.5 h-3.5 text-gray-300 group-hover:text-pink-500 transition-colors shrink-0" />
           </motion.button>
         ))}
@@ -398,12 +398,12 @@ export function BeatTypeButton({ bt, onClick }: { bt: typeof BEAT_TYPES[number];
   const Icon = bt.icon;
   return (
     <motion.button whileHover={{ y: -3 }} whileTap={{ scale: 0.93 }} onClick={onClick}
-      className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-gradient-to-b from-white to-gray-50/50 border border-gray-100/60 hover:border-pink-200/60 hover:shadow-sm transition-all"
+      className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-gradient-to-b from-white dark:from-gray-900 to-gray-50/50 dark:to-gray-800/50 border border-gray-100/60 dark:border-gray-700/60 hover:border-pink-200/60 hover:shadow-sm transition-all"
     >
       <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center', bt.bg)}>
         <Icon className={cn('w-4 h-4', bt.color)} />
       </div>
-      <span className="text-[10px] font-semibold text-gray-500">{bt.label}</span>
+      <span className="text-[10px] font-semibold text-gray-500 dark:text-gray-400">{bt.label}</span>
     </motion.button>
   );
 }

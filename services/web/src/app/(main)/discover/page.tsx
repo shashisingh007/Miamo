@@ -153,8 +153,8 @@ export default function DiscoverPage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center max-w-sm px-8"
         >
-          <div className="w-20 h-20 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-5">
-            <Heart className="w-8 h-8 text-gray-300" />
+          <div className="w-20 h-20 rounded-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center mx-auto mb-5">
+            <Heart className="w-8 h-8 text-gray-300 dark:text-gray-600" />
           </div>
           <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-2">No more profiles</h3>
           <p className="text-[13px] text-gray-400 dark:text-gray-500 mb-6 leading-relaxed">Check back later or adjust your filters</p>
@@ -181,14 +181,14 @@ export default function DiscoverPage() {
             className={cn(
               'flex items-center gap-2 h-10 px-4 rounded-xl border text-[13px] font-semibold transition-all',
               activeFilterCount > 0
-                ? 'bg-white text-gray-900 border-white shadow-[0_0_16px_rgba(236,64,122,0.1)]'
-                : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100',
+                ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-white dark:border-gray-700 shadow-[0_0_16px_rgba(236,64,122,0.1)]'
+                : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700',
             )}
           >
             <SlidersHorizontal className="w-4 h-4" />
             Filters
             {activeFilterCount > 0 && (
-              <span className="ml-0.5 w-5 h-5 rounded-full bg-lavender-500 text-gray-900 text-[10px] font-bold flex items-center justify-center">
+              <span className="ml-0.5 w-5 h-5 rounded-full bg-lavender-500 text-white text-[10px] font-bold flex items-center justify-center">
                 {activeFilterCount}
               </span>
             )}
@@ -208,7 +208,7 @@ export default function DiscoverPage() {
                     'flex items-center gap-1.5 h-10 px-4 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all border',
                     isActive
                       ? 'chip-glass-active'
-                      : 'chip-glass text-gray-500',
+                      : 'chip-glass text-gray-500 dark:text-gray-400',
                   )}
                 >
                   <Icon className="w-3.5 h-3.5" /> {f.label}
@@ -221,8 +221,8 @@ export default function DiscoverPage() {
         {/* ─── Profile Counter & Score ─── */}
         <div className="flex items-center justify-between mb-5">
           <div className="flex items-center gap-3">
-            <span className="text-[12px] text-gray-400 font-semibold tabular-nums">
-              {currentIndex + 1} <span className="text-gray-300">of</span> {profiles.length}
+            <span className="text-[12px] text-gray-400 dark:text-gray-500 font-semibold tabular-nums">
+              {currentIndex + 1} <span className="text-gray-300 dark:text-gray-600">of</span> {profiles.length}
             </span>
             <div className="flex -space-x-1">
               {profiles.slice(currentIndex, currentIndex + 4).map((p, i) => (
@@ -233,7 +233,7 @@ export default function DiscoverPage() {
                   {p.photos?.[0] ? (
                     <img loading="lazy" src={p.photos[0].url || p.photos[0]} alt="" className="w-full h-full object-cover" />
                   ) : (
-                    <div className="w-full h-full bg-white/10 flex items-center justify-center text-[8px] text-gray-400 font-bold">{p.displayName?.[0]}</div>
+                    <div className="w-full h-full bg-white/10 dark:bg-gray-700/30 flex items-center justify-center text-[8px] text-gray-400 dark:text-gray-500 font-bold">{p.displayName?.[0]}</div>
                   )}
                 </div>
               ))}
@@ -243,11 +243,11 @@ export default function DiscoverPage() {
             <motion.div
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-200"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
             >
-              <Brain className="w-3.5 h-3.5 text-gray-500" />
-              <span className="text-[12px] font-bold text-gray-700 tabular-nums">{aiData[currentUser.id].score}%</span>
-              <span className="text-[11px] text-gray-400 font-medium">match</span>
+              <Brain className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+              <span className="text-[12px] font-bold text-gray-700 dark:text-gray-300 tabular-nums">{aiData[currentUser.id].score}%</span>
+              <span className="text-[11px] text-gray-400 dark:text-gray-500 font-medium">match</span>
             </motion.div>
           )}
         </div>

@@ -66,7 +66,7 @@ function CompatibilityRing({ score, size = 120 }: { score: number; size?: number
       <div className="absolute inset-0 flex flex-col items-center justify-center">
         <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1 }}
           className="text-3xl font-black" style={{ color }}>{score}%</motion.span>
-        <span className="text-[10px] text-gray-400 font-bold">MATCH</span>
+        <span className="text-[10px] text-gray-400 dark:text-gray-500 font-bold">MATCH</span>
       </div>
     </motion.div>
   );
@@ -156,9 +156,9 @@ export default function CompatibilityPage() {
             <div className="mb-6">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-bold text-violet-500">{QUIZ_SECTIONS[sectionIdx].title}</span>
-                <span className="text-xs text-gray-400">{Math.round(progress)}%</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">{Math.round(progress)}%</span>
               </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                 <motion.div animate={{ width: `${progress}%` }} className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full" />
               </div>
             </div>
@@ -168,12 +168,12 @@ export default function CompatibilityPage() {
                 <div className="absolute inset-0 bg-gradient-to-br from-violet-50/50 to-purple-50/30" />
                 <div className="relative z-10">
                   <motion.p animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 2, repeat: Infinity }}
-                    className="text-2xl font-black text-gray-800 mb-8">{currentQ.q}</motion.p>
+                    className="text-2xl font-black text-gray-800 dark:text-gray-200 mb-8">{currentQ.q}</motion.p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {currentQ.options.map((opt, i) => (
                       <motion.button key={i} whileHover={{ y: -4, scale: 1.02 }} whileTap={{ scale: 0.95 }}
                         onClick={() => handleAnswer(i)}
-                        className="p-4 rounded-2xl bg-white border-2 border-violet-100 hover:border-violet-400 text-left font-semibold text-gray-700 transition-all hover:shadow-lg hover:shadow-violet-100/50">
+                        className="p-4 rounded-2xl bg-white dark:bg-gray-900 border-2 border-violet-100 hover:border-violet-400 text-left font-semibold text-gray-700 dark:text-gray-300 transition-all hover:shadow-lg hover:shadow-violet-100/50">
                         {opt}
                       </motion.button>
                     ))}
@@ -194,10 +194,10 @@ export default function CompatibilityPage() {
                   <CompatibilityRing score={score} />
                 </motion.div>
                 <motion.h2 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 1.5 }}
-                  className="text-2xl font-black text-gray-800 mt-4 mb-2">
+                  className="text-2xl font-black text-gray-800 dark:text-gray-200 mt-4 mb-2">
                   {score >= 80 ? '🔥 Soulmate Level!' : score >= 60 ? '✨ Great Chemistry!' : score >= 40 ? '💫 Potential There!' : '🌱 Growing Match'}
                 </motion.h2>
-                <p className="text-sm text-gray-500 mb-6">
+                <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
                   You and {(selectedMatch?.matchedUser || selectedMatch)?.displayName || 'your match'} are {score}% compatible
                 </p>
                 <div className="grid grid-cols-3 gap-3 mb-6">
@@ -207,7 +207,7 @@ export default function CompatibilityPage() {
                       <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 2 + i * 0.2 }}
                         className="p-3 rounded-xl bg-white/80 border border-violet-100">
                         <p className="text-lg font-black text-violet-600">{sectionScore}%</p>
-                        <p className="text-[10px] text-gray-400 font-bold">{s.title}</p>
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500 font-bold">{s.title}</p>
                       </motion.div>
                     );
                   })}
@@ -228,7 +228,7 @@ export default function CompatibilityPage() {
           {/* Past Results */}
           {results.length > 0 && (
             <div className="space-y-3">
-              <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
                 <Star className="w-5 h-5 text-amber-400" /> Past Results
               </h2>
               {results.map((r, i) => (
@@ -236,8 +236,8 @@ export default function CompatibilityPage() {
                   <Card hover className="p-4 flex items-center gap-4">
                     <Avatar src={r.photo} name={r.matchName} size="md" />
                     <div className="flex-1">
-                      <p className="font-bold text-gray-800">{r.matchName}</p>
-                      <p className="text-xs text-gray-400">{r.date}</p>
+                      <p className="font-bold text-gray-800 dark:text-gray-200">{r.matchName}</p>
+                      <p className="text-xs text-gray-400 dark:text-gray-500">{r.date}</p>
                     </div>
                     <div className={cn('text-2xl font-black', r.score >= 80 ? 'text-pink-500' : r.score >= 60 ? 'text-amber-500' : 'text-blue-500')}>
                       {r.score}%
@@ -250,10 +250,10 @@ export default function CompatibilityPage() {
 
           {/* Start New */}
           <Card className="p-6">
-            <h2 className="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
+            <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2 flex items-center gap-2">
               <Zap className="w-5 h-5 text-violet-500" /> Take the Quiz
             </h2>
-            <p className="text-sm text-gray-400 mb-4">Answer 12 questions to discover your compatibility score</p>
+            <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">Answer 12 questions to discover your compatibility score</p>
             <div className="space-y-2 max-h-[40vh] overflow-y-auto mb-4">
               {matches.map((m: any) => {
                 const user = m.matchedUser || m;
@@ -262,9 +262,9 @@ export default function CompatibilityPage() {
                 return (
                   <motion.button key={m.id} whileHover={{ x: 4 }} onClick={() => setSelectedMatch(m)}
                     className={cn('flex items-center gap-3 w-full p-3 rounded-xl transition-all border-2',
-                      sel ? 'border-violet-400 bg-violet-50' : 'border-transparent hover:bg-gray-50')}>
+                      sel ? 'border-violet-400 bg-violet-50' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700')}>
                     <Avatar src={photo} name={user.displayName || 'Match'} size="sm" />
-                    <span className="font-semibold text-sm text-gray-700">{user.displayName || 'Match'}</span>
+                    <span className="font-semibold text-sm text-gray-700 dark:text-gray-300">{user.displayName || 'Match'}</span>
                     {sel && <Check className="w-4 h-4 text-violet-500 ml-auto" />}
                   </motion.button>
                 );

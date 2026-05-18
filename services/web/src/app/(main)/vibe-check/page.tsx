@@ -175,8 +175,8 @@ export default function VibeCheckPage() {
             <Card className="p-8 text-center relative overflow-hidden">
               {selectedMood && <VibeWave color={selectedMood.wave} intensity={3} />}
               <div className="relative z-10">
-                <h2 className="text-xl font-black text-gray-800 mb-2">{VIBE_QUESTIONS[0].q}</h2>
-                <p className="text-sm text-gray-400 mb-6">Pick your current mood</p>
+                <h2 className="text-xl font-black text-gray-800 dark:text-gray-200 mb-2">{VIBE_QUESTIONS[0].q}</h2>
+                <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">Pick your current mood</p>
                 <div className="grid grid-cols-4 gap-3 mb-6">
                   {MOODS.map(m => (
                     <motion.button key={m.id}
@@ -186,10 +186,10 @@ export default function VibeCheckPage() {
                       transition={mood === m.id ? { duration: 1, repeat: Infinity } : {}}
                       onClick={() => setMood(m.id)}
                       className={cn('p-4 rounded-2xl border-2 transition-all',
-                        mood === m.id ? 'border-pink-400 bg-pink-50 shadow-lg shadow-pink-100' : 'border-gray-100 hover:bg-gray-50 hover:border-gray-200')}
+                        mood === m.id ? 'border-pink-400 bg-pink-50 dark:bg-pink-950/30 shadow-lg shadow-pink-100' : 'border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 hover:border-gray-200 dark:hover:border-gray-700')}
                     >
                       <span className="text-3xl block mb-1">{m.emoji}</span>
-                      <span className="text-[10px] font-bold text-gray-500">{m.label}</span>
+                      <span className="text-[10px] font-bold text-gray-500 dark:text-gray-400">{m.label}</span>
                     </motion.button>
                   ))}
                 </div>
@@ -206,8 +206,8 @@ export default function VibeCheckPage() {
           <motion.div key="energy" initial={{ opacity: 0, x: 60 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -60 }}>
             <Card className="p-8 text-center relative overflow-hidden">
               <div className="relative z-10">
-                <h2 className="text-xl font-black text-gray-800 mb-2">{VIBE_QUESTIONS[1].q}</h2>
-                <p className="text-sm text-gray-400 mb-6">How charged are you?</p>
+                <h2 className="text-xl font-black text-gray-800 dark:text-gray-200 mb-2">{VIBE_QUESTIONS[1].q}</h2>
+                <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">How charged are you?</p>
                 <div className="flex flex-wrap justify-center gap-3 mb-6">
                   {VIBE_QUESTIONS[1].options!.map((o: any) => (
                     <motion.button key={o.value}
@@ -215,12 +215,12 @@ export default function VibeCheckPage() {
                       whileTap={{ scale: 0.9 }}
                       onClick={() => setEnergy(o.value)}
                       className={cn('px-6 py-4 rounded-2xl border-2 transition-all min-w-[100px]',
-                        energy === o.value ? 'border-indigo-400 bg-indigo-50 shadow-lg' : 'border-gray-100 hover:bg-gray-50')}
+                        energy === o.value ? 'border-indigo-400 bg-indigo-50 shadow-lg' : 'border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700')}
                     >
                       <motion.span className="text-3xl block mb-1"
                         animate={energy === o.value ? { scale: [1, 1.3, 1] } : {}}
                         transition={{ duration: 0.5, repeat: energy === o.value ? Infinity : 0 }}>{o.emoji}</motion.span>
-                      <span className="text-xs font-bold text-gray-600">{o.label}</span>
+                      <span className="text-xs font-bold text-gray-600 dark:text-gray-400">{o.label}</span>
                     </motion.button>
                   ))}
                 </div>
@@ -239,8 +239,8 @@ export default function VibeCheckPage() {
         {!done && step === 2 && (
           <motion.div key="topics" initial={{ opacity: 0, x: 60 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -60 }}>
             <Card className="p-8 text-center">
-              <h2 className="text-xl font-black text-gray-800 mb-2">{VIBE_QUESTIONS[2].q}</h2>
-              <p className="text-sm text-gray-400 mb-6">Pick as many as you like</p>
+              <h2 className="text-xl font-black text-gray-800 dark:text-gray-200 mb-2">{VIBE_QUESTIONS[2].q}</h2>
+              <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">Pick as many as you like</p>
               <div className="flex flex-wrap justify-center gap-2 mb-6">
                 {(VIBE_QUESTIONS[2].options as string[]).map(t => (
                   <motion.button key={t}
@@ -248,7 +248,7 @@ export default function VibeCheckPage() {
                     whileTap={{ scale: 0.9 }}
                     onClick={() => toggleTopic(t)}
                     className={cn('px-4 py-3 rounded-xl border-2 font-semibold text-sm transition-all',
-                      topics.includes(t) ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-gray-100 text-gray-600 hover:bg-gray-50')}
+                      topics.includes(t) ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700')}
                   >
                     {t}
                   </motion.button>
@@ -268,8 +268,8 @@ export default function VibeCheckPage() {
         {!done && step === 3 && (
           <motion.div key="intent" initial={{ opacity: 0, x: 60 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -60 }}>
             <Card className="p-8 text-center">
-              <h2 className="text-xl font-black text-gray-800 mb-2">{VIBE_QUESTIONS[3].q}</h2>
-              <p className="text-sm text-gray-400 mb-6">What&apos;s your vibe today?</p>
+              <h2 className="text-xl font-black text-gray-800 dark:text-gray-200 mb-2">{VIBE_QUESTIONS[3].q}</h2>
+              <p className="text-sm text-gray-400 dark:text-gray-500 mb-6">What&apos;s your vibe today?</p>
               <div className="grid grid-cols-3 gap-3 mb-6">
                 {(VIBE_QUESTIONS[3].options as any[]).map(o => (
                   <motion.button key={o.label}
@@ -277,10 +277,10 @@ export default function VibeCheckPage() {
                     whileTap={{ scale: 0.9 }}
                     onClick={() => setIntent(o.label)}
                     className={cn('p-5 rounded-2xl border-2 transition-all',
-                      intent === o.label ? 'border-indigo-400 bg-indigo-50 shadow-lg' : 'border-gray-100 hover:bg-gray-50')}
+                      intent === o.label ? 'border-indigo-400 bg-indigo-50 shadow-lg' : 'border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700')}
                   >
                     <span className="text-3xl block mb-2">{o.emoji}</span>
-                    <span className="text-sm font-bold text-gray-700">{o.label}</span>
+                    <span className="text-sm font-bold text-gray-700 dark:text-gray-300">{o.label}</span>
                   </motion.button>
                 ))}
               </div>
@@ -318,7 +318,7 @@ export default function VibeCheckPage() {
 
               <div className="p-6 space-y-4">
                 <div>
-                  <h3 className="font-bold text-sm text-gray-600 mb-2">Topics I&apos;m into today</h3>
+                  <h3 className="font-bold text-sm text-gray-600 dark:text-gray-400 mb-2">Topics I&apos;m into today</h3>
                   <div className="flex flex-wrap gap-2">
                     {topics.map(t => (
                       <motion.span key={t} initial={{ scale: 0 }} animate={{ scale: 1 }}
@@ -340,8 +340,8 @@ export default function VibeCheckPage() {
             {/* Vibe Matches */}
             {vibeMatches.length > 0 && (
               <div className="mt-6 space-y-2">
-                <h3 className="font-bold text-gray-800 flex items-center gap-2"><Zap className="w-4 h-4 text-indigo-400" /> Vibe Matches</h3>
-                <p className="text-xs text-gray-400 mb-2">People on your wavelength right now</p>
+                <h3 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2"><Zap className="w-4 h-4 text-indigo-400" /> Vibe Matches</h3>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">People on your wavelength right now</p>
                 {vibeMatches.slice(0, 5).map((vm: any, i: number) => {
                   const photo = vm.user?.photos?.[0]?.url || vm.user?.photos?.[0];
                   const vmMood = MOODS.find(x => x.id === vm.mood);
@@ -352,12 +352,12 @@ export default function VibeCheckPage() {
                           {photo ? <img loading="lazy" src={photo} alt="" className="w-full h-full object-cover" /> : vmMood?.emoji || '✨'}
                         </div>
                         <div className="flex-1">
-                          <p className="font-semibold text-sm text-gray-800">{vm.user?.displayName || 'User'}</p>
-                          <p className="text-[10px] text-gray-400">{vmMood?.label || vm.mood} · Looking for {vm.intent}</p>
+                          <p className="font-semibold text-sm text-gray-800 dark:text-gray-200">{vm.user?.displayName || 'User'}</p>
+                          <p className="text-[10px] text-gray-400 dark:text-gray-500">{vmMood?.label || vm.mood} · Looking for {vm.intent}</p>
                         </div>
                         <div className="text-right">
                           <span className="text-xs font-bold text-indigo-500">{vm.vibeScore}%</span>
-                          <p className="text-[9px] text-gray-400">vibe match</p>
+                          <p className="text-[9px] text-gray-400 dark:text-gray-500">vibe match</p>
                         </div>
                       </Card>
                     </motion.div>
@@ -369,7 +369,7 @@ export default function VibeCheckPage() {
             {/* History */}
             {vibeHistory.length > 0 && (
               <div className="mt-6 space-y-2">
-                <h3 className="font-bold text-gray-800 flex items-center gap-2"><Star className="w-4 h-4 text-amber-400" /> Vibe History</h3>
+                <h3 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2"><Star className="w-4 h-4 text-amber-400" /> Vibe History</h3>
                 {vibeHistory.slice(0, 10).map((v, i) => {
                   const m = MOODS.find(x => x.id === v.mood);
                   return (
@@ -377,11 +377,11 @@ export default function VibeCheckPage() {
                       <Card hover className="p-3 flex items-center gap-3">
                         <span className="text-2xl">{m?.emoji || '😊'}</span>
                         <div className="flex-1">
-                          <p className="font-semibold text-sm text-gray-800">{m?.label || 'Unknown'}</p>
-                          <p className="text-[10px] text-gray-400">{v.date}</p>
+                          <p className="font-semibold text-sm text-gray-800 dark:text-gray-200">{m?.label || 'Unknown'}</p>
+                          <p className="text-[10px] text-gray-400 dark:text-gray-500">{v.date}</p>
                         </div>
                         <div className="flex gap-1">{[...Array(5)].map((_, j) => (
-                          <div key={j} className={cn('w-3 h-3 rounded-full', j < v.energy ? 'bg-indigo-400' : 'bg-gray-100')} />
+                          <div key={j} className={cn('w-3 h-3 rounded-full', j < v.energy ? 'bg-indigo-400' : 'bg-gray-100 dark:bg-gray-800')} />
                         ))}</div>
                       </Card>
                     </motion.div>

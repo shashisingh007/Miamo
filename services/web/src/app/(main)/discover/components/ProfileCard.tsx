@@ -110,14 +110,14 @@ export function ProfileCard({
                 onClick={() => handleLikeContent('photo', photos[0]?.id)}
                 className="absolute bottom-6 right-6 w-12 h-12 rounded-full bg-pink-50 dark:bg-pink-950/40 backdrop-blur-xl border border-pink-200 dark:border-pink-800 flex items-center justify-center hover:bg-pink-100 dark:hover:bg-pink-900/50 transition-all shadow-lg"
               >
-                <Heart className="w-5 h-5 text-gray-900" />
+                <Heart className="w-5 h-5 text-pink-500" />
               </motion.button>
             </div>
           ) : (
             <div className="aspect-[3/4] max-h-[520px] bg-gradient-to-br from-lavender-400/10 to-violet-deep/10 flex items-center justify-center relative">
-              <span className="text-8xl text-gray-300 font-black">{user.displayName?.[0]}</span>
+              <span className="text-8xl text-gray-300 dark:text-gray-600 font-black">{user.displayName?.[0]}</span>
               <div className="absolute bottom-0 inset-x-0 px-6 pb-6">
-                <h2 className="text-[28px] font-extrabold text-gray-900">{user.displayName}{profile.age ? `, ${profile.age}` : ''}</h2>
+                <h2 className="text-[28px] font-extrabold text-gray-900 dark:text-white">{user.displayName}{profile.age ? `, ${profile.age}` : ''}</h2>
               </div>
             </div>
           )}
@@ -127,7 +127,7 @@ export function ProfileCard({
         <div className="px-6 pt-5 pb-1">
           <div className="flex flex-wrap gap-2">
             {profile.lookingFor && profile.lookingFor !== 'open' && (
-              <span className="px-3 py-1.5 rounded-full text-[11px] font-bold bg-white text-gray-800 shadow-md">
+              <span className="px-3 py-1.5 rounded-full text-[11px] font-bold bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 shadow-md">
                 {profile.lookingFor.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
               </span>
             )}
@@ -142,7 +142,7 @@ export function ProfileCard({
               </span>
             )}
             {profile.height && (
-              <span className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-gray-50 text-gray-600 border border-gray-200">
+              <span className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-700">
                 {profile.height} cm
               </span>
             )}
@@ -152,7 +152,7 @@ export function ProfileCard({
         {/* ─── Bio ─── */}
         {profile.bio && (
           <div className="px-6 py-4">
-            <p className="text-[14px] text-gray-800 leading-[1.7] font-light">{profile.bio}</p>
+            <p className="text-[14px] text-gray-800 dark:text-gray-200 leading-[1.7] font-light">{profile.bio}</p>
           </div>
         )}
 
@@ -162,9 +162,9 @@ export function ProfileCard({
             <img loading="lazy" src={photos[1].url || photos[1]} alt="" className="w-full aspect-[4/3] object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
             <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
               onClick={() => handleLikeContent('photo', photos[1]?.id)}
-              className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-pink-50 backdrop-blur-xl border border-pink-200 flex items-center justify-center hover:bg-pink-100 transition-all"
+              className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-pink-50 dark:bg-pink-950/40 backdrop-blur-xl border border-pink-200 dark:border-pink-800 flex items-center justify-center hover:bg-pink-100 dark:hover:bg-pink-900/50 transition-all"
             >
-              <Heart className="w-4 h-4 text-gray-900" />
+              <Heart className="w-4 h-4 text-pink-500" />
             </motion.button>
           </div>
         )}
@@ -173,17 +173,17 @@ export function ProfileCard({
         {prompts.map((prompt: any, i: number) => (
           <div key={i} className="mx-6 my-3">
             <div className="relative rounded-2xl card-premium p-5 group hover:border-gray-200 transition-all">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-2">
+              <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.15em] mb-2">
                 {prompt.question}
               </p>
-              <p className="text-[15px] text-gray-900 leading-[1.65] font-medium">
+              <p className="text-[15px] text-gray-900 dark:text-gray-100 leading-[1.65] font-medium">
                 {prompt.answer}
               </p>
               <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
                 onClick={() => handleLikeContent('prompt', prompt.id || `prompt-${i}`)}
-                className="absolute -bottom-3 right-5 w-9 h-9 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center hover:border-gray-300 shadow-lg transition-all"
+                className="absolute -bottom-3 right-5 w-9 h-9 rounded-full bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-700 flex items-center justify-center hover:border-gray-300 dark:hover:border-gray-600 shadow-lg transition-all"
               >
-                <Heart className="w-4 h-4 text-gray-600 hover:text-gray-900" />
+                <Heart className="w-4 h-4 text-gray-600 dark:text-gray-400 hover:text-pink-500" />
               </motion.button>
             </div>
           </div>
@@ -195,9 +195,9 @@ export function ProfileCard({
             <img loading="lazy" src={photos[2].url || photos[2]} alt="" className="w-full aspect-[4/3] object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
             <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
               onClick={() => handleLikeContent('photo', photos[2]?.id)}
-              className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-pink-50 backdrop-blur-xl border border-pink-200 flex items-center justify-center hover:bg-pink-100 transition-all"
+              className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-pink-50 dark:bg-pink-950/40 backdrop-blur-xl border border-pink-200 dark:border-pink-800 flex items-center justify-center hover:bg-pink-100 dark:hover:bg-pink-900/50 transition-all"
             >
-              <Heart className="w-4 h-4 text-gray-900" />
+              <Heart className="w-4 h-4 text-pink-500" />
             </motion.button>
           </div>
         )}
@@ -205,7 +205,7 @@ export function ProfileCard({
         {/* ─── Interests ─── */}
         {interests.length > 0 && (
           <div className="px-6 py-5">
-            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-3">Interests</h4>
+            <h4 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.15em] mb-3">Interests</h4>
             <div className="flex flex-wrap gap-2">
               {interests.map((int: any) => {
                 const name = int.name || int;
@@ -214,8 +214,8 @@ export function ProfileCard({
                   <span key={name} className={cn(
                     'px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all',
                     isCommon
-                      ? 'bg-white text-gray-800 shadow-lg'
-                      : 'bg-gray-50 text-gray-500 border border-gray-200',
+                      ? 'bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 shadow-lg'
+                      : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700',
                   )}>
                     {isCommon && <Star className="w-3 h-3 inline mr-1 -mt-0.5" />}{name}
                   </span>
@@ -228,14 +228,14 @@ export function ProfileCard({
         {/* ─── Lifestyle Grid ─── */}
         {lifestyleItems.length > 0 && (
           <div className="px-6 pb-5">
-            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-3">Lifestyle</h4>
+            <h4 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.15em] mb-3">Lifestyle</h4>
             <div className="grid grid-cols-2 gap-2">
               {lifestyleItems.map((item, idx) => {
                 const Icon = item.icon;
                 return (
-                  <div key={idx} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-gray-50 border border-gray-100">
+                  <div key={idx} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-100 dark:border-gray-700">
                     <Icon className={cn('w-3.5 h-3.5', item.color)} />
-                    <span className="text-[12px] text-gray-600 font-medium capitalize">{item.label}</span>
+                    <span className="text-[12px] text-gray-600 dark:text-gray-400 font-medium capitalize">{item.label}</span>
                   </div>
                 );
               })}
@@ -279,22 +279,22 @@ export function ProfileCard({
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
             className="fixed inset-x-0 bottom-0 z-50 p-5"
           >
-            <div className="max-w-[480px] mx-auto bg-white border border-gray-200 rounded-[20px] shadow-[0_8px_60px_rgba(0,0,0,0.5)] overflow-hidden">
+            <div className="max-w-[480px] mx-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-[20px] shadow-[0_8px_60px_rgba(0,0,0,0.5)] overflow-hidden">
               <div className="p-5">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-[0_0_20px_rgba(255,255,255,0.15)]">
-                      <Heart className="w-5 h-5 text-gray-900" fill="currentColor" />
+                    <div className="w-10 h-10 rounded-full bg-pink-50 dark:bg-pink-950/40 flex items-center justify-center shadow-[0_0_20px_rgba(236,64,122,0.15)]">
+                      <Heart className="w-5 h-5 text-pink-500" fill="currentColor" />
                     </div>
                     <div>
-                      <h4 className="text-[13px] font-bold text-gray-900">Miamo Move</h4>
-                      <p className="text-[11px] text-gray-400">
+                      <h4 className="text-[13px] font-bold text-gray-900 dark:text-white">Miamo Move</h4>
+                      <p className="text-[11px] text-gray-400 dark:text-gray-500">
                         {moveTarget.type === 'prompt' ? 'Liked their answer' : moveTarget.type === 'photo' ? 'Liked their photo' : 'Liked their profile'}
                       </p>
                     </div>
                   </div>
-                  <button onClick={() => setMoveTarget(null)} className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center hover:bg-white/10 transition-colors">
-                    <X className="w-4 h-4 text-gray-500" />
+                  <button onClick={() => setMoveTarget(null)} className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                    <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                   </button>
                 </div>
                 <div className="relative">
@@ -302,21 +302,21 @@ export function ProfileCard({
                     value={moveText}
                     onChange={e => setMoveText(e.target.value)}
                     placeholder="Write your move... or send blank"
-                    className="w-full h-20 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 py-3 pr-14 resize-none focus:border-pink-200 focus:outline-none placeholder:text-gray-400"
+                    className="w-full h-20 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-[13px] px-4 py-3 pr-14 resize-none focus:border-pink-200 dark:focus:border-pink-800 focus:outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
                     autoFocus
                   />
                   <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
                     onClick={handleSendMove}
-                    className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-[0_0_16px_rgba(255,255,255,0.15)] hover:shadow-[0_0_24px_rgba(255,255,255,0.25)] transition-all"
+                    className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-gradient-to-r from-pink-500 to-rose-500 flex items-center justify-center shadow-lg hover:shadow-xl transition-all"
                   >
-                    <Send className="w-4 h-4 text-gray-900" />
+                    <Send className="w-4 h-4 text-white" />
                   </motion.button>
                 </div>
                 {/* AI suggestions toggle */}
                 {aiData?.moveRecommendations && aiData.moveRecommendations.length > 0 && (
                   <div className="mt-3">
                     <button onClick={() => setShowMoveRecs(!showMoveRecs)}
-                      className="flex items-center gap-1.5 text-[11px] text-gray-400 hover:text-gray-600 font-semibold transition-colors">
+                      className="flex items-center gap-1.5 text-[11px] text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 font-semibold transition-colors">
                       <Sparkles className="w-3 h-3" /> {showMoveRecs ? 'Hide' : 'Show'} AI suggestions
                       <ChevronDown className={cn('w-3 h-3 transition-transform', showMoveRecs && 'rotate-180')} />
                     </button>
@@ -326,8 +326,8 @@ export function ProfileCard({
                           className="overflow-hidden mt-2 space-y-1.5">
                           {aiData.moveRecommendations.slice(0, 5).map((rec, i) => (
                             <button key={i} onClick={() => { setMoveText(rec.text); setShowMoveRecs(false); }}
-                              className="w-full text-left px-3 py-2.5 rounded-xl bg-gray-50 hover:bg-gray-100 border border-gray-100 hover:border-gray-200 transition-all">
-                              <p className="text-[12px] text-gray-700 leading-relaxed">{rec.text}</p>
+                              className="w-full text-left px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600 transition-all">
+                              <p className="text-[12px] text-gray-700 dark:text-gray-300 leading-relaxed">{rec.text}</p>
                             </button>
                           ))}
                         </motion.div>

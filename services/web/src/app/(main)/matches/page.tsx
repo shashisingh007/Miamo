@@ -316,7 +316,7 @@ export default function MatchesPage() {
         <div className="flex items-center justify-between mb-5">
           <div>
             <h1 className="text-xl font-extrabold text-gray-900 dark:text-white tracking-tight">Matches</h1>
-            <p className="text-[12px] text-gray-400 mt-0.5 font-medium">
+            <p className="text-[12px] text-gray-400 dark:text-gray-500 mt-0.5 font-medium">
               {incoming.length > 0 && <span className="text-pink-400">{incoming.length} incoming</span>}
               {incoming.length > 0 && matches.length > 0 && <span> · </span>}
               {matches.length > 0 && <span>{matches.length} mutual</span>}
@@ -335,11 +335,11 @@ export default function MatchesPage() {
             const count = tab.id === 'incoming' ? incoming.length : tab.id === 'matches' ? matches.length : heldItems.length;
             return (
               <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-                className={cn('flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-[12px] font-semibold transition-all', isActive ? 'bg-pink-50 text-gray-900 shadow-sm' : 'text-gray-400 hover:text-gray-500')}>
+                className={cn('flex-1 flex items-center justify-center gap-1.5 h-9 rounded-lg text-[12px] font-semibold transition-all', isActive ? 'bg-pink-50 dark:bg-pink-950/30 text-gray-900 dark:text-white shadow-sm' : 'text-gray-400 dark:text-gray-500 hover:text-gray-500 dark:hover:text-gray-400')}>
                 <Icon className="w-3.5 h-3.5" />
                 {tab.label}
                 {count > 0 && (
-                  <span className={cn('w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center', isActive ? 'bg-pink-500 text-gray-900' : 'bg-gray-50 text-gray-400')}>
+                  <span className={cn('w-5 h-5 rounded-full text-[10px] font-bold flex items-center justify-center', isActive ? 'bg-pink-500 text-gray-900 dark:text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500')}>
                     {count > 99 ? '99+' : count}
                   </span>
                 )}
@@ -353,23 +353,23 @@ export default function MatchesPage() {
           <div>
             {incoming.length === 0 ? (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-20">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-b from-lavender-400/10 to-lavender-600/10 border border-gray-200 flex items-center justify-center mx-auto mb-5">
-                  <Heart className="w-8 h-8 text-gray-300" />
+                <div className="w-20 h-20 rounded-full bg-gradient-to-b from-lavender-400/10 to-lavender-600/10 border border-gray-200 dark:border-gray-700 flex items-center justify-center mx-auto mb-5">
+                  <Heart className="w-8 h-8 text-gray-300 dark:text-gray-600" />
                 </div>
-                <h3 className="text-[16px] font-bold text-gray-900 mb-2">No matches for now</h3>
-                <p className="text-[13px] text-gray-400 max-w-[280px] mx-auto leading-relaxed">
+                <h3 className="text-[16px] font-bold text-gray-900 dark:text-white mb-2">No matches for now</h3>
+                <p className="text-[13px] text-gray-400 dark:text-gray-500 max-w-[280px] mx-auto leading-relaxed">
                   When someone likes your profile, they&apos;ll appear here. Keep your profile active and engaging!
                 </p>
                 <button onClick={() => router.push('/discover')}
-                  className="mt-6 h-10 px-6 rounded-xl bg-gray-50 border border-gray-200 text-gray-500 text-[12px] font-semibold hover:bg-pink-50 transition-all">
+                  className="mt-6 h-10 px-6 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 text-[12px] font-semibold hover:bg-pink-50 dark:hover:bg-pink-950/30 transition-all">
                   Explore Discover →
                 </button>
               </motion.div>
             ) : (
               <div className="space-y-2">
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-3 flex items-center gap-2">
+                <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.15em] mb-3 flex items-center gap-2">
                   <Heart className="w-3.5 h-3.5 text-pink-400" /> People who liked you
-                  <span className="ml-auto text-[10px] text-gray-300 font-normal normal-case">Tap to view profile</span>
+                  <span className="ml-auto text-[10px] text-gray-300 dark:text-gray-600 font-normal normal-case">Tap to view profile</span>
                 </p>
                 {incoming.map((item) => (
                   <IncomingCard key={item.id} item={item} onClick={() => setSelectedIncoming(item)} />
@@ -384,15 +384,15 @@ export default function MatchesPage() {
           <div>
             <div className="flex gap-3 mb-4">
               <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-300 dark:text-gray-600" />
                 <input value={searchQuery} onChange={e => handleSearch(e.target.value)} placeholder="Search matches..."
-                  className="w-full h-9 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[12px] pl-9 pr-4 focus:border-pink-200 focus:outline-none placeholder:text-gray-400 transition" />
+                  className="w-full h-9 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-[12px] pl-9 pr-4 focus:border-pink-200 dark:focus:border-pink-800 focus:outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500 transition" />
               </div>
             </div>
             <div className="flex gap-1.5 mb-4 overflow-x-auto no-scrollbar">
               {matchFilters.map(f => (
                 <button key={f.id} onClick={() => setMatchFilter(f.id)}
-                  className={cn('px-3 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-all border', matchFilter === f.id ? 'bg-pink-50 border-pink-200 text-gray-900' : 'border-gray-100 text-gray-400 hover:text-gray-400')}>
+                  className={cn('px-3 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-all border', matchFilter === f.id ? 'bg-pink-50 dark:bg-pink-950/30 border-pink-200 dark:border-pink-800 text-gray-900 dark:text-white' : 'border-gray-100 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-400 dark:hover:text-gray-500')}>
                   {f.label}
                 </button>
               ))}
@@ -400,13 +400,13 @@ export default function MatchesPage() {
 
             {matches.length === 0 ? (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
-                <div className="w-16 h-16 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-4">
-                  <Sparkles className="w-7 h-7 text-gray-300" />
+                <div className="w-16 h-16 rounded-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center mx-auto mb-4">
+                  <Sparkles className="w-7 h-7 text-gray-300 dark:text-gray-600" />
                 </div>
-                <h3 className="text-[15px] font-bold text-gray-900 mb-1.5">
+                <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-1.5">
                   {searchQuery ? 'No matches found' : matchFilter !== 'all' ? `No ${matchFilter} matches` : 'No mutual matches yet'}
                 </h3>
-                <p className="text-[12px] text-gray-400 max-w-xs mx-auto">
+                <p className="text-[12px] text-gray-400 dark:text-gray-500 max-w-xs mx-auto">
                   {searchQuery ? 'Try a different search' : "When you match back with someone, they'll appear here and you can start chatting!"}
                 </p>
               </motion.div>
@@ -414,9 +414,9 @@ export default function MatchesPage() {
               <div className="space-y-2">
                 {hasPinned && (
                   <>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5"><Pin className="w-3 h-3" /> Pinned</p>
+                    <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.15em] mb-1 flex items-center gap-1.5"><Pin className="w-3 h-3" /> Pinned</p>
                     {pinnedMatches.map(match => <MatchCard key={match.id} match={match} onOpenMenu={openMenu} onChat={handleChat} onVideoCall={handleVideoCall} />)}
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] mt-4 mb-1 flex items-center gap-1.5"><Clock className="w-3 h-3" /> All Matches</p>
+                    <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.15em] mt-4 mb-1 flex items-center gap-1.5"><Clock className="w-3 h-3" /> All Matches</p>
                   </>
                 )}
                 {unpinnedMatches.map(match => <MatchCard key={match.id} match={match} onOpenMenu={openMenu} onChat={handleChat} onVideoCall={handleVideoCall} />)}
@@ -430,13 +430,13 @@ export default function MatchesPage() {
           <div>
             {heldItems.length === 0 ? (
               <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
-                <div className="w-16 h-16 rounded-full bg-gray-50 border border-gray-200 flex items-center justify-center mx-auto mb-4">
-                  <Pause className="w-7 h-7 text-gray-300" />
+                <div className="w-16 h-16 rounded-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-center mx-auto mb-4">
+                  <Pause className="w-7 h-7 text-gray-300 dark:text-gray-600" />
                 </div>
-                <h3 className="text-[15px] font-bold text-gray-900 mb-1.5">Nothing on hold</h3>
-                <p className="text-[12px] text-gray-400 max-w-xs mx-auto">When you&apos;re not sure about someone, put them on hold to revisit later.</p>
+                <h3 className="text-[15px] font-bold text-gray-900 dark:text-white mb-1.5">Nothing on hold</h3>
+                <p className="text-[12px] text-gray-400 dark:text-gray-500 max-w-xs mx-auto">When you&apos;re not sure about someone, put them on hold to revisit later.</p>
                 {incomingMeta?.heldCount > 0 && (
-                  <button onClick={loadData} className="mt-4 px-4 py-2 rounded-lg bg-gray-50 text-gray-500 text-[12px] font-medium hover:bg-pink-50 transition">
+                  <button onClick={loadData} className="mt-4 px-4 py-2 rounded-lg bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 text-[12px] font-medium hover:bg-pink-50 dark:hover:bg-pink-950/30 transition">
                     Refresh
                   </button>
                 )}
@@ -445,14 +445,14 @@ export default function MatchesPage() {
               <div className="space-y-2">
                 {/* Header with Select toggle */}
                 <div className="flex items-center justify-between mb-3">
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] flex items-center gap-2">
+                  <p className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.15em] flex items-center gap-2">
                     <Pause className="w-3.5 h-3.5 text-amber-400" /> Saved for later ({heldItems.length})
                   </p>
                   <button
                     onClick={() => { if (selectMode) clearSelection(); else setSelectMode(true); }}
                     className={cn(
                       "px-2.5 py-1 rounded-md text-[10px] font-semibold transition",
-                      selectMode ? "bg-amber-400/20 text-amber-300 border border-amber-400/30" : "bg-gray-50 text-gray-400 hover:bg-gray-100"
+                      selectMode ? "bg-amber-400/20 text-amber-300 border border-amber-400/30" : "bg-gray-50 dark:bg-gray-800 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700"
                     )}
                   >
                     {selectMode ? 'Cancel' : 'Select'}
@@ -463,11 +463,11 @@ export default function MatchesPage() {
                 <AnimatePresence>
                   {selectMode && selectedHeldIds.size > 0 && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                      className="mb-3 p-3 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-between"
+                      className="mb-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 flex items-center justify-between"
                     >
-                      <span className="text-[11px] text-gray-500 font-medium">{selectedHeldIds.size} selected</span>
+                      <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">{selectedHeldIds.size} selected</span>
                       <div className="flex items-center gap-2">
-                        <button onClick={selectAllHeld} className="px-2.5 py-1 rounded-md text-[10px] font-medium bg-gray-50 text-gray-500 hover:bg-pink-50 transition">
+                        <button onClick={selectAllHeld} className="px-2.5 py-1 rounded-md text-[10px] font-medium bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 hover:bg-pink-50 dark:hover:bg-pink-950/30 transition">
                           All
                         </button>
                         <button onClick={handleBulkResume} className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-semibold hover:bg-emerald-500/20 transition flex items-center gap-1">
@@ -499,15 +499,15 @@ export default function MatchesPage() {
                           <button onClick={() => toggleHeldSelect(userId)} className="flex-shrink-0">
                             <div className={cn(
                               "w-5 h-5 rounded-md border-2 flex items-center justify-center transition",
-                              isSelected ? "bg-amber-400 border-amber-400" : "border-pink-200 bg-transparent hover:border-white/40"
+                              isSelected ? "bg-amber-400 border-amber-400" : "border-pink-200 dark:border-pink-800 bg-transparent hover:border-white/40"
                             )}>
                               {isSelected && <Check className="w-3 h-3 text-black" />}
                             </div>
                           </button>
                         )}
                         <button onClick={() => selectMode ? toggleHeldSelect(userId) : setSelectedIncoming(item)} className="relative flex-shrink-0">
-                          <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-50">
-                            {photo ? <img loading="lazy" src={photo} alt={name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg font-black text-gray-300">{name[0]}</div>}
+                          <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-800">
+                            {photo ? <img loading="lazy" src={photo} alt={name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg font-black text-gray-300 dark:text-gray-600">{name[0]}</div>}
                           </div>
                           {!selectMode && (
                             <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-amber-400/20 border border-amber-400/30 flex items-center justify-center">
@@ -517,10 +517,10 @@ export default function MatchesPage() {
                         </button>
                         <button onClick={() => selectMode ? toggleHeldSelect(userId) : setSelectedIncoming(item)} className="flex-1 min-w-0 text-left">
                           <div className="flex items-center gap-2 mb-0.5">
-                            <h3 className="text-[14px] font-bold text-gray-900 truncate">{name}</h3>
-                            {age && <span className="text-[12px] text-gray-400">{age}</span>}
+                            <h3 className="text-[14px] font-bold text-gray-900 dark:text-white truncate">{name}</h3>
+                            {age && <span className="text-[12px] text-gray-400 dark:text-gray-500">{age}</span>}
                           </div>
-                          {city && <p className="text-[11px] text-gray-400 flex items-center gap-1"><MapPin className="w-2.5 h-2.5" />{city}</p>}
+                          {city && <p className="text-[11px] text-gray-400 dark:text-gray-500 flex items-center gap-1"><MapPin className="w-2.5 h-2.5" />{city}</p>}
                         </button>
                         {!selectMode && (
                           <div className="flex items-center gap-2">

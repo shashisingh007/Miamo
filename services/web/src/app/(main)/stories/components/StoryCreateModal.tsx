@@ -48,12 +48,12 @@ export function StoryCreateModal({ onClose, onCreated }: { onClose: () => void; 
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
       <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
-        className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
+        className="bg-white dark:bg-gray-900 rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl max-h-[90vh] flex flex-col">
 
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-100">
-          <h2 className="text-lg font-black text-gray-800">Create Story</h2>
-          <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200">
+        <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700">
+          <h2 className="text-lg font-black text-gray-800 dark:text-gray-200">Create Story</h2>
+          <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center hover:bg-gray-200 dark:hover:bg-gray-700">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -61,7 +61,7 @@ export function StoryCreateModal({ onClose, onCreated }: { onClose: () => void; 
         <div className="flex-1 overflow-y-auto">
           {step === 'type' ? (
             <div className="p-6 space-y-4">
-              <p className="text-sm text-gray-500">What kind of story?</p>
+              <p className="text-sm text-gray-500 dark:text-gray-400">What kind of story?</p>
               <div className="grid grid-cols-3 gap-3">
                 {[
                   { id: 'text' as const, icon: Type, label: 'Text', desc: 'Share a thought', color: 'from-violet-400 to-purple-500' },
@@ -70,19 +70,19 @@ export function StoryCreateModal({ onClose, onCreated }: { onClose: () => void; 
                 ].map(t => (
                   <motion.button key={t.id} whileHover={{ y: -4 }} whileTap={{ scale: 0.95 }}
                     onClick={() => { setStoryType(t.id); setStep('compose'); }}
-                    className="p-5 rounded-2xl border-2 border-gray-100 hover:border-pink-200 text-center group transition-all">
+                    className="p-5 rounded-2xl border-2 border-gray-100 dark:border-gray-700 hover:border-pink-200 text-center group transition-all">
                     <div className={cn('w-12 h-12 rounded-xl bg-gradient-to-br mx-auto flex items-center justify-center mb-3 group-hover:scale-110 transition-transform', t.color)}>
                       <t.icon className="w-6 h-6 text-white" />
                     </div>
-                    <p className="font-bold text-sm text-gray-800">{t.label}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{t.desc}</p>
+                    <p className="font-bold text-sm text-gray-800 dark:text-gray-200">{t.label}</p>
+                    <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{t.desc}</p>
                   </motion.button>
                 ))}
               </div>
             </div>
           ) : (
             <div className="p-6 space-y-4">
-              <button onClick={() => setStep('type')} className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+              <button onClick={() => setStep('type')} className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 flex items-center gap-1">
                 <ChevronLeft className="w-3 h-3" /> Change type
               </button>
 
@@ -103,13 +103,13 @@ export function StoryCreateModal({ onClose, onCreated }: { onClose: () => void; 
               {/* Mood picker */}
               {storyType === 'mood' && (
                 <div>
-                  <p className="text-xs font-bold text-gray-500 mb-2">Pick your mood</p>
+                  <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">Pick your mood</p>
                   <div className="flex flex-wrap gap-2">
                     {STORY_MOODS.map(m => (
                       <motion.button key={m} whileTap={{ scale: 0.8 }}
                         onClick={() => setSelectedMood(m)}
                         className={cn('w-10 h-10 rounded-xl flex items-center justify-center text-xl border-2 transition-all',
-                          selectedMood === m ? 'border-pink-400 bg-pink-50 scale-110' : 'border-gray-100 hover:bg-gray-50')}>
+                          selectedMood === m ? 'border-pink-400 bg-pink-50 dark:bg-pink-950/30 scale-110' : 'border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700')}>
                         {m}
                       </motion.button>
                     ))}
@@ -120,18 +120,18 @@ export function StoryCreateModal({ onClose, onCreated }: { onClose: () => void; 
               {/* Photo URL */}
               {storyType === 'photo' && (
                 <input value={mediaUrl} onChange={e => setMediaUrl(e.target.value)}
-                  placeholder="Paste image URL..." className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:border-pink-300 focus:ring-2 focus:ring-pink-100 outline-none" />
+                  placeholder="Paste image URL..." className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-sm focus:border-pink-300 focus:ring-2 focus:ring-pink-100 outline-none" />
               )}
 
               {/* Text input */}
               <textarea value={content} onChange={e => setContent(e.target.value)}
                 placeholder={storyType === 'mood' ? 'Add a caption (optional)...' : "What's on your mind?"}
-                className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm resize-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100 outline-none" rows={3} />
+                className="w-full rounded-xl border border-gray-200 dark:border-gray-700 px-4 py-3 text-sm resize-none focus:border-pink-300 focus:ring-2 focus:ring-pink-100 outline-none" rows={3} />
 
               {/* Background picker (text & mood) */}
               {storyType !== 'photo' && (
                 <div>
-                  <p className="text-xs font-bold text-gray-500 mb-2">Background</p>
+                  <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">Background</p>
                   <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
                     {STORY_BACKGROUNDS.map(bg => (
                       <motion.button key={bg.id} whileTap={{ scale: 0.9 }}
@@ -147,7 +147,7 @@ export function StoryCreateModal({ onClose, onCreated }: { onClose: () => void; 
 
               {/* Visibility */}
               <div>
-                <p className="text-xs font-bold text-gray-500 mb-2">Who can see?</p>
+                <p className="text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">Who can see?</p>
                 <div className="flex gap-2">
                   {[
                     { id: 'everyone', label: 'All Matches', icon: Users },
@@ -155,7 +155,7 @@ export function StoryCreateModal({ onClose, onCreated }: { onClose: () => void; 
                   ].map(v => (
                     <button key={v.id} onClick={() => setVisibility(v.id)}
                       className={cn('flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-semibold flex-1 transition-all',
-                        visibility === v.id ? 'border-pink-400 bg-pink-50 text-pink-600' : 'border-gray-100 text-gray-500 hover:bg-gray-50')}>
+                        visibility === v.id ? 'border-pink-400 bg-pink-50 dark:bg-pink-950/30 text-pink-600' : 'border-gray-100 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700')}>
                       <v.icon className="w-4 h-4" /> {v.label}
                     </button>
                   ))}
@@ -167,7 +167,7 @@ export function StoryCreateModal({ onClose, onCreated }: { onClose: () => void; 
 
         {/* Footer */}
         {step === 'compose' && (
-          <div className="p-4 border-t border-gray-100 flex gap-3">
+          <div className="p-4 border-t border-gray-100 dark:border-gray-700 flex gap-3">
             <Button variant="secondary" onClick={onClose} className="flex-1">Cancel</Button>
             <Button onClick={handleCreate} disabled={creating || (storyType === 'text' && !content.trim()) || (storyType === 'photo' && !mediaUrl.trim()) || (storyType === 'mood' && !selectedMood)}
               className="flex-1 gap-2 bg-gradient-to-r from-pink-500 to-rose-500">

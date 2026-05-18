@@ -16,7 +16,7 @@ import { useToast } from '@/components/ui/toast';
 /* ═══ Love Languages ═══ */
 const LANGUAGES = [
   { id: 'words', name: 'Words of Affirmation', emoji: '💬', icon: MessageSquare,
-    color: 'from-pink-500 to-rose-500', bg: 'bg-pink-50', accent: 'text-pink-600',
+    color: 'from-pink-500 to-rose-500', bg: 'bg-pink-50 dark:bg-pink-950/30', accent: 'text-pink-600',
     desc: 'You feel loved through compliments, encouragement, and "I love you"s',
     tips: ['Leave sweet notes', 'Compliment their outfit', 'Say "I\'m proud of you"', 'Text good morning/night'],
     example: '"The way you handled that was amazing. I\'m so lucky to have you."' },
@@ -121,7 +121,7 @@ function ResultCard({ primary, secondary, scores }: { primary: typeof LANGUAGES[
         <div className="p-6 space-y-5">
           {/* Score bars */}
           <div className="space-y-3">
-            <h3 className="font-bold text-gray-800 text-sm">Your Love Language Profile</h3>
+            <h3 className="font-bold text-gray-800 dark:text-gray-200 text-sm">Your Love Language Profile</h3>
             {LANGUAGES.map(l => {
               const pct = total > 0 ? Math.round((scores[l.id] || 0) / total * 100) : 0;
               const isPrimary = l.id === primary.id;
@@ -130,10 +130,10 @@ function ResultCard({ primary, secondary, scores }: { primary: typeof LANGUAGES[
                   <span className="text-lg w-8 text-center">{l.emoji}</span>
                   <div className="flex-1">
                     <div className="flex items-center justify-between mb-1">
-                      <span className={cn('text-xs font-semibold', isPrimary ? l.accent : 'text-gray-500')}>{l.name}</span>
-                      <span className="text-xs font-bold text-gray-400">{pct}%</span>
+                      <span className={cn('text-xs font-semibold', isPrimary ? l.accent : 'text-gray-500 dark:text-gray-400')}>{l.name}</span>
+                      <span className="text-xs font-bold text-gray-400 dark:text-gray-500">{pct}%</span>
                     </div>
-                    <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                       <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }}
                         transition={{ duration: 1, delay: 0.5 }}
                         className={cn('h-full rounded-full', isPrimary ? `bg-gradient-to-r ${l.color}` : 'bg-gray-300')} />
@@ -146,7 +146,7 @@ function ResultCard({ primary, secondary, scores }: { primary: typeof LANGUAGES[
 
           {/* Tips */}
           <div>
-            <h3 className="font-bold text-gray-800 text-sm mb-3 flex items-center gap-2">
+            <h3 className="font-bold text-gray-800 dark:text-gray-200 text-sm mb-3 flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-pink-500" /> How to Show Love
             </h3>
             <div className="grid grid-cols-2 gap-2">
@@ -166,11 +166,11 @@ function ResultCard({ primary, secondary, scores }: { primary: typeof LANGUAGES[
           </div>
 
           {/* Secondary */}
-          <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
+          <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50 dark:bg-gray-800">
             <SecIcon className={cn('w-5 h-5', secondary.accent)} />
             <div>
-              <p className="text-xs text-gray-400">Secondary Language</p>
-              <p className="text-sm font-bold text-gray-700">{secondary.name} {secondary.emoji}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">Secondary Language</p>
+              <p className="text-sm font-bold text-gray-700 dark:text-gray-300">{secondary.name} {secondary.emoji}</p>
             </div>
           </div>
         </div>
@@ -231,8 +231,8 @@ export default function LoveLanguagePage() {
               <div className="relative z-10">
                 <motion.div animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
                   transition={{ duration: 3, repeat: Infinity }} className="text-7xl mb-4">💝</motion.div>
-                <h2 className="text-2xl font-black text-gray-800 mb-2">What&apos;s Your Love Language?</h2>
-                <p className="text-gray-500 mb-6 max-w-md mx-auto">
+                <h2 className="text-2xl font-black text-gray-800 dark:text-gray-200 mb-2">What&apos;s Your Love Language?</h2>
+                <p className="text-gray-500 dark:text-gray-400 mb-6 max-w-md mx-auto">
                   Answer 8 quick questions to find out how you express and experience love.
                   Share with your match for deeper understanding!
                 </p>
@@ -240,7 +240,7 @@ export default function LoveLanguagePage() {
                   {LANGUAGES.map(l => (
                     <motion.div key={l.id} whileHover={{ y: -5, scale: 1.1 }} className={cn('p-3 rounded-xl', l.bg)}>
                       <span className="text-2xl">{l.emoji}</span>
-                      <p className="text-[9px] font-bold text-gray-500 mt-1">{l.name.split(' ')[0]}</p>
+                      <p className="text-[9px] font-bold text-gray-500 dark:text-gray-400 mt-1">{l.name.split(' ')[0]}</p>
                     </motion.div>
                   ))}
                 </div>
@@ -259,9 +259,9 @@ export default function LoveLanguagePage() {
             <div className="mb-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-xs font-bold text-rose-500">Question {qIdx + 1} of {QUESTIONS.length}</span>
-                <span className="text-xs text-gray-400">{Math.round((qIdx / QUESTIONS.length) * 100)}%</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">{Math.round((qIdx / QUESTIONS.length) * 100)}%</span>
               </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div className="h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                 <motion.div animate={{ width: `${(qIdx / QUESTIONS.length) * 100}%` }}
                   className="h-full bg-gradient-to-r from-rose-500 to-pink-500 rounded-full" />
               </div>
@@ -271,12 +271,12 @@ export default function LoveLanguagePage() {
               <motion.div key={qIdx} initial={{ opacity: 0, x: 60 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -60 }}>
                 <Card className="p-6">
                   <motion.h2 animate={{ scale: [1, 1.02, 1] }} transition={{ duration: 2, repeat: Infinity }}
-                    className="text-xl font-black text-gray-800 mb-6 text-center">{QUESTIONS[qIdx].q}</motion.h2>
+                    className="text-xl font-black text-gray-800 dark:text-gray-200 mb-6 text-center">{QUESTIONS[qIdx].q}</motion.h2>
                   <div className="space-y-2">
                     {QUESTIONS[qIdx].answers.map((a, i) => (
                       <motion.button key={i} whileHover={{ x: 6, scale: 1.01 }} whileTap={{ scale: 0.97 }}
                         onClick={() => handleAnswer(a.lang)}
-                        className="w-full text-left p-4 rounded-xl border-2 border-gray-100 hover:border-rose-300 hover:bg-rose-50/50 transition-all font-semibold text-gray-700">
+                        className="w-full text-left p-4 rounded-xl border-2 border-gray-100 dark:border-gray-700 hover:border-rose-300 hover:bg-rose-50/50 transition-all font-semibold text-gray-700 dark:text-gray-300">
                         {a.text}
                       </motion.button>
                     ))}

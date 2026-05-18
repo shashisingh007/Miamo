@@ -30,8 +30,8 @@ export function FilterPanel({
     <button onClick={onClick} className={cn(
       'px-3.5 py-2 rounded-full text-[11px] font-semibold tracking-wide transition-all border',
       active
-        ? 'bg-white text-gray-900 border-white shadow-[0_0_12px_rgba(236,64,122,0.15)]'
-        : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-700',
+        ? 'bg-white text-gray-900 border-white shadow-[0_0_12px_rgba(236,64,122,0.15)] dark:bg-gray-700 dark:text-white dark:border-gray-600'
+        : 'bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100 hover:text-gray-700 dark:bg-gray-800 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200',
     )}>
       {label}
     </button>
@@ -39,7 +39,7 @@ export function FilterPanel({
 
   const Section = ({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) => (
     <div className="space-y-3">
-      <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.15em] flex items-center gap-2">{icon}{title}</h4>
+      <h4 className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-[0.15em] flex items-center gap-2">{icon}{title}</h4>
       {children}
     </div>
   );
@@ -60,7 +60,7 @@ export function FilterPanel({
                 <ChevronLeft className="w-4 h-4" /> Back
               </button>
               <h3 className="text-sm font-bold text-gray-900 dark:text-white tracking-wide">Filters</h3>
-              <button onClick={() => setLocal(DEFAULT_FILTERS)} className="text-[11px] text-lavender-400 hover:text-gray-900 transition-colors font-semibold">Reset</button>
+              <button onClick={() => setLocal(DEFAULT_FILTERS)} className="text-[11px] text-lavender-400 hover:text-gray-900 dark:hover:text-white transition-colors font-semibold">Reset</button>
             </div>
             <div className="px-6 py-6 space-y-7">
               <Section title="Quick Filters" icon={<Zap className="w-3 h-3 text-amber-400" />}>
@@ -74,24 +74,24 @@ export function FilterPanel({
               <Section title="Age Range" icon={<span className="text-[10px]">🎂</span>}>
                 <div className="flex items-center gap-3">
                   <input type="number" value={local.minAge} onChange={e => set('minAge', parseInt(e.target.value) || 18)}
-                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-sm focus:border-pink-200 focus:outline-none" min={18} max={99} />
-                  <span className="text-gray-400 text-sm font-medium">to</span>
+                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-center text-sm focus:border-pink-200 focus:outline-none" min={18} max={99} />
+                  <span className="text-gray-400 dark:text-gray-500 text-sm font-medium">to</span>
                   <input type="number" value={local.maxAge} onChange={e => set('maxAge', parseInt(e.target.value) || 99)}
-                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-sm focus:border-pink-200 focus:outline-none" min={18} max={99} />
+                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-center text-sm focus:border-pink-200 focus:outline-none" min={18} max={99} />
                 </div>
               </Section>
               <Section title="Height (cm)" icon={<span className="text-[10px]">📏</span>}>
                 <div className="flex items-center gap-3">
                   <input type="number" value={local.minHeight || ''} onChange={e => set('minHeight', parseInt(e.target.value) || null)}
-                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-sm focus:border-pink-200 focus:outline-none" placeholder="Min" />
-                  <span className="text-gray-400 text-sm font-medium">to</span>
+                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-center text-sm focus:border-pink-200 focus:outline-none" placeholder="Min" />
+                  <span className="text-gray-400 dark:text-gray-500 text-sm font-medium">to</span>
                   <input type="number" value={local.maxHeight || ''} onChange={e => set('maxHeight', parseInt(e.target.value) || null)}
-                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-center text-sm focus:border-pink-200 focus:outline-none" placeholder="Max" />
+                    className="w-20 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white text-center text-sm focus:border-pink-200 focus:outline-none" placeholder="Max" />
                 </div>
               </Section>
               <Section title="City" icon={<MapPin className="w-3 h-3 text-blue-400" />}>
                 <input value={local.city} onChange={e => set('city', e.target.value)}
-                  className="w-full h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 px-4 text-sm focus:border-pink-200 focus:outline-none placeholder:text-gray-400" placeholder="Any city..." />
+                  className="w-full h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white px-4 text-sm focus:border-pink-200 focus:outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder="Any city..." />
               </Section>
               <Section title="Show Me" icon={<span className="text-[10px]">👤</span>}>
                 <div className="flex flex-wrap gap-2">
@@ -165,12 +165,12 @@ export function FilterPanel({
               </Section>
               <Section title="Religion" icon={<span className="text-[10px]">🙏</span>}>
                 <input value={local.religion} onChange={e => set('religion', e.target.value)}
-                  className="w-full h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 px-4 text-sm focus:border-pink-200 focus:outline-none placeholder:text-gray-400" placeholder="Any religion..." />
+                  className="w-full h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 dark:bg-gray-800 dark:border-gray-700 dark:text-white px-4 text-sm focus:border-pink-200 focus:outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500" placeholder="Any religion..." />
               </Section>
             </div>
-            <div className="sticky bottom-0 bg-white/95 backdrop-blur-xl border-t border-gray-100 p-5 flex gap-3">
-              <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-gray-200 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-all">Cancel</button>
-              <button onClick={() => { onApply(local); onClose(); }} className="flex-1 h-11 rounded-xl bg-white text-gray-900 text-sm font-bold hover:bg-white/90 transition-all flex items-center justify-center gap-2">
+            <div className="sticky bottom-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-gray-100 dark:border-gray-800 p-5 flex gap-3">
+              <button onClick={onClose} className="flex-1 h-11 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition-all">Cancel</button>
+              <button onClick={() => { onApply(local); onClose(); }} className="flex-1 h-11 rounded-xl bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-bold hover:bg-white/90 dark:hover:bg-gray-600 transition-all flex items-center justify-center gap-2">
                 <Check className="w-4 h-4" /> Apply
               </button>
             </div>

@@ -46,8 +46,8 @@ class BeatsErrorBoundary extends Component<
       return (
         <div className="max-w-3xl mx-auto p-6 text-center py-20">
           <Zap className="w-10 h-10 text-pink-300 mx-auto mb-4" />
-          <h2 className="text-lg font-bold text-gray-800 mb-2">Something went wrong</h2>
-          <p className="text-sm text-gray-500 mb-4">The Beats page encountered an error. Please try refreshing.</p>
+          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-2">Something went wrong</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">The Beats page encountered an error. Please try refreshing.</p>
           {this.state.error && (
             <p className="text-xs text-red-400 font-mono mb-4 max-w-lg mx-auto break-all">
               {this.state.error.message}
@@ -334,10 +334,10 @@ function BeatsPageInner() {
       {/* QUICK BEAT ACTIONS */}
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+          <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
             <Zap className="w-4 h-4 text-pink-500" /> Quick Beat Actions
           </h3>
-          <span className="text-[10px] text-gray-400">Tap to choose who to send</span>
+          <span className="text-[10px] text-gray-400 dark:text-gray-500">Tap to choose who to send</span>
         </div>
         <div className="grid grid-cols-4 lg:grid-cols-8 gap-2">
           {BEAT_TYPES.map(bt => (
@@ -366,14 +366,14 @@ function BeatsPageInner() {
               className="card-premium p-6 max-w-sm mx-4 w-full max-h-[70vh] flex flex-col"
             >
               <div className="flex items-center justify-between mb-4">
-                <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
+                <h3 className="text-base font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
                   {(() => { const bt = BEAT_TYPES.find(b => b.type === quickBeatType); if (!bt) return null; const Icon = bt.icon; return <><Icon className={cn('w-5 h-5', bt.color)} /> Send {bt.label} Beat</>; })()}
                 </h3>
-                <button onClick={() => setQuickBeatType(null)} className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 hover:text-gray-600 hover:bg-gray-50">
+                <button onClick={() => setQuickBeatType(null)} className="w-8 h-8 rounded-lg flex items-center justify-center text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
                   <X className="w-4 h-4" />
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mb-3">Choose who to send this beat to:</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-3">Choose who to send this beat to:</p>
               <div className="flex-1 overflow-y-auto space-y-1.5">
                 {beats.map(beat => {
                   const other = beat.matchedUser || { id: '', displayName: 'Unknown', photos: [] };
@@ -384,7 +384,7 @@ function BeatsPageInner() {
                       whileHover={{ x: 3 }}
                       onClick={() => { handleSelectMatch(beat, quickBeatType); setQuickBeatType(null); }}
                       disabled={beat.iSentToday}
-                      className={cn("flex items-center gap-3 w-full p-3 rounded-xl hover:bg-pink-50/40 transition-all text-left", beat.iSentToday && "opacity-50")}
+                      className={cn("flex items-center gap-3 w-full p-3 rounded-xl hover:bg-pink-50/40 dark:hover:bg-pink-950/30 transition-all text-left", beat.iSentToday && "opacity-50")}
                     >
                       <div className="relative">
                         <Avatar src={photo} name={other.displayName} size="sm" online={other.online} verified={other.verified} />
@@ -393,15 +393,15 @@ function BeatsPageInner() {
                         </div>
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-gray-800 truncate">{other.displayName}</p>
-                        <p className="text-[11px] text-gray-400">{beat.count} day streak</p>
+                        <p className="text-[13px] font-semibold text-gray-800 dark:text-gray-200 truncate">{other.displayName}</p>
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500">{beat.count} day streak</p>
                       </div>
                       {beat.iSentToday ? (
                         <Badge variant="default" className="text-[10px] gap-1 bg-blue-50 text-blue-600 border-blue-100">
                           <Check className="w-3 h-3" /> Sent
                         </Badge>
                       ) : (
-                        <Badge variant="default" className="text-[10px] gap-1 bg-pink-50 text-pink-600 border-pink-100">
+                        <Badge variant="default" className="text-[10px] gap-1 bg-pink-50 dark:bg-pink-950/30 text-pink-600 border-pink-100">
                           <Send className="w-3 h-3" /> Send
                         </Badge>
                       )}
@@ -444,10 +444,10 @@ function BeatsPageInner() {
       {/* YOUR MATCHES WITH BEATS */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2">
+          <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
             <Users className="w-4 h-4 text-pink-500" /> Your Beat Matches
           </h3>
-          <span className="text-[10px] text-gray-400">{beats.length} active</span>
+          <span className="text-[10px] text-gray-400 dark:text-gray-500">{beats.length} active</span>
         </div>
 
         {beats.length === 0 ? (
@@ -483,22 +483,22 @@ function BeatsPageInner() {
                       {/* Info */}
                       <button onClick={() => handleSelectMatch(beat)} className="flex-1 min-w-0 text-left">
                         <div className="flex items-center gap-2">
-                          <h3 className="text-[13px] font-bold text-gray-800 truncate">{other.displayName}</h3>
+                          <h3 className="text-[13px] font-bold text-gray-800 dark:text-gray-200 truncate">{other.displayName}</h3>
                           <Badge variant={beat.state === 'strong' ? 'success' : beat.state === 'critical' ? 'danger' : beat.state === 'weak' ? 'warning' : 'default'}>
                             {state.label}
                           </Badge>
                           {milestone && <span className="text-xs">{milestone[1].emoji}</span>}
                         </div>
-                        <p className="text-[11px] text-gray-400 mt-0.5">
+                        <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
                           {beat.count} day streak &bull; Best: {beat.longestStreak || beat.count} &bull; {beat.lastBeatAt ? formatRelativeTime(beat.lastBeatAt) : 'Start now'}
                         </p>
                         {/* Day Status — who sent, who hasn't */}
                         <BeatDayStatus beat={beat} />
                         <div className="flex items-center gap-3 mt-1">
-                          <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                          <span className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-0.5">
                             <ArrowUp className="w-2.5 h-2.5 text-pink-400" /> {beat.totalSent || 0} sent
                           </span>
-                          <span className="text-[10px] text-gray-400 flex items-center gap-0.5">
+                          <span className="text-[10px] text-gray-400 dark:text-gray-500 flex items-center gap-0.5">
                             <ArrowDown className="w-2.5 h-2.5 text-emerald-400" /> {beat.totalReceived || 0} received
                           </span>
                           {/* Countdown timer */}
@@ -536,7 +536,7 @@ function BeatsPageInner() {
                           onBlock={() => setConfirmAction({ type: 'block', beatId: beat.id })}
                           onReport={() => setConfirmAction({ type: 'report', beatId: beat.id })}
                           onMute={() => {
-                            api.updateSettings({ notifications: { mutedBeats: [beat.id] } }).catch(() => {});
+                            api.updateSettings({ pushNotifications: false } as any).catch(() => {});
                           }}
                         />
                       </div>
@@ -572,8 +572,8 @@ function BeatsPageInner() {
             <BeatsIcon size={20} />
           </div>
           <div>
-            <h4 className="text-sm font-bold text-gray-800 mb-1.5">How Beats Work</h4>
-            <div className="space-y-2 text-[12px] text-gray-500 leading-relaxed">
+            <h4 className="text-sm font-bold text-gray-800 dark:text-gray-200 mb-1.5">How Beats Work</h4>
+            <div className="space-y-2 text-[12px] text-gray-500 dark:text-gray-400 leading-relaxed">
               <p><strong>Send daily beats</strong> — photos, videos, voice notes, or messages to keep your streak alive.</p>
               <p><strong>Build your streak</strong> — both of you must send at least one beat per day. The counter grows daily!</p>
               <p><strong>Don&apos;t get ghosted</strong> — Beats remind both of you to stay connected. No more awkward silence.</p>
@@ -588,7 +588,7 @@ function BeatsPageInner() {
       {/* MILESTONE LEADERBOARD */}
       {beats.some(b => b.count >= 3) && (
         <Card className="p-4">
-          <h3 className="text-sm font-bold text-gray-800 flex items-center gap-2 mb-3">
+          <h3 className="text-sm font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2 mb-3">
             <Crown className="w-4 h-4 text-amber-500" /> Streak Milestones
           </h3>
           <div className="flex items-center gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
@@ -596,10 +596,10 @@ function BeatsPageInner() {
               const achieved = beats.some(b => b.count >= Number(days));
               return (
                 <div key={days} className={cn('flex flex-col items-center gap-1 px-3 py-2 rounded-xl min-w-[60px] transition-all',
-                  achieved ? 'bg-gradient-to-b from-amber-50 to-orange-50 border border-amber-100' : 'bg-gray-50 opacity-40'
+                  achieved ? 'bg-gradient-to-b from-amber-50 to-orange-50 border border-amber-100' : 'bg-gray-50 dark:bg-gray-800 opacity-40'
                 )}>
                   <span className="text-lg">{data.emoji}</span>
-                  <span className={cn('text-[9px] font-bold', achieved ? data.color : 'text-gray-400')}>{days}d</span>
+                  <span className={cn('text-[9px] font-bold', achieved ? data.color : 'text-gray-400 dark:text-gray-500')}>{days}d</span>
                 </div>
               );
             })}
@@ -637,7 +637,7 @@ function BeatsPageInner() {
             danger
             onConfirm={async () => {
               const beat = beats.find(b => b.id === confirmAction.beatId);
-              if (beat) { try { await api.reportUser({ userId: beat.matchedUser.id, reason: 'inappropriate' }); } catch {} }
+              if (beat) { try { await api.reportUser({ reportedId: beat.matchedUser.id, reason: 'inappropriate' }); } catch {} }
               setConfirmAction(null);
             }}
             onCancel={() => setConfirmAction(null)}

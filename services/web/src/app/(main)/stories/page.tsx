@@ -27,10 +27,10 @@ function MyStoryInsights({ stories, onView, onDelete, onPostToFeed }: {
   return (
     <Card className="p-0 overflow-hidden">
       <div className="p-4 bg-gradient-to-r from-pink-50 to-rose-50 border-b border-pink-100/50">
-        <h3 className="font-bold text-gray-800 flex items-center gap-2">
+        <h3 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-pink-400" /> Your Active Stories
         </h3>
-        <p className="text-xs text-gray-400 mt-0.5">{stories.length} stor{stories.length !== 1 ? 'ies' : 'y'} live</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{stories.length} stor{stories.length !== 1 ? 'ies' : 'y'} live</p>
       </div>
       <div className="divide-y divide-gray-50">
         {stories.map((s: any, i: number) => {
@@ -38,7 +38,7 @@ function MyStoryInsights({ stories, onView, onDelete, onPostToFeed }: {
           const bgGradient = getBackgroundGradient(background);
           const isPopular = (s._count?.likes || 0) >= 3;
           return (
-            <div key={s.id} className="p-3 flex items-center gap-3 hover:bg-gray-50/50 transition-colors">
+            <div key={s.id} className="p-3 flex items-center gap-3 hover:bg-gray-50/50 dark:hover:bg-gray-700/50 transition-colors">
               {/* Mini preview */}
               <motion.button whileHover={{ scale: 1.05 }} onClick={() => onView(i)}
                 className={cn('w-14 h-20 rounded-xl overflow-hidden flex-shrink-0 relative',
@@ -54,11 +54,11 @@ function MyStoryInsights({ stories, onView, onDelete, onPostToFeed }: {
 
               {/* Stats */}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-gray-800 truncate">{text?.substring(0, 50) || 'Photo story'}</p>
+                <p className="text-sm font-semibold text-gray-800 dark:text-gray-200 truncate">{text?.substring(0, 50) || 'Photo story'}</p>
                 <div className="flex items-center gap-3 mt-1">
-                  <span className="flex items-center gap-1 text-[10px] text-gray-400"><Eye className="w-3 h-3" /> {s._count?.views || 0}</span>
-                  <span className="flex items-center gap-1 text-[10px] text-gray-400"><Heart className="w-3 h-3" /> {s._count?.likes || 0}</span>
-                  <span className="flex items-center gap-1 text-[10px] text-gray-400"><MessageCircle className="w-3 h-3" /> {s._count?.comments || 0}</span>
+                  <span className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500"><Eye className="w-3 h-3" /> {s._count?.views || 0}</span>
+                  <span className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500"><Heart className="w-3 h-3" /> {s._count?.likes || 0}</span>
+                  <span className="flex items-center gap-1 text-[10px] text-gray-400 dark:text-gray-500"><MessageCircle className="w-3 h-3" /> {s._count?.comments || 0}</span>
                 </div>
                 <p className="text-[10px] text-gray-300 mt-0.5">
                   <Clock className="w-2.5 h-2.5 inline mr-0.5" />
@@ -169,8 +169,8 @@ export default function StoriesPage() {
             className="flex flex-col items-center gap-2 shrink-0 group">
             <div className="relative">
               <div className={cn('rounded-full p-[3px] transition-all',
-                ownGroup && ownGroup.stories.length > 0 ? 'bg-gradient-to-br from-pink-400 via-rose-500 to-purple-500 shadow-lg shadow-pink-200/40' : 'bg-gray-200')}>
-                <div className="w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-full bg-white border-[3px] border-white flex items-center justify-center overflow-hidden">
+                ownGroup && ownGroup.stories.length > 0 ? 'bg-gradient-to-br from-pink-400 via-rose-500 to-purple-500 shadow-lg shadow-pink-200/40' : 'bg-gray-200 dark:bg-gray-700')}>
+                <div className="w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-full bg-white dark:bg-gray-900 border-[3px] border-white flex items-center justify-center overflow-hidden">
                   <Avatar name="You" size="xl" />
                 </div>
               </div>
@@ -179,7 +179,7 @@ export default function StoriesPage() {
                 <Plus className="w-3.5 h-3.5 text-white" />
               </motion.div>
             </div>
-            <span className="text-[11px] font-semibold text-gray-500 w-16 text-center truncate">Your story</span>
+            <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 w-16 text-center truncate">Your story</span>
           </motion.button>
 
           {/* Match stories */}
@@ -192,7 +192,7 @@ export default function StoriesPage() {
                 className="flex flex-col items-center gap-2 shrink-0 group">
                 <div className="relative">
                   <div className={cn('rounded-full p-[3px] transition-all',
-                    !group.viewed ? 'bg-gradient-to-br from-pink-400 via-rose-500 to-purple-500 shadow-lg shadow-pink-200/40 animate-pulse' : 'bg-gray-200')}>
+                    !group.viewed ? 'bg-gradient-to-br from-pink-400 via-rose-500 to-purple-500 shadow-lg shadow-pink-200/40 animate-pulse' : 'bg-gray-200 dark:bg-gray-700')}>
                     <Avatar src={gPhoto} name={author.displayName || 'User'} size="xl" className="border-[3px] border-white" />
                   </div>
                   {unviewedCount > 0 && (
@@ -201,7 +201,7 @@ export default function StoriesPage() {
                     </span>
                   )}
                 </div>
-                <span className="text-[11px] font-semibold text-gray-500 w-16 text-center truncate group-hover:text-pink-500 transition-colors">
+                <span className="text-[11px] font-semibold text-gray-500 dark:text-gray-400 w-16 text-center truncate group-hover:text-pink-500 transition-colors">
                   {(author.displayName || 'User').split(' ')[0]}
                 </span>
               </motion.button>
@@ -209,9 +209,9 @@ export default function StoriesPage() {
           })}
 
           {matchGroups.length === 0 && !ownGroup && (
-            <div className="flex items-center gap-3 px-6 py-4 bg-gray-50 rounded-2xl ml-2">
+            <div className="flex items-center gap-3 px-6 py-4 bg-gray-50 dark:bg-gray-800 rounded-2xl ml-2">
               <Eye className="w-5 h-5 text-gray-300" />
-              <p className="text-sm text-gray-400">No stories from your matches yet</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500">No stories from your matches yet</p>
             </div>
           )}
         </div>
@@ -231,14 +231,14 @@ export default function StoriesPage() {
       {(matchGroups.length > 0 || viewedCount > 0) && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="relative z-10">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="font-bold text-gray-800 flex items-center gap-2">
+            <h3 className="font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
               <Heart className="w-4 h-4 text-pink-400" /> From Your Matches
             </h3>
             <div className="flex items-center gap-2">
               {viewedCount > 0 && (
                 <button onClick={() => setHideViewed(!hideViewed)}
                   className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition border',
-                    hideViewed ? 'bg-pink-50 text-pink-600 border-pink-200' : 'bg-gray-50 text-gray-500 border-gray-200')}>
+                    hideViewed ? 'bg-pink-50 dark:bg-pink-950/30 text-pink-600 border-pink-200' : 'bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 border-gray-200 dark:border-gray-700')}>
                   {hideViewed ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
                   {hideViewed ? `${viewedCount} viewed hidden` : 'Show all'}
                 </button>
@@ -320,8 +320,8 @@ export default function StoriesPage() {
             className="w-20 h-20 rounded-3xl bg-gradient-to-br from-pink-100 to-rose-100 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-pink-100/50">
             <Sparkles className="w-10 h-10 text-pink-400" />
           </motion.div>
-          <h3 className="text-lg font-black text-gray-800 mb-1">No Stories Yet</h3>
-          <p className="text-sm text-gray-400 mb-6 max-w-xs mx-auto">Share a moment with your matches! Stories are visible only to people you&apos;ve matched with.</p>
+          <h3 className="text-lg font-black text-gray-800 dark:text-gray-200 mb-1">No Stories Yet</h3>
+          <p className="text-sm text-gray-400 dark:text-gray-500 mb-6 max-w-xs mx-auto">Share a moment with your matches! Stories are visible only to people you&apos;ve matched with.</p>
           <Button onClick={() => setShowCreate(true)} className="gap-2 bg-gradient-to-r from-pink-500 to-rose-500">
             <Plus className="w-4 h-4" /> Create Your First Story
           </Button>
@@ -336,8 +336,8 @@ export default function StoriesPage() {
               <Sparkles className="w-4 h-4 text-indigo-500" />
             </div>
             <div>
-              <h4 className="font-bold text-sm text-gray-800">Story Tips</h4>
-              <ul className="text-xs text-gray-500 mt-1 space-y-1">
+              <h4 className="font-bold text-sm text-gray-800 dark:text-gray-200">Story Tips</h4>
+              <ul className="text-xs text-gray-500 dark:text-gray-400 mt-1 space-y-1">
                 <li className="flex items-start gap-1.5"><span className="text-pink-400 mt-0.5">&#9829;</span> Viewed stories auto-hide — toggle to see them again</li>
                 <li className="flex items-start gap-1.5"><span className="text-pink-400 mt-0.5">&#9829;</span> Stories expire after 7 days, even if unviewed</li>
                 <li className="flex items-start gap-1.5"><span className="text-pink-400 mt-0.5">&#9829;</span> Only matched users can comment on your stories</li>

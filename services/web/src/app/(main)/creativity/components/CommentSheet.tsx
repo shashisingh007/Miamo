@@ -46,13 +46,13 @@ export function CommentSheet({
           <motion.div
             initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
             transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed bottom-0 inset-x-0 max-h-[70vh] bg-white border-t border-gray-200 rounded-t-[20px] z-50 flex flex-col"
+            className="fixed bottom-0 inset-x-0 max-h-[70vh] bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 rounded-t-[20px] z-50 flex flex-col"
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200">
-              <h3 className="text-[14px] font-bold text-gray-900">{commentCount} Comments</h3>
-              <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center hover:bg-pink-50">
-                <X className="w-4 h-4 text-gray-500" />
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-200 dark:border-gray-700">
+              <h3 className="text-[14px] font-bold text-gray-900 dark:text-white">{commentCount} Comments</h3>
+              <button onClick={onClose} className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center hover:bg-pink-50 dark:hover:bg-pink-950/30">
+                <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
               </button>
             </div>
 
@@ -63,20 +63,20 @@ export function CommentSheet({
                   <img src="/logo.png" alt="" className="w-6 h-6 rounded animate-pulse" />
                 </div>
               ) : comments.length === 0 ? (
-                <p className="text-center text-[12px] text-gray-400 py-8">No comments yet — be the first!</p>
+                <p className="text-center text-[12px] text-gray-400 dark:text-gray-500 py-8">No comments yet — be the first!</p>
               ) : (
                 comments.map((c: any) => (
                   <div key={c.id} className="flex gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gray-50 flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-gray-400">
+                    <div className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-800 flex items-center justify-center flex-shrink-0 text-[11px] font-bold text-gray-400 dark:text-gray-500">
                       {(c.author?.displayName || 'U')[0]}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-bold text-gray-700">{c.author?.displayName || 'User'}</span>
-                        {c.author?.verified && <Shield className="w-3 h-3 text-gray-400" />}
+                        <span className="text-[11px] font-bold text-gray-700 dark:text-gray-300">{c.author?.displayName || 'User'}</span>
+                        {c.author?.verified && <Shield className="w-3 h-3 text-gray-400 dark:text-gray-500" />}
                         <span className="text-[10px] text-gray-300">{timeAgo(c.createdAt)}</span>
                       </div>
-                      <p className="text-[12px] text-gray-600 leading-relaxed mt-0.5">{c.content}</p>
+                      <p className="text-[12px] text-gray-600 dark:text-gray-400 leading-relaxed mt-0.5">{c.content}</p>
                     </div>
                   </div>
                 ))
@@ -84,13 +84,13 @@ export function CommentSheet({
             </div>
 
             {/* Input */}
-            <div className="flex items-center gap-3 px-5 py-4 border-t border-gray-200">
+            <div className="flex items-center gap-3 px-5 py-4 border-t border-gray-200 dark:border-gray-700">
               <input
                 value={text}
                 onChange={e => setText(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && handleSend()}
                 placeholder="Add a comment..."
-                className="flex-1 h-10 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 text-[13px] px-4 focus:border-pink-200 focus:outline-none placeholder:text-gray-400"
+                className="flex-1 h-10 rounded-xl bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white text-[13px] px-4 focus:border-pink-200 focus:outline-none placeholder:text-gray-400 dark:placeholder:text-gray-500"
               />
               <motion.button
                 whileTap={{ scale: 0.9 }}
@@ -98,7 +98,7 @@ export function CommentSheet({
                 disabled={!text.trim() || sending}
                 className={cn(
                   'w-10 h-10 rounded-xl flex items-center justify-center transition-all',
-                  text.trim() ? 'bg-white text-gray-900' : 'bg-gray-50 text-gray-300',
+                  text.trim() ? 'bg-white dark:bg-gray-900 text-gray-900 dark:text-white' : 'bg-gray-50 dark:bg-gray-800 text-gray-300',
                 )}
               >
                 <Send className="w-4 h-4" />

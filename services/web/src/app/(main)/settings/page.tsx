@@ -205,8 +205,8 @@ export default function SettingsPage() {
     <ErrorBoundary>
     <div className="max-w-4xl mx-auto p-6">
       <Toast message={toast.message} type={toast.type} open={toast.open} onClose={() => setToast(t => ({...t, open: false}))} />
-      <InputModal open={emailModal} onClose={() => setEmailModal(false)} title="Change Email" label="New email" defaultValue={user?.email||''} placeholder="you@example.com" type="email" onSubmit={async v => { try { await api.updateProfile({email:v}); showToast('Email updated','success'); } catch { showToast('Failed','error'); } }} submitLabel="Update Email" />
-      <InputModal open={phoneModal} onClose={() => setPhoneModal(false)} title="Add Phone" label="Phone number" placeholder="+1 (555) 000-0000" type="tel" onSubmit={async v => { try { await api.updateProfile({phone:v}); showToast('Phone added','success'); } catch { showToast('Failed','error'); } }} submitLabel="Save" />
+      <InputModal open={emailModal} onClose={() => setEmailModal(false)} title="Change Email" label="New email" defaultValue={user?.email||''} placeholder="you@example.com" type="email" onSubmit={async v => { try { await api.updateProfile({email:v} as any); showToast('Email updated','success'); } catch { showToast('Failed','error'); } }} submitLabel="Update Email" />
+      <InputModal open={phoneModal} onClose={() => setPhoneModal(false)} title="Add Phone" label="Phone number" placeholder="+1 (555) 000-0000" type="tel" onSubmit={async v => { try { await api.updateProfile({phone:v} as any); showToast('Phone added','success'); } catch { showToast('Failed','error'); } }} submitLabel="Save" />
       <PasswordModal open={passwordModal} onClose={() => { setPasswordModal(false); setPasswordError(''); }} error={passwordError} onSubmit={async (cur,pw) => { try { await api.updatePassword({currentPassword:cur,newPassword:pw}); setPasswordModal(false); showToast('Password updated','success'); } catch { setPasswordError('Failed'); } }} />
       <TwoFactorModal open={twoFactorModal} onClose={() => setTwoFactorModal(false)} />
       <SessionsModal open={sessionsModal} onClose={() => setSessionsModal(false)} />

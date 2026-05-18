@@ -49,7 +49,7 @@ export function ChatListItem({ chat, active, onClick, onAction, selectMode, sele
           <div className="flex items-center justify-between mt-0.5">
             <p className="text-xs text-text-muted truncate pr-2">{chat.lastMessagePreview || 'Start a conversation'}</p>
             {chat.unreadCount > 0 && (
-              <span className="shrink-0 w-5 h-5 bg-lavender-400 text-gray-900 text-[10px] font-bold rounded-full flex items-center justify-center">{chat.unreadCount}</span>
+              <span className="shrink-0 w-5 h-5 bg-lavender-400 text-gray-900 dark:text-white text-[10px] font-bold rounded-full flex items-center justify-center">{chat.unreadCount}</span>
             )}
           </div>
         </div>

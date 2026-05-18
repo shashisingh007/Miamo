@@ -94,7 +94,7 @@ const badgeVariants: Record<string, string> = {
   warning: 'bg-gradient-to-r from-amber-50 to-yellow-50 text-amber-700 border-amber-200/50',
   danger: 'bg-gradient-to-r from-red-50 to-rose-50 text-red-700 border-red-200/50',
   info: 'bg-gradient-to-r from-sky-50 to-blue-50 text-sky-700 border-sky-200/50',
-  muted: 'bg-gray-50 text-gray-600 border-gray-200/50',
+  muted: 'bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 border-gray-200/50 dark:border-gray-700/50',
 };
 
 /**
@@ -148,8 +148,8 @@ export function EmptyState({ icon, title, description, action }: EmptyStateProps
           {icon}
         </div>
       )}
-      <h3 className="text-lg font-bold text-gray-800 mb-1.5">{title}</h3>
-      {description && <p className="text-sm text-gray-500 max-w-sm leading-relaxed">{description}</p>}
+      <h3 className="text-lg font-bold text-gray-800 dark:text-gray-200 mb-1.5">{title}</h3>
+      {description && <p className="text-sm text-gray-500 dark:text-gray-400 max-w-sm leading-relaxed">{description}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
   );
@@ -219,7 +219,7 @@ export function ScoreRing({ score, size = 48, strokeWidth = 3, className }: Scor
           </linearGradient>
         </defs>
       </svg>
-      <span className="absolute text-[10px] font-black text-gray-700">{score}</span>
+      <span className="absolute text-[10px] font-black text-gray-700 dark:text-gray-300">{score}</span>
     </div>
   );
 }
@@ -250,7 +250,7 @@ export function FilterChip({ label, active, onClick, icon }: FilterChipProps) {
         'flex items-center gap-1.5 px-4 py-2 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all duration-300',
         active
           ? 'chip-glass-active'
-          : 'chip-glass text-gray-600 hover:text-pink-600'
+          : 'chip-glass text-gray-600 dark:text-gray-400 hover:text-pink-600'
       )}
     >
       {icon}

@@ -77,7 +77,7 @@ class MessagesErrorBoundary extends Component<
               <p className="text-xs text-red-400 font-mono max-w-sm break-all">{this.state.error.message}</p>
             )}
             <button onClick={() => { this.setState({ hasError: false }); window.location.reload(); }}
-              className="px-4 py-2 bg-lavender-400 text-gray-900 rounded-lg font-medium text-sm">
+              className="px-4 py-2 bg-lavender-400 text-gray-900 dark:text-white rounded-lg font-medium text-sm">
               Refresh Page
             </button>
           </div>
@@ -197,7 +197,7 @@ function MessagesPageInner() {
             <h2 className="text-lg font-bold flex items-center gap-2">
               <MessageCircle className="w-5 h-5 text-lavender-400" /> Messages
               {totalMsgCount > 0 && (
-                <span className="ml-1 min-w-[22px] h-[22px] bg-lavender-400 rounded-full text-[11px] font-bold text-gray-900 flex items-center justify-center px-1.5">
+                <span className="ml-1 min-w-[22px] h-[22px] bg-lavender-400 rounded-full text-[11px] font-bold text-gray-900 dark:text-white flex items-center justify-center px-1.5">
                   {totalMsgCount > 99 ? '99+' : totalMsgCount}
                 </span>
               )}

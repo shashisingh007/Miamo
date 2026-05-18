@@ -16,7 +16,7 @@ export function MatrimonialCard({ profile: p, onView }: { profile: any; onView: 
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-      className="group relative bg-white rounded-2xl border border-zinc-200 overflow-hidden hover:shadow-xl hover:shadow-amber-100 transition-all duration-300 cursor-pointer"
+      className="group relative bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700 overflow-hidden hover:shadow-xl hover:shadow-amber-100 transition-all duration-300 cursor-pointer"
       onClick={onView}>
       <div className="relative h-56 overflow-hidden">
         {photo ? (
@@ -47,12 +47,12 @@ export function MatrimonialCard({ profile: p, onView }: { profile: any; onView: 
           {p.motherTongue && <span className="text-[10px] bg-blue-50 text-blue-700 rounded-full px-2 py-0.5 font-semibold border border-blue-200">{p.motherTongue}</span>}
           {p.manglik === 'Yes' && <span className="text-[10px] bg-orange-50 text-orange-700 rounded-full px-2 py-0.5 font-semibold border border-orange-200">Manglik</span>}
         </div>
-        <div className="space-y-1 text-xs text-zinc-500">
-          {p.education && <div className="flex items-center gap-1.5"><GraduationCap className="w-3 h-3 text-amber-500" /> <span className="text-zinc-700">{p.education}</span></div>}
-          {p.occupation && <div className="flex items-center gap-1.5"><Briefcase className="w-3 h-3 text-amber-500" /> <span className="text-zinc-700">{p.occupation}{p.company ? ` at ${p.company}` : ''}</span></div>}
-          {p.annualIncome && p.annualIncome !== 'Not specified' && <div className="flex items-center gap-1.5"><Building className="w-3 h-3 text-amber-500" /> <span className="text-zinc-700">₹{p.annualIncome}</span></div>}
+        <div className="space-y-1 text-xs text-zinc-500 dark:text-gray-400">
+          {p.education && <div className="flex items-center gap-1.5"><GraduationCap className="w-3 h-3 text-amber-500" /> <span className="text-zinc-700 dark:text-gray-300">{p.education}</span></div>}
+          {p.occupation && <div className="flex items-center gap-1.5"><Briefcase className="w-3 h-3 text-amber-500" /> <span className="text-zinc-700 dark:text-gray-300">{p.occupation}{p.company ? ` at ${p.company}` : ''}</span></div>}
+          {p.annualIncome && p.annualIncome !== 'Not specified' && <div className="flex items-center gap-1.5"><Building className="w-3 h-3 text-amber-500" /> <span className="text-zinc-700 dark:text-gray-300">₹{p.annualIncome}</span></div>}
         </div>
-        <div className="flex items-center gap-2 pt-2 border-t border-zinc-100">
+        <div className="flex items-center gap-2 pt-2 border-t border-zinc-100 dark:border-gray-700">
           <Phone className={`w-3.5 h-3.5 ${p.hasPhone ? 'text-emerald-500' : 'text-zinc-300'}`} />
           <Linkedin className={`w-3.5 h-3.5 ${p.hasLinkedIn ? 'text-blue-500' : 'text-zinc-300'}`} />
           <Mail className={`w-3.5 h-3.5 ${p.hasEmail ? 'text-amber-500' : 'text-zinc-300'}`} />

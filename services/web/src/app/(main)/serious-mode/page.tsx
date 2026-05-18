@@ -45,7 +45,7 @@ const DTM_SECTIONS = [
   { id: 'chat', label: 'DTM Chat', icon: MessageCircle, color: 'text-emerald-500' },
   { id: 'access', label: 'Access Control', icon: Shield, color: 'text-teal-500' },
   { id: 'preferences', label: 'Partner Preferences', icon: Heart, color: 'text-pink-500' },
-  { id: 'privacy', label: 'Privacy & Security', icon: Lock, color: 'text-zinc-500' },
+  { id: 'privacy', label: 'Privacy & Security', icon: Lock, color: 'text-zinc-500 dark:text-gray-400' },
   { id: 'templates', label: 'Bio Data Templates', icon: Palette, color: 'text-orange-500' },
 ] as const;
 type SectionId = typeof DTM_SECTIONS[number]['id'];
@@ -179,20 +179,20 @@ export default function DateToMarryPage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-rose-50 flex items-center justify-center p-6">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
-          className="bg-white rounded-3xl border border-zinc-200 shadow-xl max-w-md w-full p-8 text-center space-y-5">
+          className="bg-white dark:bg-gray-900 rounded-3xl border border-zinc-200 dark:border-gray-700 shadow-xl max-w-md w-full p-8 text-center space-y-5">
           <div className="text-5xl">🕉</div>
-          <h2 className="text-xl font-bold text-zinc-900">Welcome to Date to Marry</h2>
-          <p className="text-sm text-zinc-500">Build your matrimonial profile to access all features. Complete at least 60% to enable browsing & matching.</p>
-          <div className="w-full bg-zinc-100 rounded-full h-3">
+          <h2 className="text-xl font-bold text-zinc-900 dark:text-white">Welcome to Date to Marry</h2>
+          <p className="text-sm text-zinc-500 dark:text-gray-400">Build your matrimonial profile to access all features. Complete at least 60% to enable browsing & matching.</p>
+          <div className="w-full bg-zinc-100 dark:bg-gray-800 rounded-full h-3">
             <div className="h-full bg-gradient-to-r from-amber-400 to-rose-400 rounded-full transition-all" style={{ width: `${profileCompletion}%` }} />
           </div>
-          <p className="text-xs text-zinc-400">{profileCompletion}% complete • Need 60% minimum</p>
+          <p className="text-xs text-zinc-400 dark:text-gray-500">{profileCompletion}% complete • Need 60% minimum</p>
           <button onClick={() => { setProfileEnabled(true); setSection('profile'); }}
             className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 text-white font-bold text-sm hover:shadow-lg transition">
             {profileCompletion >= 60 ? 'Enter Date to Marry' : 'Build Your Profile First'} →
           </button>
           <button onClick={() => { setProfileEnabled(true); setSection('browse'); }}
-            className="text-xs text-zinc-400 hover:text-zinc-600 transition">or browse profiles first →</button>
+            className="text-xs text-zinc-400 dark:text-gray-500 hover:text-zinc-600 transition">or browse profiles first →</button>
         </motion.div>
       </div>
     );
@@ -202,10 +202,10 @@ export default function DateToMarryPage() {
     <ErrorBoundary>
     <div className="min-h-screen bg-gradient-to-br from-amber-50/50 via-white to-rose-50/50">
       {/* HEADER */}
-      <div className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-zinc-200/60">
+      <div className="sticky top-0 z-30 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-b border-zinc-200/60 dark:border-gray-700/60">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
-          <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 rounded-xl bg-zinc-100 flex items-center justify-center hover:bg-zinc-200 transition">
-            <Menu className="w-5 h-5 text-zinc-700" />
+          <button onClick={() => setSidebarOpen(true)} className="w-10 h-10 rounded-xl bg-zinc-100 dark:bg-gray-800 flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-gray-700 transition">
+            <Menu className="w-5 h-5 text-zinc-700 dark:text-gray-300" />
           </button>
           <div className="flex items-center gap-2.5 flex-1">
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center shadow-lg shadow-amber-200">
@@ -230,36 +230,36 @@ export default function DateToMarryPage() {
           <>
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
             <motion.div initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }} transition={{ type: 'spring', damping: 25 }}
-              className="fixed left-0 top-0 bottom-0 z-50 w-72 bg-white border-r border-zinc-200 shadow-2xl overflow-y-auto">
-              <div className="p-5 border-b border-zinc-100">
+              className="fixed left-0 top-0 bottom-0 z-50 w-72 bg-white dark:bg-gray-900 border-r border-zinc-200 dark:border-gray-700 shadow-2xl overflow-y-auto">
+              <div className="p-5 border-b border-zinc-100 dark:border-gray-700">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center">
                       <HeartHandshake className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-zinc-900">Date to Marry</h3>
-                      <p className="text-[10px] text-zinc-400">Matrimonial Platform</p>
+                      <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Date to Marry</h3>
+                      <p className="text-[10px] text-zinc-400 dark:text-gray-500">Matrimonial Platform</p>
                     </div>
                   </div>
-                  <button onClick={() => setSidebarOpen(false)} className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center hover:bg-zinc-200"><X className="w-4 h-4 text-zinc-500" /></button>
+                  <button onClick={() => setSidebarOpen(false)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-gray-800 flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-gray-700"><X className="w-4 h-4 text-zinc-500 dark:text-gray-400" /></button>
                 </div>
               </div>
               <div className="p-3 space-y-1">
                 {DTM_SECTIONS.map(s => (
                   <button key={s.id} onClick={() => { setSection(s.id); setSidebarOpen(false); }}
-                    className={cn('w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition', section === s.id ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900')}>
+                    className={cn('w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition', section === s.id ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'text-zinc-600 dark:text-gray-400 hover:bg-zinc-50 dark:hover:bg-gray-700 hover:text-zinc-900')}>
                     <s.icon className={cn('w-4.5 h-4.5', section === s.id ? 'text-amber-500' : s.color)} />
                     {s.label}
                   </button>
                 ))}
               </div>
-              <div className="p-4 mx-3 mb-3 bg-zinc-50 rounded-xl border border-zinc-100">
-                <p className="text-[10px] text-zinc-400 font-semibold mb-2">PROFILE COMPLETION</p>
-                <div className="w-full bg-zinc-200 rounded-full h-2 mb-1">
+              <div className="p-4 mx-3 mb-3 bg-zinc-50 dark:bg-gray-800 rounded-xl border border-zinc-100 dark:border-gray-700">
+                <p className="text-[10px] text-zinc-400 dark:text-gray-500 font-semibold mb-2">PROFILE COMPLETION</p>
+                <div className="w-full bg-zinc-200 dark:bg-gray-700 rounded-full h-2 mb-1">
                   <div className="h-full bg-gradient-to-r from-amber-400 to-rose-400 rounded-full transition-all" style={{ width: `${profileCompletion}%` }} />
                 </div>
-                <p className="text-[10px] text-zinc-500">{profileCompletion}%</p>
+                <p className="text-[10px] text-zinc-500 dark:text-gray-400">{profileCompletion}%</p>
               </div>
             </motion.div>
           </>
@@ -285,7 +285,7 @@ export default function DateToMarryPage() {
             <div className="flex items-center justify-end">
               <button onClick={() => setShowFilters(!showFilters)}
                 className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition border',
-                  showFilters ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50')}>
+                  showFilters ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-white dark:bg-gray-900 text-zinc-600 dark:text-gray-400 border-zinc-200 dark:border-gray-700 hover:bg-zinc-50 dark:hover:bg-gray-700')}>
                 <Filter className="w-3.5 h-3.5" /> Filters {Object.values(filters).filter(Boolean).length > 0 && `(${Object.values(filters).filter(Boolean).length})`}
               </button>
             </div>
@@ -294,7 +294,7 @@ export default function DateToMarryPage() {
             <AnimatePresence>
               {showFilters && (
                 <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                  <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
+                  <div className="bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700 p-5 space-y-4 shadow-sm">
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <Select value={filters.religion || ''} onChange={v => setFilters(f => ({ ...f, religion: v }))} options={RELIGIONS} placeholder="Religion" />
                       <Select value={filters.caste || ''} onChange={v => setFilters(f => ({ ...f, caste: v }))} options={filters.religion ? (CASTES_BY_RELIGION[filters.religion] || ['Other']) : []} placeholder="Caste" />
@@ -317,12 +317,12 @@ export default function DateToMarryPage() {
                     <div className="flex flex-wrap gap-2">
                       <button onClick={() => setFilters(f => ({ ...f, numerologyMatch: f.numerologyMatch === 'true' ? '' : 'true' }))}
                         className={cn('px-3 py-1.5 rounded-full text-xs font-semibold border transition',
-                          filters.numerologyMatch === 'true' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-white text-zinc-500 border-zinc-200')}>
+                          filters.numerologyMatch === 'true' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-white dark:bg-gray-900 text-zinc-500 dark:text-gray-400 border-zinc-200 dark:border-gray-700')}>
                         <Hash className="w-3 h-3 inline mr-1" /> Numerology Match
                       </button>
                       <button onClick={() => setFilters(f => ({ ...f, sortBy: f.sortBy === 'numerology' ? '' : 'numerology' }))}
                         className={cn('px-3 py-1.5 rounded-full text-xs font-semibold border transition',
-                          filters.sortBy === 'numerology' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-white text-zinc-500 border-zinc-200')}>
+                          filters.sortBy === 'numerology' ? 'bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 border-indigo-200' : 'bg-white dark:bg-gray-900 text-zinc-500 dark:text-gray-400 border-zinc-200 dark:border-gray-700')}>
                         Sort by Numerology
                       </button>
                     </div>
@@ -330,7 +330,7 @@ export default function DateToMarryPage() {
                       <button onClick={applyFilters} className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-rose-500 text-white hover:shadow-lg transition">
                         <Search className="w-3.5 h-3.5 inline mr-1.5" /> Search
                       </button>
-                      <button onClick={async () => { setFilters({}); try { const res = await api.browseMatrimonialAdvanced({}).catch(() => api.browseMatrimonial({})); setBrowseProfiles(res.data || []); } catch {} }} className="px-4 py-2.5 rounded-xl text-xs font-medium text-zinc-500 bg-zinc-100 hover:bg-zinc-200 transition">Clear</button>
+                      <button onClick={async () => { setFilters({}); try { const res = await api.browseMatrimonialAdvanced({}).catch(() => api.browseMatrimonial({})); setBrowseProfiles(res.data || []); } catch {} }} className="px-4 py-2.5 rounded-xl text-xs font-medium text-zinc-500 dark:text-gray-400 bg-zinc-100 dark:bg-gray-800 hover:bg-zinc-200 dark:hover:bg-gray-700 transition">Clear</button>
                     </div>
                   </div>
                 </motion.div>
@@ -339,10 +339,10 @@ export default function DateToMarryPage() {
 
             {/* Profile Grid */}
             {browseProfiles.length === 0 ? (
-              <div className="text-center py-20 bg-white rounded-2xl border border-zinc-200">
+              <div className="text-center py-20 bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700">
                 <Search className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
-                <p className="text-sm text-zinc-500 font-medium">No profiles found</p>
-                <p className="text-xs text-zinc-400 mt-1">Try adjusting your filters</p>
+                <p className="text-sm text-zinc-500 dark:text-gray-400 font-medium">No profiles found</p>
+                <p className="text-xs text-zinc-400 dark:text-gray-500 mt-1">Try adjusting your filters</p>
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -372,11 +372,11 @@ export default function DateToMarryPage() {
         {/* ═══ MATCHES (3 TABS) ═══════════════════════════════ */}
         {section === 'matches' && (
           <div className="space-y-5">
-            <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Heart className="w-5 h-5 text-rose-500" /> My Matches</h2>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2"><Heart className="w-5 h-5 text-rose-500" /> My Matches</h2>
             {/* Tab bar */}
             <div className="flex gap-1 bg-amber-50/60 rounded-xl p-1 border border-amber-100">
               {([['matches', 'My Matches', matches.length], ['incoming', 'Incoming', pendingRequestCount], ['hold', 'On Hold', 0]] as const).map(([key, label, count]) => (
-                <button key={key} onClick={() => setMatchTab(key as any)} className={cn('flex-1 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all', matchTab === key ? 'bg-amber-50 text-amber-700 shadow-sm border border-amber-200' : 'text-zinc-500 hover:text-zinc-700')}>
+                <button key={key} onClick={() => setMatchTab(key as any)} className={cn('flex-1 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all', matchTab === key ? 'bg-amber-50 text-amber-700 shadow-sm border border-amber-200' : 'text-zinc-500 dark:text-gray-400 hover:text-zinc-700')}>
                   {label} {count > 0 && <span className="ml-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px]">{count}</span>}
                 </button>
               ))}
@@ -385,10 +385,10 @@ export default function DateToMarryPage() {
             {/* Tab: Matches */}
             {matchTab === 'matches' && (
               matches.length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-2xl border border-zinc-200">
+                <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700">
                   <Heart className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
-                  <p className="text-sm text-zinc-500">No matches yet</p>
-                  <p className="text-xs text-zinc-400 mt-1">Complete your profile for better matching</p>
+                  <p className="text-sm text-zinc-500 dark:text-gray-400">No matches yet</p>
+                  <p className="text-xs text-zinc-400 dark:text-gray-500 mt-1">Complete your profile for better matching</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -400,23 +400,23 @@ export default function DateToMarryPage() {
             {/* Tab: Incoming Requests */}
             {matchTab === 'incoming' && (
               incomingRequests.length === 0 ? (
-                <div className="text-center py-16 bg-white rounded-2xl border border-zinc-200">
+                <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700">
                   <Shield className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
-                  <p className="text-sm text-zinc-500">No incoming requests</p>
+                  <p className="text-sm text-zinc-500 dark:text-gray-400">No incoming requests</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {incomingRequests.map(req => {
                     const user = req.requester?.user;
                     return (
-                      <div key={req.id} className="bg-white rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-sm">
+                      <div key={req.id} className="bg-white dark:bg-gray-900 rounded-xl border border-zinc-200 dark:border-gray-700 p-4 flex items-center gap-4 shadow-sm">
                         <div className="w-11 h-11 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center shrink-0">
                           <span className="text-base font-bold text-white">{user?.displayName?.[0] || '?'}</span>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-zinc-900">{user?.displayName || 'User'}</p>
-                          <p className="text-xs text-zinc-500">Wants: <span className="text-amber-600 font-medium">{req.accessType}</span></p>
-                          {req.message && <p className="text-xs text-zinc-400 mt-0.5 truncate">&ldquo;{req.message}&rdquo;</p>}
+                          <p className="text-sm font-semibold text-zinc-900 dark:text-white">{user?.displayName || 'User'}</p>
+                          <p className="text-xs text-zinc-500 dark:text-gray-400">Wants: <span className="text-amber-600 font-medium">{req.accessType}</span></p>
+                          {req.message && <p className="text-xs text-zinc-400 dark:text-gray-500 mt-0.5 truncate">&ldquo;{req.message}&rdquo;</p>}
                         </div>
                         <div className="flex gap-1.5 shrink-0">
                           {req.status === 'pending' ? (
@@ -427,7 +427,7 @@ export default function DateToMarryPage() {
                           ) : req.status === 'granted' ? (
                             <div className="flex items-center gap-1.5">
                               <span className="text-xs font-medium px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700">Granted</span>
-                              <button onClick={() => handleAccessAction(req.id, 'revoke')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-100 text-zinc-600 hover:bg-zinc-200 border border-zinc-200 transition-colors">Revoke</button>
+                              <button onClick={() => handleAccessAction(req.id, 'revoke')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-100 dark:bg-gray-800 text-zinc-600 dark:text-gray-400 hover:bg-zinc-200 dark:hover:bg-gray-700 border border-zinc-200 dark:border-gray-700 transition-colors">Revoke</button>
                             </div>
                           ) : (
                             <span className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-700">Denied</span>
@@ -442,9 +442,9 @@ export default function DateToMarryPage() {
 
             {/* Tab: On Hold */}
             {matchTab === 'hold' && (
-              <div className="text-center py-16 bg-white rounded-2xl border border-zinc-200">
+              <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700">
                 <Send className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
-                <p className="text-sm text-zinc-500">Profiles you put on hold will appear here</p>
+                <p className="text-sm text-zinc-500 dark:text-gray-400">Profiles you put on hold will appear here</p>
               </div>
             )}
           </div>
@@ -453,12 +453,12 @@ export default function DateToMarryPage() {
         {/* ═══ NUMEROLOGY ════════════════════════════ */}
         {section === 'numerology' && (
           <div className="space-y-5">
-            <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Hash className="w-5 h-5 text-purple-500" /> Numerology</h2>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2"><Hash className="w-5 h-5 text-purple-500" /> Numerology</h2>
             {!numerologyData ? (
-              <div className="bg-white rounded-2xl border border-zinc-200 p-8 text-center shadow-sm">
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700 p-8 text-center shadow-sm">
                 <div className="text-5xl mb-4">🔢</div>
-                <h3 className="text-base font-bold text-zinc-900 mb-2">Discover Your Numbers</h3>
-                <p className="text-sm text-zinc-500 mb-5">Calculate your Life Path, Destiny & Soul numbers using Pythagorean + Vedic analysis.</p>
+                <h3 className="text-base font-bold text-zinc-900 dark:text-white mb-2">Discover Your Numbers</h3>
+                <p className="text-sm text-zinc-500 dark:text-gray-400 mb-5">Calculate your Life Path, Destiny & Soul numbers using Pythagorean + Vedic analysis.</p>
                 <button onClick={loadNumerology} className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-white text-sm font-bold hover:shadow-lg transition">
                   Calculate My Numerology
                 </button>
@@ -471,7 +471,7 @@ export default function DateToMarryPage() {
                     <p className="text-4xl font-black text-purple-600">{numerologyData.lifePath}</p>
                     <p className="text-xs text-purple-500 font-semibold mt-2">Life Path</p>
                   </div>
-                  <div className="bg-indigo-50 rounded-2xl p-5 text-center border border-indigo-100">
+                  <div className="bg-indigo-50 dark:bg-indigo-950/30 rounded-2xl p-5 text-center border border-indigo-100">
                     <p className="text-4xl font-black text-indigo-600">{numerologyData.destiny}</p>
                     <p className="text-xs text-indigo-500 font-semibold mt-2">Destiny</p>
                   </div>
@@ -486,15 +486,15 @@ export default function DateToMarryPage() {
                 </div>
 
                 {/* Info Rows */}
-                <div className="bg-white rounded-2xl border border-zinc-200 p-5 shadow-sm">
-                  <h3 className="text-xs font-bold text-zinc-900 mb-3 flex items-center gap-2">🕉 Vedic Numerology Details</h3>
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700 p-5 shadow-sm">
+                  <h3 className="text-xs font-bold text-zinc-900 dark:text-white mb-3 flex items-center gap-2">🕉 Vedic Numerology Details</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Ruling Planet</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.rulingPlanet}</span></div>
-                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Lucky Gem</span><span className="text-sm text-zinc-800 font-medium">💎 {numerologyData.luckyGem || '—'}</span></div>
-                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Mantra</span><span className="text-sm text-zinc-800 font-medium italic">{numerologyData.mantra || '—'}</span></div>
-                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Hora Lord</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.horaLord || '—'}</span></div>
-                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Elemental Energy</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.elementalEnergy || '—'}</span></div>
-                    <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Lucky Day</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.luckyDay || '—'}</span></div>
+                    <div className="flex items-center gap-3 bg-zinc-50 dark:bg-gray-800 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 dark:text-gray-400 w-28">Ruling Planet</span><span className="text-sm text-zinc-800 dark:text-gray-200 font-medium">{numerologyData.rulingPlanet}</span></div>
+                    <div className="flex items-center gap-3 bg-zinc-50 dark:bg-gray-800 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 dark:text-gray-400 w-28">Lucky Gem</span><span className="text-sm text-zinc-800 dark:text-gray-200 font-medium">💎 {numerologyData.luckyGem || '—'}</span></div>
+                    <div className="flex items-center gap-3 bg-zinc-50 dark:bg-gray-800 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 dark:text-gray-400 w-28">Mantra</span><span className="text-sm text-zinc-800 dark:text-gray-200 font-medium italic">{numerologyData.mantra || '—'}</span></div>
+                    <div className="flex items-center gap-3 bg-zinc-50 dark:bg-gray-800 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 dark:text-gray-400 w-28">Hora Lord</span><span className="text-sm text-zinc-800 dark:text-gray-200 font-medium">{numerologyData.horaLord || '—'}</span></div>
+                    <div className="flex items-center gap-3 bg-zinc-50 dark:bg-gray-800 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 dark:text-gray-400 w-28">Elemental Energy</span><span className="text-sm text-zinc-800 dark:text-gray-200 font-medium">{numerologyData.elementalEnergy || '—'}</span></div>
+                    <div className="flex items-center gap-3 bg-zinc-50 dark:bg-gray-800 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 dark:text-gray-400 w-28">Lucky Day</span><span className="text-sm text-zinc-800 dark:text-gray-200 font-medium">{numerologyData.luckyDay || '—'}</span></div>
                   </div>
                 </div>
 
@@ -510,9 +510,9 @@ export default function DateToMarryPage() {
                 )}
 
                 {/* Compatible Numbers */}
-                <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
+                <div className="bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700 p-5 space-y-4 shadow-sm">
                   <div>
-                    <p className="text-xs text-zinc-500 font-semibold mb-2">Compatible Numbers</p>
+                    <p className="text-xs text-zinc-500 dark:text-gray-400 font-semibold mb-2">Compatible Numbers</p>
                     <div className="flex gap-2">
                       {numerologyData.compatibleNumbers?.map((n: number) => (
                         <span key={n} className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm flex items-center justify-center border border-indigo-200">{n}</span>
@@ -522,12 +522,12 @@ export default function DateToMarryPage() {
 
                   {/* Lucky Colors as dots */}
                   <div>
-                    <p className="text-xs text-zinc-500 font-semibold mb-2">Lucky Colors</p>
+                    <p className="text-xs text-zinc-500 dark:text-gray-400 font-semibold mb-2">Lucky Colors</p>
                     <div className="flex gap-2">
                       {numerologyData.luckyColors?.map((color: string, i: number) => (
                         <div key={i} className="flex items-center gap-1.5">
-                          <span className="w-4 h-4 rounded-full border border-zinc-200 shadow-sm" style={{ backgroundColor: color.toLowerCase().includes('gold') ? '#FFD700' : color.toLowerCase().includes('red') ? '#DC2626' : color.toLowerCase().includes('orange') ? '#EA580C' : color.toLowerCase().includes('yellow') ? '#EAB308' : color.toLowerCase().includes('green') ? '#16A34A' : color.toLowerCase().includes('blue') ? '#2563EB' : color.toLowerCase().includes('purple') ? '#9333EA' : color.toLowerCase().includes('white') ? '#F8FAFC' : color.toLowerCase().includes('pink') ? '#EC4899' : '#6B7280' }} />
-                          <span className="text-xs text-zinc-600">{color}</span>
+                          <span className="w-4 h-4 rounded-full border border-zinc-200 dark:border-gray-700 shadow-sm" style={{ backgroundColor: color.toLowerCase().includes('gold') ? '#FFD700' : color.toLowerCase().includes('red') ? '#DC2626' : color.toLowerCase().includes('orange') ? '#EA580C' : color.toLowerCase().includes('yellow') ? '#EAB308' : color.toLowerCase().includes('green') ? '#16A34A' : color.toLowerCase().includes('blue') ? '#2563EB' : color.toLowerCase().includes('purple') ? '#9333EA' : color.toLowerCase().includes('white') ? '#F8FAFC' : color.toLowerCase().includes('pink') ? '#EC4899' : '#6B7280' }} />
+                          <span className="text-xs text-zinc-600 dark:text-gray-400">{color}</span>
                         </div>
                       ))}
                     </div>
@@ -535,7 +535,7 @@ export default function DateToMarryPage() {
 
                   {/* Traits as badges */}
                   <div>
-                    <p className="text-xs text-zinc-500 font-semibold mb-2">Traits</p>
+                    <p className="text-xs text-zinc-500 dark:text-gray-400 font-semibold mb-2">Traits</p>
                     <div className="flex flex-wrap gap-2">
                       {numerologyData.traits?.map((t: string, i: number) => (
                         <span key={i} className="px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-700 rounded-full border border-purple-100">{t}</span>
@@ -556,10 +556,10 @@ export default function DateToMarryPage() {
         {/* ═══ KUNDLI / HOROSCOPE ══════════════════ */}
         {section === 'kundli' && (
           <div className="space-y-5">
-            <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Moon className="w-5 h-5 text-indigo-500" /> Kundli / Horoscope</h2>
-            <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
-              <h3 className="text-sm font-bold text-zinc-900">Upload Your Kundli</h3>
-              <p className="text-xs text-zinc-500">Upload your kundli/horoscope data. When both partners have kundli data, AI will analyze match compatibility using Ashtakoota system.</p>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2"><Moon className="w-5 h-5 text-indigo-500" /> Kundli / Horoscope</h2>
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700 p-5 space-y-4 shadow-sm">
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Upload Your Kundli</h3>
+              <p className="text-xs text-zinc-500 dark:text-gray-400">Upload your kundli/horoscope data. When both partners have kundli data, AI will analyze match compatibility using Ashtakoota system.</p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Kundli URL / Image Link"><Input value={myProfile?.kundliUrl} onChange={(v: string) => updateField('kundliUrl', v)} placeholder="https://...kundli.pdf" /></Field>
                 <Field label="Nakshatra"><Select value={myProfile?.star || myProfile?.nakshatra} onChange={(v: string) => updateField('star', v)} options={NAKSHATRAS} placeholder="Select" /></Field>
@@ -571,9 +571,9 @@ export default function DateToMarryPage() {
                 Save Kundli Data
               </button>
             </div>
-            <div className="bg-zinc-50 rounded-2xl border border-zinc-200 p-5">
-              <h3 className="text-sm font-bold text-zinc-700 mb-2">About Ashtakoota Matching</h3>
-              <p className="text-xs text-zinc-500 leading-relaxed">The traditional Ashtakoota system evaluates 8 aspects: <strong>Varna</strong> (spiritual), <strong>Vashya</strong> (attraction), <strong>Tara</strong> (health), <strong>Yoni</strong> (physical), <strong>Graha Maitri</strong> (mental), <strong>Gana</strong> (temperament), <strong>Bhakoot</strong> (love), and <strong>Nadi</strong> (progeny). Total 36 points. 18+ is considered acceptable.</p>
+            <div className="bg-zinc-50 dark:bg-gray-800 rounded-2xl border border-zinc-200 dark:border-gray-700 p-5">
+              <h3 className="text-sm font-bold text-zinc-700 dark:text-gray-300 mb-2">About Ashtakoota Matching</h3>
+              <p className="text-xs text-zinc-500 dark:text-gray-400 leading-relaxed">The traditional Ashtakoota system evaluates 8 aspects: <strong>Varna</strong> (spiritual), <strong>Vashya</strong> (attraction), <strong>Tara</strong> (health), <strong>Yoni</strong> (physical), <strong>Graha Maitri</strong> (mental), <strong>Gana</strong> (temperament), <strong>Bhakoot</strong> (love), and <strong>Nadi</strong> (progeny). Total 36 points. 18+ is considered acceptable.</p>
             </div>
           </div>
         )}
@@ -581,47 +581,47 @@ export default function DateToMarryPage() {
         {/* ═══ DTM CHAT ═══════════════════════════════ */}
         {section === 'chat' && (
           <div className="space-y-5">
-            <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><MessageCircle className="w-5 h-5 text-emerald-500" /> DTM Chat</h2>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2"><MessageCircle className="w-5 h-5 text-emerald-500" /> DTM Chat</h2>
             {!activeChatUserId ? (
               <div className="space-y-3">
                 {dtmChats.length === 0 ? (
-                  <div className="text-center py-16 bg-white rounded-2xl border border-zinc-200">
+                  <div className="text-center py-16 bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700">
                     <MessageCircle className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
-                    <p className="text-sm text-zinc-500">No DTM chats yet</p>
-                    <p className="text-xs text-zinc-400 mt-1">Browse profiles and start a conversation</p>
+                    <p className="text-sm text-zinc-500 dark:text-gray-400">No DTM chats yet</p>
+                    <p className="text-xs text-zinc-400 dark:text-gray-500 mt-1">Browse profiles and start a conversation</p>
                   </div>
                 ) : dtmChats.map(c => (
                   <button key={c.userId} onClick={() => openChat(c.userId)}
-                    className="w-full bg-white rounded-xl border border-zinc-200 p-4 flex items-center gap-4 hover:bg-zinc-50 transition text-left">
+                    className="w-full bg-white dark:bg-gray-900 rounded-xl border border-zinc-200 dark:border-gray-700 p-4 flex items-center gap-4 hover:bg-zinc-50 dark:hover:bg-gray-700 transition text-left">
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center shrink-0">
                       <span className="text-base font-bold text-white">?</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-zinc-900">{c.userId.slice(0, 8)}...</p>
-                      <p className="text-xs text-zinc-500 truncate">{c.lastMessage?.message || 'No messages'}</p>
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-white">{c.userId.slice(0, 8)}...</p>
+                      <p className="text-xs text-zinc-500 dark:text-gray-400 truncate">{c.lastMessage?.message || 'No messages'}</p>
                     </div>
                     {c.unreadCount > 0 && <span className="w-6 h-6 rounded-full bg-amber-500 text-white text-xs font-bold flex items-center justify-center">{c.unreadCount}</span>}
                   </button>
                 ))}
               </div>
             ) : (
-              <div className="bg-white rounded-2xl border border-zinc-200 overflow-hidden shadow-sm">
-                <div className="flex items-center gap-3 p-4 border-b border-zinc-100">
-                  <button onClick={() => setActiveChatUserId(null)} className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center hover:bg-zinc-200"><ChevronLeft className="w-4 h-4 text-zinc-600" /></button>
-                  <p className="text-sm font-semibold text-zinc-900">Chat</p>
+              <div className="bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700 overflow-hidden shadow-sm">
+                <div className="flex items-center gap-3 p-4 border-b border-zinc-100 dark:border-gray-700">
+                  <button onClick={() => setActiveChatUserId(null)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-gray-800 flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-gray-700"><ChevronLeft className="w-4 h-4 text-zinc-600 dark:text-gray-400" /></button>
+                  <p className="text-sm font-semibold text-zinc-900 dark:text-white">Chat</p>
                 </div>
-                <div className="h-80 overflow-y-auto p-4 space-y-3 bg-zinc-50">
-                  {chatMessages.length === 0 && <p className="text-center text-xs text-zinc-400 py-10">No messages yet. Say hello!</p>}
+                <div className="h-80 overflow-y-auto p-4 space-y-3 bg-zinc-50 dark:bg-gray-800">
+                  {chatMessages.length === 0 && <p className="text-center text-xs text-zinc-400 dark:text-gray-500 py-10">No messages yet. Say hello!</p>}
                   {chatMessages.map(m => (
-                    <div key={m.id} className={cn('max-w-[75%] rounded-2xl p-3', m.senderId === myProfile?.userId ? 'ml-auto bg-amber-500 text-white' : 'bg-white border border-zinc-200 text-zinc-800')}>
+                    <div key={m.id} className={cn('max-w-[75%] rounded-2xl p-3', m.senderId === myProfile?.userId ? 'ml-auto bg-amber-500 text-white' : 'bg-white dark:bg-gray-900 border border-zinc-200 dark:border-gray-700 text-zinc-800 dark:text-gray-200')}>
                       <p className="text-sm">{m.message}</p>
-                      <p className={cn('text-[10px] mt-1', m.senderId === myProfile?.userId ? 'text-amber-100' : 'text-zinc-400')}>{new Date(m.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</p>
+                      <p className={cn('text-[10px] mt-1', m.senderId === myProfile?.userId ? 'text-amber-100' : 'text-zinc-400 dark:text-gray-500')}>{new Date(m.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</p>
                     </div>
                   ))}
                 </div>
-                <div className="p-3 border-t border-zinc-100 flex gap-2">
+                <div className="p-3 border-t border-zinc-100 dark:border-gray-700 flex gap-2">
                   <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChatMessage()}
-                    className="flex-1 bg-zinc-100 border border-zinc-200 rounded-xl px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40" placeholder="Type a message..." />
+                    className="flex-1 bg-zinc-100 dark:bg-gray-800 border border-zinc-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm text-zinc-900 dark:text-white placeholder:text-zinc-400 dark:placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500/40" placeholder="Type a message..." />
                   <button onClick={sendChatMessage} className="w-10 h-10 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 flex items-center justify-center hover:shadow-lg transition">
                     <Send className="w-4 h-4 text-white" />
                   </button>
@@ -634,25 +634,25 @@ export default function DateToMarryPage() {
         {/* ═══ ACCESS CONTROL (3-way: Grant / Deny / Revoke) ══════════════════════════ */}
         {section === 'access' && (
           <div className="space-y-6">
-            <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Shield className="w-5 h-5 text-teal-500" /> Access Control</h2>
-            <p className="text-xs text-zinc-500 -mt-3">Manage who can see your biodata, photos, and contact details</p>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2"><Shield className="w-5 h-5 text-teal-500" /> Access Control</h2>
+            <p className="text-xs text-zinc-500 dark:text-gray-400 -mt-3">Manage who can see your biodata, photos, and contact details</p>
 
             {/* Incoming Requests */}
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-zinc-800 flex items-center gap-2">📥 Incoming Requests <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">{incomingRequests.filter(r => r.status === 'pending').length} pending</span></h3>
+              <h3 className="text-sm font-semibold text-zinc-800 dark:text-gray-200 flex items-center gap-2">📥 Incoming Requests <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">{incomingRequests.filter(r => r.status === 'pending').length} pending</span></h3>
               {incomingRequests.length === 0 ? (
-                <div className="text-center py-10 bg-white rounded-2xl border border-zinc-200"><Shield className="w-10 h-10 text-zinc-300 mx-auto mb-3" /><p className="text-sm text-zinc-500">No incoming requests</p></div>
+                <div className="text-center py-10 bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700"><Shield className="w-10 h-10 text-zinc-300 mx-auto mb-3" /><p className="text-sm text-zinc-500 dark:text-gray-400">No incoming requests</p></div>
               ) : incomingRequests.map(req => {
                 const user = req.requester?.user;
                 return (
-                  <div key={req.id} className="bg-white rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
+                  <div key={req.id} className="bg-white dark:bg-gray-900 rounded-xl border border-zinc-200 dark:border-gray-700 p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
                     <div className="w-11 h-11 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center shrink-0">
                       <span className="text-base font-bold text-white">{user?.displayName?.[0] || '?'}</span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-zinc-900">{user?.displayName || 'User'}</p>
-                      <p className="text-xs text-zinc-500">Wants: <span className="text-amber-600 font-medium">{req.accessType}</span></p>
-                      {req.message && <p className="text-xs text-zinc-400 mt-0.5 truncate italic">&ldquo;{req.message}&rdquo;</p>}
+                      <p className="text-sm font-semibold text-zinc-900 dark:text-white">{user?.displayName || 'User'}</p>
+                      <p className="text-xs text-zinc-500 dark:text-gray-400">Wants: <span className="text-amber-600 font-medium">{req.accessType}</span></p>
+                      {req.message && <p className="text-xs text-zinc-400 dark:text-gray-500 mt-0.5 truncate italic">&ldquo;{req.message}&rdquo;</p>}
                     </div>
                     <div className="flex gap-1.5 shrink-0">
                       {req.status === 'pending' ? (
@@ -676,13 +676,13 @@ export default function DateToMarryPage() {
 
             {/* Sent Requests */}
             <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-zinc-800 flex items-center gap-2">📤 Sent Requests <span className="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">{sentRequests.filter(r => r.status === 'pending').length} awaiting</span></h3>
+              <h3 className="text-sm font-semibold text-zinc-800 dark:text-gray-200 flex items-center gap-2">📤 Sent Requests <span className="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">{sentRequests.filter(r => r.status === 'pending').length} awaiting</span></h3>
               {sentRequests.length === 0 ? (
-                <div className="text-center py-10 bg-white rounded-2xl border border-zinc-200"><Send className="w-10 h-10 text-zinc-300 mx-auto mb-3" /><p className="text-sm text-zinc-500">No sent requests</p></div>
+                <div className="text-center py-10 bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700"><Send className="w-10 h-10 text-zinc-300 mx-auto mb-3" /><p className="text-sm text-zinc-500 dark:text-gray-400">No sent requests</p></div>
               ) : sentRequests.map(req => (
-                <div key={req.id} className="bg-white rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-sm">
+                <div key={req.id} className="bg-white dark:bg-gray-900 rounded-xl border border-zinc-200 dark:border-gray-700 p-4 flex items-center gap-4 shadow-sm">
                   <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center shrink-0"><span className="text-base font-bold text-white">{req.owner?.user?.displayName?.[0] || '?'}</span></div>
-                  <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-zinc-900">{req.owner?.user?.displayName || 'User'}</p><p className="text-xs text-zinc-500">Requested: <span className="text-amber-600 font-medium">{req.accessType}</span></p></div>
+                  <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-zinc-900 dark:text-white">{req.owner?.user?.displayName || 'User'}</p><p className="text-xs text-zinc-500 dark:text-gray-400">Requested: <span className="text-amber-600 font-medium">{req.accessType}</span></p></div>
                   <span className={cn('text-xs font-medium px-3 py-1.5 rounded-lg border', req.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' : req.status === 'granted' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200')}>
                     {req.status === 'pending' ? '⏳ Awaiting' : req.status === 'granted' ? '✓ Granted' : '✕ Denied'}
                   </span>
@@ -695,8 +695,8 @@ export default function DateToMarryPage() {
         {/* ═══ PARTNER PREFERENCES ════════════════════ */}
         {section === 'preferences' && myProfile && (
           <div className="space-y-5">
-            <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Heart className="w-5 h-5 text-pink-500" /> Partner Preferences</h2>
-            <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2"><Heart className="w-5 h-5 text-pink-500" /> Partner Preferences</h2>
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700 p-5 space-y-4 shadow-sm">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Field label="Min Age"><Input type="number" value={myProfile.partnerAgeMin} onChange={(v: string) => updateField('partnerAgeMin', parseInt(v) || 21)} /></Field>
                 <Field label="Max Age"><Input type="number" value={myProfile.partnerAgeMax} onChange={(v: string) => updateField('partnerAgeMax', parseInt(v) || 35)} /></Field>
@@ -722,9 +722,9 @@ export default function DateToMarryPage() {
         {/* ═══ PRIVACY & SECURITY ═════════════════════ */}
         {section === 'privacy' && (
           <div className="space-y-5">
-            <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Lock className="w-5 h-5 text-zinc-600" /> Privacy & Security</h2>
-            <div className="bg-white rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
-              <h3 className="text-sm font-bold text-zinc-900">Who can see your info</h3>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2"><Lock className="w-5 h-5 text-zinc-600 dark:text-gray-400" /> Privacy & Security</h2>
+            <div className="bg-white dark:bg-gray-900 rounded-2xl border border-zinc-200 dark:border-gray-700 p-5 space-y-4 shadow-sm">
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Who can see your info</h3>
               {[
                 { key: 'bioDataPublic', label: 'Bio Data', desc: 'Allow everyone to view your bio data' },
                 { key: 'phonePublic', label: 'Phone Number', desc: 'Allow everyone to see your phone (not recommended)' },
@@ -733,9 +733,9 @@ export default function DateToMarryPage() {
                 { key: 'photosPublic', label: 'All Photos', desc: 'Show all photos to everyone' },
               ].map(item => (
                 <div key={item.key} className="flex items-center justify-between py-3 border-b border-zinc-50 last:border-0">
-                  <div><p className="text-sm text-zinc-800 font-medium">{item.label}</p><p className="text-[10px] text-zinc-400">{item.desc}</p></div>
+                  <div><p className="text-sm text-zinc-800 dark:text-gray-200 font-medium">{item.label}</p><p className="text-[10px] text-zinc-400 dark:text-gray-500">{item.desc}</p></div>
                   <button onClick={() => updateField(item.key, !myProfile?.[item.key])}
-                    className={cn('w-12 h-7 rounded-full transition-colors relative', myProfile?.[item.key] ? 'bg-amber-500' : 'bg-zinc-200')}>
+                    className={cn('w-12 h-7 rounded-full transition-colors relative', myProfile?.[item.key] ? 'bg-amber-500' : 'bg-zinc-200 dark:bg-gray-700')}>
                     <div className={cn('w-5 h-5 rounded-full bg-white shadow-sm absolute top-1 transition-all', myProfile?.[item.key] ? 'right-1' : 'left-1')} />
                   </button>
                 </div>
@@ -750,20 +750,20 @@ export default function DateToMarryPage() {
         {/* ═══ TEMPLATES ══════════════════════════════ */}
         {section === 'templates' && (
           <div className="space-y-5">
-            <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Palette className="w-5 h-5 text-orange-500" /> Bio Data Templates</h2>
-            <p className="text-sm text-zinc-500">Choose a template theme. Preview will use the selected template with your profile data.</p>
+            <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2"><Palette className="w-5 h-5 text-orange-500" /> Bio Data Templates</h2>
+            <p className="text-sm text-zinc-500 dark:text-gray-400">Choose a template theme. Preview will use the selected template with your profile data.</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {TEMPLATES.map(t => (
                 <button key={t.id} onClick={() => { updateField('bioDataTemplate', t.id); setPreviewTemplate(t.id); }}
                   className={cn('relative rounded-2xl p-4 text-left transition border overflow-hidden',
-                    (myProfile?.bioDataTemplate || previewTemplate) === t.id ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-200' : 'border-zinc-200 hover:border-zinc-300 bg-white')}>
+                    (myProfile?.bioDataTemplate || previewTemplate) === t.id ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-200' : 'border-zinc-200 dark:border-gray-700 hover:border-zinc-300 bg-white dark:bg-gray-900')}>
                   {t.premium && <div className="absolute top-2 right-2"><Crown className="w-3.5 h-3.5 text-amber-500" /></div>}
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg" style={{ background: `linear-gradient(135deg, ${t.colors[0]}40, ${t.colors[1]}40)` }}>{t.emoji}</div>
                     {(myProfile?.bioDataTemplate || previewTemplate) === t.id && <Check className="w-4 h-4 text-amber-500" />}
                   </div>
-                  <p className="text-xs font-semibold text-zinc-800 truncate">{t.name}</p>
-                  <div className="flex gap-1 mt-2">{t.colors.map((c, i) => <div key={i} className="w-4 h-4 rounded-full border border-zinc-200" style={{ background: c }} />)}</div>
+                  <p className="text-xs font-semibold text-zinc-800 dark:text-gray-200 truncate">{t.name}</p>
+                  <div className="flex gap-1 mt-2">{t.colors.map((c, i) => <div key={i} className="w-4 h-4 rounded-full border border-zinc-200 dark:border-gray-700" style={{ background: c }} />)}</div>
                 </button>
               ))}
             </div>
@@ -786,11 +786,11 @@ export default function DateToMarryPage() {
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowPreview(false)}>
             <motion.div initial={{ scale: 0.9, y: 30 }} animate={{ scale: 1, y: 0 }}
-              className="bg-white rounded-3xl max-w-xl w-full max-h-[90vh] overflow-y-auto border border-zinc-200 shadow-2xl p-6"
+              className="bg-white dark:bg-gray-900 rounded-3xl max-w-xl w-full max-h-[90vh] overflow-y-auto border border-zinc-200 dark:border-gray-700 shadow-2xl p-6"
               onClick={(e: any) => e.stopPropagation()}>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><ScrollText className="w-5 h-5 text-amber-500" /> Bio Data Preview</h2>
-                <button onClick={() => setShowPreview(false)} className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center hover:bg-zinc-200"><X className="w-4 h-4 text-zinc-600" /></button>
+                <h2 className="text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2"><ScrollText className="w-5 h-5 text-amber-500" /> Bio Data Preview</h2>
+                <button onClick={() => setShowPreview(false)} className="w-8 h-8 rounded-full bg-zinc-100 dark:bg-gray-800 flex items-center justify-center hover:bg-zinc-200 dark:hover:bg-gray-700"><X className="w-4 h-4 text-zinc-600 dark:text-gray-400" /></button>
               </div>
               <BioDataPreview profile={myProfile} templateId={previewTemplate || myProfile.bioDataTemplate || 'royal-rajasthani'} />
             </motion.div>

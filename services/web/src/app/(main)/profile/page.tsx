@@ -135,7 +135,7 @@ export default function ProfilePage() {
     setLoading(true);
     api.getMyProfile().then(res => {
       setProfile(res.data);
-      const prof = res.data?.profile || res.data || {};
+      const prof = (res.data as any)?.profile || res.data || {};
       setEditForm({ bio: prof.bio || '', city: prof.city || '', profession: prof.profession || '', datingIntent: prof.datingIntent || prof.intent || '', education: prof.education || '', height: prof.height || '', languages: prof.languages || '', drinking: prof.drinking || '', smoking: prof.smoking || '', fitness: prof.fitness || '', diet: prof.diet || '', pets: prof.pets || '', children: prof.children || '', religion: prof.religion || '', politicalViews: prof.politicalViews || '' });
     }).catch(() => {}).finally(() => setLoading(false));
   };
@@ -222,7 +222,7 @@ export default function ProfilePage() {
             <Button variant="secondary" size="sm" onClick={() => {
               if (editing) {
                 setSaving(true);
-                api.updateProfile(editForm).then(() => { loadProfile(); updateUser(editForm); setEditing(false); toast.success('Profile saved'); }).catch(() => toast.error('Save failed')).finally(() => setSaving(false));
+                api.updateProfile({ ...editForm, height: editForm.height ? parseInt(editForm.height as any) || null : null } as any).then(() => { loadProfile(); updateUser(editForm); setEditing(false); toast.success('Profile saved'); }).catch(() => toast.error('Save failed')).finally(() => setSaving(false));
               } else {
                 setEditing(true);
                 trackClick('edit-profile');

@@ -86,7 +86,7 @@ export default function RegisterPage() {
           >
             <Image src="/logo.png" alt="Miamo" width={56} height={56} className="w-full h-full object-contain" priority />
           </motion.div>
-          <h1 className="text-2xl font-bold tracking-tight">Create your account</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white">Create your account</h1>
           <p className="text-sm text-text-muted mt-1">Join {APP_NAME} and find real connections</p>
         </div>
 

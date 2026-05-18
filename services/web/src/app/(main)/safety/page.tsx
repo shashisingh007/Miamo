@@ -26,7 +26,7 @@ export default function SafetyPage() {
   const handleReport = async () => {
     if (!reportData.reason.trim()) return;
     setSubmitting(true);
-    try { await api.reportUser({ reason: reportData.reason, details: reportData.details }); setSubmitted(true); setShowReport(false); setReportData({ userId: '', reason: '', details: '' }); setTimeout(() => setSubmitted(false), 3000); } catch (e) {}
+    try { await api.reportUser({ reportedId: reportData.userId || 'unknown', reason: reportData.reason, details: reportData.details }); setSubmitted(true); setShowReport(false); setReportData({ userId: '', reason: '', details: '' }); setTimeout(() => setSubmitted(false), 3000); } catch (e) {}
     setSubmitting(false);
   };
 

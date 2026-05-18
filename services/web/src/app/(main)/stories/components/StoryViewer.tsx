@@ -48,19 +48,19 @@ function CommentsDrawer({ story, onClose }: { story: any; onClose: () => void })
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
       className="fixed inset-0 z-[60] bg-black/50 backdrop-blur-sm flex items-end justify-center" onClick={onClose}>
       <motion.div initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }} transition={{ type: 'spring', damping: 25 }}
-        className="bg-white rounded-t-3xl w-full max-w-lg max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        className="bg-white dark:bg-gray-900 rounded-t-3xl w-full max-w-lg max-h-[70vh] flex flex-col" onClick={e => e.stopPropagation()}>
 
-        <div className="flex items-center justify-between p-4 border-b border-gray-100 relative">
-          <h3 className="font-bold text-gray-800">Comments ({comments.length})</h3>
-          <div className="w-10 h-1 rounded-full bg-gray-200 absolute left-1/2 -translate-x-1/2 top-2" />
-          <button onClick={onClose}><X className="w-5 h-5 text-gray-400" /></button>
+        <div className="flex items-center justify-between p-4 border-b border-gray-100 dark:border-gray-700 relative">
+          <h3 className="font-bold text-gray-800 dark:text-gray-200">Comments ({comments.length})</h3>
+          <div className="w-10 h-1 rounded-full bg-gray-200 dark:bg-gray-700 absolute left-1/2 -translate-x-1/2 top-2" />
+          <button onClick={onClose}><X className="w-5 h-5 text-gray-400 dark:text-gray-500" /></button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {comments.length === 0 && (
             <div className="text-center py-8">
               <MessageCircle className="w-10 h-10 text-gray-200 mx-auto mb-2" />
-              <p className="text-sm text-gray-400">No comments yet. Be the first!</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500">No comments yet. Be the first!</p>
             </div>
           )}
           {comments.map((c: any) => (
@@ -68,24 +68,24 @@ function CommentsDrawer({ story, onClose }: { story: any; onClose: () => void })
               <div className="flex gap-3">
                 <Avatar name={c.author?.displayName || 'User'} size="sm" />
                 <div className="flex-1">
-                  <div className="bg-gray-50 rounded-2xl rounded-tl-md px-4 py-2.5">
-                    <p className="text-xs font-bold text-gray-700">{c.author?.displayName || 'User'}</p>
-                    <p className="text-sm text-gray-600">{c.content}</p>
+                  <div className="bg-gray-50 dark:bg-gray-800 rounded-2xl rounded-tl-md px-4 py-2.5">
+                    <p className="text-xs font-bold text-gray-700 dark:text-gray-300">{c.author?.displayName || 'User'}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{c.content}</p>
                   </div>
                   <div className="flex items-center gap-3 mt-1 px-2">
-                    <span className="text-[10px] text-gray-400">{new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                    <button onClick={() => handleReply(c)} className="text-[10px] font-bold text-gray-400 hover:text-pink-500">Reply</button>
+                    <span className="text-[10px] text-gray-400 dark:text-gray-500">{new Date(c.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                    <button onClick={() => handleReply(c)} className="text-[10px] font-bold text-gray-400 dark:text-gray-500 hover:text-pink-500">Reply</button>
                   </div>
                   {/* Replies */}
                   {c.replies?.map((r: any) => (
                     <div key={r.id} className="flex gap-2 mt-2 ml-4">
                       <Avatar name={r.author?.displayName || 'User'} size="xs" />
                       <div className="flex-1">
-                        <div className="bg-pink-50 rounded-2xl rounded-tl-md px-3 py-2">
-                          <p className="text-[10px] font-bold text-gray-700">{r.author?.displayName || 'User'}</p>
-                          <p className="text-xs text-gray-600">{r.content}</p>
+                        <div className="bg-pink-50 dark:bg-pink-950/30 rounded-2xl rounded-tl-md px-3 py-2">
+                          <p className="text-[10px] font-bold text-gray-700 dark:text-gray-300">{r.author?.displayName || 'User'}</p>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">{r.content}</p>
                         </div>
-                        <span className="text-[10px] text-gray-400 px-2">{new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500 px-2">{new Date(r.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>
                     </div>
                   ))}
@@ -96,18 +96,18 @@ function CommentsDrawer({ story, onClose }: { story: any; onClose: () => void })
         </div>
 
         {/* Input */}
-        <div className="p-3 border-t border-gray-100">
+        <div className="p-3 border-t border-gray-100 dark:border-gray-700">
           {replyingTo && (
-            <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-gray-50 rounded-lg">
+            <div className="flex items-center gap-2 px-3 py-1.5 mb-2 bg-gray-50 dark:bg-gray-800 rounded-lg">
               <Reply className="w-3 h-3 text-pink-400" />
-              <span className="text-xs text-gray-500">Replying to <b>{replyingTo.name}</b></span>
-              <button onClick={() => setReplyingTo(null)} className="ml-auto"><X className="w-3 h-3 text-gray-400" /></button>
+              <span className="text-xs text-gray-500 dark:text-gray-400">Replying to <b>{replyingTo.name}</b></span>
+              <button onClick={() => setReplyingTo(null)} className="ml-auto"><X className="w-3 h-3 text-gray-400 dark:text-gray-500" /></button>
             </div>
           )}
           <div className="flex gap-2">
             <input ref={inputRef} value={newComment} onChange={e => setNewComment(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSend()}
-              placeholder="Add a comment..." className="flex-1 rounded-full border border-gray-200 px-4 py-2.5 text-sm focus:border-pink-300 focus:ring-2 focus:ring-pink-100 outline-none" />
+              placeholder="Add a comment..." className="flex-1 rounded-full border border-gray-200 dark:border-gray-700 px-4 py-2.5 text-sm focus:border-pink-300 focus:ring-2 focus:ring-pink-100 outline-none" />
             <Button size="sm" onClick={handleSend} disabled={!newComment.trim() || sending}
               className="rounded-full w-10 h-10 p-0 bg-gradient-to-r from-pink-500 to-rose-500">
               <Send className="w-4 h-4" />
@@ -231,10 +231,10 @@ export function StoryViewer({ storyGroup, initialIndex, onClose, onRefresh }: {
         <AnimatePresence>
           {showMenu && (
             <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}
-              className="absolute top-20 right-4 z-30 bg-white rounded-2xl shadow-2xl py-2 w-48 overflow-hidden">
+              className="absolute top-20 right-4 z-30 bg-white dark:bg-gray-900 rounded-2xl shadow-2xl py-2 w-48 overflow-hidden">
               {isOwn && (
                 <>
-                  <button onClick={handlePostToFeed} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left text-sm">
+                  <button onClick={handlePostToFeed} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 text-left text-sm">
                     <Share2 className="w-4 h-4 text-indigo-500" /> Post to Feed
                   </button>
                   <button onClick={handleDelete} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 text-left text-sm text-red-500">
@@ -243,11 +243,11 @@ export function StoryViewer({ storyGroup, initialIndex, onClose, onRefresh }: {
                 </>
               )}
               {!isOwn && (
-                <button onClick={() => { api.reportUser({ reportedId: author.id, reason: 'inappropriate', targetType: 'story', targetId: story.id }).catch(() => {}); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left text-sm">
+                <button onClick={() => { api.reportUser({ reportedId: author.id, reason: 'inappropriate', targetType: 'story', targetId: story.id }).catch(() => {}); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 text-left text-sm">
                   <AlertCircle className="w-4 h-4 text-amber-500" /> Report
                 </button>
               )}
-              <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 text-left text-sm text-gray-400">
+              <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 text-left text-sm text-gray-400 dark:text-gray-500">
                 <X className="w-4 h-4" /> Close
               </button>
             </motion.div>

@@ -152,6 +152,10 @@ export interface MiamoSettings {
   ageRangeMax: number;
   maxDistance: number;
   genderPreference: string;
+  // Nested objects returned by backend
+  privacy?: Record<string, any>;
+  notifications?: Record<string, any>;
+  preferences?: Record<string, any>;
 }
 
 export interface MiamoBookmark {

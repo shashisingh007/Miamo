@@ -39,7 +39,7 @@ const DATE_VIBES = [
   { id: 'chill', label: 'Chill & Cozy', emoji: '☕', color: 'from-amber-400 to-orange-500', bg: 'bg-amber-50' },
   { id: 'luxe', label: 'Luxe Night', emoji: '✨', color: 'from-violet-400 to-purple-500', bg: 'bg-violet-50' },
   { id: 'creative', label: 'Creative', emoji: '🎨', color: 'from-sky-400 to-blue-500', bg: 'bg-sky-50' },
-  { id: 'playful', label: 'Playful', emoji: '🎮', color: 'from-pink-400 to-fuchsia-500', bg: 'bg-pink-50' },
+  { id: 'playful', label: 'Playful', emoji: '🎮', color: 'from-pink-400 to-fuchsia-500', bg: 'bg-pink-50 dark:bg-pink-950/30' },
 ];
 
 const VENUES = [
@@ -100,7 +100,7 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
           className={cn(
             'h-2 rounded-full transition-all duration-300',
             i === current ? 'w-8 bg-gradient-to-r from-pink-500 to-rose-500 shadow-lg shadow-pink-200' :
-            i < current ? 'w-2 bg-pink-400' : 'w-2 bg-gray-200'
+            i < current ? 'w-2 bg-pink-400' : 'w-2 bg-gray-200 dark:bg-gray-700'
           )}
         />
       ))}
@@ -198,15 +198,15 @@ export default function DatePlannerPage() {
           >
             <motion.div
               initial={{ scale: 0.8, y: 30 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.8, y: 30 }}
-              className="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col"
+              className="bg-white dark:bg-gray-900 rounded-3xl shadow-2xl w-full max-w-lg max-h-[85vh] overflow-hidden flex flex-col"
               onClick={e => e.stopPropagation()}
             >
               {/* Modal header */}
               <div className="p-6 pb-0">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-black text-gray-800">Plan Your Date</h2>
-                  <button onClick={() => setCreating(false)} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center hover:bg-gray-200 transition-all">
-                    <X className="w-4 h-4 text-gray-500" />
+                  <h2 className="text-xl font-black text-gray-800 dark:text-gray-200">Plan Your Date</h2>
+                  <button onClick={() => setCreating(false)} className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center hover:bg-gray-200 dark:bg-gray-700 transition-all">
+                    <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                   </button>
                 </div>
                 <StepIndicator current={step} total={totalSteps} />
@@ -218,8 +218,8 @@ export default function DatePlannerPage() {
                   {/* Step 0: Choose your match */}
                   {step === 0 && (
                     <motion.div key="s0" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }}>
-                      <h3 className="text-lg font-bold text-gray-700 mb-1">Who&apos;s the lucky one? 💕</h3>
-                      <p className="text-sm text-gray-400 mb-4">Choose a match to plan a date with</p>
+                      <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-1">Who&apos;s the lucky one? 💕</h3>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">Choose a match to plan a date with</p>
                       <div className="space-y-2 max-h-[40vh] overflow-y-auto">
                         {matches.map((m: any) => {
                           const user = m.matchedUser || m;
@@ -229,15 +229,15 @@ export default function DatePlannerPage() {
                             <motion.button key={m.id} whileHover={{ x: 4 }} whileTap={{ scale: 0.97 }}
                               onClick={() => setSelectedMatch(m)}
                               className={cn('flex items-center gap-3 w-full p-3 rounded-2xl transition-all text-left border-2',
-                                selected ? 'border-pink-400 bg-pink-50 shadow-lg shadow-pink-100' : 'border-transparent hover:bg-gray-50')}
+                                selected ? 'border-pink-400 bg-pink-50 dark:bg-pink-950/30 shadow-lg shadow-pink-100' : 'border-transparent hover:bg-gray-50 dark:hover:bg-gray-700')}
                             >
                               <Avatar src={photo} name={user.displayName || 'Match'} size="md" />
                               <div className="flex-1 min-w-0">
-                                <p className="font-semibold text-gray-800 truncate">{user.displayName || 'Match'}</p>
-                                <p className="text-xs text-gray-400">@{user.username || 'user'}</p>
+                                <p className="font-semibold text-gray-800 dark:text-gray-200 truncate">{user.displayName || 'Match'}</p>
+                                <p className="text-xs text-gray-400 dark:text-gray-500">@{user.username || 'user'}</p>
                               </div>
                               {selected && (
-                                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-8 h-8 rounded-full bg-pink-500 flex items-center justify-center">
+                                <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="w-8 h-8 rounded-full bg-pink-50 dark:bg-pink-950/300 flex items-center justify-center">
                                   <Check className="w-4 h-4 text-white" />
                                 </motion.div>
                               )}
@@ -247,7 +247,7 @@ export default function DatePlannerPage() {
                         {matches.length === 0 && (
                           <div className="text-center py-8">
                             <Heart className="w-10 h-10 text-gray-200 mx-auto mb-2" />
-                            <p className="text-sm text-gray-400">No matches yet. Get swiping!</p>
+                            <p className="text-sm text-gray-400 dark:text-gray-500">No matches yet. Get swiping!</p>
                           </div>
                         )}
                       </div>
@@ -257,8 +257,8 @@ export default function DatePlannerPage() {
                   {/* Step 1: Choose vibe */}
                   {step === 1 && (
                     <motion.div key="s1" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }}>
-                      <h3 className="text-lg font-bold text-gray-700 mb-1">Set the vibe 🎭</h3>
-                      <p className="text-sm text-gray-400 mb-4">What kind of energy are you going for?</p>
+                      <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-1">Set the vibe 🎭</h3>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">What kind of energy are you going for?</p>
                       <div className="grid grid-cols-2 gap-3">
                         {DATE_VIBES.map(vibe => (
                           <motion.button key={vibe.id} whileHover={{ y: -4, scale: 1.02 }} whileTap={{ scale: 0.95 }}
@@ -268,7 +268,7 @@ export default function DatePlannerPage() {
                           >
                             <motion.span className="text-3xl block mb-2" animate={selectedVibe === vibe.id ? { scale: [1, 1.3, 1], rotate: [0, 10, -10, 0] } : {}}
                               transition={{ duration: 0.5 }}>{vibe.emoji}</motion.span>
-                            <p className="font-bold text-sm text-gray-700">{vibe.label}</p>
+                            <p className="font-bold text-sm text-gray-700 dark:text-gray-300">{vibe.label}</p>
                           </motion.button>
                         ))}
                       </div>
@@ -278,8 +278,8 @@ export default function DatePlannerPage() {
                   {/* Step 2: Choose venue */}
                   {step === 2 && (
                     <motion.div key="s2" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }}>
-                      <h3 className="text-lg font-bold text-gray-700 mb-1">Pick a spot 📍</h3>
-                      <p className="text-sm text-gray-400 mb-4">Where do you want to go?</p>
+                      <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-1">Pick a spot 📍</h3>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">Where do you want to go?</p>
                       <div className="grid grid-cols-2 gap-3">
                         {VENUES.map(v => {
                           const Icon = v.icon;
@@ -288,13 +288,13 @@ export default function DatePlannerPage() {
                             <motion.button key={v.id} whileHover={{ y: -3 }} whileTap={{ scale: 0.95 }}
                               onClick={() => setSelectedVenue(v.id)}
                               className={cn('p-4 rounded-2xl border-2 flex flex-col items-center gap-2 transition-all',
-                                sel ? 'border-pink-400 bg-pink-50 shadow-lg' : 'border-gray-100 bg-white hover:bg-gray-50')}
+                                sel ? 'border-pink-400 bg-pink-50 dark:bg-pink-950/30 shadow-lg' : 'border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-700')}
                             >
                               <motion.div animate={sel ? { rotateY: 360 } : {}} transition={{ duration: 0.6 }}
-                                className={cn('w-12 h-12 rounded-xl flex items-center justify-center', sel ? 'bg-pink-100' : 'bg-gray-50')}>
+                                className={cn('w-12 h-12 rounded-xl flex items-center justify-center', sel ? 'bg-pink-100' : 'bg-gray-50 dark:bg-gray-800')}>
                                 <Icon className={cn('w-6 h-6', v.color)} />
                               </motion.div>
-                              <p className="font-semibold text-sm text-gray-700">{v.label}</p>
+                              <p className="font-semibold text-sm text-gray-700 dark:text-gray-300">{v.label}</p>
                             </motion.button>
                           );
                         })}
@@ -305,8 +305,8 @@ export default function DatePlannerPage() {
                   {/* Step 3: Time & Budget */}
                   {step === 3 && (
                     <motion.div key="s3" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }}>
-                      <h3 className="text-lg font-bold text-gray-700 mb-1">When & How? ⏰</h3>
-                      <p className="text-sm text-gray-400 mb-4">Pick the perfect time</p>
+                      <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-1">When & How? ⏰</h3>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">Pick the perfect time</p>
                       <div className="space-y-4">
                         <div className="flex flex-wrap gap-2">
                           {TIMES_OF_DAY.map(t => {
@@ -316,7 +316,7 @@ export default function DatePlannerPage() {
                               <motion.button key={t.id} whileTap={{ scale: 0.9 }}
                                 onClick={() => setSelectedTime(t.id)}
                                 className={cn('flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all',
-                                  sel ? 'border-pink-400 bg-pink-50' : 'border-gray-100 hover:bg-gray-50')}>
+                                  sel ? 'border-pink-400 bg-pink-50 dark:bg-pink-950/30' : 'border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700')}>
                                 <Icon className={cn('w-4 h-4', t.color)} />
                                 <span className="text-sm font-semibold">{t.label}</span>
                               </motion.button>
@@ -324,13 +324,13 @@ export default function DatePlannerPage() {
                           })}
                         </div>
                         <div>
-                          <p className="text-sm font-bold text-gray-600 mb-2">Budget 💰</p>
+                          <p className="text-sm font-bold text-gray-600 dark:text-gray-400 mb-2">Budget 💰</p>
                           <div className="flex flex-wrap gap-2">
                             {BUDGETS.map(b => (
                               <motion.button key={b} whileTap={{ scale: 0.9 }}
                                 onClick={() => setSelectedBudget(b)}
                                 className={cn('px-4 py-2.5 rounded-xl border-2 text-sm font-semibold transition-all',
-                                  selectedBudget === b ? 'border-pink-400 bg-pink-50 text-pink-700' : 'border-gray-100 text-gray-600 hover:bg-gray-50')}>
+                                  selectedBudget === b ? 'border-pink-400 bg-pink-50 dark:bg-pink-950/30 text-pink-700' : 'border-gray-100 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700')}>
                                 {b}
                               </motion.button>
                             ))}
@@ -343,14 +343,14 @@ export default function DatePlannerPage() {
                   {/* Step 4: Activities & Notes */}
                   {step === 4 && (
                     <motion.div key="s4" initial={{ opacity: 0, x: 50 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -50 }}>
-                      <h3 className="text-lg font-bold text-gray-700 mb-1">Fun Extras 🎉</h3>
-                      <p className="text-sm text-gray-400 mb-4">Add activities to make it special</p>
+                      <h3 className="text-lg font-bold text-gray-700 dark:text-gray-300 mb-1">Fun Extras 🎉</h3>
+                      <p className="text-sm text-gray-400 dark:text-gray-500 mb-4">Add activities to make it special</p>
                       <div className="flex flex-wrap gap-2 mb-4">
                         {FUN_ACTIVITIES.map(a => (
                           <motion.button key={a} whileTap={{ scale: 0.9 }}
                             onClick={() => toggleActivity(a)}
                             className={cn('px-3 py-2 rounded-xl text-xs font-semibold border-2 transition-all',
-                              selectedActivities.includes(a) ? 'border-pink-400 bg-pink-50 text-pink-700' : 'border-gray-100 text-gray-500 hover:bg-gray-50')}>
+                              selectedActivities.includes(a) ? 'border-pink-400 bg-pink-50 dark:bg-pink-950/30 text-pink-700' : 'border-gray-100 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700')}>
                             {a}
                           </motion.button>
                         ))}
@@ -358,7 +358,7 @@ export default function DatePlannerPage() {
                       <textarea
                         value={notes} onChange={e => setNotes(e.target.value)}
                         placeholder="Any special notes or surprises? 💝"
-                        className="w-full p-3 rounded-xl border border-pink-100 bg-pink-50/30 text-sm resize-none h-24 focus:outline-none focus:ring-2 focus:ring-pink-200"
+                        className="w-full p-3 rounded-xl border border-pink-100 bg-pink-50 dark:bg-pink-950/30/30 text-sm resize-none h-24 focus:outline-none focus:ring-2 focus:ring-pink-200"
                       />
                     </motion.div>
                   )}
@@ -406,7 +406,7 @@ export default function DatePlannerPage() {
       {/* Saved Plans */}
       <div className="relative z-10 space-y-4">
         {plans.length > 0 && (
-          <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+          <h2 className="text-lg font-bold text-gray-800 dark:text-gray-200 flex items-center gap-2">
             <Star className="w-5 h-5 text-amber-400" /> Your Date Plans
           </h2>
         )}
@@ -418,15 +418,15 @@ export default function DatePlannerPage() {
                 <div className={cn('absolute top-0 right-0 w-24 h-24 rounded-bl-full opacity-20 bg-gradient-to-br', vibe?.color || 'from-pink-400 to-rose-500')} />
                 <div className="flex items-start gap-4">
                   <motion.div animate={{ rotate: [0, 5, -5, 0] }} transition={{ duration: 4, repeat: Infinity }}
-                    className={cn('w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-lg', vibe?.bg || 'bg-pink-50')}>
+                    className={cn('w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-lg', vibe?.bg || 'bg-pink-50 dark:bg-pink-950/30')}>
                     {vibe?.emoji || '💕'}
                   </motion.div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-bold text-gray-800">{vibe?.label || 'Date'} with {plan.matchName}</h3>
+                      <h3 className="font-bold text-gray-800 dark:text-gray-200">{vibe?.label || 'Date'} with {plan.matchName}</h3>
                       <Badge variant="default">{plan.venue}</Badge>
                     </div>
-                    <div className="flex items-center gap-4 text-xs text-gray-400 mb-2">
+                    <div className="flex items-center gap-4 text-xs text-gray-400 dark:text-gray-500 mb-2">
                       <span className="flex items-center gap-1"><CalendarHeart className="w-3 h-3" /> {plan.date}</span>
                       <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {plan.time}</span>
                       <span>{plan.budget}</span>
@@ -434,16 +434,16 @@ export default function DatePlannerPage() {
                     {plan.activities.length > 0 && (
                       <div className="flex flex-wrap gap-1.5">
                         {plan.activities.map(a => (
-                          <span key={a} className="px-2 py-1 rounded-lg bg-pink-50 text-[10px] font-semibold text-pink-600">{a}</span>
+                          <span key={a} className="px-2 py-1 rounded-lg bg-pink-50 dark:bg-pink-950/30 text-[10px] font-semibold text-pink-600">{a}</span>
                         ))}
                       </div>
                     )}
-                    {plan.notes && <p className="text-xs text-gray-500 mt-2 italic">&ldquo;{plan.notes}&rdquo;</p>}
+                    {plan.notes && <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 italic">&ldquo;{plan.notes}&rdquo;</p>}
                   </div>
                   <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
                     onClick={() => setPlans(prev => prev.map(p => p.id === plan.id ? { ...p, confirmed: !p.confirmed } : p))}
                     className={cn('w-10 h-10 rounded-xl flex items-center justify-center transition-all',
-                      plan.confirmed ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-50 text-gray-300 hover:text-pink-500')}>
+                      plan.confirmed ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-50 dark:bg-gray-800 text-gray-300 hover:text-pink-500')}>
                     <Check className="w-5 h-5" />
                   </motion.button>
                 </div>
