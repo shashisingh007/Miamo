@@ -1,11 +1,12 @@
 # Miamo Frontend Audit
 
 > Every page, component, hook, lib, and store file — fully read and catalogued.
+> **Last Updated:** Code cleanup audit completed — dead imports removed, unused assets purged, CSS optimized.
 
 ---
 
 ## app/page.tsx (Landing Page)
-- **Lines:** ~281
+- **Lines:** ~474
 - **State Variables:** None (fully static)
 - **API Calls:** None
 - **User Actions:** Click "Start Your Story" → `/register`, Click "Already have an account" → `/login`
@@ -17,7 +18,7 @@
   - None critical
 - **Code Smells:**
   - Hardcoded features/testimonials/stats arrays inline — should be in constants
-  - Uses `APP_NAME` from constants but all other text is hardcoded
+  - ~~Uses `APP_NAME` from constants but all other text is hardcoded~~ (FIXED: removed unused `APP_NAME` import)
 
 ---
 
@@ -42,12 +43,12 @@
 ---
 
 ## app/globals.css
-- **Lines:** ~540
-- **Notes:** Extensive premium CSS — glass morphism, card-3d, btn-primary/glass/ghost/outline, input-premium, nav-item, floating-hearts, shimmer-glass, animations, orbs, badges, progress bars, header-premium.
+- **Lines:** ~1035 (reduced from ~1170 after dead code removal)
+- **Notes:** Premium CSS — glass morphism, card-3d, btn-primary/glass/ghost/outline, input-premium, nav-item, floating-hearts, shimmer-glass, heart orbit animations, orbs, badges, progress bars.
+- **Removed (dead code):** `.miamo-icon-card`, `sparkle-blink`, `.text-gold`, `copper-text-shift`, `.rose-gold-border`, `.rose-gold-glow`, `.luxury-divider`, `.shadow-3d`, `.shadow-3d-hover`, `.rose-particle`, `rose-particle-float`, `.tap-glow`, `.inset-premium`, `.magnetic-hover`
 - **Code Smells:**
-  - Very large single CSS file — could split into modules (animations.css, components.css, etc.)
-  - Some duplicate transition definitions
-  - `.dark` mode selectors defined but dark mode not fully wired in the app (most pages use hardcoded light-mode colors like `text-gray-800`, `bg-white`)
+  - Large single CSS file — could split into modules but Tailwind + PostCSS makes this acceptable
+  - `.dark` mode selectors defined but dark mode not fully wired in the app
 
 ---
 

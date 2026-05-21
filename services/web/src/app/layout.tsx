@@ -1,30 +1,31 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Cormorant_Garamond } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/providers';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
+const brand = Cormorant_Garamond({ subsets: ['latin'], variable: '--font-brand', weight: ['600', '700'] });
 
 export const metadata: Metadata = {
   title: 'Miamo — Premium Dating App',
   description: 'A premium dating and social platform for meaningful connections, thoughtful matching, and authentic relationships.',
   keywords: ['dating', 'social', 'meaningful connections', 'relationships', 'AI matching'],
   icons: {
-    icon: '/logo.png',
-    shortcut: '/logo.png',
-    apple: '/logo.png',
+    icon: '/assets/logo.svg',
+    shortcut: '/assets/logo.svg',
+    apple: '/assets/logo.svg',
   },
   openGraph: {
     title: 'Miamo — Premium Dating App',
     description: 'Premium dating and social platform',
     type: 'website',
     siteName: 'Miamo',
-    images: [{ url: '/logo.png', width: 512, height: 512 }],
+    images: [{ url: '/assets/logo.svg', width: 512, height: 512 }],
   },
 };
 
 export const viewport: Viewport = {
-  themeColor: '#FDF2F5',
+  themeColor: '#FFFFFF',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -33,7 +34,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans`}>
+      <body className={`${inter.variable} ${brand.variable} font-sans`}>
         <Providers>{children}</Providers>
       </body>
     </html>

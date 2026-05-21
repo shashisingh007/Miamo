@@ -10,11 +10,11 @@ import { twMerge } from 'tailwind-merge';
  *
  * @example
  * ```tsx
- * cn('px-2 py-1', isActive && 'bg-pink-500', 'px-4') // 'py-1 bg-pink-500 px-4'
+ * cn('px-2 py-1', isActive && 'bg-miamo-surface0', 'px-4') // 'py-1 bg-miamo-surface0 px-4'
  * ```
  */
 export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs));
+ return twMerge(clsx(inputs));
 }
 
 /**
@@ -25,12 +25,12 @@ export function cn(...inputs: ClassValue[]) {
  * @returns Uppercase initials (e.g. "JD")
  */
 export function getInitials(name: string): string {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .join('')
-    .toUpperCase()
-    .slice(0, 2);
+ return name
+ .split(' ')
+ .map((w) => w[0])
+ .join('')
+ .toUpperCase()
+ .slice(0, 2);
 }
 
 /**
@@ -40,17 +40,17 @@ export function getInitials(name: string): string {
  * @returns Relative string: "Just now", "5m ago", "3h ago", "2d ago", or locale date
  */
 export function formatRelativeTime(date: string | Date): string {
-  const now = new Date();
-  const d = new Date(date);
-  const diffMs = now.getTime() - d.getTime();
-  const diffMin = Math.floor(diffMs / 60000);
-  if (diffMin < 1) return 'Just now';
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffH = Math.floor(diffMin / 60);
-  if (diffH < 24) return `${diffH}h ago`;
-  const diffD = Math.floor(diffH / 24);
-  if (diffD < 7) return `${diffD}d ago`;
-  return d.toLocaleDateString();
+ const now = new Date();
+ const d = new Date(date);
+ const diffMs = now.getTime() - d.getTime();
+ const diffMin = Math.floor(diffMs / 60000);
+ if (diffMin < 1) return 'Just now';
+ if (diffMin < 60) return `${diffMin}m ago`;
+ const diffH = Math.floor(diffMin / 60);
+ if (diffH < 24) return `${diffH}h ago`;
+ const diffD = Math.floor(diffH / 24);
+ if (diffD < 7) return `${diffD}d ago`;
+ return d.toLocaleDateString();
 }
 
 /**
@@ -61,5 +61,5 @@ export function formatRelativeTime(date: string | Date): string {
  * @returns Original string or truncated with '…' suffix
  */
 export function truncate(str: string, len: number): string {
-  return str.length > len ? str.slice(0, len) + '…' : str;
+ return str.length > len ? str.slice(0, len) + '…' : str;
 }

@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
-import { Camera, Edit3, MapPin, Briefcase, Heart, Plus, CheckCircle, Save, X, Eye, Shield, ChevronLeft, ChevronRight, ZoomIn, Sparkles, TrendingUp } from 'lucide-react';
+import { Camera, Edit3, MapPin, Briefcase, Plus, CheckCircle, Save, X, Eye, Shield, ChevronLeft, ChevronRight, ZoomIn, Sparkles, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, Badge, Card, ScoreRing } from '@/components/ui';
 import { ProfilePageSkeleton } from '@/components/ui/skeleton';
@@ -16,471 +16,471 @@ import { ErrorBoundary } from '@/components/ui/error-boundary';
 
 /* ═══ Animated Score Ring (counts up on mount) ═══ */
 function AnimatedScoreRing({ score, size = 80, strokeWidth = 5 }: { score: number; size?: number; strokeWidth?: number }) {
-  const [display, setDisplay] = useState(0);
-  useEffect(() => {
-    let current = 0;
-    const step = Math.max(1, Math.ceil(score / 40));
-    const timer = setInterval(() => {
-      current += step;
-      if (current >= score) { current = score; clearInterval(timer); }
-      setDisplay(current);
-    }, 30);
-    return () => clearInterval(timer);
-  }, [score]);
-  return <ScoreRing score={display} size={size} strokeWidth={strokeWidth} />;
+ const [display, setDisplay] = useState(0);
+ useEffect(() => {
+ let current = 0;
+ const step = Math.max(1, Math.ceil(score / 40));
+ const timer = setInterval(() => {
+ current += step;
+ if (current >= score) { current = score; clearInterval(timer); }
+ setDisplay(current);
+ }, 30);
+ return () => clearInterval(timer);
+ }, [score]);
+ return <ScoreRing score={display} size={size} strokeWidth={strokeWidth} />;
 }
 
 /* ═══ Photo Lightbox ═══ */
 function PhotoLightbox({ photos, initialIndex, onClose }: { photos: any[]; initialIndex: number; onClose: () => void }) {
-  const [idx, setIdx] = useState(initialIndex);
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-      if (e.key === 'ArrowRight') setIdx(i => Math.min(i + 1, photos.length - 1));
-      if (e.key === 'ArrowLeft') setIdx(i => Math.max(i - 1, 0));
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [onClose, photos.length]);
+ const [idx, setIdx] = useState(initialIndex);
+ useEffect(() => {
+ const handler = (e: KeyboardEvent) => {
+ if (e.key === 'Escape') onClose();
+ if (e.key === 'ArrowRight') setIdx(i => Math.min(i + 1, photos.length - 1));
+ if (e.key === 'ArrowLeft') setIdx(i => Math.max(i - 1, 0));
+ };
+ window.addEventListener('keydown', handler);
+ return () => window.removeEventListener('keydown', handler);
+ }, [onClose, photos.length]);
 
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center"
-      onClick={onClose}
-    >
-      <button className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors" onClick={onClose}>
-        <X className="w-5 h-5 text-white" />
-      </button>
-      <div className="relative w-full max-w-lg mx-4" onClick={e => e.stopPropagation()}>
-        <AnimatePresence mode="wait">
-          <motion.img
-            key={idx}
-            src={photos[idx]?.url}
-            alt=""
-            className="w-full rounded-2xl object-contain max-h-[80vh]"
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-          />
-        </AnimatePresence>
-        {idx > 0 && (
-          <button className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 flex items-center justify-center" onClick={() => setIdx(i => i - 1)}>
-            <ChevronLeft className="w-5 h-5 text-white" />
-          </button>
-        )}
-        {idx < photos.length - 1 && (
-          <button className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 flex items-center justify-center" onClick={() => setIdx(i => i + 1)}>
-            <ChevronRight className="w-5 h-5 text-white" />
-          </button>
-        )}
-        <div className="flex justify-center gap-1.5 mt-3">
-          {photos.map((_: any, i: number) => (
-            <div key={i} className={cn('w-2 h-2 rounded-full transition-all', i === idx ? 'bg-white scale-125' : 'bg-white/30')} />
-          ))}
-        </div>
-      </div>
-    </motion.div>
-  );
+ return (
+ <motion.div
+ initial={{ opacity: 0 }}
+ animate={{ opacity: 1 }}
+ exit={{ opacity: 0 }}
+ className="fixed inset-0 z-50 bg-black/90 backdrop-blur-xl flex items-center justify-center"
+ onClick={onClose}
+ >
+ <button className="absolute top-4 right-4 z-10 w-10 h-10 rounded-full bg-miamo-card/10 flex items-center justify-center hover:bg-miamo-card/20 transition-colors" onClick={onClose}>
+ <X className="w-5 h-5 text-text-primary" />
+ </button>
+ <div className="relative w-full max-w-lg mx-4" onClick={e => e.stopPropagation()}>
+ <AnimatePresence mode="wait">
+ <motion.img
+ key={idx}
+ src={photos[idx]?.url}
+ alt=""
+ className="w-full rounded-2xl object-contain max-h-[80vh]"
+ initial={{ opacity: 0, scale: 0.95 }}
+ animate={{ opacity: 1, scale: 1 }}
+ exit={{ opacity: 0, scale: 0.95 }}
+ transition={{ duration: 0.2 }}
+ />
+ </AnimatePresence>
+ {idx > 0 && (
+ <button className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 flex items-center justify-center" onClick={() => setIdx(i => i - 1)}>
+ <ChevronLeft className="w-5 h-5 text-text-primary" />
+ </button>
+ )}
+ {idx < photos.length - 1 && (
+ <button className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-black/40 flex items-center justify-center" onClick={() => setIdx(i => i + 1)}>
+ <ChevronRight className="w-5 h-5 text-text-primary" />
+ </button>
+ )}
+ <div className="flex justify-center gap-1.5 mt-3">
+ {photos.map((_: any, i: number) => (
+ <div key={i} className={cn('w-2 h-2 rounded-full transition-all', i === idx ? 'bg-miamo-card scale-125' : 'bg-miamo-card/30')} />
+ ))}
+ </div>
+ </div>
+ </motion.div>
+ );
 }
 
 export default function ProfilePage() {
-  const [profile, setProfile] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [editing, setEditing] = useState(false);
-  const [editForm, setEditForm] = useState({ bio: '', city: '', profession: '', datingIntent: '', education: '', height: '', languages: '', drinking: '', smoking: '', fitness: '', diet: '', pets: '', children: '', religion: '', politicalViews: '' });
-  const [saving, setSaving] = useState(false);
-  const [showAddInterest, setShowAddInterest] = useState(false);
-  const [showAddPrompt, setShowAddPrompt] = useState(false);
-  const [newPromptQ, setNewPromptQ] = useState('');
-  const [newPromptA, setNewPromptA] = useState('');
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
-  const { updateUser } = useAuthStore();
-  const photoInputRef = useRef<HTMLInputElement>(null);
-  const coverInputRef = useRef<HTMLInputElement>(null);
-  const heroRef = useRef<HTMLDivElement>(null);
-  const toast = useToast();
+ const [profile, setProfile] = useState<any>(null);
+ const [loading, setLoading] = useState(true);
+ const [editing, setEditing] = useState(false);
+ const [editForm, setEditForm] = useState({ bio: '', city: '', profession: '', datingIntent: '', education: '', height: '', languages: '', drinking: '', smoking: '', fitness: '', diet: '', pets: '', children: '', religion: '', politicalViews: '' });
+ const [saving, setSaving] = useState(false);
+ const [showAddInterest, setShowAddInterest] = useState(false);
+ const [showAddPrompt, setShowAddPrompt] = useState(false);
+ const [newPromptQ, setNewPromptQ] = useState('');
+ const [newPromptA, setNewPromptA] = useState('');
+ const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+ const { updateUser } = useAuthStore();
+ const photoInputRef = useRef<HTMLInputElement>(null);
+ const coverInputRef = useRef<HTMLInputElement>(null);
+ const heroRef = useRef<HTMLDivElement>(null);
+ const toast = useToast();
 
-  useTrackPageView('profile');
-  useTrackScrollDepth('profile');
+ useTrackPageView('profile');
+ useTrackScrollDepth('profile');
 
-  // Parallax for hero
-  const { scrollY } = useScroll();
-  const heroY = useTransform(scrollY, [0, 300], [0, 80]);
-  const heroScale = useTransform(scrollY, [0, 300], [1, 1.1]);
+ // Parallax for hero
+ const { scrollY } = useScroll();
+ const heroY = useTransform(scrollY, [0, 300], [0, 80]);
+ const heroScale = useTransform(scrollY, [0, 300], [1, 1.1]);
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const preview = URL.createObjectURL(file);
-    setProfile((prev: any) => ({
-      ...prev,
-      user: { ...(prev?.user || prev), photos: [{ url: preview }, ...(prev?.user?.photos || prev?.photos || [])] },
-    }));
-    const formData = new FormData();
-    formData.append('photo', file);
-    api.uploadPhoto(formData).then(() => {
-      loadProfile();
-      toast.success('Photo uploaded', 'Your new photo is now visible');
-    }).catch(() => {
-      toast.error('Upload failed', 'Please try again');
-    });
-    e.target.value = '';
-  };
+ const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+ const file = e.target.files?.[0];
+ if (!file) return;
+ const preview = URL.createObjectURL(file);
+ setProfile((prev: any) => ({
+ ...prev,
+ user: { ...(prev?.user || prev), photos: [{ url: preview }, ...(prev?.user?.photos || prev?.photos || [])] },
+ }));
+ const formData = new FormData();
+ formData.append('photo', file);
+ api.uploadPhoto(formData).then(() => {
+ loadProfile();
+ toast.success('Photo uploaded', 'Your new photo is now visible');
+ }).catch(() => {
+ toast.error('Upload failed', 'Please try again');
+ });
+ e.target.value = '';
+ };
 
-  const loadProfile = () => {
-    setLoading(true);
-    api.getMyProfile().then(res => {
-      setProfile(res.data);
-      const prof = (res.data as any)?.profile || res.data || {};
-      setEditForm({ bio: prof.bio || '', city: prof.city || '', profession: prof.profession || '', datingIntent: prof.datingIntent || prof.intent || '', education: prof.education || '', height: prof.height || '', languages: prof.languages || '', drinking: prof.drinking || '', smoking: prof.smoking || '', fitness: prof.fitness || '', diet: prof.diet || '', pets: prof.pets || '', children: prof.children || '', religion: prof.religion || '', politicalViews: prof.politicalViews || '' });
-    }).catch(() => {}).finally(() => setLoading(false));
-  };
+ const loadProfile = () => {
+ setLoading(true);
+ api.getMyProfile().then(res => {
+ setProfile(res.data);
+ const prof = (res.data as any)?.profile || res.data || {};
+ setEditForm({ bio: prof.bio || '', city: prof.city || '', profession: prof.profession || '', datingIntent: prof.datingIntent || prof.intent || '', education: prof.education || '', height: prof.height || '', languages: prof.languages || '', drinking: prof.drinking || '', smoking: prof.smoking || '', fitness: prof.fitness || '', diet: prof.diet || '', pets: prof.pets || '', children: prof.children || '', religion: prof.religion || '', politicalViews: prof.politicalViews || '' });
+ }).catch(() => {}).finally(() => setLoading(false));
+ };
 
-  useEffect(() => { loadProfile(); }, []);
+ useEffect(() => { loadProfile(); }, []);
 
-  if (loading) return <ProfilePageSkeleton />;
+ if (loading) return <ProfilePageSkeleton />;
 
-  if (!profile) return (
-    <div className="h-full flex items-center justify-center">
-      <div className="text-center"><p className="text-text-muted">Could not load profile. Please log in.</p></div>
-    </div>
-  );
+ if (!profile) return (
+ <div className="h-full flex items-center justify-center">
+ <div className="text-center"><p className="text-text-muted">Could not load profile. Please log in.</p></div>
+ </div>
+ );
 
-  const user = profile.user || profile;
-  const prof = profile.profile || profile;
-  const photos = user.photos || profile.photos || [];
-  const interests = profile.interests || user.interests || [];
-  const prompts = profile.prompts || user.prompts || [];
-  const profileScore = prof.profileScore || 70;
+ const user = profile.user || profile;
+ const prof = profile.profile || profile;
+ const photos = user.photos || profile.photos || [];
+ const interests = profile.interests || user.interests || [];
+ const prompts = profile.prompts || user.prompts || [];
+ const profileScore = prof.profileScore || 70;
 
-  const completionSteps = [
-    { label: 'Basic info', done: !!user.displayName, action: () => setEditing(true) },
-    { label: 'Photos (3+)', done: photos.length >= 3, action: () => photoInputRef.current?.click() },
-    { label: 'Bio', done: !!prof.bio, action: () => setEditing(true) },
-    { label: 'Interests (5+)', done: interests.length >= 5, action: () => setShowAddInterest(true) },
-    { label: 'Prompts (2+)', done: prompts.length >= 2, action: () => setShowAddPrompt(true) },
-    { label: 'Relationship intent', done: !!prof.intent, action: () => setEditing(true) },
-    { label: 'Verification', done: user.verified, action: () => {} },
-  ];
-  const doneCount = completionSteps.filter(s => s.done).length;
-  const profilePercent = Math.round((doneCount / completionSteps.length) * 100);
+ const completionSteps = [
+ { label: 'Basic info', done: !!user.displayName, action: () => setEditing(true) },
+ { label: 'Photos (3+)', done: photos.length >= 3, action: () => photoInputRef.current?.click() },
+ { label: 'Bio', done: !!prof.bio, action: () => setEditing(true) },
+ { label: 'Interests (5+)', done: interests.length >= 5, action: () => setShowAddInterest(true) },
+ { label: 'Prompts (2+)', done: prompts.length >= 2, action: () => setShowAddPrompt(true) },
+ { label: 'Relationship intent', done: !!prof.intent, action: () => setEditing(true) },
+ { label: 'Verification', done: user.verified, action: () => {} },
+ ];
+ const doneCount = completionSteps.filter(s => s.done).length;
+ const profilePercent = Math.round((doneCount / completionSteps.length) * 100);
 
-  return (
-    <ErrorBoundary>
-    <div className="max-w-3xl mx-auto space-y-6 pb-8">
-      {/* ═══ HERO SECTION WITH PARALLAX ═══ */}
-      <Card className="overflow-hidden relative">
-        <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-        <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-        <div ref={heroRef} className="h-40 relative overflow-hidden">
-          <motion.div
-            style={{ y: heroY, scale: heroScale }}
-            className="absolute inset-0 bg-gradient-to-br from-lavender-400/30 via-miamo-elevated to-violet-deep/30"
-          />
-          {/* Decorative orbs */}
-          <div className="absolute top-4 right-8 w-20 h-20 rounded-full bg-pink-400/10 animate-float blur-lg" />
-          <div className="absolute bottom-2 left-12 w-16 h-16 rounded-full bg-amber-400/10 animate-float-delayed blur-lg" />
-          <button onClick={() => coverInputRef.current?.click()} className="absolute top-3 right-3 bg-black/30 backdrop-blur-sm text-white p-2 rounded-xl hover:bg-black/50 transition-colors z-10">
-            <Camera className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="px-6 pb-6 -mt-14 relative z-10">
-          <div className="flex items-end gap-4">
-            <motion.div
-              className="relative"
-              whileHover={{ scale: 1.05 }}
-              transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-            >
-              <Avatar src={photos[0]?.url} name={user.displayName || 'User'} size="xl" className="w-24 h-24 text-2xl border-4 border-miamo-card dark:border-gray-900 shadow-xl" />
-              <button onClick={() => photoInputRef.current?.click()} className="absolute bottom-0 right-0 w-8 h-8 bg-gradient-to-r from-pink-500 to-rose-500 rounded-full flex items-center justify-center border-2 border-white dark:border-gray-900 shadow-lg hover:scale-110 transition-transform">
-                <Camera className="w-3.5 h-3.5 text-white" />
-              </button>
-              {user.verified && (
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-r from-emerald-400 to-green-400 rounded-full flex items-center justify-center border-2 border-white shadow-md"
-                  title={`Verified ${user.verifiedAt ? `on ${new Date(user.verifiedAt).toLocaleDateString()}` : ''}`}
-                >
-                  <Shield className="w-3 h-3 text-white" />
-                </motion.div>
-              )}
-            </motion.div>
-            <div className="flex-1 mb-1">
-              <div className="flex items-center gap-2">
-                <h1 className="text-xl font-bold dark:text-white">{user.displayName}</h1>
-                {user.verified && <Badge variant="success">Verified</Badge>}
-              </div>
-              <p className="text-sm text-text-muted flex items-center gap-2 mt-0.5">
-                <span>@{user.username}</span><span>•</span><MapPin className="w-3 h-3" />{prof.city || ''}
-              </p>
-            </div>
-            <Button variant="secondary" size="sm" onClick={() => {
-              if (editing) {
-                setSaving(true);
-                api.updateProfile({ ...editForm, height: editForm.height ? parseInt(editForm.height as any) || null : null } as any).then(() => { loadProfile(); updateUser(editForm); setEditing(false); toast.success('Profile saved'); }).catch(() => toast.error('Save failed')).finally(() => setSaving(false));
-              } else {
-                setEditing(true);
-                trackClick('edit-profile');
-              }
-            }}>
-              {editing ? (saving ? 'Saving…' : <><Save className="w-3.5 h-3.5" /> Save</>) : <><Edit3 className="w-3.5 h-3.5" /> Edit</>}
-            </Button>
-            {editing && <Button variant="ghost" size="sm" onClick={() => setEditing(false)}><X className="w-3.5 h-3.5" /></Button>}
-          </div>
+ return (
+ <ErrorBoundary>
+ <div className="max-w-3xl mx-auto space-y-6 pb-8">
+ {/* ═══ HERO SECTION WITH PARALLAX ═══ */}
+ <Card className="overflow-hidden relative">
+ <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+ <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+ <div ref={heroRef} className="h-40 relative overflow-hidden">
+ <motion.div
+ style={{ y: heroY, scale: heroScale }}
+ className="absolute inset-0 bg-gradient-to-br from-rose-main/30 via-miamo-elevated to-rose- /30"
+ />
+ {/* Decorative orbs */}
+ <div className="absolute top-4 right-8 w-20 h-20 rounded-full bg-rose-light/10 animate-float blur-lg" />
+ <div className="absolute bottom-2 left-12 w-16 h-16 rounded-full bg-amber-400/10 animate-float-delayed blur-lg" />
+ <button onClick={() => coverInputRef.current?.click()} className="absolute top-3 right-3 bg-black/30 backdrop-blur-sm text-text-primary p-2 rounded-xl hover:bg-black/50 transition-colors z-10">
+ <Camera className="w-4 h-4" />
+ </button>
+ </div>
+ <div className="px-6 pb-6 -mt-14 relative z-10">
+ <div className="flex items-end gap-4">
+ <motion.div
+ className="relative"
+ whileHover={{ scale: 1.05 }}
+ transition={{ type: 'spring', stiffness: 300, damping: 20 }}
+ >
+ <Avatar src={photos[0]?.url} name={user.displayName || 'User'} size="xl" className="w-24 h-24 text-2xl border-4 border-miamo-card shadow-xl" />
+ <button onClick={() => photoInputRef.current?.click()} className="absolute bottom-0 right-0 w-8 h-8 bg-gradient-rose rounded-full flex items-center justify-center border-2 border-white shadow-lg hover:scale-110 transition-transform">
+ <Camera className="w-3.5 h-3.5 text-text-primary" />
+ </button>
+ {user.verified && (
+ <motion.div
+ initial={{ scale: 0 }}
+ animate={{ scale: 1 }}
+ className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-r from-emerald-400 to-green-400 rounded-full flex items-center justify-center border-2 border-white shadow-md"
+ title={`Verified ${user.verifiedAt ? `on ${new Date(user.verifiedAt).toLocaleDateString()}` : ''}`}
+ >
+ <Shield className="w-3 h-3 text-text-primary" />
+ </motion.div>
+ )}
+ </motion.div>
+ <div className="flex-1 mb-1">
+ <div className="flex items-center gap-2">
+ <h1 className="text-xl font-bold">{user.displayName}</h1>
+ {user.verified && <Badge variant="success">Verified</Badge>}
+ </div>
+ <p className="text-sm text-text-muted flex items-center gap-2 mt-0.5">
+ <span>@{user.username}</span><span>•</span><MapPin className="w-3 h-3" />{prof.city || ''}
+ </p>
+ </div>
+ <Button variant="secondary" size="sm" onClick={() => {
+ if (editing) {
+ setSaving(true);
+ api.updateProfile({ ...editForm, height: editForm.height ? parseInt(editForm.height as any) || null : null } as any).then(() => { loadProfile(); updateUser(editForm); setEditing(false); toast.success('Profile saved'); }).catch(() => toast.error('Save failed')).finally(() => setSaving(false));
+ } else {
+ setEditing(true);
+ trackClick('edit-profile');
+ }
+ }}>
+ {editing ? (saving ? 'Saving…' : <><Save className="w-3.5 h-3.5" /> Save</>) : <><Edit3 className="w-3.5 h-3.5" /> Edit</>}
+ </Button>
+ {editing && <Button variant="ghost" size="sm" onClick={() => setEditing(false)}><X className="w-3.5 h-3.5" /></Button>}
+ </div>
 
-          {/* ═══ SOCIAL PROOF ═══ */}
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="flex items-center gap-4 mt-4 p-3 rounded-xl bg-gradient-to-r from-pink-50/60 to-rose-50/40 dark:from-pink-950/20 dark:to-rose-950/10 border border-pink-100/30 dark:border-pink-900/20"
-          >
-            <div className="flex items-center gap-2">
-              <div className="flex -space-x-2">
-                {[1,2,3].map(i => <div key={i} className="w-6 h-6 rounded-full bg-gradient-to-r from-pink-300 to-rose-300 border-2 border-white dark:border-gray-900" />)}
-              </div>
-              <span className="text-xs text-gray-600 dark:text-gray-400">
-                <Eye className="w-3 h-3 inline mb-0.5" /> <strong className="text-pink-600 dark:text-pink-400">{Math.floor(Math.random() * 30) + 5}</strong> people viewed this week
-              </span>
-            </div>
-            <div className="ml-auto flex items-center gap-1.5">
-              <TrendingUp className="w-3 h-3 text-emerald-500" />
-              <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">+12%</span>
-            </div>
-          </motion.div>
-        </div>
-      </Card>
+ {/* ═══ SOCIAL PROOF ═══ */}
+ <motion.div
+ initial={{ opacity: 0, y: 10 }}
+ animate={{ opacity: 1, y: 0 }}
+ transition={{ delay: 0.3 }}
+ className="flex items-center gap-4 mt-4 p-3 rounded-xl bg-gradient-to-r from-rose-main/10/60 to-rose-50/40 border border-border/30"
+ >
+ <div className="flex items-center gap-2">
+ <div className="flex -space-x-2">
+ {[1,2,3].map(i => <div key={i} className="w-6 h-6 rounded-full bg-gradient-to-r from-rose-light to-rose-light border-2 border-white" />)}
+ </div>
+ <span className="text-xs text-text-secondary">
+ <Eye className="w-3 h-3 inline mb-0.5" /> <strong className="text-rose">{Math.floor(Math.random() * 30) + 5}</strong> people viewed this week
+ </span>
+ </div>
+ <div className="ml-auto flex items-center gap-1.5">
+ <TrendingUp className="w-3 h-3 text-emerald-500" />
+ <span className="text-[10px] font-bold text-emerald-600">+12%</span>
+ </div>
+ </motion.div>
+ </div>
+ </Card>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 px-6 lg:px-0">
-        <div className="space-y-5">
-          {/* ═══ PHOTO GRID WITH LIGHTBOX ═══ */}
-          {photos.length > 0 && (
-            <Card className="p-5">
-              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">Photos <Badge variant="muted">{photos.length}</Badge></h3>
-              <div className="grid grid-cols-3 gap-2.5">
-                {photos.map((photo: any, i: number) => (
-                  <motion.div
-                    key={i}
-                    className="tilt-3d cursor-pointer group relative"
-                    whileHover={{ scale: 1.03, y: -2 }}
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => setLightboxIndex(i)}
-                  >
-                    <div className="tilt-3d-inner aspect-square rounded-2xl overflow-hidden bg-gray-100 dark:bg-gray-800">
-                      <img loading="lazy" src={photo.url} alt="" className="w-full h-full object-cover group-hover:brightness-90 transition-all" />
-                    </div>
-                    <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 flex items-center justify-center">
-                      <ZoomIn className="w-5 h-5 text-white" />
-                    </div>
-                  </motion.div>
-                ))}
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => photoInputRef.current?.click()}
-                  className="aspect-square rounded-2xl border-2 border-dashed border-pink-200 dark:border-pink-800 flex flex-col items-center justify-center gap-1.5 text-pink-400 hover:border-pink-300 hover:bg-pink-50/50 dark:hover:bg-pink-950/20 transition-all"
-                >
-                  <Plus className="w-5 h-5" />
-                  <span className="text-[10px] font-medium">Add Photo</span>
-                </motion.button>
-              </div>
-            </Card>
-          )}
+ <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 px-6 lg:px-0">
+ <div className="space-y-5">
+ {/* ═══ PHOTO GRID WITH LIGHTBOX ═══ */}
+ {photos.length > 0 && (
+ <Card className="p-5">
+ <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">Photos <Badge variant="muted">{photos.length}</Badge></h3>
+ <div className="grid grid-cols-3 gap-2.5">
+ {photos.map((photo: any, i: number) => (
+ <motion.div
+ key={i}
+ className="tilt-3d cursor-pointer group relative"
+ whileHover={{ scale: 1.03, y: -2 }}
+ whileTap={{ scale: 0.97 }}
+ onClick={() => setLightboxIndex(i)}
+ >
+ <div className="tilt-3d-inner aspect-square rounded-2xl overflow-hidden bg-miamo-surface">
+ <img loading="lazy" src={photo.url} alt="" className="w-full h-full object-cover group-hover:brightness-90 transition-all" />
+ </div>
+ <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 flex items-center justify-center">
+ <ZoomIn className="w-5 h-5 text-text-primary" />
+ </div>
+ </motion.div>
+ ))}
+ <motion.button
+ whileHover={{ scale: 1.03 }}
+ whileTap={{ scale: 0.97 }}
+ onClick={() => photoInputRef.current?.click()}
+ className="aspect-square rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1.5 text-rose-light hover:border-rose hover:bg-miamo-surface/50 transition-all"
+ >
+ <Plus className="w-5 h-5" />
+ <span className="text-[10px] font-medium">Add Photo</span>
+ </motion.button>
+ </div>
+ </Card>
+ )}
 
-          {/* About Section */}
-          <Card className="p-5">
-            <h3 className="text-sm font-semibold mb-2">About</h3>
-            {editing ? (
-              <div className="space-y-3">
-                <div><label className="text-xs text-text-muted">Bio</label><textarea value={editForm.bio} onChange={e => setEditForm(f => ({...f, bio: e.target.value}))} className="input-premium w-full mt-1 text-sm resize-none" rows={3} /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label className="text-xs text-text-muted">City</label><input value={editForm.city} onChange={e => setEditForm(f => ({...f, city: e.target.value}))} className="input-premium w-full mt-1 text-sm" /></div>
-                  <div><label className="text-xs text-text-muted">Profession</label><input value={editForm.profession} onChange={e => setEditForm(f => ({...f, profession: e.target.value}))} className="input-premium w-full mt-1 text-sm" /></div>
-                </div>
-                <div><label className="text-xs text-text-muted">Relationship Intent</label><input value={editForm.datingIntent} onChange={e => setEditForm(f => ({...f, datingIntent: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. Long-term relationship" /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label className="text-xs text-text-muted">Education</label><input value={editForm.education} onChange={e => setEditForm(f => ({...f, education: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. Bachelor's" /></div>
-                  <div><label className="text-xs text-text-muted">Height</label><input value={editForm.height} onChange={e => setEditForm(f => ({...f, height: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. 5'10&quot;" /></div>
-                </div>
-                <div><label className="text-xs text-text-muted">Languages</label><input value={editForm.languages} onChange={e => setEditForm(f => ({...f, languages: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. English, Spanish" /></div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label className="text-xs text-text-muted">Drinking</label><select value={editForm.drinking} onChange={e => setEditForm(f => ({...f, drinking: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Never">Never</option><option value="Socially">Socially</option><option value="Regularly">Regularly</option></select></div>
-                  <div><label className="text-xs text-text-muted">Smoking</label><select value={editForm.smoking} onChange={e => setEditForm(f => ({...f, smoking: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Never">Never</option><option value="Sometimes">Sometimes</option><option value="Regularly">Regularly</option></select></div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label className="text-xs text-text-muted">Fitness</label><select value={editForm.fitness} onChange={e => setEditForm(f => ({...f, fitness: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Active">Active</option><option value="Sometimes">Sometimes</option><option value="Rarely">Rarely</option></select></div>
-                  <div><label className="text-xs text-text-muted">Diet</label><select value={editForm.diet} onChange={e => setEditForm(f => ({...f, diet: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Everything">Everything</option><option value="Vegetarian">Vegetarian</option><option value="Vegan">Vegan</option><option value="Halal">Halal</option><option value="Kosher">Kosher</option></select></div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label className="text-xs text-text-muted">Pets</label><select value={editForm.pets} onChange={e => setEditForm(f => ({...f, pets: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Dog">Dog</option><option value="Cat">Cat</option><option value="Both">Both</option><option value="Other">Other</option><option value="None">None</option></select></div>
-                  <div><label className="text-xs text-text-muted">Children</label><select value={editForm.children} onChange={e => setEditForm(f => ({...f, children: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Want someday">Want someday</option><option value="Don't want">Don't want</option><option value="Have & want more">Have & want more</option><option value="Have & don't want more">Have & don't want more</option></select></div>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div><label className="text-xs text-text-muted">Religion</label><input value={editForm.religion} onChange={e => setEditForm(f => ({...f, religion: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. Hindu, Christian" /></div>
-                  <div><label className="text-xs text-text-muted">Political Views</label><input value={editForm.politicalViews} onChange={e => setEditForm(f => ({...f, politicalViews: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. Liberal" /></div>
-                </div>
-              </div>
-            ) : (
-              <>
-                <p className="text-sm text-text-secondary dark:text-gray-300 leading-relaxed">{prof.bio || 'No bio yet — tell people about yourself!'}</p>
-                <div className="flex items-center gap-3 mt-3 flex-wrap">
-                  {prof.intent && <Badge>{prof.intent}</Badge>}
-                  {prof.age && <Badge variant="muted">{prof.age}, {prof.city}</Badge>}
-                  {prof.profession && <Badge variant="muted"><Briefcase className="w-3 h-3" /> {prof.profession}</Badge>}
-                </div>
-              </>
-            )}
-          </Card>
+ {/* About Section */}
+ <Card className="p-5">
+ <h3 className="text-sm font-semibold mb-2">About</h3>
+ {editing ? (
+ <div className="space-y-3">
+ <div><label className="text-xs text-text-muted">Bio</label><textarea value={editForm.bio} onChange={e => setEditForm(f => ({...f, bio: e.target.value}))} className="input-premium w-full mt-1 text-sm resize-none" rows={3} /></div>
+ <div className="grid grid-cols-2 gap-3">
+ <div><label className="text-xs text-text-muted">City</label><input value={editForm.city} onChange={e => setEditForm(f => ({...f, city: e.target.value}))} className="input-premium w-full mt-1 text-sm" /></div>
+ <div><label className="text-xs text-text-muted">Profession</label><input value={editForm.profession} onChange={e => setEditForm(f => ({...f, profession: e.target.value}))} className="input-premium w-full mt-1 text-sm" /></div>
+ </div>
+ <div><label className="text-xs text-text-muted">Relationship Intent</label><input value={editForm.datingIntent} onChange={e => setEditForm(f => ({...f, datingIntent: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. Long-term relationship" /></div>
+ <div className="grid grid-cols-2 gap-3">
+ <div><label className="text-xs text-text-muted">Education</label><input value={editForm.education} onChange={e => setEditForm(f => ({...f, education: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. Bachelor's" /></div>
+ <div><label className="text-xs text-text-muted">Height</label><input value={editForm.height} onChange={e => setEditForm(f => ({...f, height: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. 5'10&quot;" /></div>
+ </div>
+ <div><label className="text-xs text-text-muted">Languages</label><input value={editForm.languages} onChange={e => setEditForm(f => ({...f, languages: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. English, Spanish" /></div>
+ <div className="grid grid-cols-2 gap-3">
+ <div><label className="text-xs text-text-muted">Drinking</label><select value={editForm.drinking} onChange={e => setEditForm(f => ({...f, drinking: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Never">Never</option><option value="Socially">Socially</option><option value="Regularly">Regularly</option></select></div>
+ <div><label className="text-xs text-text-muted">Smoking</label><select value={editForm.smoking} onChange={e => setEditForm(f => ({...f, smoking: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Never">Never</option><option value="Sometimes">Sometimes</option><option value="Regularly">Regularly</option></select></div>
+ </div>
+ <div className="grid grid-cols-2 gap-3">
+ <div><label className="text-xs text-text-muted">Fitness</label><select value={editForm.fitness} onChange={e => setEditForm(f => ({...f, fitness: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Active">Active</option><option value="Sometimes">Sometimes</option><option value="Rarely">Rarely</option></select></div>
+ <div><label className="text-xs text-text-muted">Diet</label><select value={editForm.diet} onChange={e => setEditForm(f => ({...f, diet: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Everything">Everything</option><option value="Vegetarian">Vegetarian</option><option value="Vegan">Vegan</option><option value="Halal">Halal</option><option value="Kosher">Kosher</option></select></div>
+ </div>
+ <div className="grid grid-cols-2 gap-3">
+ <div><label className="text-xs text-text-muted">Pets</label><select value={editForm.pets} onChange={e => setEditForm(f => ({...f, pets: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Dog">Dog</option><option value="Cat">Cat</option><option value="Both">Both</option><option value="Other">Other</option><option value="None">None</option></select></div>
+ <div><label className="text-xs text-text-muted">Children</label><select value={editForm.children} onChange={e => setEditForm(f => ({...f, children: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Want someday">Want someday</option><option value="Don't want">Don't want</option><option value="Have & want more">Have & want more</option><option value="Have & don't want more">Have & don't want more</option></select></div>
+ </div>
+ <div className="grid grid-cols-2 gap-3">
+ <div><label className="text-xs text-text-muted">Religion</label><input value={editForm.religion} onChange={e => setEditForm(f => ({...f, religion: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. Hindu, Christian" /></div>
+ <div><label className="text-xs text-text-muted">Political Views</label><input value={editForm.politicalViews} onChange={e => setEditForm(f => ({...f, politicalViews: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. Liberal" /></div>
+ </div>
+ </div>
+ ) : (
+ <>
+ <p className="text-sm text-text-secondary leading-relaxed">{prof.bio || 'No bio yet — tell people about yourself!'}</p>
+ <div className="flex items-center gap-3 mt-3 flex-wrap">
+ {prof.intent && <Badge>{prof.intent}</Badge>}
+ {prof.age && <Badge variant="muted">{prof.age}, {prof.city}</Badge>}
+ {prof.profession && <Badge variant="muted"><Briefcase className="w-3 h-3" /> {prof.profession}</Badge>}
+ </div>
+ </>
+ )}
+ </Card>
 
-          {/* ═══ PROMPTS — Elegant card design ═══ */}
-          {(prompts.length > 0 || editing) && (
-            <Card className="p-5">
-              <div className="flex items-center justify-between mb-3"><h3 className="text-sm font-semibold">Prompts</h3>
-                <Button variant="ghost" size="sm" onClick={() => setShowAddPrompt(!showAddPrompt)}><Plus className="w-3.5 h-3.5" /> Add</Button>
-              </div>
-              {showAddPrompt && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
-                  className="mb-3 bg-gradient-to-br from-pink-50/60 to-rose-50/40 dark:from-pink-950/20 dark:to-rose-950/10 rounded-2xl p-4 border border-pink-100/30 dark:border-pink-900/20 space-y-2">
-                  <select value={newPromptQ} onChange={e => setNewPromptQ(e.target.value)} className="input-premium w-full text-sm">
-                    <option value="">Select a prompt…</option>
-                    {PROFILE_PROMPTS.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                  <textarea value={newPromptA} onChange={e => setNewPromptA(e.target.value)} placeholder="Your answer…" className="input-premium w-full text-sm resize-none" rows={2} />
-                  <div className="flex gap-2">
-                    <Button size="sm" disabled={!newPromptQ || !newPromptA.trim()} onClick={async () => {
-                      const updated = [...prompts, { question: newPromptQ, answer: newPromptA.trim() }];
-                      try { await api.updatePrompts(updated); setShowAddPrompt(false); setNewPromptQ(''); setNewPromptA(''); loadProfile(); toast.success('Prompt added'); } catch (e) { toast.error('Failed to add prompt'); }
-                    }}>Save</Button>
-                    <Button variant="ghost" size="sm" onClick={() => setShowAddPrompt(false)}>Cancel</Button>
-                  </div>
-                </motion.div>
-              )}
-              <div className="space-y-3">
-                {prompts.map((p: any, i: number) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    className="bg-gradient-to-br from-miamo-elevated/50 to-pink-50/30 dark:from-gray-800/50 dark:to-pink-950/10 rounded-2xl p-4 border border-pink-100/20 dark:border-pink-900/15"
-                  >
-                    <p className="text-xs text-pink-500 dark:text-pink-400 font-semibold mb-1.5 flex items-center gap-1"><Sparkles className="w-3 h-3" /> {p.question}</p>
-                    <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">{p.answer}</p>
-                  </motion.div>
-                ))}
-              </div>
-            </Card>
-          )}
+ {/* ═══ PROMPTS — Elegant card design ═══ */}
+ {(prompts.length > 0 || editing) && (
+ <Card className="p-5">
+ <div className="flex items-center justify-between mb-3"><h3 className="text-sm font-semibold">Prompts</h3>
+ <Button variant="ghost" size="sm" onClick={() => setShowAddPrompt(!showAddPrompt)}><Plus className="w-3.5 h-3.5" /> Add</Button>
+ </div>
+ {showAddPrompt && (
+ <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
+ className="mb-3 bg-gradient-to-br from-rose-main/10/60 to-rose-50/40 rounded-2xl p-4 border border-border/30 space-y-2">
+ <select value={newPromptQ} onChange={e => setNewPromptQ(e.target.value)} className="input-premium w-full text-sm">
+ <option value="">Select a prompt…</option>
+ {PROFILE_PROMPTS.map(p => <option key={p} value={p}>{p}</option>)}
+ </select>
+ <textarea value={newPromptA} onChange={e => setNewPromptA(e.target.value)} placeholder="Your answer…" className="input-premium w-full text-sm resize-none" rows={2} />
+ <div className="flex gap-2">
+ <Button size="sm" disabled={!newPromptQ || !newPromptA.trim()} onClick={async () => {
+ const updated = [...prompts, { question: newPromptQ, answer: newPromptA.trim() }];
+ try { await api.updatePrompts(updated); setShowAddPrompt(false); setNewPromptQ(''); setNewPromptA(''); loadProfile(); toast.success('Prompt added'); } catch (e) { toast.error('Failed to add prompt'); }
+ }}>Save</Button>
+ <Button variant="ghost" size="sm" onClick={() => setShowAddPrompt(false)}>Cancel</Button>
+ </div>
+ </motion.div>
+ )}
+ <div className="space-y-3">
+ {prompts.map((p: any, i: number) => (
+ <motion.div
+ key={i}
+ initial={{ opacity: 0, y: 10 }}
+ animate={{ opacity: 1, y: 0 }}
+ transition={{ delay: i * 0.1 }}
+ className="bg-gradient-to-br from-miamo-elevated/50 to-rose-main/10/30 rounded-2xl p-4 border border-border/20"
+ >
+ <p className="text-xs text-rose font-semibold mb-1.5 flex items-center gap-1"><Sparkles className="w-3 h-3" /> {p.question}</p>
+ <p className="text-sm text-text-secondary leading-relaxed">{p.answer}</p>
+ </motion.div>
+ ))}
+ </div>
+ </Card>
+ )}
 
-          {/* ═══ INTERESTS — Animated colorful tags ═══ */}
-          <Card className="p-5">
-            <h3 className="text-sm font-semibold mb-3">Interests</h3>
-            <div className="flex flex-wrap gap-2">
-              {interests.map((interest: any, i: number) => (
-                <motion.span
-                  key={interest.name || interest}
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: i * 0.04 }}
-                  whileHover={{ scale: 1.08, y: -2 }}
-                  className="px-3 py-1.5 bg-gradient-to-r from-pink-100/80 to-rose-100/60 dark:from-pink-900/30 dark:to-rose-900/20 text-pink-700 dark:text-pink-300 rounded-full text-xs font-medium border border-pink-200/40 dark:border-pink-800/30 cursor-default shadow-sm hover:shadow-md transition-shadow"
-                >
-                  {interest.name || interest}
-                </motion.span>
-              ))}
-              <button onClick={() => setShowAddInterest(!showAddInterest)} className="px-3 py-1.5 border border-dashed border-pink-200 dark:border-pink-800 text-text-muted rounded-full text-xs hover:border-pink-400 hover:text-pink-500 transition-colors"><Plus className="w-3 h-3 inline mr-1" />Add more</button>
-            </div>
-            {showAddInterest && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
-                className="mt-3 bg-miamo-elevated/50 dark:bg-gray-800/50 rounded-xl p-4 border border-border/30 dark:border-gray-700/30">
-                <p className="text-xs text-text-muted mb-2">Select interests to add:</p>
-                <div className="flex flex-wrap gap-1.5">
-                  {INTEREST_CATEGORIES.filter(ic => !interests.some((i: any) => (i.name || i) === ic)).map(ic => (
-                    <button key={ic} onClick={async () => {
-                      const updated = [...interests.map((i: any) => i.name || i), ic];
-                      try { await api.updateInterests(updated); loadProfile(); toast.success(`Added "${ic}"`); } catch (e) { toast.error('Failed to add interest'); }
-                    }} className="px-2.5 py-1 bg-white dark:bg-gray-800 border border-pink-100 dark:border-pink-900/30 text-text-muted rounded-full text-xs hover:border-pink-400 hover:text-pink-500 hover:bg-pink-50/50 dark:hover:bg-pink-950/20 transition-all">
-                      {ic}
-                    </button>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </Card>
-        </div>
+ {/* ═══ INTERESTS — Animated colorful tags ═══ */}
+ <Card className="p-5">
+ <h3 className="text-sm font-semibold mb-3">Interests</h3>
+ <div className="flex flex-wrap gap-2">
+ {interests.map((interest: any, i: number) => (
+ <motion.span
+ key={interest.name || interest}
+ initial={{ opacity: 0, scale: 0.8 }}
+ animate={{ opacity: 1, scale: 1 }}
+ transition={{ delay: i * 0.04 }}
+ whileHover={{ scale: 1.08, y: -2 }}
+ className="px-3 py-1.5 bg-gradient-to-r from-rose-main/15/80 to-rose-100/60 text-rose- rounded-full text-xs font-medium border border-border/40 cursor-default shadow-sm hover:shadow-md transition-shadow"
+ >
+ {interest.name || interest}
+ </motion.span>
+ ))}
+ <button onClick={() => setShowAddInterest(!showAddInterest)} className="px-3 py-1.5 border border-dashed border-border text-text-muted rounded-full text-xs hover:border-rose-main hover:text-rose transition-colors"><Plus className="w-3 h-3 inline mr-1" />Add more</button>
+ </div>
+ {showAddInterest && (
+ <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }}
+ className="mt-3 bg-miamo-elevated/50 rounded-xl p-4 border border-border/30">
+ <p className="text-xs text-text-muted mb-2">Select interests to add:</p>
+ <div className="flex flex-wrap gap-1.5">
+ {INTEREST_CATEGORIES.filter(ic => !interests.some((i: any) => (i.name || i) === ic)).map(ic => (
+ <button key={ic} onClick={async () => {
+ const updated = [...interests.map((i: any) => i.name || i), ic];
+ try { await api.updateInterests(updated); loadProfile(); toast.success(`Added "${ic}"`); } catch (e) { toast.error('Failed to add interest'); }
+ }} className="px-2.5 py-1 bg-miamo-card border border-border text-text-muted rounded-full text-xs hover:border-rose-main hover:text-rose hover:bg-miamo-surface/50 transition-all">
+ {ic}
+ </button>
+ ))}
+ </div>
+ </motion.div>
+ )}
+ </Card>
+ </div>
 
-        {/* ═══ SIDEBAR ═══ */}
-        <div className="space-y-5">
-          {/* Animated Score Ring */}
-          <Card className="p-5 text-center">
-            <h3 className="text-sm font-semibold mb-3">Profile Score</h3>
-            <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2, type: 'spring' }} className="flex justify-center mb-3">
-              <AnimatedScoreRing score={profilePercent} size={88} strokeWidth={5} />
-            </motion.div>
-            <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{profilePercent}% Complete</p>
-            <p className="text-xs text-text-muted mt-1">
-              {profilePercent >= 70
-                ? <span className="text-emerald-500">✓ Matching unlocked!</span>
-                : `Complete ${70 - profilePercent}% more to unlock matching`}
-            </p>
-          </Card>
+ {/* ═══ SIDEBAR ═══ */}
+ <div className="space-y-5">
+ {/* Animated Score Ring */}
+ <Card className="p-5 text-center">
+ <h3 className="text-sm font-semibold mb-3">Profile Score</h3>
+ <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ delay: 0.2, type: 'spring' }} className="flex justify-center mb-3">
+ <AnimatedScoreRing score={profilePercent} size={88} strokeWidth={5} />
+ </motion.div>
+ <p className="text-sm font-semibold text-text-primary">{profilePercent}% Complete</p>
+ <p className="text-xs text-text-muted mt-1">
+ {profilePercent >= 70
+ ? <span className="text-emerald-500">✓ Matching unlocked!</span>
+ : `Complete ${70 - profilePercent}% more to unlock matching`}
+ </p>
+ </Card>
 
-          {/* ═══ COMPLETION CHECKLIST with animations ═══ */}
-          <Card className="p-5">
-            <h3 className="text-sm font-semibold mb-3">Completion Checklist</h3>
-            <div className="space-y-2">
-              {completionSteps.map((step, i) => (
-                <motion.button
-                  key={i}
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: 0.3 + i * 0.06 }}
-                  className="flex items-center gap-2.5 w-full text-left hover:bg-pink-50/50 dark:hover:bg-pink-950/10 rounded-xl px-2 py-1.5 transition-all group"
-                  onClick={step.action}
-                >
-                  {step.done ? (
-                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
-                      <CheckCircle className="w-4.5 h-4.5 text-emerald-400" />
-                    </motion.div>
-                  ) : (
-                    <div className="w-4.5 h-4.5 border-2 border-pink-200 dark:border-pink-800 rounded-full group-hover:border-pink-400 transition-colors" />
-                  )}
-                  <span className={cn('text-xs', step.done ? 'text-gray-600 dark:text-gray-400 line-through' : 'text-gray-700 dark:text-gray-300 group-hover:text-pink-600 dark:group-hover:text-pink-400')}>
-                    {step.label}
-                  </span>
-                </motion.button>
-              ))}
-            </div>
-          </Card>
+ {/* ═══ COMPLETION CHECKLIST with animations ═══ */}
+ <Card className="p-5">
+ <h3 className="text-sm font-semibold mb-3">Completion Checklist</h3>
+ <div className="space-y-2">
+ {completionSteps.map((step, i) => (
+ <motion.button
+ key={i}
+ initial={{ opacity: 0, x: -10 }}
+ animate={{ opacity: 1, x: 0 }}
+ transition={{ delay: 0.3 + i * 0.06 }}
+ className="flex items-center gap-2.5 w-full text-left hover:bg-miamo-surface/50 rounded-xl px-2 py-1.5 transition-all group"
+ onClick={step.action}
+ >
+ {step.done ? (
+ <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
+ <CheckCircle className="w-4.5 h-4.5 text-emerald-400" />
+ </motion.div>
+ ) : (
+ <div className="w-4.5 h-4.5 border-2 border-border rounded-full group-hover:border-rose-main transition-colors" />
+ )}
+ <span className={cn('text-xs', step.done ? 'text-text-secondary line-through' : 'text-text-secondary group-hover:text-rose')}>
+ {step.label}
+ </span>
+ </motion.button>
+ ))}
+ </div>
+ </Card>
 
-          {/* Verification CTA */}
-          {!user.verified && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
-              <Card className="p-5 border-lavender-400/20 bg-gradient-to-br from-pink-50/60 to-rose-50/40 dark:from-pink-950/20 dark:to-rose-950/10">
-                <div className="flex items-center gap-2 mb-2">
-                  <Shield className="w-4 h-4 text-pink-500" />
-                  <h3 className="text-sm font-semibold">Get Verified</h3>
-                </div>
-                <p className="text-xs text-text-muted mb-3">Build trust and attract 3x more matches with the verified badge.</p>
-                <Button size="sm" className="w-full">Start Verification</Button>
-              </Card>
-            </motion.div>
-          )}
-        </div>
-      </div>
+ {/* Verification CTA */}
+ {!user.verified && (
+ <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+ <Card className="p-5 border-rose-main/20 bg-gradient-to-br from-rose-main/10/60 to-rose-50/40">
+ <div className="flex items-center gap-2 mb-2">
+ <Shield className="w-4 h-4 text-rose" />
+ <h3 className="text-sm font-semibold">Get Verified</h3>
+ </div>
+ <p className="text-xs text-text-muted mb-3">Build trust and attract 3x more matches with the verified badge.</p>
+ <Button size="sm" className="w-full">Start Verification</Button>
+ </Card>
+ </motion.div>
+ )}
+ </div>
+ </div>
 
-      {/* ═══ PHOTO LIGHTBOX ═══ */}
-      <AnimatePresence>
-        {lightboxIndex !== null && (
-          <PhotoLightbox photos={photos} initialIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
-        )}
-      </AnimatePresence>
-    </div>
-    </ErrorBoundary>
-  );
+ {/* ═══ PHOTO LIGHTBOX ═══ */}
+ <AnimatePresence>
+ {lightboxIndex !== null && (
+ <PhotoLightbox photos={photos} initialIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
+ )}
+ </AnimatePresence>
+ </div>
+ </ErrorBoundary>
+ );
 }

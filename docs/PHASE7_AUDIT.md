@@ -1,6 +1,7 @@
 # Phase 7: Code Quality & Performance Audit
 
 **Date:** 17 May 2026  
+**Updated:** Code cleanup pass completed  
 **Scope:** Full Miamo codebase — backend services, frontend, Prisma schemas, infrastructure
 
 ---
@@ -570,3 +571,23 @@ The schema is **identical** across all 7 Prisma schemas (shared single schema fi
 12. **Per-endpoint rate limiting** — Currently only global limits
 13. **Shared service-base connection pooling** — Missing `connection_limit`
 14. **Frontend shared components** — UserAvatar, UserCard, LoadingSpinner extraction
+
+---
+
+## Cleanup Pass (Completed)
+
+### Dead Code Removed
+- **Unused imports:** Removed from 30+ files (dead `useToast`, `trackClick`, `trackContentEngage`, `trackFilterChange`, `trackSearchQuery`, `trackNotificationClick`, `trackSettingsChange`, `APP_NAME`, `TrendingUp`, `Phone`, `Award`, `Fingerprint`, `UserPlus`, `Crown`, `Plus`, `Heart`, `Badge`, `Avatar`, `EmptyState`, `cn`, `fmt`, `useEffect`, `useRef`, `useCallback`, `AnimatePresence`, `motion`, `MiamoIcon`)
+- **Dead CSS classes:** Removed 14 unused utility classes (~135 lines) from `globals.css`
+- **Dead files:** Removed `page-transition.tsx` (165 lines, never imported), 2 `.bak` files
+- **Unused assets:** Removed 5 unreferenced files from `public/` (`favicon.svg`, `logo-icon.svg`, `miamo-wordmark.svg`, `logo-icon.png`, `logo.png`)
+- **Dead type imports:** Removed 6 unused type aliases from `api.ts`
+
+### Optimizations Applied
+- **SVG gradient ID collision:** Fixed duplicate `id="miamoHG"` across multiple `HeartSVG` instances using `React.useId()`
+- **Unused component props:** Removed `showWordmark`, `variant`, `glass` from exported component interfaces
+- **CSS reduction:** `globals.css` reduced from 1170 → 1035 lines
+
+### Build Verification
+- `npx next build` — ✅ Compiled successfully
+- `npx tsc --noEmit` — ✅ No type errors
