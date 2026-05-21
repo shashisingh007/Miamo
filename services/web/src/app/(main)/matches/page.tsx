@@ -223,23 +223,23 @@ export default function MatchesPage() {
  const handleReport = async (userId?: string) => {
  const id = userId || selectedIncoming?.user?.id;
  if (!id) return;
- // Find matchId for this user from heldItems or matches
  const heldItem = heldItems.find(i => i.user?.id === id);
  const matchItem = matches.find(m => m.matchedUser?.id === id);
- const matchId = heldItem?.matchId || heldItem?.id || matchItem?.id;
- const matchName = heldItem?.user?.displayName || matchItem?.matchedUser?.displayName || 'User';
- if (matchId) {
+ const matchId = heldItem?.matchId || heldItem?.id || matchItem?.id || `report-${id}`;
+ const matchName = heldItem?.user?.displayName || matchItem?.matchedUser?.displayName || selectedIncoming?.user?.displayName || 'User';
  setFeedbackModal({ type: 'report', matchId, matchName });
- } else {
- // Fallback: direct report without modal
- try { await api.reportUser({ reportedId: id, reason: 'other' }); showToast('Reported — thanks for keeping Miamo safe'); loadData(); } catch {}
- }
+ if (selectedIncoming) setSelectedIncoming(null);
  };
 
  const handleBlock = async (userId?: string) => {
  const id = userId || selectedIncoming?.user?.id;
  if (!id) return;
- try { await api.blockUser(id); showToast('Blocked'); if (selectedIncoming) setSelectedIncoming(null); loadData(); } catch {}
+ const heldItem = heldItems.find(i => i.user?.id === id);
+ const matchItem = matches.find(m => m.matchedUser?.id === id);
+ const matchId = heldItem?.matchId || heldItem?.id || matchItem?.id || `block-${id}`;
+ const matchName = heldItem?.user?.displayName || matchItem?.matchedUser?.displayName || selectedIncoming?.user?.displayName || 'User';
+ setFeedbackModal({ type: 'block', matchId, matchName });
+ if (selectedIncoming) setSelectedIncoming(null);
  };
 
  const handleFavorite = useCallback(async (matchId: string) => {
@@ -260,23 +260,32 @@ export default function MatchesPage() {
  };
  const handleReportMatch = async (reason: string, details: string) => {
  if (!feedbackModal) return;
+ const isSynthetic = feedbackModal.matchId.startsWith('report-');
+ const targetUserId = isSynthetic ? feedbackModal.matchId.replace('report-', '') : getMatchById(feedbackModal.matchId)?.matchedUser?.id;
  try {
+ if (isSynthetic && targetUserId) {
+ await api.reportUser({ reportedId: targetUserId, reason, details });
+ } else {
  await api.reportMatch(feedbackModal.matchId, reason, details);
+ }
  showToast('Reported — thanks for keeping Miamo safe');
  loadData();
  } catch {}
  };
  const handleBlockMatch = async (reason: string, details: string) => {
  if (!feedbackModal) return;
- const match = getMatchById(feedbackModal.matchId);
- const targetUserId = match?.matchedUser?.id;
+ // Support both real matchId and synthetic block-{userId}
+ const isSynthetic = feedbackModal.matchId.startsWith('block-');
+ const targetUserId = isSynthetic ? feedbackModal.matchId.replace('block-', '') : getMatchById(feedbackModal.matchId)?.matchedUser?.id;
  if (!targetUserId) return;
  try {
  await api.blockUser(targetUserId);
- // Also store the feedback reason for AI algorithm
- try { await api.reportMatch(feedbackModal.matchId, `block:${reason}`, details); } catch {}
+ // Store feedback reason for AI algorithm improvement
+ try { await api.blockByUser(targetUserId, reason, details); } catch {}
+ if (!isSynthetic) {
  setMatches(p => p.filter(m => m.id !== feedbackModal.matchId));
  setHeldItems(p => p.filter(i => (i.matchId || i.id) !== feedbackModal.matchId));
+ }
  showToast('User blocked');
  loadData();
  } catch {}

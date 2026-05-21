@@ -103,7 +103,14 @@ app.post('/api/v1/auth/register', async (req: Request, res: Response, next: Next
     const { email: rawEmail, password, displayName: rawDisplayName } = req.body;
     if (!rawEmail || !password || !rawDisplayName) throw new AppError('Missing required fields', 400, 'VALIDATION_ERROR');
     if (password.length < 8) throw new AppError('Password must be at least 8 characters', 400, 'VALIDATION_ERROR');
-    const email = sanitize(rawEmail);
+    if (password.length > 128) throw new AppError('Password too long', 400, 'VALIDATION_ERROR');
+    // Email format validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(rawEmail)) throw new AppError('Invalid email format', 400, 'VALIDATION_ERROR');
+    if (rawEmail.length > 254) throw new AppError('Email too long', 400, 'VALIDATION_ERROR');
+    // Display name length validation
+    if (rawDisplayName.length > 50) throw new AppError('Display name too long (max 50 characters)', 400, 'VALIDATION_ERROR');
+    const email = sanitize(rawEmail).toLowerCase();
     const displayName = sanitize(rawDisplayName);
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -154,7 +161,12 @@ app.post('/api/v1/auth/login', async (req: Request, res: Response, next: NextFun
     const email = sanitize(rawEmail);
 
     const user = await prisma.user.findUnique({ where: { email }, include: { profile: true, photos: { orderBy: { position: 'asc' }, take: 1 } } });
-    if (!user) throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
+    // Timing attack mitigation: always run bcrypt even if user not found
+    // This ensures consistent response time regardless of email validity
+    if (!user) {
+      await bcrypt.compare(password, '$2a$12$invalidhashpaddingtoensureconstanttime000000000000');
+      throw new AppError('Invalid email or password', 401, 'INVALID_CREDENTIALS');
+    }
     if (!user.active || user.deactivated) throw new AppError('Account deactivated', 403, 'ACCOUNT_DEACTIVATED');
 
     const valid = await bcrypt.compare(password, user.passwordHash);
@@ -204,6 +216,8 @@ app.put('/api/v1/auth/password', authMiddleware, async (req: AuthRequest, res: R
     const { currentPassword, newPassword } = req.body;
     if (!currentPassword || !newPassword) throw new AppError('Both current and new password required', 400, 'VALIDATION_ERROR');
     if (newPassword.length < 8) throw new AppError('New password must be at least 8 characters', 400, 'VALIDATION_ERROR');
+    if (newPassword.length > 128) throw new AppError('New password too long', 400, 'VALIDATION_ERROR');
+    if (currentPassword === newPassword) throw new AppError('New password must be different from current password', 400, 'VALIDATION_ERROR');
 
     const user = await prisma.user.findUnique({ where: { id: req.userId } });
     if (!user) throw new AppError('User not found', 404, 'NOT_FOUND');
@@ -239,6 +253,12 @@ app.post('/api/v1/auth/refresh', async (req: Request, res: Response, next: NextF
     const { refreshToken } = req.body;
     if (!refreshToken) throw new AppError('Refresh token required', 400, 'VALIDATION_ERROR');
     const payload = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as { userId: string };
+    // Security: verify user still has active sessions (prevents use after logout/password change)
+    const activeSession = await prisma.session.findFirst({ where: { userId: payload.userId, revoked: false } });
+    if (!activeSession) throw new AppError('Session expired — please login again', 401, 'SESSION_EXPIRED');
+    // Verify account is still active
+    const user = await prisma.user.findUnique({ where: { id: payload.userId }, select: { active: true, deactivated: true } });
+    if (!user || !user.active || user.deactivated) throw new AppError('Account deactivated', 403, 'ACCOUNT_DEACTIVATED');
     const tokens = generateTokens(payload.userId);
     // Update session lastActiveAt
     await prisma.session.updateMany({ where: { userId: payload.userId, revoked: false }, data: { lastActiveAt: new Date() } }).catch((e: unknown) => logger.warn('Session refresh update failed:', e));
@@ -269,9 +289,14 @@ app.post('/api/v1/auth/sessions/:id/revoke', authMiddleware, async (req: AuthReq
 });
 
 // ─── Error Handler ───────────────────────────────────
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  const statusCode = err.statusCode || 500;
-  res.status(statusCode).json({ error: { message: err.message, code: err.code || 'INTERNAL_ERROR', statusCode } });
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const error = err as { statusCode?: number; message?: string; code?: string };
+  const statusCode = error.statusCode || 500;
+  const message = statusCode === 500 && process.env.NODE_ENV === 'production'
+    ? 'Internal server error'
+    : (error.message || 'Internal server error');
+  if (statusCode >= 500) logger.error('Unhandled error:', error.message);
+  res.status(statusCode).json({ error: { message, code: error.code || 'INTERNAL_ERROR', statusCode } });
 });
 
 // ─── Start ───────────────────────────────────────────

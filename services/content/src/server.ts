@@ -8,7 +8,7 @@ import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
 import { LRUCache, MinHeap, TTL, feedCache, activityCache } from '../../shared/cache';
-import { scoreFeedItem, scoreDtm, type FeedItem, type FeedUserProfile, type DtmUser, type DtmCandidate } from '../../shared/algorithms';
+import { scoreFeedItem, scoreDtm, scoreDtmEnhanced, type FeedItem, type FeedUserProfile, type DtmUser, type DtmCandidate } from '../../shared/algorithms';
 import { logger } from '../../shared/src/logger';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
@@ -324,6 +324,10 @@ app.delete('/api/v1/stories/:id/comments/:commentId', authMiddleware, async (req
 // GET /api/v1/stories/:id/viewers — Viewers list (story author only)
 app.get('/api/v1/stories/:id/viewers', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    // Security: only the story author can see who viewed their story
+    const story = await prisma.story.findUnique({ where: { id: req.params.id } });
+    if (!story) return res.status(404).json({ error: { message: 'Story not found' } });
+    if (story.authorId !== req.userId) return res.status(403).json({ error: { message: 'Access denied — only the author can view story viewers', code: 'FORBIDDEN' } });
     const views = await prisma.storyView.findMany({ where: { storyId: req.params.id }, include: { viewer: { select: { id: true, displayName: true, username: true } } } });
     res.json({ data: views });
   } catch (e) { next(e); }
@@ -921,8 +925,8 @@ app.get('/api/v1/matrimonial/browse', authMiddleware, async (req: AuthRequest, r
     // Check access granted for each profile
     const myProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
 
-    // Score each profile using DTM algorithm engine
-    const result = profiles.map(p => {
+    // Score each profile using DTM algorithm engine (enhanced with behavioral signals)
+    const result = await Promise.all(profiles.map(async p => {
       const { phoneNumber, alternatePhone, linkedIn, contactEmail, ...safe } = p;
 
       // Build DTM scoring inputs
@@ -952,7 +956,23 @@ app.get('/api/v1/matrimonial/browse', authMiddleware, async (req: AuthRequest, r
           maritalStatus: p.maritalStatus || undefined,
           userAge: p.user?.profile?.age,
         };
-        dtmScore = scoreDtm(myDtm, candDtm);
+
+        // Get behavioral signals for enhanced scoring
+        let behavioralSignals = { profileCompleteness: 0.5, responseRateToRequests: 0.5, avgResponseTimeHrs: 48, browseOverlap: 0.3, activeDaysLast14: 3 };
+        try {
+          // Candidate profile completeness (how filled-out their DTM profile is)
+          const fields = [p.religion, p.education, p.annualIncome, p.workingCity, p.height, p.diet, p.motherTongue, p.familyType, p.bodyType, p.aboutMe];
+          behavioralSignals.profileCompleteness = fields.filter(Boolean).length / fields.length;
+          // Recently active (user was online in last 48h) → approximate activeDaysLast14
+          const recentlyActive = !!(p.user?.profile as any)?.online || (p.updatedAt > new Date(Date.now() - 48 * 3600000));
+          behavioralSignals.activeDaysLast14 = recentlyActive ? 7 : 2;
+          // View count as a proxy for engagement/overlap
+          const viewCount = await prisma.userActivity.count({ where: { targetId: p.userId, action: 'view', targetType: 'dtm_profile', createdAt: { gte: new Date(Date.now() - 7 * 86400000) } } });
+          behavioralSignals.browseOverlap = Math.min(viewCount / 10, 1);
+        } catch {}
+
+        const staticScore = scoreDtm(myDtm, candDtm);
+        dtmScore = scoreDtmEnhanced(staticScore, behavioralSignals);
       }
 
       return {
@@ -962,11 +982,16 @@ app.get('/api/v1/matrimonial/browse', authMiddleware, async (req: AuthRequest, r
         hasEmail: !!contactEmail,
         dtmScore,
       };
-    });
+    }));
 
     // Sort by DTM score if available
     if (myProfile) {
       result.sort((a, b) => (b.dtmScore || 0) - (a.dtmScore || 0));
+    }
+
+    // Track DTM browse activity for behavioral scoring
+    for (const p of result.slice(0, 5)) {
+      trackActivity(prisma, req.userId!, 'view', 'dtm_profile', p.userId, { dtmScore: p.dtmScore });
     }
 
     res.json({ data: result, cursor: profiles[profiles.length - 1]?.id });
@@ -1560,13 +1585,18 @@ app.get('/api/v1/matrimonial/chat', authMiddleware, async (req: AuthRequest, res
 });
 
 // Error Handler
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const error = err as { statusCode?: number; message?: string; code?: string };
   // Prisma FK violation on userId means the user's session is stale (deleted after reseed)
-  if (err?.code === 'P2003' && err?.message?.includes('userId')) {
+  if (error?.code === 'P2003' && error?.message?.includes('userId')) {
     return res.status(401).json({ error: { message: 'Session expired — please log in again', code: 'UNAUTHORIZED', statusCode: 401 } });
   }
-  const statusCode = err.statusCode || 500;
-  res.status(statusCode).json({ error: { message: err.message, code: err.code || 'INTERNAL_ERROR', statusCode } });
+  const statusCode = error.statusCode || 500;
+  const message = statusCode === 500 && process.env.NODE_ENV === 'production'
+    ? 'Internal server error'
+    : (error.message || 'Internal server error');
+  if (statusCode >= 500) logger.error('Unhandled error:', error.message);
+  res.status(statusCode).json({ error: { message, code: error.code || 'INTERNAL_ERROR', statusCode } });
 });
 
 if (process.env.NODE_ENV !== 'test') {

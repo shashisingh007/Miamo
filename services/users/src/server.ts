@@ -165,10 +165,10 @@ app.post('/api/v1/profiles/me/photos', authMiddleware, async (req: AuthRequest, 
   try {
     const userId = req.userId!;
     // Count existing photos
-    const existing = await prisma.photo.count({ where: { userId } });
+    const existing = await prisma.profilePhoto.count({ where: { userId } });
     if (existing >= 9) return res.status(400).json({ error: { message: 'Maximum 9 photos allowed' } });
     // In production this would save to object storage; here we store a placeholder URL
-    const photo = await prisma.photo.create({
+    const photo = await prisma.profilePhoto.create({
       data: { userId, url: `/uploads/photos/${userId}_${Date.now()}.jpg`, position: existing + 1 },
     });
     res.json({ data: photo });
@@ -177,13 +177,13 @@ app.post('/api/v1/profiles/me/photos', authMiddleware, async (req: AuthRequest, 
 
 app.delete('/api/v1/profiles/me/photos/:photoId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const photo = await prisma.photo.findFirst({ where: { id: req.params.photoId, userId: req.userId } });
+    const photo = await prisma.profilePhoto.findFirst({ where: { id: req.params.photoId, userId: req.userId } });
     if (!photo) return res.status(404).json({ error: { message: 'Photo not found' } });
-    await prisma.photo.delete({ where: { id: req.params.photoId } });
+    await prisma.profilePhoto.delete({ where: { id: req.params.photoId } });
     // Reorder remaining photos
-    const remaining = await prisma.photo.findMany({ where: { userId: req.userId }, orderBy: { position: 'asc' } });
+    const remaining = await prisma.profilePhoto.findMany({ where: { userId: req.userId }, orderBy: { position: 'asc' } });
     for (let i = 0; i < remaining.length; i++) {
-      await prisma.photo.update({ where: { id: remaining[i].id }, data: { position: i + 1 } });
+      await prisma.profilePhoto.update({ where: { id: remaining[i].id }, data: { position: i + 1 } });
     }
     res.json({ data: { success: true } });
   } catch (e) { next(e); }
@@ -294,7 +294,7 @@ app.delete('/api/v1/settings/delete', authMiddleware, async (req: AuthRequest, r
     // Cascade delete user data
     await prisma.profileInterest.deleteMany({ where: { userId } });
     await prisma.profilePrompt.deleteMany({ where: { userId } });
-    await prisma.photo.deleteMany({ where: { userId } });
+    await prisma.profilePhoto.deleteMany({ where: { userId } });
     await prisma.notification.deleteMany({ where: { userId } });
     await prisma.profile.deleteMany({ where: { userId } });
     await prisma.settings.deleteMany({ where: { userId } });
@@ -413,10 +413,83 @@ app.delete('/api/v1/bookmarks/:id', authMiddleware, async (req: AuthRequest, res
   } catch (e) { next(e); }
 });
 
+// ─── User Data (Generic Feature Persistence) ─────────
+app.get('/api/v1/user-data', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { type, limit: limitStr } = req.query as { type?: string; limit?: string };
+    if (!type) return res.status(400).json({ error: { message: 'type query parameter is required' } });
+    const limit = Math.min(parseInt(limitStr || '50', 10) || 50, 200);
+    const items = await prisma.userData.findMany({
+      where: { userId: req.userId!, type },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+    });
+    res.json({ data: items });
+  } catch (e) { next(e); }
+});
+
+app.post('/api/v1/user-data', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { type, data } = req.body;
+    if (!type) return res.status(400).json({ error: { message: 'type is required' } });
+    const item = await prisma.userData.create({
+      data: { userId: req.userId!, type, data: data || {} },
+    });
+    res.status(201).json({ data: item });
+  } catch (e) { next(e); }
+});
+
+app.put('/api/v1/user-data/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const existing = await prisma.userData.findFirst({ where: { id: req.params.id, userId: req.userId! } });
+    if (!existing) return res.status(404).json({ error: { message: 'Not found' } });
+    const updated = await prisma.userData.update({
+      where: { id: req.params.id },
+      data: { data: req.body.data || {} },
+    });
+    res.json({ data: updated });
+  } catch (e) { next(e); }
+});
+
+app.delete('/api/v1/user-data/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const existing = await prisma.userData.findFirst({ where: { id: req.params.id, userId: req.userId! } });
+    if (!existing) return res.status(404).json({ error: { message: 'Not found' } });
+    await prisma.userData.delete({ where: { id: req.params.id } });
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
+
+// Upsert: save or update the latest record of a type (convenience)
+app.put('/api/v1/user-data/upsert/:type', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { type } = req.params;
+    const { data } = req.body;
+    if (!type) return res.status(400).json({ error: { message: 'type is required' } });
+    // Find existing
+    const existing = await prisma.userData.findFirst({
+      where: { userId: req.userId!, type },
+      orderBy: { createdAt: 'desc' },
+    });
+    if (existing) {
+      const updated = await prisma.userData.update({ where: { id: existing.id }, data: { data: data || {} } });
+      res.json({ data: updated });
+    } else {
+      const created = await prisma.userData.create({ data: { userId: req.userId!, type, data: data || {} } });
+      res.status(201).json({ data: created });
+    }
+  } catch (e) { next(e); }
+});
+
 // ─── Error Handler ───────────────────────────────────
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  const statusCode = err.statusCode || 500;
-  res.status(statusCode).json({ error: { message: err.message, code: err.code || 'INTERNAL_ERROR', statusCode } });
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const error = err as { statusCode?: number; message?: string; code?: string };
+  const statusCode = error.statusCode || 500;
+  const message = statusCode === 500 && process.env.NODE_ENV === 'production'
+    ? 'Internal server error'
+    : (error.message || 'Internal server error');
+  if (statusCode >= 500) logger.error('Unhandled error:', error.message);
+  res.status(statusCode).json({ error: { message, code: error.code || 'INTERNAL_ERROR', statusCode } });
 });
 
 // ─── Start ───────────────────────────────────────────

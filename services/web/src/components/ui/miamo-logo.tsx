@@ -212,9 +212,10 @@ export function MiamoWordmark({
 
     async function orbitPhase(geom: Geom) {
       lastTrail = 0;
-      const heartEl = heartRef.current!;
-      const traceFront = traceFrontRef.current!;
-      const traceBack = traceBackRef.current!;
+      const heartEl = heartRef.current;
+      const traceFront = traceFrontRef.current;
+      const traceBack = traceBackRef.current;
+      if (!heartEl || !traceFront || !traceBack) return;
 
       await animateFrame(CFG.orbitDuration, (p, raw, now) => {
         if (cancelRef.current) return;
@@ -241,8 +242,9 @@ export function MiamoWordmark({
     }
 
     async function dotPhase(geom: Geom) {
-      const heartEl = heartRef.current!;
-      const fxLayer = fxLayerRef.current!;
+      const heartEl = heartRef.current;
+      const fxLayer = fxLayerRef.current;
+      if (!heartEl || !fxLayer) return;
       heartEl.classList.add('miamo-is-dot');
       heartEl.style.zIndex = '10';
       const holdX = geom.startX, holdY = geom.startY;

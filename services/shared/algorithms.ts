@@ -1204,3 +1204,642 @@ export function scoreSearch(
     scoreIdSearch(query, miamoId),
   );
 }
+
+// ═══════════════════════════════════════════════════════
+// 10. DEEP COMPATIBILITY — Behavioral + Communication Style Matching
+// ═══════════════════════════════════════════════════════
+
+/** Communication style metrics extracted from messaging patterns */
+export interface CommStyleVector {
+  avgWordCount: number;          // average words per message
+  emojiPerMessage: number;       // avg emoji count per message
+  questionRatio: number;         // fraction of messages containing questions (0-1)
+  exclamationRatio: number;      // fraction with ! (0-1)
+  avgResponseTimeMins: number;   // avg reply speed in minutes
+  initiationRate: number;        // fraction of convos they start (0-1)
+  flirtIndicator: number;       // 0-1 how flirty their messages are
+  humorIndicator: number;       // 0-1 presence of humor markers
+  lengthVariance: number;       // how much length varies (0=uniform, 1=high variance)
+  lowercaseRatio: number;       // fraction of messages starting lowercase (casualness indicator)
+  fillerWords: string[];        // common fillers: "lol", "haha", "ngl", "honestly"
+}
+
+/** Personality archetype derived from behavioral patterns */
+export type PersonalityArchetype =
+  | 'Explorer'       // high travel content, many diverse interests, fast swiping
+  | 'Homebody'       // cozy content, few interests but deep engagement
+  | 'Socialite'      // many chats, high initiation, fast responses
+  | 'Deep-Thinker'   // long messages, question-heavy, serious intent
+  | 'Creative'       // content creation, art/music engagement
+  | 'Ambitious'      // career-focused prompts, serious mode, structured comms
+  | 'Caretaker'      // empathetic responses, relationship-focused
+  | 'Adventurer';    // spontaneous, high activity variance, outdoors interests
+
+/** Full deep compatibility result */
+export interface DeepCompatibilityResult {
+  overallScore: number; // 0-100
+  breakdown: {
+    interestOverlap: number;      // 0-25
+    behavioralSync: number;       // 0-20
+    communicationStyle: number;   // 0-20
+    intentAlignment: number;      // 0-15
+    lifestyleMatch: number;       // 0-10
+    temporalHarmony: number;      // 0-10
+  };
+  myPersonality: PersonalityArchetype;
+  theirPersonality: PersonalityArchetype;
+  compatibilityInsight: string;
+}
+
+/** Inputs for deep compatibility computation */
+export interface DeepCompatibilityInput {
+  myProfile: UserProfile | null;
+  myInterests: string[];
+  myCommStyle: CommStyleVector | null;
+  myCluster: { type: string; activeHours: number[]; preferredContentTypes: string[] } | null;
+  myTemporal: { hourlyDistribution: number[] } | null;
+  candidateProfile: CandidateProfile | null;
+  candidateInterests: string[];
+  candidateCommStyle: CommStyleVector | null;
+  candidateCluster: { type: string; activeHours: number[]; preferredContentTypes: string[] } | null;
+  candidateTemporal: { hourlyDistribution: number[] } | null;
+  behavior: BehaviorVector;
+  myVibe?: VibeData | null;
+  candidateVibe?: VibeData | null;
+}
+
+/**
+ * Derive personality archetype from behavioral signals.
+ */
+export function computePersonalityArchetype(
+  cluster: { type: string; preferredContentTypes: string[] } | null,
+  commStyle: CommStyleVector | null,
+  interests: string[],
+  profile: CandidateProfile | UserProfile | null,
+): PersonalityArchetype {
+  // Score each archetype based on available signals
+  const scores: Record<PersonalityArchetype, number> = {
+    Explorer: 0, Homebody: 0, Socialite: 0, 'Deep-Thinker': 0,
+    Creative: 0, Ambitious: 0, Caretaker: 0, Adventurer: 0,
+  };
+
+  const lowerInterests = interests.map(i => i.toLowerCase());
+
+  // Interest-based signals
+  const travelWords = ['travel', 'adventure', 'hiking', 'explore', 'wanderlust', 'backpacking'];
+  const homeWords = ['cooking', 'reading', 'gaming', 'netflix', 'baking', 'gardening', 'cozy'];
+  const socialWords = ['parties', 'networking', 'socializing', 'nightlife', 'clubbing', 'events'];
+  const creativeWords = ['art', 'music', 'photography', 'writing', 'design', 'painting', 'singing'];
+  const ambitiousWords = ['startup', 'finance', 'entrepreneurship', 'investing', 'career', 'leadership'];
+  const caretakerWords = ['volunteering', 'animals', 'family', 'mental health', 'teaching', 'nurturing'];
+  const adventureWords = ['skydiving', 'rock climbing', 'surfing', 'camping', 'motorcycling', 'scuba'];
+
+  for (const i of lowerInterests) {
+    if (travelWords.some(w => i.includes(w))) scores.Explorer += 3;
+    if (homeWords.some(w => i.includes(w))) scores.Homebody += 3;
+    if (socialWords.some(w => i.includes(w))) scores.Socialite += 3;
+    if (creativeWords.some(w => i.includes(w))) scores.Creative += 3;
+    if (ambitiousWords.some(w => i.includes(w))) scores.Ambitious += 3;
+    if (caretakerWords.some(w => i.includes(w))) scores.Caretaker += 3;
+    if (adventureWords.some(w => i.includes(w))) scores.Adventurer += 3;
+  }
+
+  // Communication style signals
+  if (commStyle) {
+    if (commStyle.avgWordCount > 40) scores['Deep-Thinker'] += 4;
+    if (commStyle.avgWordCount < 10) scores.Socialite += 2; // quick short msgs = chatty
+    if (commStyle.questionRatio > 0.4) scores['Deep-Thinker'] += 3;
+    if (commStyle.flirtIndicator > 0.4) scores.Socialite += 2;
+    if (commStyle.humorIndicator > 0.4) scores.Adventurer += 2;
+    if (commStyle.initiationRate > 0.6) scores.Socialite += 3;
+    if (commStyle.initiationRate < 0.2) scores.Homebody += 2;
+    if (commStyle.emojiPerMessage > 2) scores.Creative += 2;
+    if (commStyle.lowercaseRatio > 0.7) scores.Adventurer += 1;
+  }
+
+  // Cluster signals
+  if (cluster) {
+    if (cluster.type === 'communicator') scores.Socialite += 4;
+    if (cluster.type === 'creator') scores.Creative += 4;
+    if (cluster.type === 'browser') scores.Explorer += 2;
+    if (cluster.type === 'lurker') scores.Homebody += 3;
+    if (cluster.type === 'engager') scores.Caretaker += 2;
+    if (cluster.type === 'power-user') scores.Ambitious += 3;
+  }
+
+  // Profile signals
+  if (profile) {
+    if (profile.seriousMode) scores.Ambitious += 2;
+    if (profile.datingIntent === 'long-term') { scores['Deep-Thinker'] += 2; scores.Caretaker += 2; }
+    if (profile.datingIntent === 'casual') scores.Adventurer += 2;
+    if (profile.exercise === 'daily') scores.Adventurer += 2;
+  }
+
+  // Find dominant archetype
+  let best: PersonalityArchetype = 'Explorer';
+  let bestScore = 0;
+  for (const [arch, s] of Object.entries(scores)) {
+    if (s > bestScore) { bestScore = s; best = arch as PersonalityArchetype; }
+  }
+  return best;
+}
+
+/** Compatibility map — which archetypes pair well */
+const ARCHETYPE_COMPAT: Record<PersonalityArchetype, PersonalityArchetype[]> = {
+  Explorer: ['Adventurer', 'Socialite', 'Creative'],
+  Homebody: ['Caretaker', 'Deep-Thinker', 'Creative'],
+  Socialite: ['Adventurer', 'Explorer', 'Ambitious'],
+  'Deep-Thinker': ['Caretaker', 'Homebody', 'Creative'],
+  Creative: ['Deep-Thinker', 'Explorer', 'Adventurer'],
+  Ambitious: ['Socialite', 'Deep-Thinker', 'Caretaker'],
+  Caretaker: ['Deep-Thinker', 'Homebody', 'Ambitious'],
+  Adventurer: ['Explorer', 'Socialite', 'Creative'],
+};
+
+/**
+ * Deep Compatibility Algorithm — master scoring function.
+ *
+ * Combines 6 sub-models: interest overlap (IDF-weighted), behavioral sync,
+ * communication style similarity, intent alignment, lifestyle match, and temporal harmony.
+ * Also produces personality archetypes and human-readable insight.
+ */
+export function computeDeepCompatibility(input: DeepCompatibilityInput): DeepCompatibilityResult {
+  const { myProfile, myInterests, myCommStyle, myCluster, myTemporal,
+          candidateProfile, candidateInterests, candidateCommStyle, candidateCluster,
+          candidateTemporal, behavior, myVibe, candidateVibe } = input;
+
+  if (!candidateProfile) {
+    return { overallScore: 0, breakdown: { interestOverlap: 0, behavioralSync: 0, communicationStyle: 0, intentAlignment: 0, lifestyleMatch: 0, temporalHarmony: 0 },
+      myPersonality: 'Explorer', theirPersonality: 'Explorer', compatibilityInsight: '' };
+  }
+
+  // ── 1) Interest Overlap with IDF weighting (0-25) ──
+  // Rare shared interests score higher than common ones
+  const allInterests = [...myInterests, ...candidateInterests];
+  const idfMap = new Map<string, number>();
+  const totalDocs = 2;
+  for (const interest of new Set(allInterests)) {
+    const docFreq = (myInterests.includes(interest) ? 1 : 0) + (candidateInterests.includes(interest) ? 1 : 0);
+    idfMap.set(interest, Math.log(totalDocs / docFreq + 1));
+  }
+  let interestScore = 0;
+  const sharedInterests = myInterests.filter(i => candidateInterests.includes(i));
+  for (const interest of sharedInterests) {
+    interestScore += (idfMap.get(interest) || 1) * 4; // rare = higher IDF = more points
+  }
+  interestScore = Math.min(Math.round(interestScore), 25);
+
+  // ── 2) Behavioral Sync (0-20) ──
+  let behavioralSync = 0;
+  if (myCluster && candidateCluster) {
+    // Same cluster type
+    if (myCluster.type === candidateCluster.type) behavioralSync += 8;
+    // Active hours overlap
+    const myHoursSet = new Set(myCluster.activeHours);
+    const sharedHours = candidateCluster.activeHours.filter(h => myHoursSet.has(h));
+    behavioralSync += Math.min(Math.round(sharedHours.length * 2.5), 7);
+    // Content type overlap
+    const myTypes = new Set(myCluster.preferredContentTypes);
+    const sharedTypes = candidateCluster.preferredContentTypes.filter(t => myTypes.has(t));
+    behavioralSync += Math.min(sharedTypes.length * 2, 5);
+  }
+  behavioralSync = Math.min(behavioralSync, 20);
+
+  // ── 3) Communication Style Similarity (0-20) ──
+  let commScore = 0;
+  if (myCommStyle && candidateCommStyle) {
+    // Word count similarity (within 50% = good)
+    const wcRatio = Math.min(myCommStyle.avgWordCount, candidateCommStyle.avgWordCount) /
+                    Math.max(myCommStyle.avgWordCount, candidateCommStyle.avgWordCount, 1);
+    commScore += Math.round(wcRatio * 6);
+
+    // Emoji usage similarity
+    const emojiDiff = Math.abs(myCommStyle.emojiPerMessage - candidateCommStyle.emojiPerMessage);
+    if (emojiDiff < 0.5) commScore += 4;
+    else if (emojiDiff < 1.5) commScore += 2;
+
+    // Question asking style
+    const qDiff = Math.abs(myCommStyle.questionRatio - candidateCommStyle.questionRatio);
+    if (qDiff < 0.15) commScore += 4;
+    else if (qDiff < 0.3) commScore += 2;
+
+    // Response speed similarity (within 2x = good)
+    const rMin = Math.min(myCommStyle.avgResponseTimeMins, candidateCommStyle.avgResponseTimeMins);
+    const rMax = Math.max(myCommStyle.avgResponseTimeMins, candidateCommStyle.avgResponseTimeMins, 1);
+    if (rMax / rMin < 2) commScore += 4;
+    else if (rMax / rMin < 4) commScore += 2;
+
+    // Casualness alignment (both casual or both formal)
+    const casualDiff = Math.abs(myCommStyle.lowercaseRatio - candidateCommStyle.lowercaseRatio);
+    if (casualDiff < 0.2) commScore += 2;
+  }
+  commScore = Math.min(commScore, 20);
+
+  // ── 4) Intent Alignment (0-15) ──
+  let intentScore = 0;
+  if (myProfile && candidateProfile) {
+    if (myProfile.datingIntent === candidateProfile.datingIntent) intentScore += 7;
+    if (myProfile.seriousMode === candidateProfile.seriousMode) intentScore += 3;
+    if (myProfile.lookingFor === candidateProfile.lookingFor) intentScore += 3;
+  }
+  if (myVibe && candidateVibe) {
+    if (myVibe.intent === candidateVibe.intent) intentScore += 2;
+  }
+  intentScore = Math.min(intentScore, 15);
+
+  // ── 5) Lifestyle Match (0-10) ──
+  let lifestyleScore = 0;
+  if (myProfile && candidateProfile) {
+    if (myProfile.smoking === candidateProfile.smoking) lifestyleScore += 2;
+    if (myProfile.drinking === candidateProfile.drinking) lifestyleScore += 2;
+    if (myProfile.exercise === candidateProfile.exercise) lifestyleScore += 2;
+    if (myProfile.religion === candidateProfile.religion) lifestyleScore += 2;
+    if (myProfile.pets === candidateProfile.pets) lifestyleScore += 1;
+    if (myProfile.children === candidateProfile.children) lifestyleScore += 1;
+  }
+  lifestyleScore = Math.min(lifestyleScore, 10);
+
+  // ── 6) Temporal Harmony (0-10) ──
+  let temporalScore = 0;
+  if (myTemporal && candidateTemporal) {
+    // Cosine similarity on hourly distributions
+    let dot = 0, magA = 0, magB = 0;
+    for (let i = 0; i < 24; i++) {
+      const a = myTemporal.hourlyDistribution[i] || 0;
+      const b = candidateTemporal.hourlyDistribution[i] || 0;
+      dot += a * b;
+      magA += a * a;
+      magB += b * b;
+    }
+    const cosSim = (magA > 0 && magB > 0) ? dot / (Math.sqrt(magA) * Math.sqrt(magB)) : 0;
+    temporalScore = Math.round(cosSim * 10);
+  }
+  temporalScore = Math.min(temporalScore, 10);
+
+  // ── Personality archetypes ──
+  const myPersonality = computePersonalityArchetype(myCluster, myCommStyle, myInterests, myProfile);
+  const theirPersonality = computePersonalityArchetype(candidateCluster, candidateCommStyle, candidateInterests, candidateProfile);
+
+  // ── Archetype compatibility bonus ──
+  const compatArchetypes = ARCHETYPE_COMPAT[myPersonality] || [];
+  let archetypeBonus = 0;
+  if (compatArchetypes.includes(theirPersonality)) archetypeBonus = 5;
+  else if (myPersonality === theirPersonality) archetypeBonus = 3; // same type = decent too
+
+  // ── Total score ──
+  const rawScore = interestScore + behavioralSync + commScore + intentScore + lifestyleScore + temporalScore + archetypeBonus;
+  const overallScore = clamp(rawScore, 0, 100);
+
+  // ── Generate human-readable insight ──
+  const compatibilityInsight = generateCompatInsight(
+    myPersonality, theirPersonality, sharedInterests, commScore, intentScore, lifestyleScore, candidateProfile
+  );
+
+  return {
+    overallScore,
+    breakdown: { interestOverlap: interestScore, behavioralSync, communicationStyle: commScore, intentAlignment: intentScore, lifestyleMatch: lifestyleScore, temporalHarmony: temporalScore },
+    myPersonality,
+    theirPersonality,
+    compatibilityInsight,
+  };
+}
+
+/** Generate a human-readable compatibility insight */
+function generateCompatInsight(
+  myArch: PersonalityArchetype, theirArch: PersonalityArchetype,
+  shared: string[], commScore: number, intentScore: number, lifestyleScore: number,
+  profile: CandidateProfile | null,
+): string {
+  const pieces: string[] = [];
+
+  if (shared.length >= 3) pieces.push(`You share ${shared.length} interests including ${shared.slice(0, 2).join(' and ')}`);
+  else if (shared.length > 0) pieces.push(`You both enjoy ${shared[0]}`);
+
+  if (commScore >= 14) pieces.push('your communication styles are very aligned');
+  else if (commScore >= 8) pieces.push('you communicate in compatible ways');
+
+  if (intentScore >= 10) pieces.push('you want the same things from dating');
+  if (lifestyleScore >= 7) pieces.push('your lifestyles are well-matched');
+
+  const archetypeDesc: Record<PersonalityArchetype, string> = {
+    Explorer: 'curious and worldly', Homebody: 'cozy and grounded',
+    Socialite: 'outgoing and energetic', 'Deep-Thinker': 'thoughtful and introspective',
+    Creative: 'artistic and expressive', Ambitious: 'driven and focused',
+    Caretaker: 'nurturing and empathetic', Adventurer: 'spontaneous and bold',
+  };
+
+  if (myArch !== theirArch) {
+    pieces.push(`they're ${archetypeDesc[theirArch]} which complements your ${archetypeDesc[myArch]} nature`);
+  }
+
+  if (pieces.length === 0) return 'You might discover shared perspectives through conversation';
+  return pieces.slice(0, 3).join(', ') + '.';
+}
+
+// ═══════════════════════════════════════════════════════
+// 11. SMART MOVE SUGGESTIONS — Style-Mirrored Openers
+// ═══════════════════════════════════════════════════════
+
+/** Input for generating personalized move suggestions */
+export interface SmartMoveInput {
+  myLastMessages: string[];              // user's last 10 sent messages (raw text)
+  myProfile: { city?: string; profession?: string; bio?: string } | null;
+  myInterests: string[];
+  targetProfile: { city?: string; profession?: string; bio?: string; age?: number } | null;
+  targetInterests: string[];
+  targetPrompts: { question: string; answer: string }[];
+  commonInterests: string[];
+  targetRecentTopics: string[];          // topics extracted from their recent activity
+}
+
+/** A generated move suggestion */
+export interface MoveSuggestion {
+  text: string;
+  reasoning: string;
+  matchBackProbability: number;
+}
+
+/**
+ * Generate 5 personalized Miamo Move suggestions that mirror the user's writing style
+ * and reference specific details about the target.
+ */
+export function generateSmartMoves(input: SmartMoveInput): MoveSuggestion[] {
+  const { myLastMessages, myProfile, myInterests, targetProfile, targetInterests,
+          targetPrompts, commonInterests, targetRecentTopics } = input;
+
+  // ── Extract user's messaging style ──
+  const style = extractWritingStyle(myLastMessages);
+  const suggestions: MoveSuggestion[] = [];
+
+  // ── Strategy 1: Prompt-based (highest success rate) ──
+  if (targetPrompts.length > 0) {
+    const prompt = targetPrompts[0];
+    const answer = prompt.answer.length > 60 ? prompt.answer.substring(0, 57) + '...' : prompt.answer;
+    let text = '';
+    if (style.casual) {
+      text = `${style.usesLol ? 'ok but ' : ''}${answer.toLowerCase()} is such a good answer${style.usesExcl ? '!' : ''} ${style.commonOpener}what made you think of that${style.usesQuestion ? '?' : ''}`;
+    } else {
+      text = `Your answer "${answer}" really resonated with me. I'd love to hear the story behind it.`;
+    }
+    text = applyStyleCaps(text, style);
+    suggestions.push({ text, reasoning: 'Prompt responses show personality — referencing one signals genuine interest', matchBackProbability: 0.85 });
+  }
+
+  // ── Strategy 2: Shared interest deep-dive ──
+  if (commonInterests.length > 0) {
+    const interest = commonInterests[0];
+    let text = '';
+    if (style.casual) {
+      text = `${style.commonOpener}so you're into ${interest} too${style.usesQuestion ? '?' : ''} ${style.usesLol ? 'lol' : ''} what got you started${style.usesQuestion ? '?' : ''}`.trim();
+    } else {
+      text = `I'm curious about your ${interest} journey — what's the most unexpected thing you've discovered through it?`;
+    }
+    text = applyStyleCaps(text, style);
+    suggestions.push({ text, reasoning: 'Shared interests create instant common ground without feeling generic', matchBackProbability: 0.82 });
+  }
+
+  // ── Strategy 3: Opinion/statement (not a question) ──
+  if (targetRecentTopics.length > 0) {
+    const topic = targetRecentTopics[0];
+    let text = '';
+    if (style.casual) {
+      text = `${style.usesLol ? 'ngl ' : ''}I have some strong opinions about ${topic}${style.usesExcl ? '!' : ''} ${style.commonOpener}bet we'd either totally agree or have the most fun debate`;
+    } else {
+      text = `I have a feeling we'd have really interesting conversations about ${topic}. I have some takes that might surprise you.`;
+    }
+    text = applyStyleCaps(text, style);
+    suggestions.push({ text, reasoning: 'Statements signal confidence and create intrigue — invites response without demanding one', matchBackProbability: 0.78 });
+  } else if (targetProfile?.profession) {
+    let text = '';
+    if (style.casual) {
+      text = `${style.commonOpener}${targetProfile.profession} sounds like it comes with some wild stories${style.usesExcl ? '!' : ''} what's the most unexpected part`;
+    } else {
+      text = `There's something about ${targetProfile.profession} that I find genuinely fascinating. I bet you have stories.`;
+    }
+    text = applyStyleCaps(text, style);
+    suggestions.push({ text, reasoning: 'Career reference shows you paid attention to their profile without being generic', matchBackProbability: 0.75 });
+  }
+
+  // ── Strategy 4: Playful/humorous ──
+  {
+    const hooks: string[] = [];
+    if (commonInterests.includes('coffee') || commonInterests.includes('Coffee')) hooks.push('coffee order');
+    if (commonInterests.includes('travel') || commonInterests.includes('Travel')) hooks.push('most chaotic travel story');
+    if (commonInterests.includes('music') || commonInterests.includes('Music')) hooks.push('controversial music take');
+    if (commonInterests.includes('food') || commonInterests.includes('Food')) hooks.push(`food hill you'd die on`);
+    const hook = hooks[0] || 'hot take on pineapple pizza';
+
+    let text = '';
+    if (style.casual) {
+      text = `${style.commonOpener}important question${style.usesExcl ? '!' : ''} what's your ${hook}${style.usesQuestion ? '?' : ''} ${style.usesLol ? 'mine might be controversial lol' : 'mine is probably concerning'}`;
+    } else {
+      text = `Alright, critical compatibility question: what's your ${hook}? Mine is... let's just say divisive.`;
+    }
+    text = applyStyleCaps(text, style);
+    suggestions.push({ text, reasoning: 'Humor + low-stakes question reduces pressure and shows personality', matchBackProbability: 0.80 });
+  }
+
+  // ── Strategy 5: Location/experience based ──
+  if (targetProfile?.city && myProfile?.city) {
+    let text = '';
+    if (targetProfile.city.toLowerCase() === myProfile.city?.toLowerCase()) {
+      if (style.casual) {
+        text = `${style.commonOpener}fellow ${targetProfile.city} person${style.usesExcl ? '!' : ''} what's a spot you'd take someone to that's not the obvious tourist places`;
+      } else {
+        text = `As a fellow ${targetProfile.city} person, I'm always looking for hidden spots. What's somewhere that actually surprised you?`;
+      }
+    } else {
+      if (style.casual) {
+        text = `${style.commonOpener}${targetProfile.city}${style.usesExcl ? '!' : ''} I've always been curious about that city. sell me on it in one sentence`;
+      } else {
+        text = `I've been meaning to explore ${targetProfile.city}. What's the one thing about it that you think people completely overlook?`;
+      }
+    }
+    text = applyStyleCaps(text, style);
+    suggestions.push({ text, reasoning: 'Location-based messages feel personal while opening door to meet-up conversation', matchBackProbability: 0.73 });
+  } else if (targetPrompts.length > 1) {
+    const prompt = targetPrompts[1];
+    let text = '';
+    if (style.casual) {
+      text = `${style.commonOpener}${prompt.answer.substring(0, 40)}${style.usesExcl ? '!' : ''} I relate to this way more than I expected`;
+    } else {
+      text = `"${prompt.answer.substring(0, 45)}" — this hit different. I think we might be on the same wavelength.`;
+    }
+    text = applyStyleCaps(text, style);
+    suggestions.push({ text, reasoning: 'Second prompt reference shows thorough profile reading', matchBackProbability: 0.76 });
+  }
+
+  // Ensure we always have 5 suggestions by filling fallbacks
+  while (suggestions.length < 5) {
+    const idx = suggestions.length;
+    const fallbacks = [
+      { text: style.casual ? `${style.commonOpener}your vibe is honestly refreshing from the usual profiles on here` : `Something about your profile genuinely stood out to me — it's refreshingly real.`, reasoning: 'Authentic compliment about overall vibe', matchBackProbability: 0.65 },
+      { text: style.casual ? `${style.usesLol ? 'ok ' : ''}this might be random but you seem like someone who'd have really good music taste` : `I have a theory that you have excellent music taste. Am I right?`, reasoning: 'Playful assumption invites correction or validation', matchBackProbability: 0.68 },
+    ];
+    const fb = fallbacks[idx - suggestions.length] || fallbacks[0];
+    suggestions.push({ text: applyStyleCaps(fb.text, style), reasoning: fb.reasoning, matchBackProbability: fb.matchBackProbability });
+  }
+
+  return suggestions.slice(0, 5).sort((a, b) => b.matchBackProbability - a.matchBackProbability);
+}
+
+/** Extract writing style metrics from user's recent messages */
+function extractWritingStyle(messages: string[]): {
+  casual: boolean; usesLol: boolean; usesExcl: boolean; usesQuestion: boolean;
+  commonOpener: string; avgLen: number;
+} {
+  if (!messages.length) return { casual: true, usesLol: false, usesExcl: true, usesQuestion: true, commonOpener: '', avgLen: 20 };
+
+  const totalLen = messages.reduce((s, m) => s + m.length, 0);
+  const avgLen = totalLen / messages.length;
+  const lolCount = messages.filter(m => /\b(lol|lmao|haha|hehe|😂|💀)\b/i.test(m)).length;
+  const exclCount = messages.filter(m => m.includes('!')).length;
+  const qCount = messages.filter(m => m.includes('?')).length;
+  const lowercaseStarts = messages.filter(m => m[0] && m[0] === m[0].toLowerCase() && /[a-z]/.test(m[0])).length;
+
+  const casual = avgLen < 80 || lowercaseStarts > messages.length * 0.5;
+  const usesLol = lolCount > messages.length * 0.3;
+  const usesExcl = exclCount > messages.length * 0.4;
+  const usesQuestion = qCount > messages.length * 0.3;
+
+  // Find common openers
+  const openers = messages.map(m => m.split(/[,.!?]/)[0]?.trim().toLowerCase() || '');
+  const commonWords = ['hey', 'so', 'honestly', 'ngl', 'ok but', 'wait', 'omg', 'yo', 'bruh'];
+  let commonOpener = '';
+  for (const word of commonWords) {
+    if (openers.filter(o => o.startsWith(word)).length >= 2) { commonOpener = word + ' '; break; }
+  }
+
+  return { casual, usesLol, usesExcl, usesQuestion, commonOpener, avgLen };
+}
+
+/** Apply capitalization style to generated text */
+function applyStyleCaps(text: string, style: { casual: boolean }): string {
+  if (style.casual) {
+    // Casual → lowercase first char unless it's a name/place
+    return text.charAt(0).toLowerCase() + text.slice(1);
+  }
+  // Formal → ensure first char uppercase
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+// ═══════════════════════════════════════════════════════
+// 12. FILTER RELEVANCE BONUS — Post-filter ranking enhancement
+// ═══════════════════════════════════════════════════════
+
+/**
+ * After SQL filtering, this function adds a relevance bonus based on
+ * how well the candidate exceeds the filter minimum criteria.
+ *
+ * @param candidate - The candidate profile
+ * @param behavior - User's behavioral vector
+ * @param filterParams - Active filter parameters
+ * @returns Bonus score 0-15 to add on top of compatibility score
+ */
+export function computeFilterRelevanceBonus(
+  candidate: CandidateProfile,
+  behavior: BehaviorVector,
+  filterParams: { city?: string; intent?: string; ageMin?: number; ageMax?: number; serious?: boolean },
+): number {
+  let bonus = 0;
+
+  // Age preference from behavior vs filter range
+  if (behavior.preferredAge && candidate.age) {
+    const center = (behavior.preferredAge.min + behavior.preferredAge.max) / 2;
+    const dist = Math.abs(candidate.age - center);
+    if (dist <= 2) bonus += 5;
+    else if (dist <= 4) bonus += 3;
+  }
+
+  // City is user's top preferred city (from behavioral data)
+  if (candidate.city && behavior.preferredCities.includes(candidate.city.toLowerCase())) {
+    bonus += 3;
+  }
+
+  // Intent matches user's behavioral preference
+  if (candidate.datingIntent && behavior.preferredIntents.includes(candidate.datingIntent)) {
+    bonus += 3;
+  }
+
+  // Profile quality (high-quality within filtered set ranks higher)
+  if (candidate.profileScore >= 80) bonus += 2;
+  if (candidate.online) bonus += 2;
+
+  return Math.min(bonus, 15);
+}
+
+// ═══════════════════════════════════════════════════════
+// 13. ENHANCED DTM SCORING — Behavioral + Static Hybrid
+// ═══════════════════════════════════════════════════════
+
+/**
+ * Enhanced DTM score that combines static profile matching with behavioral signals.
+ * @param staticScore - Score from scoreDtm() (0-100)
+ * @param dtmBehavior - DTM-specific behavioral signals
+ * @returns Combined score 0-100
+ */
+export function scoreDtmEnhanced(
+  staticScore: number,
+  dtmBehavior: {
+    profileCompleteness: number;          // 0-1 how complete their DTM profile is
+    responseRateToRequests: number;       // 0-1 how often they respond to access requests
+    avgResponseTimeHrs: number;           // avg time to respond to requests
+    browseOverlap: number;               // 0-1 similarity in browse patterns
+    activeDaysLast14: number;            // days active on DTM in last 2 weeks
+  },
+): number {
+  // Static score dominates (70%) but behavioral adds ranking intelligence
+  let behavioral = 0;
+
+  // Profile completeness (users who filled 80%+ = serious)
+  if (dtmBehavior.profileCompleteness >= 0.8) behavioral += 10;
+  else if (dtmBehavior.profileCompleteness >= 0.5) behavioral += 5;
+
+  // Response rate (responsive users = more likely to engage)
+  behavioral += Math.round(dtmBehavior.responseRateToRequests * 8);
+
+  // Fast responders get bonus
+  if (dtmBehavior.avgResponseTimeHrs < 24) behavioral += 5;
+  else if (dtmBehavior.avgResponseTimeHrs < 72) behavioral += 2;
+
+  // Browse pattern similarity (collaborative signal)
+  behavioral += Math.round(dtmBehavior.browseOverlap * 5);
+
+  // Recency/activity (active users first)
+  if (dtmBehavior.activeDaysLast14 >= 7) behavioral += 2;
+
+  behavioral = Math.min(behavioral, 30);
+
+  // Weighted combination
+  return clamp(Math.round(staticScore * 0.7 + behavioral), 0, 100);
+}
+
+/**
+ * Extract communication style vector from message metrics.
+ * Called from messaging service to provide style data without exposing content.
+ */
+export function computeCommStyleVector(metrics: {
+  messages: Array<{ wordCount: number; hasEmoji: boolean; emojiCount: number; hasQuestion: boolean; hasExclamation: boolean; startsLowercase: boolean; responseTimeMs: number | null; isInitiation: boolean; hasFlirtWords: boolean; hasHumorWords: boolean }>;
+}): CommStyleVector {
+  const msgs = metrics.messages;
+  if (msgs.length === 0) {
+    return { avgWordCount: 15, emojiPerMessage: 0.5, questionRatio: 0.3, exclamationRatio: 0.3, avgResponseTimeMins: 30, initiationRate: 0.3, flirtIndicator: 0, humorIndicator: 0, lengthVariance: 0.3, lowercaseRatio: 0.3, fillerWords: [] };
+  }
+
+  const avgWordCount = msgs.reduce((s, m) => s + m.wordCount, 0) / msgs.length;
+  const emojiPerMessage = msgs.reduce((s, m) => s + m.emojiCount, 0) / msgs.length;
+  const questionRatio = msgs.filter(m => m.hasQuestion).length / msgs.length;
+  const exclamationRatio = msgs.filter(m => m.hasExclamation).length / msgs.length;
+  const responseTimes = msgs.filter(m => m.responseTimeMs !== null).map(m => m.responseTimeMs!);
+  const avgResponseTimeMins = responseTimes.length > 0 ? (responseTimes.reduce((s, t) => s + t, 0) / responseTimes.length) / 60000 : 30;
+  const initiationRate = msgs.filter(m => m.isInitiation).length / msgs.length;
+  const flirtIndicator = msgs.filter(m => m.hasFlirtWords).length / msgs.length;
+  const humorIndicator = msgs.filter(m => m.hasHumorWords).length / msgs.length;
+  const lengths = msgs.map(m => m.wordCount);
+  const meanLen = avgWordCount;
+  const variance = lengths.reduce((s, l) => s + Math.pow(l - meanLen, 2), 0) / lengths.length;
+  const lengthVariance = Math.min(Math.sqrt(variance) / meanLen, 1);
+  const lowercaseRatio = msgs.filter(m => m.startsLowercase).length / msgs.length;
+
+  return { avgWordCount, emojiPerMessage, questionRatio, exclamationRatio, avgResponseTimeMins, initiationRate, flirtIndicator, humorIndicator, lengthVariance, lowercaseRatio, fillerWords: [] };
+}

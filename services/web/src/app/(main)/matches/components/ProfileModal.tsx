@@ -232,7 +232,7 @@ export function ProfileModal({
  <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
  {suggestions.map((s, i) => (
  <button key={i} onClick={() => setMoveMessage(s)}
- className="shrink-0 max-w-[200px] px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/15 text-[11px] text-purple-200 text-left hover:bg-purple-500/20 transition truncate">
+ className="shrink-0 max-w-[200px] px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/15 text-[11px] text-purple-700 text-left hover:bg-purple-500/20 transition truncate">
  {s}
  </button>
  ))}

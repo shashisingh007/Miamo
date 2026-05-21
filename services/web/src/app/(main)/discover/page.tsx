@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
  Heart, Shield, Brain, SlidersHorizontal, Sparkles, Zap, Eye,
+ ThumbsDown, Ghost, MapPin, Camera, Users as UsersIcon, X, Check,
 } from 'lucide-react';
 import { ProfileCardSkeleton } from '@/components/ui/skeleton';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
@@ -27,6 +28,8 @@ export default function DiscoverPage() {
  const [showFilters, setShowFilters] = useState(false);
  const [aiData, setAiData] = useState<Record<string, AiData>>({});
  const [activeQuickFilter, setActiveQuickFilter] = useState('all');
+ const [passFeedback, setPassFeedback] = useState<{ userId: string; name: string } | null>(null);
+ const [passCount, setPassCount] = useState(0);
  const toast = useToast();
 
  useTrackPageView('discover');
@@ -97,6 +100,12 @@ export default function DiscoverPage() {
  if (passedUser) {
  trackActivity('pass', 'profile', passedUser.id);
  api.passUser(passedUser.id).catch(() => {});
+ const newCount = passCount + 1;
+ setPassCount(newCount);
+ // Show feedback prompt every 3rd pass
+ if (newCount % 3 === 0) {
+ setPassFeedback({ userId: passedUser.id, name: passedUser.displayName || 'this person' });
+ }
  }
  if (currentIndex < profiles.length - 1) setCurrentIndex(i => i + 1);
  else setProfiles([]);
@@ -303,7 +312,96 @@ export default function DiscoverPage() {
  </div>
 
  <FilterPanel isOpen={showFilters} onClose={() => setShowFilters(false)} filters={filters} onApply={handleApplyFilters} />
+
+ {/* Pass Feedback Modal */}
+ <AnimatePresence>
+ {passFeedback && (
+ <PassFeedbackModal
+ userName={passFeedback.name}
+ onSubmit={(reason, details) => {
+ api.passUserFeedback(passFeedback.userId, reason, details).catch(() => {});
+ trackActivity('pass_feedback', 'profile', passFeedback.userId, { reason, details });
+ setPassFeedback(null);
+ }}
+ onSkip={() => setPassFeedback(null)}
+ />
+ )}
+ </AnimatePresence>
  </div>
  </ErrorBoundary>
+ );
+}
+
+/* ─── Pass Feedback Modal ─── */
+const PASS_REASONS = [
+ { code: 'not-attractive', label: 'Not my type', icon: ThumbsDown },
+ { code: 'too-far', label: 'Too far away', icon: MapPin },
+ { code: 'fake-profile', label: 'Seems fake', icon: Camera },
+ { code: 'no-effort', label: 'Low effort profile', icon: Ghost },
+ { code: 'different-goals', label: 'Different goals', icon: UsersIcon },
+];
+
+function PassFeedbackModal({ userName, onSubmit, onSkip }: {
+ userName: string;
+ onSubmit: (reason: string, details: string) => void;
+ onSkip: () => void;
+}) {
+ const [selected, setSelected] = useState('');
+ const [details, setDetails] = useState('');
+
+ return (
+ <>
+ <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+ className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60]" onClick={onSkip} />
+ <motion.div
+ initial={{ opacity: 0, y: 40, scale: 0.95 }}
+ animate={{ opacity: 1, y: 0, scale: 1 }}
+ exit={{ opacity: 0, y: 40, scale: 0.95 }}
+ transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+ className="fixed bottom-6 inset-x-4 max-w-sm mx-auto bg-miamo-card border border-border rounded-2xl shadow-2xl z-[60] p-5"
+ >
+ <div className="flex items-center justify-between mb-4">
+ <div>
+ <p className="text-[13px] font-bold text-text-primary">Why did you pass?</p>
+ <p className="text-[11px] text-text-muted mt-0.5">Helps us show better matches</p>
+ </div>
+ <button onClick={onSkip} className="w-7 h-7 rounded-lg bg-miamo-surface flex items-center justify-center">
+ <X className="w-3.5 h-3.5 text-text-muted" />
+ </button>
+ </div>
+ <div className="flex flex-wrap gap-2 mb-3">
+ {PASS_REASONS.map(r => {
+ const Icon = r.icon;
+ return (
+ <button key={r.code} onClick={() => setSelected(r.code)}
+ className={cn(
+ 'flex items-center gap-1.5 px-3 py-2 rounded-xl border text-[11px] font-medium transition-all',
+ selected === r.code ? 'bg-[#C97856]/10 border-[#C97856]/30 text-[#C97856]' : 'bg-miamo-surface border-border text-text-muted hover:border-border',
+ )}>
+ <Icon className="w-3 h-3" /> {r.label}
+ </button>
+ );
+ })}
+ </div>
+ {selected && (
+ <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }}>
+ <textarea value={details} onChange={e => setDetails(e.target.value)}
+ placeholder="Tell us more (optional)..."
+ className="w-full h-14 rounded-xl bg-miamo-surface border border-border text-text-primary text-[11px] px-3 py-2 resize-none focus:outline-none placeholder:text-text-muted mb-3" />
+ </motion.div>
+ )}
+ <div className="flex gap-2">
+ <button onClick={onSkip} className="flex-1 h-9 rounded-xl border border-border text-text-muted text-[11px] font-semibold hover:bg-miamo-surface transition">Skip</button>
+ <button onClick={() => { if (selected) onSubmit(selected, details); else onSkip(); }}
+ disabled={!selected}
+ className={cn(
+ 'flex-1 h-9 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1.5 transition-all',
+ selected ? 'bg-[#C97856] text-white' : 'bg-miamo-surface text-text-secondary cursor-not-allowed',
+ )}>
+ <Check className="w-3 h-3" /> Submit
+ </button>
+ </div>
+ </motion.div>
+ </>
  );
 }

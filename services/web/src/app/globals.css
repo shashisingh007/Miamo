@@ -497,6 +497,12 @@
     background: transparent;
   }
 
+  .miamo-sidebar-logo .miamo-logo-wrap {
+    left: 0;
+    transform: translate(0, -50%);
+    padding-left: 0;
+  }
+
   .miamo-logo-wrap {
     position: absolute;
     left: 50%;

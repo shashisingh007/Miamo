@@ -4,7 +4,7 @@ import './globals.css';
 import { Providers } from '@/components/providers';
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
-const brand = Cormorant_Garamond({ subsets: ['latin'], variable: '--font-brand', weight: ['600', '700'] });
+const brand = Cormorant_Garamond({ subsets: ['latin', 'latin-ext'], variable: '--font-brand', weight: ['600', '700'] });
 
 export const metadata: Metadata = {
   title: 'Miamo — Premium Dating App',

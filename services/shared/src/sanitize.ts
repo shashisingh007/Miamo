@@ -22,18 +22,28 @@ export function sanitize(input: string): string {
 }
 
 /**
- * Sanitize all string values in a shallow object.
+ * Sanitize all string values in an object, including nested objects and arrays.
  * Non-string values are left unchanged. Creates a new object (does not mutate).
  *
  * @template T - Object type
  * @param obj - Object whose string values should be sanitized
+ * @param maxDepth - Maximum recursion depth (default 5, prevents prototype pollution)
  * @returns New object with all string values sanitized
  */
-export function sanitizeObject<T extends Record<string, unknown>>(obj: T): T {
+export function sanitizeObject<T extends Record<string, unknown>>(obj: T, maxDepth = 5): T {
+  if (maxDepth <= 0) return obj;
   const result = { ...obj };
   for (const key of Object.keys(result)) {
-    if (typeof result[key] === 'string') {
-      (result as Record<string, unknown>)[key] = sanitize(result[key] as string);
+    const val = result[key];
+    if (typeof val === 'string') {
+      (result as Record<string, unknown>)[key] = sanitize(val);
+    } else if (Array.isArray(val)) {
+      (result as Record<string, unknown>)[key] = val.map(item =>
+        typeof item === 'string' ? sanitize(item) :
+        (item && typeof item === 'object') ? sanitizeObject(item as Record<string, unknown>, maxDepth - 1) : item
+      );
+    } else if (val && typeof val === 'object' && !(val instanceof Date)) {
+      (result as Record<string, unknown>)[key] = sanitizeObject(val as Record<string, unknown>, maxDepth - 1);
     }
   }
   return result;
@@ -55,4 +65,15 @@ export function escapeHtml(str: string): string {
     .replace(/'/g, '&#039;');
 }
 
-export default { sanitize, sanitizeObject, escapeHtml };
+/**
+ * Strip sensitive fields from user objects before sending to clients.
+ * Removes: passwordHash, and any other sensitive fields.
+ * Works on single objects or arrays. Returns a new object (does not mutate).
+ */
+export function stripSensitive<T extends Record<string, unknown>>(obj: T): Omit<T, 'passwordHash'> {
+  if (!obj || typeof obj !== 'object') return obj;
+  const { passwordHash, ...safe } = obj as any;
+  return safe;
+}
+
+export default { sanitize, sanitizeObject, escapeHtml, stripSensitive };

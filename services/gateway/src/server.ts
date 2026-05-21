@@ -133,9 +133,15 @@ function sanitizeHeaders(req: express.Request, _res: express.Response, next: exp
   delete req.headers['x-forwarded-host'];
   delete req.headers['x-original-url'];
   delete req.headers['x-rewrite-url'];
+  delete req.headers['x-forwarded-server'];
+  delete req.headers['x-forwarded-proto'];
   // Validate authorization header format
   const auth = req.headers.authorization;
   if (auth && !auth.startsWith('Bearer ')) {
+    delete req.headers.authorization;
+  }
+  // Reject excessively long authorization headers (max 2KB)
+  if (auth && auth.length > 2048) {
     delete req.headers.authorization;
   }
   next();
@@ -196,8 +202,11 @@ app.get('/api/v1/events/stream', (req: express.Request, res: express.Response) =
   // EventSource can't send custom headers — accept token from query param
   let userId = req.headers['x-user-id'] as string;
   if (!userId && req.query.token) {
+    // Validate token length before attempting verification (prevent DoS via long tokens)
+    const tokenStr = req.query.token as string;
+    if (tokenStr.length > 2048) return res.status(400).json({ error: { message: 'Invalid token' } });
     try {
-      const payload = jwt.verify(req.query.token as string, JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string };
+      const payload = jwt.verify(tokenStr, JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string };
       userId = payload.userId;
     } catch {}
   }
@@ -216,7 +225,14 @@ app.get('/api/v1/events/stream', (req: express.Request, res: express.Response) =
 
   // Register this response in the SSE client map (supports multi-tab)
   if (!sseClients.has(userId)) sseClients.set(userId, new Set());
-  sseClients.get(userId)!.add(res);
+  const userClients = sseClients.get(userId)!;
+  // Security: limit max SSE connections per user to prevent memory exhaustion
+  if (userClients.size >= 10) {
+    // Close oldest connection to make room
+    const oldest = userClients.values().next().value;
+    if (oldest) { try { oldest.end(); } catch {} userClients.delete(oldest); }
+  }
+  userClients.add(res);
 
   // Keep alive every 30s to prevent proxy/firewall timeout (e.g., nginx default 60s)
   const keepAlive = setInterval(() => { try { res.write(': keepalive\n\n'); } catch {} }, 30000);
@@ -293,6 +309,7 @@ app.use('/api/v1/profiles', requireAuth, createProxyMiddleware(proxyTo(SERVICES.
 app.use('/api/v1/search', requireAuth, createProxyMiddleware(proxyTo(SERVICES.users)));
 app.use('/api/v1/settings', requireAuth, createProxyMiddleware(proxyTo(SERVICES.users)));
 app.use('/api/v1/bookmarks', requireAuth, createProxyMiddleware(proxyTo(SERVICES.users)));
+app.use('/api/v1/user-data', requireAuth, createProxyMiddleware(proxyTo(SERVICES.users)));
 
 // Social routes (protected)
 app.use('/api/v1/discover', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));

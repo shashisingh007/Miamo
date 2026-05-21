@@ -22,7 +22,19 @@
     "db:studio": "cd services/shared && npx prisma studio",
     "setup": "bash scripts/setup.sh"
   },
-  "keywords": ["dating", "social", "microservices", "nextjs", "express", "prisma"],
+  "keywords": [
+    "dating",
+    "social",
+    "microservices",
+    "nextjs",
+    "express",
+    "prisma"
+  ],
   "author": "Miamo Team",
-  "license": "UNLICENSED"
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "ts-node": "^10.9.2",
+    "tsx": "^4.22.3",
+    "typescript": "^6.0.3"
+  }
 }

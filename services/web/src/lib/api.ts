@@ -103,6 +103,9 @@ class ApiClient {
  async passUser(userId: string) {
  return this.request<any>('/api/v1/discover/pass', { method: 'POST', body: JSON.stringify({ userId }) });
  }
+ async passUserFeedback(userId: string, reason: string, details?: string) {
+ return this.request<any>('/api/v1/discover/pass-feedback', { method: 'POST', body: JSON.stringify({ userId, reason, details }) });
+ }
  async superLikeUser(userId: string) {
  return this.request<any>(`/api/v1/discover/${userId}/superlike`, { method: 'POST' });
  }
@@ -333,6 +336,24 @@ class ApiClient {
 
  // Health
  async health() { return this.request<any>('/health'); }
+
+ // ─── User Data (persisted state) ────────────────────
+ async getUserData(type: string, limit?: number) {
+ const qs = limit ? `?type=${type}&limit=${limit}` : `?type=${type}`;
+ return this.request<any>(`/api/v1/user-data${qs}`);
+ }
+ async saveUserData(type: string, data: any) {
+ return this.request<any>('/api/v1/user-data', { method: 'POST', body: JSON.stringify({ type, data }) });
+ }
+ async updateUserData(id: string, data: any) {
+ return this.request<any>(`/api/v1/user-data/${id}`, { method: 'PUT', body: JSON.stringify({ data }) });
+ }
+ async deleteUserData(id: string) {
+ return this.request<any>(`/api/v1/user-data/${id}`, { method: 'DELETE' });
+ }
+ async upsertUserData(type: string, data: any) {
+ return this.request<any>(`/api/v1/user-data/upsert/${type}`, { method: 'PUT', body: JSON.stringify({ data }) });
+ }
 
  // ─── Activity Tracking ─────────────────────────────
  trackActivity(action: string, targetType: string, targetId?: string, metadata?: Record<string, unknown>, durationMs?: number) {

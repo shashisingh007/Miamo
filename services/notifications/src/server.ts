@@ -28,7 +28,9 @@ async function pushToUser(userId: string, event: string, data: any) {
       headers: { 'Content-Type': 'application/json', 'x-internal-key': INTERNAL_KEY },
       body: JSON.stringify({ userId, event, data }),
     });
-  } catch {}
+  } catch (e) {
+    logger.warn('SSE push failed for user', userId, ':', (e as Error).message);
+  }
 }
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
@@ -76,7 +78,13 @@ app.get('/api/v1/notifications/count', authMiddleware, async (req: AuthRequest, 
 });
 
 app.post('/api/v1/notifications/:id/read', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try { await prisma.notification.update({ where: { id: req.params.id }, data: { read: true } }); res.json({ data: { success: true } }); } catch (e) { next(e); }
+  try {
+    // SECURITY FIX: Verify the notification belongs to the requesting user
+    const notification = await prisma.notification.findFirst({ where: { id: req.params.id, userId: req.userId! } });
+    if (!notification) return res.status(404).json({ error: { message: 'Notification not found', code: 'NOT_FOUND' } });
+    await prisma.notification.update({ where: { id: req.params.id }, data: { read: true } });
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
 });
 
 app.post('/api/v1/notifications/read-all', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -115,9 +123,14 @@ app.post('/internal/notifications', async (req: Request, res: Response, next: Ne
 });
 
 // Error Handler
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  const statusCode = err.statusCode || 500;
-  res.status(statusCode).json({ error: { message: err.message, code: err.code || 'INTERNAL_ERROR', statusCode } });
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const error = err as { statusCode?: number; message?: string; code?: string };
+  const statusCode = error.statusCode || 500;
+  const message = statusCode === 500 && process.env.NODE_ENV === 'production'
+    ? 'Internal server error'
+    : (error.message || 'Internal server error');
+  if (statusCode >= 500) logger.error('Unhandled error:', error.message);
+  res.status(statusCode).json({ error: { message, code: error.code || 'INTERNAL_ERROR', statusCode } });
 });
 
 if (process.env.NODE_ENV !== 'test') {

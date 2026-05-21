@@ -147,17 +147,17 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           {/* ═══ PREMIUM SIDEBAR ═══ */}
  <aside className="hidden lg:flex flex-col w-[270px] glass-sidebar relative z-10">
  {/* Brand header */}
- <div className="flex items-center gap-3 px-6 h-[72px] relative">
- <div className="relative flex-1">
- <MiamoWordmark height={18} animated={true} />
- <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#C97856]/80 block mt-0.5">Premium</span>
+ <div className="flex items-center h-[72px] relative" style={{ paddingLeft: 28, paddingRight: 16 }}>
+ <div className="relative flex items-center miamo-sidebar-logo" style={{ width: 100, height: 50, overflow: 'visible' }}>
+ <MiamoWordmark height={18} animated={true} className="!min-h-0 !h-[50px] !w-[100px]" />
  </div>
- <div className="ml-auto">
+ <div className="ml-auto flex flex-col items-center gap-0.5">
  <Link href="/premium" className="relative group">
  <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-amber-100 to-amber-50 border border-amber-200/50 group-hover:border-amber-300 transition-all group-hover:shadow-[0_0_12px_rgba(212,175,55,0.3)]">
  <Crown className="w-4 h-4 text-amber-600 group-hover:text-amber-500 transition-colors" />
  </div>
  </Link>
+ <span className="text-[8px] font-bold uppercase tracking-[0.15em] text-[#C97856]/80">Premium</span>
  </div>
  </div>
 

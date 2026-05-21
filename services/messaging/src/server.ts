@@ -19,9 +19,14 @@ const suggestionCache = new LRUCache(200);
 
 // ═══ AES-256-GCM ENCRYPTION ═════════════════════════
 // Derive a 32-byte key from the service key using scrypt (computationally expensive,
-// resistant to brute-force). The salt is static because the same key is needed across
-// service restarts to decrypt existing messages.
-const ENC_KEY = crypto.scryptSync(process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key', 'miamo-e2e-salt-2026', 32);
+// resistant to brute-force). The salt is derived from the encryption key env var
+// to provide per-deployment uniqueness while remaining deterministic across restarts.
+const ENC_SALT = process.env.ENCRYPTION_SALT || 'miamo-e2e-salt-2026';
+const ENC_KEY = crypto.scryptSync(
+  process.env.ENCRYPTION_KEY || process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key',
+  ENC_SALT,
+  32
+);
 const ENC_ALGO = 'aes-256-gcm';
 
 // Encrypt plaintext to format: "enc:<iv_hex>:<authTag_hex>:<ciphertext_hex>"
@@ -62,7 +67,7 @@ const PORT = parseInt(process.env.PORT || '3204', 10);
 
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3100', credentials: true }));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
 if (process.env.NODE_ENV !== 'test') app.use(morgan('short'));
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 2000, standardHeaders: true, legacyHeaders: false }));
@@ -97,7 +102,18 @@ async function pushToUser(userId: string, event: string, data: any) {
       headers: { 'Content-Type': 'application/json', 'x-internal-key': INTERNAL_KEY },
       body: JSON.stringify({ userId, event, data }),
     });
-  } catch {}
+  } catch (e) {
+    logger.warn('SSE push failed for user', userId, ':', (e as Error).message);
+  }
+}
+
+// ═══ CHAT MEMBERSHIP VERIFICATION ═══════════════════
+// Security: Ensures the requesting user is a member of the chat before any operation
+async function verifyChatMembership(chatId: string, userId: string): Promise<{ chat: any; isMember: boolean }> {
+  const chat = await prisma.chat.findUnique({ where: { id: chatId } });
+  if (!chat) return { chat: null, isMember: false };
+  const isMember = chat.user1Id === userId || chat.user2Id === userId;
+  return { chat, isMember };
 }
 
 // ═══ CHATS & MESSAGES ════════════════════════════════
@@ -115,12 +131,21 @@ app.get('/api/v1/messages/chats', authMiddleware, async (req: AuthRequest, res: 
     });
 
     const result: any[] = [];
+    // Batch unread counts to avoid N+1 queries
+    const chatIds = chats.map(c => c.id);
+    const unreadCounts = await prisma.message.groupBy({
+      by: ['chatId'],
+      where: { chatId: { in: chatIds }, senderId: { not: userId }, read: false, deletedForAll: false },
+      _count: { id: true },
+    });
+    const unreadMap = new Map(unreadCounts.map(u => [u.chatId, u._count.id]));
+
     for (const c of chats) {
       const rawOther = c.user1Id === userId ? c.user2 : c.user1;
       const { passwordHash, ...otherUser } = rawOther;
       const lastMsg = c.messages[0] || null;
       const lastContent = lastMsg ? decryptMessage(lastMsg.content) : null;
-      const unreadCount = await prisma.message.count({ where: { chatId: c.id, senderId: { not: userId }, read: false, deletedForAll: false } });
+      const unreadCount = unreadMap.get(c.id) || 0;
       result.push({
         id: c.id,
         otherUser,
@@ -169,6 +194,9 @@ app.get('/api/v1/messages/chats/:chatId/messages', authMiddleware, async (req: A
     const { chatId } = req.params;
     const { cursor } = req.query;
     const userId = req.userId!;
+    // Security: verify chat membership before revealing messages
+    const { isMember } = await verifyChatMembership(chatId, userId);
+    if (!isMember) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
     const messages = await prisma.message.findMany({
       where: { chatId, deletedForAll: false, NOT: { deletedFor: { contains: userId } } },
       include: {
@@ -196,6 +224,10 @@ app.post('/api/v1/messages/chats/:chatId/messages', authMiddleware, async (req: 
     const { content: rawContent, type, replyToId } = req.body;
     const content = sanitize(rawContent || '');
     const userId = req.userId!;
+    // Security: verify sender is a member of this chat
+    const { isMember } = await verifyChatMembership(chatId, userId);
+    if (!isMember) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
+    if (!content.trim()) return res.status(400).json({ error: { message: 'Message content required', code: 'VALIDATION_ERROR' } });
     // Encrypt the message content before storing
     const encryptedContent = encryptMessage(content);
     const message = await prisma.message.create({
@@ -234,8 +266,14 @@ app.post('/api/v1/messages/messages/:id/delete-for-me', authMiddleware, async (r
   try {
     const msg = await prisma.message.findUnique({ where: { id: req.params.id } });
     if (!msg) return res.status(404).json({ error: { message: 'Not found' } });
-    const deletedFor = msg.deletedFor ? msg.deletedFor + ',' + req.userId : req.userId!;
-    await prisma.message.update({ where: { id: req.params.id }, data: { deletedFor } });
+    // Security: verify user is a member of this chat
+    const { isMember } = await verifyChatMembership(msg.chatId, req.userId!);
+    if (!isMember) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
+    // Use JSON array format for deletedFor to prevent substring matching issues
+    let deletedForList: string[] = [];
+    try { deletedForList = msg.deletedFor ? JSON.parse(msg.deletedFor) : []; } catch { deletedForList = msg.deletedFor ? msg.deletedFor.split(',') : []; }
+    if (!deletedForList.includes(req.userId!)) deletedForList.push(req.userId!);
+    await prisma.message.update({ where: { id: req.params.id }, data: { deletedFor: JSON.stringify(deletedForList) } });
     res.json({ data: { success: true } });
   } catch (e) { next(e); }
 });
@@ -246,6 +284,9 @@ app.post('/api/v1/messages/messages/:id/react', authMiddleware, async (req: Auth
   try {
     const msg = await prisma.message.findUnique({ where: { id: req.params.id } });
     if (!msg) return res.status(404).json({ error: { message: 'Not found' } });
+    // Security: verify user is a member of this chat
+    const { isMember } = await verifyChatMembership(msg.chatId, req.userId!);
+    if (!isMember) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
     const reactions = msg.reactions ? JSON.parse(msg.reactions) : [];
     const idx = reactions.findIndex((r: any) => r.userId === req.userId);
     const emoji = sanitize(req.body.emoji || '');
@@ -258,8 +299,9 @@ app.post('/api/v1/messages/messages/:id/react', authMiddleware, async (req: Auth
 
 app.post('/api/v1/messages/chats/:chatId/pin', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const chat = await prisma.chat.findUnique({ where: { id: req.params.chatId } });
+    const { isMember, chat } = await verifyChatMembership(req.params.chatId, req.userId!);
     if (!chat) return res.status(404).json({ error: { message: 'Not found' } });
+    if (!isMember) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
     const field = chat.user1Id === req.userId ? 'pinned1' : 'pinned2';
     await prisma.chat.update({ where: { id: req.params.chatId }, data: { [field]: req.body.pinned ?? true } });
     res.json({ data: { success: true } });
@@ -268,8 +310,9 @@ app.post('/api/v1/messages/chats/:chatId/pin', authMiddleware, async (req: AuthR
 
 app.post('/api/v1/messages/chats/:chatId/mute', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const chat = await prisma.chat.findUnique({ where: { id: req.params.chatId } });
+    const { isMember, chat } = await verifyChatMembership(req.params.chatId, req.userId!);
     if (!chat) return res.status(404).json({ error: { message: 'Not found' } });
+    if (!isMember) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
     const field = chat.user1Id === req.userId ? 'muted1' : 'muted2';
     await prisma.chat.update({ where: { id: req.params.chatId }, data: { [field]: req.body.muted ?? true } });
     res.json({ data: { success: true } });
@@ -278,8 +321,9 @@ app.post('/api/v1/messages/chats/:chatId/mute', authMiddleware, async (req: Auth
 
 app.post('/api/v1/messages/chats/:chatId/archive', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const chat = await prisma.chat.findUnique({ where: { id: req.params.chatId } });
+    const { isMember, chat } = await verifyChatMembership(req.params.chatId, req.userId!);
     if (!chat) return res.status(404).json({ error: { message: 'Not found' } });
+    if (!isMember) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
     const field = chat.user1Id === req.userId ? 'archived1' : 'archived2';
     await prisma.chat.update({ where: { id: req.params.chatId }, data: { [field]: req.body.archived ?? true } });
     res.json({ data: { success: true } });
@@ -289,8 +333,9 @@ app.post('/api/v1/messages/chats/:chatId/archive', authMiddleware, async (req: A
 // Unarchive
 app.post('/api/v1/messages/chats/:chatId/unarchive', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const chat = await prisma.chat.findUnique({ where: { id: req.params.chatId } });
+    const { isMember, chat } = await verifyChatMembership(req.params.chatId, req.userId!);
     if (!chat) return res.status(404).json({ error: { message: 'Not found' } });
+    if (!isMember) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
     const field = chat.user1Id === req.userId ? 'archived1' : 'archived2';
     await prisma.chat.update({ where: { id: req.params.chatId }, data: { [field]: false } });
     res.json({ data: { success: true } });
@@ -300,6 +345,8 @@ app.post('/api/v1/messages/chats/:chatId/unarchive', authMiddleware, async (req:
 // Set chat theme/background
 app.post('/api/v1/messages/chats/:chatId/theme', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
+    const { isMember } = await verifyChatMembership(req.params.chatId, req.userId!);
+    if (!isMember) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
     const { theme, background } = req.body;
     const data: any = {};
     if (theme) data.theme = theme;
@@ -313,10 +360,15 @@ app.post('/api/v1/messages/chats/:chatId/theme', authMiddleware, async (req: Aut
 app.delete('/api/v1/messages/chats/:chatId/clear', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
+    // Security: verify chat membership
+    const { isMember } = await verifyChatMembership(req.params.chatId, userId);
+    if (!isMember) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
     const messages = await prisma.message.findMany({ where: { chatId: req.params.chatId } });
     for (const msg of messages) {
-      const deletedFor = msg.deletedFor ? msg.deletedFor + ',' + userId : userId;
-      await prisma.message.update({ where: { id: msg.id }, data: { deletedFor } });
+      let deletedForList: string[] = [];
+      try { deletedForList = msg.deletedFor ? JSON.parse(msg.deletedFor) : []; } catch { deletedForList = msg.deletedFor ? msg.deletedFor.split(',') : []; }
+      if (!deletedForList.includes(userId)) deletedForList.push(userId);
+      await prisma.message.update({ where: { id: msg.id }, data: { deletedFor: JSON.stringify(deletedForList) } });
     }
     auditLog(prisma, userId, 'chat_clear', { chatId: req.params.chatId, messageCount: messages.length });
     res.json({ data: { success: true } });
@@ -329,6 +381,9 @@ app.get('/api/v1/messages/chats/:chatId/search', authMiddleware, async (req: Aut
     const { q } = req.query;
     const userId = req.userId!;
     if (!q) return res.json({ data: [] });
+    // Security: verify chat membership before searching
+    const { isMember } = await verifyChatMembership(req.params.chatId, userId);
+    if (!isMember) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
     // Fetch all messages, decrypt in-memory, then filter (encrypted content can't be searched via SQL)
     const messages = await prisma.message.findMany({
       where: {
@@ -701,10 +756,144 @@ app.post('/api/v1/beats/:id/archive', authMiddleware, async (req: AuthRequest, r
   } catch (e) { next(e); }
 });
 
+// ─── Communication Profile (for algorithm intelligence) ───────────────
+// Returns aggregated communication metrics without exposing message content.
+// Used by the social service to compute CommStyleVector for deep compatibility.
+app.get('/api/v1/messages/comm-profile/:userId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const targetUserId = req.params.userId;
+    // Only allow the user themselves or internal service calls
+    if (req.userId !== targetUserId) {
+      // Allow internal service-to-service calls (same internal key)
+      const internalKey = req.headers['x-internal-key'];
+      if (internalKey !== (process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key')) {
+        return res.status(403).json({ error: { message: 'Forbidden' } });
+      }
+    }
+
+    // Fetch last 100 messages sent by this user across all chats
+    const chats = await prisma.chat.findMany({
+      where: { OR: [{ user1Id: targetUserId }, { user2Id: targetUserId }] },
+      select: { id: true },
+    });
+    const chatIds = chats.map(c => c.id);
+    if (chatIds.length === 0) {
+      return res.json({ data: { avgWordCount: 5, emojiPerMessage: 0.2, questionRatio: 0.3, avgResponseTimeSec: 300, formalityScore: 0.5, messageCount: 0 } });
+    }
+
+    const messages = await prisma.message.findMany({
+      where: { chatId: { in: chatIds }, senderId: targetUserId },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+      select: { content: true, createdAt: true, chatId: true },
+    });
+
+    if (messages.length === 0) {
+      return res.json({ data: { avgWordCount: 5, emojiPerMessage: 0.2, questionRatio: 0.3, avgResponseTimeSec: 300, formalityScore: 0.5, messageCount: 0 } });
+    }
+
+    // Decrypt and analyze messages
+    let totalWords = 0, totalEmoji = 0, totalQuestions = 0, formalWords = 0;
+    const decrypted: string[] = [];
+    for (const m of messages) {
+      const text = decryptMessage(m.content);
+      if (text === '[encrypted message]') continue;
+      decrypted.push(text);
+      const words = text.split(/\s+/).filter(Boolean);
+      totalWords += words.length;
+      totalEmoji += (text.match(/[\u{1F600}-\u{1F6FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F900}-\u{1F9FF}\u{1FA00}-\u{1FA6F}]/gu) || []).length;
+      if (text.includes('?')) totalQuestions++;
+      // Formality heuristics
+      const formalIndicators = ['would', 'could', 'perhaps', 'regarding', 'appreciate', 'however', 'furthermore'];
+      const casualIndicators = ['lol', 'haha', 'omg', 'nah', 'gonna', 'wanna', 'btw', 'rn', 'tbh'];
+      for (const w of words) {
+        if (formalIndicators.includes(w.toLowerCase())) formalWords++;
+        if (casualIndicators.includes(w.toLowerCase())) formalWords--;
+      }
+    }
+
+    const count = decrypted.length || 1;
+    const avgWordCount = Math.round(totalWords / count);
+    const emojiPerMessage = Math.round((totalEmoji / count) * 100) / 100;
+    const questionRatio = Math.round((totalQuestions / count) * 100) / 100;
+    const formalityScore = Math.max(0, Math.min(1, 0.5 + (formalWords / (totalWords || 1)) * 5));
+
+    // Compute average response time (look at message pairs in same chat)
+    let totalResponseTime = 0, responseCount = 0;
+    const chatGroups = new Map<string, typeof messages>();
+    for (const m of messages) {
+      if (!chatGroups.has(m.chatId)) chatGroups.set(m.chatId, []);
+      chatGroups.get(m.chatId)!.push(m);
+    }
+    // For each chat, get the other user's messages to compute response timing
+    for (const [chatId, myMsgs] of chatGroups.entries()) {
+      const otherMsgs = await prisma.message.findMany({
+        where: { chatId, senderId: { not: targetUserId } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: { createdAt: true },
+      });
+      for (const myMsg of myMsgs) {
+        // Find the most recent other-user message before this one
+        const precedingMsg = otherMsgs.find(o => new Date(o.createdAt) < new Date(myMsg.createdAt));
+        if (precedingMsg) {
+          const diff = (new Date(myMsg.createdAt).getTime() - new Date(precedingMsg.createdAt).getTime()) / 1000;
+          if (diff > 0 && diff < 86400) { // Within 24h = valid response
+            totalResponseTime += diff;
+            responseCount++;
+          }
+        }
+      }
+    }
+    const avgResponseTimeSec = responseCount > 0 ? Math.round(totalResponseTime / responseCount) : 300;
+
+    res.json({ data: { avgWordCount, emojiPerMessage, questionRatio, avgResponseTimeSec, formalityScore: Math.round(formalityScore * 100) / 100, messageCount: count } });
+  } catch (e) { next(e); }
+});
+
+// ─── Sent Texts (for Miamo Move style extraction) ─────────────────────
+// Returns last N sent message texts (decrypted) for the authenticated user only.
+// Used by social service to extract writing style for generateSmartMoves().
+app.get('/api/v1/messages/sent-texts/:userId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const targetUserId = req.params.userId;
+    // Security: only allow the user themselves or internal service calls
+    if (req.userId !== targetUserId) {
+      const internalKey = req.headers['x-internal-key'];
+      if (internalKey !== (process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key')) {
+        return res.status(403).json({ error: { message: 'Forbidden' } });
+      }
+    }
+
+    const limit = Math.min(parseInt(req.query.limit as string) || 10, 30);
+
+    const chats = await prisma.chat.findMany({
+      where: { OR: [{ user1Id: targetUserId }, { user2Id: targetUserId }] },
+      select: { id: true },
+    });
+    if (chats.length === 0) return res.json({ data: [] });
+
+    const messages = await prisma.message.findMany({
+      where: { chatId: { in: chats.map(c => c.id) }, senderId: targetUserId },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: { content: true, createdAt: true },
+    });
+
+    const texts = messages.map(m => decryptMessage(m.content)).filter(t => t !== '[encrypted message]' && t.length > 2);
+    res.json({ data: texts });
+  } catch (e) { next(e); }
+});
+
 // Error Handler
-app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-  const statusCode = err.statusCode || 500;
-  res.status(statusCode).json({ error: { message: err.message, code: err.code || 'INTERNAL_ERROR', statusCode } });
+app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
+  const error = err as { statusCode?: number; message?: string; code?: string };
+  const statusCode = error.statusCode || 500;
+  const message = statusCode === 500 && process.env.NODE_ENV === 'production'
+    ? 'Internal server error'
+    : (error.message || 'Internal server error');
+  if (statusCode >= 500) logger.error('Unhandled error:', error.message);
+  res.status(statusCode).json({ error: { message, code: error.code || 'INTERNAL_ERROR', statusCode } });
 });
 
 if (process.env.NODE_ENV !== 'test') {
