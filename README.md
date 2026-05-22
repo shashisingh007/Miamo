@@ -660,15 +660,24 @@ secrets:
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | `postgresql://...` | PostgreSQL connection string |
-| `JWT_SECRET` | dev fallback | JWT signing secret |
-| `JWT_REFRESH_SECRET` | dev fallback | Refresh token secret |
-| `INTERNAL_SERVICE_KEY` | `miamo-internal-dev-key` | Inter-service auth key |
-| `ALLOWED_ORIGINS` | `http://localhost:3100` | CORS origins |
-| `LOG_LEVEL` | `debug` (dev) / `error` (prod) | Logger verbosity |
-| `NODE_ENV` | `development` | Environment mode |
+See [.env.example](.env.example) for the full list. All secrets are required in
+`NODE_ENV=production` — startup fails fast if any are unset. In `development`
+and `test` they fall back to well-known dev defaults and the logger emits a
+one-time warning per missing secret.
+
+| Variable | Required in prod | Description |
+|----------|------------------|-------------|
+| `DATABASE_URL` | yes | PostgreSQL connection string |
+| `JWT_SECRET` | yes | Access-token signing secret (HS256) |
+| `JWT_REFRESH_SECRET` | yes | Refresh-token signing secret |
+| `INTERNAL_SERVICE_KEY` | yes | Inter-service auth key (gateway ↔ services, SSE push) |
+| `ENCRYPTION_KEY` | yes | Source key for AES-256-GCM message encryption (scrypt-derived) |
+| `ENCRYPTION_SALT` | yes | Deterministic scrypt salt (rotating breaks existing ciphertexts) |
+| `ALLOWED_ORIGINS` | no | Comma-separated CORS origins (defaults to `FRONTEND_URL`) |
+| `LOG_LEVEL` | no | `debug` (dev) / `error` (prod) — logger verbosity |
+| `NODE_ENV` | no | `development` \| `test` \| `production` |
+
+Generate strong secrets with `openssl rand -hex 32`.
 
 ---
 
