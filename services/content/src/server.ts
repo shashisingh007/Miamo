@@ -895,6 +895,17 @@ app.get('/api/v1/matrimonial/browse', authMiddleware, async (req: AuthRequest, r
     // Check access granted for each profile
     const myProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
 
+    // Batch behavioral view-counts across all candidates in a single groupBy
+    // (was N+1: one userActivity.count per candidate inside the map).
+    const since7d = new Date(Date.now() - 7 * 86400000);
+    const candidateIds = profiles.map(p => p.userId);
+    const viewCountRows = candidateIds.length ? await prisma.userActivity.groupBy({
+      by: ['targetId'],
+      where: { targetId: { in: candidateIds }, action: 'view', targetType: 'dtm_profile', createdAt: { gte: since7d } },
+      _count: { _all: true },
+    }) : [];
+    const viewCountByCandidate = new Map(viewCountRows.map(r => [r.targetId, r._count._all]));
+
     // Score each profile using DTM algorithm engine (enhanced with behavioral signals)
     const result = await Promise.all(profiles.map(async p => {
       const { phoneNumber, alternatePhone, linkedIn, contactEmail, ...safe } = p;
@@ -936,8 +947,8 @@ app.get('/api/v1/matrimonial/browse', authMiddleware, async (req: AuthRequest, r
           // Recently active (user was online in last 48h) → approximate activeDaysLast14
           const recentlyActive = !!(p.user?.profile as any)?.online || (p.updatedAt > new Date(Date.now() - 48 * 3600000));
           behavioralSignals.activeDaysLast14 = recentlyActive ? 7 : 2;
-          // View count as a proxy for engagement/overlap
-          const viewCount = await prisma.userActivity.count({ where: { targetId: p.userId, action: 'view', targetType: 'dtm_profile', createdAt: { gte: new Date(Date.now() - 7 * 86400000) } } });
+          // View count as a proxy for engagement/overlap (batched above)
+          const viewCount = viewCountByCandidate.get(p.userId) || 0;
           behavioralSignals.browseOverlap = Math.min(viewCount / 10, 1);
         } catch {}
 
@@ -1515,36 +1526,29 @@ app.get('/api/v1/matrimonial/chat/:userId', authMiddleware, async (req: AuthRequ
 app.get('/api/v1/matrimonial/chat', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
-    // Get all unique chat partners
-    const sentTo = await prisma.dtmMessage.findMany({
-      where: { senderId: userId },
-      distinct: ['recipientId'],
-      select: { recipientId: true },
+    // Single fetch for all DTM messages this user is involved in, then
+    // aggregate per-partner stats in memory (was N+1: 3 queries per partner).
+    const allMessages = await prisma.dtmMessage.findMany({
+      where: { OR: [{ senderId: userId }, { recipientId: userId }] },
+      orderBy: { createdAt: 'desc' },
     });
-    const receivedFrom = await prisma.dtmMessage.findMany({
-      where: { recipientId: userId },
-      distinct: ['senderId'],
-      select: { senderId: true },
-    });
-    const partnerIds = [...new Set([
-      ...sentTo.map(m => m.recipientId),
-      ...receivedFrom.map(m => m.senderId),
-    ])];
-
-    const chats = await Promise.all(partnerIds.map(async (partnerId) => {
-      const lastMessage = await prisma.dtmMessage.findFirst({
-        where: { OR: [{ senderId: userId, recipientId: partnerId }, { senderId: partnerId, recipientId: userId }] },
-        orderBy: { createdAt: 'desc' },
-      });
-      const unreadCount = await prisma.dtmMessage.count({
-        where: { senderId: partnerId, recipientId: userId, read: false },
-      });
-      const totalMessages = await prisma.dtmMessage.count({
-        where: { OR: [{ senderId: userId, recipientId: partnerId }, { senderId: partnerId, recipientId: userId }] },
-      });
-      return { userId: partnerId, lastMessage, unreadCount, totalMessages };
+    const lastByPartner = new Map<string, typeof allMessages[number]>();
+    const totalByPartner = new Map<string, number>();
+    const unreadByPartner = new Map<string, number>();
+    for (const m of allMessages) {
+      const partner = m.senderId === userId ? m.recipientId : m.senderId;
+      if (!lastByPartner.has(partner)) lastByPartner.set(partner, m);
+      totalByPartner.set(partner, (totalByPartner.get(partner) || 0) + 1);
+      if (m.recipientId === userId && !m.read) {
+        unreadByPartner.set(partner, (unreadByPartner.get(partner) || 0) + 1);
+      }
+    }
+    const chats = Array.from(lastByPartner.entries()).map(([partnerId, lastMessage]) => ({
+      userId: partnerId,
+      lastMessage,
+      unreadCount: unreadByPartner.get(partnerId) || 0,
+      totalMessages: totalByPartner.get(partnerId) || 0,
     }));
-    // Sort by last message time
     chats.sort((a, b) => {
       const aTime = a.lastMessage?.createdAt ? new Date(a.lastMessage.createdAt).getTime() : 0;
       const bTime = b.lastMessage?.createdAt ? new Date(b.lastMessage.createdAt).getTime() : 0;
