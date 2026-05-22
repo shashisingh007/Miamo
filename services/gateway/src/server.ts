@@ -7,6 +7,8 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
+import { RedisStore } from 'rate-limit-redis';
+import { createClient } from 'redis';
 import compression from 'compression';
 import { createProxyMiddleware, Options } from 'http-proxy-middleware';
 import jwt from 'jsonwebtoken';
@@ -17,6 +19,25 @@ const app = express();
 const PORT = parseInt(process.env.PORT || '3200', 10);
 const JWT_SECRET = env.jwtSecret;
 const INTERNAL_KEY = env.internalServiceKey;
+
+// ═══ Redis store for distributed rate limiting ═══════
+// When REDIS_URL is set, rate-limit counters are kept in Redis so all gateway
+// replicas share the same window. Without Redis, each replica keeps its own
+// in-memory counters (fine for single-process dev/test, BYPASSABLE in prod
+// with >1 replica — set REDIS_URL in any multi-replica deployment).
+let redisStore: RedisStore | undefined;
+let authRedisStore: RedisStore | undefined;
+if (process.env.REDIS_URL) {
+  const redisClient = createClient({ url: process.env.REDIS_URL });
+  redisClient.on('error', (err) => logger.warn('Redis rate-limit client error:', err.message));
+  redisClient.connect().then(
+    () => logger.info('Rate-limit Redis store connected'),
+    (err) => logger.warn('Rate-limit Redis store failed to connect (falling back to memory):', err.message),
+  );
+  // Separate key prefixes so the two limiters don't share counters
+  redisStore = new RedisStore({ sendCommand: (...args: string[]) => redisClient.sendCommand(args), prefix: 'rl:global:' });
+  authRedisStore = new RedisStore({ sendCommand: (...args: string[]) => redisClient.sendCommand(args), prefix: 'rl:auth:' });
+}
 
 // ═══ SSE: Real-time event connections per user ═══════
 // In-memory map of userId → Set of active SSE response objects.
@@ -114,6 +135,7 @@ const globalLimiter = rateLimit({
   max: 5000,
   standardHeaders: true,
   legacyHeaders: false,
+  store: redisStore,
   keyGenerator: (req) => {
     // Use user ID if authenticated, otherwise IP
     return (req.headers['x-user-id'] as string) || req.ip || 'unknown';
@@ -126,6 +148,7 @@ const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 30,
   message: { error: { message: 'Too many auth attempts. Please try again later.', code: 'RATE_LIMITED' } },
+  store: authRedisStore,
   keyGenerator: (req) => req.ip || 'unknown',
 });
 

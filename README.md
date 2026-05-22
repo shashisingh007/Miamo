@@ -578,6 +578,10 @@ $$\text{SearchScore} = w_1 \cdot \text{ExactMatch} + w_2 \cdot \text{PrefixMatch
 - Global: 5000 req / 15 min per user/IP
 - Auth routes: 30 req / 15 min per IP
 - Per-service: 1000–2000 req / 15 min
+- **Distributed store**: gateway uses Redis-backed counters (`rate-limit-redis`) when `REDIS_URL` is set, so limits are shared across replicas. Falls back to per-process in-memory counters if Redis is unavailable (acceptable for single-process dev; **set `REDIS_URL` in any multi-replica deployment** or the limit is trivially bypassable).
+
+### Production Secrets
+Sensitive env vars (`JWT_SECRET`, `JWT_REFRESH_SECRET`, `INTERNAL_SERVICE_KEY`, `ENCRYPTION_KEY`, `ENCRYPTION_SALT`, `DATABASE_URL`, `REDIS_URL`) should live in a Kubernetes `Secret`, not the `ConfigMap`. See [k8s/templates/secret.yaml](k8s/templates/secret.yaml) for the template and recommended sources (External Secrets Operator → AWS/GCP Secret Manager / Vault, or Sealed Secrets). Backend services call `requireSecret()` at boot and **crash fast** if any required secret is missing in `NODE_ENV=production`.
 
 ### Connection Pooling
 All database services configure Prisma connection limits:
