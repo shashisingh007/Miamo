@@ -9,6 +9,7 @@ import { SettingsSkeleton } from '@/components/ui/skeleton';
 import { InputModal, PasswordModal, Toast } from '@/components/ui/modal';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { logError } from '@/lib/logError';
 import { useAuthStore, useThemeStore } from '@/stores';
 import { useRouter } from 'next/navigation';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
@@ -153,7 +154,7 @@ export default function SettingsPage() {
  dateFormat: s.preferences?.dateFormat ?? prev.dateFormat,
  }));
  }
- }).catch(() => {}).finally(() => setLoading(false));
+ }).catch((e) => logError('settings.load', e)).finally(() => setLoading(false));
  }, []);
 
  const toggle = async (key: keyof typeof settings) => {
@@ -198,7 +199,7 @@ export default function SettingsPage() {
  const handleDeactivate = async () => { try { await api.deactivateAccount(); clearAuth(); router.push('/login'); } catch { showToast('Failed', 'error'); } };
  const handleLogout = async () => { try { await api.logout(); } catch {} clearAuth(); router.push('/login'); };
  const handleUnblock = async (userId: string) => { try { await api.unblockUser(userId); setBlockList(prev => prev.filter(b => b.id !== userId)); showToast('Unblocked', 'success'); } catch {} };
- const loadBlockList = () => { api.getBlockList().then(res => setBlockList(res.data || [])).catch(() => {}); };
+ const loadBlockList = () => { api.getBlockList().then(res => setBlockList(res.data || [])).catch((e) => logError('settings.getBlockList', e)); };
 
  return (
  <ErrorBoundary>

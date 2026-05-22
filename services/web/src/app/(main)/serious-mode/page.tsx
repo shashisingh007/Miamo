@@ -14,6 +14,7 @@ import {
  ChevronLeft, Hash, Percent, Activity, BookOpen,
 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { logError } from '@/lib/logError';
 import { MiamoLoader } from '@/components/ui/miamo-logo';
 import { cn } from '@/lib/utils';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
@@ -149,7 +150,15 @@ export default function DateToMarryPage() {
 
  const requestAccess = useCallback(async (type: string) => {
  if (!selectedProfile) return;
- try { await api.requestAccess(selectedProfile.user?.id || selectedProfile.userId, type, 'I would like to view your ' + type); setSaveMsg('Access request sent!'); setTimeout(() => setSaveMsg(''), 3000); } catch {}
+ try {
+ await api.requestAccess(selectedProfile.user?.id || selectedProfile.userId, type, 'I would like to view your ' + type);
+ setSaveMsg('Access request sent!');
+ setTimeout(() => setSaveMsg(''), 3000);
+ } catch (e) {
+ logError('seriousMode.requestAccess', e);
+ setSaveMsg('Could not send access request. Try again.');
+ setTimeout(() => setSaveMsg(''), 3000);
+ }
  }, [selectedProfile]);
 
  const loadNumerology = useCallback(async () => {

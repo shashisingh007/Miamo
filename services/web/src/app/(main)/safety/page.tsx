@@ -5,6 +5,7 @@ import { Shield, AlertTriangle, Phone, FileText, Heart, Lock, Eye, Users, X, Sen
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui';
 import { api } from '@/lib/api';
+import { logError } from '@/lib/logError';
 import { useRouter } from 'next/navigation';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
@@ -18,19 +19,30 @@ export default function SafetyPage() {
  const [reportData, setReportData] = useState({ userId: '', reason: '', details: '' });
  const [submitting, setSubmitting] = useState(false);
  const [submitted, setSubmitted] = useState(false);
+ const [reportError, setReportError] = useState('');
  const [showTips, setShowTips] = useState(false);
  const [tips, setTips] = useState<any[]>([]);
  const [showDialerConfirm, setShowDialerConfirm] = useState(false);
 
  const handleReport = async () => {
  if (!reportData.reason.trim()) return;
+ setReportError('');
  setSubmitting(true);
- try { await api.reportUser({ reportedId: reportData.userId || 'unknown', reason: reportData.reason, details: reportData.details }); setSubmitted(true); setShowReport(false); setReportData({ userId: '', reason: '', details: '' }); setTimeout(() => setSubmitted(false), 3000); } catch (e) {}
+ try {
+ await api.reportUser({ reportedId: reportData.userId || 'unknown', reason: reportData.reason, details: reportData.details });
+ setSubmitted(true);
+ setShowReport(false);
+ setReportData({ userId: '', reason: '', details: '' });
+ setTimeout(() => setSubmitted(false), 3000);
+ } catch (e) {
+ logError('safety.reportUser', e);
+ setReportError('Could not submit report. Please try again.');
+ }
  setSubmitting(false);
  };
 
  const loadTips = async () => {
- try { const res = await api.getSafetyTips(); setTips(res.data || []); setShowTips(true); } catch (e) {}
+ try { const res = await api.getSafetyTips(); setTips(res.data || []); setShowTips(true); } catch (e) { logError('safety.getSafetyTips', e); }
  };
 
  const safetyCards = [
@@ -71,7 +83,7 @@ export default function SafetyPage() {
  <Card className="p-5 border-red-500/20">
  <div className="flex items-center justify-between mb-3">
  <h3 className="text-sm font-semibold">Report a User</h3>
- <button onClick={() => setShowReport(false)}><X className="w-4 h-4 text-text-muted" /></button>
+ <button onClick={() => { setShowReport(false); setReportError(''); }}><X className="w-4 h-4 text-text-muted" /></button>
  </div>
  <div className="space-y-3">
  <select value={reportData.reason} onChange={e => setReportData(d => ({...d, reason: e.target.value}))} className="input-premium w-full text-sm">
@@ -84,6 +96,7 @@ export default function SafetyPage() {
  </select>
  <textarea value={reportData.details} onChange={e => setReportData(d => ({...d, details: e.target.value}))} placeholder="Additional details (optional)…"
  className="input-premium w-full text-sm resize-none" rows={3} />
+ {reportError && <p className="text-xs text-red-400" role="alert">{reportError}</p>}
  <Button size="sm" onClick={handleReport} disabled={submitting || !reportData.reason}><Send className="w-3 h-3" /> {submitting ? 'Submitting…' : 'Submit Report'}</Button>
  </div>
  </Card>

@@ -8,6 +8,7 @@ import { NAV_MAIN, NAV_SECONDARY } from '@/lib/constants';
 import { useAuthStore } from '@/stores';
 import { Avatar, ScoreRing } from '@/components/ui';
 import { api } from '@/lib/api';
+import { logError } from '@/lib/logError';
 import { MiamoCompactIcon, MiamoWordmark, AnimatedMiamoLogo } from '@/components/ui/miamo-logo';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { Bell, LogOut, Crown, Sparkles } from 'lucide-react';
@@ -82,7 +83,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  });
  api.getNotificationCount().then(res => {
  setNotifCount(res.data?.count ?? 0);
- }).catch(() => {});
+ }).catch((e) => logError('layout.getNotificationCount', e));
  refreshUnread();
  }
  }, [isAuthenticated, clearAuth, refreshUnread]);
