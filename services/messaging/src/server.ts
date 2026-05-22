@@ -2,18 +2,13 @@
 // Handles: Chats, Messages, Beats (Streaks)
 // All messages encrypted with AES-256-GCM at rest
 import express, { Request, Response, NextFunction } from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import cookieParser from 'cookie-parser';
-import rateLimit from 'express-rate-limit';
-import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
 import { LRUCache, TTL } from '../../shared/cache';
 import { logger } from '../../shared/src/logger';
 import { sanitize } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
 import { env } from '../../shared/src/env';
+import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware, createPushToUser } from '../../shared/src/service';
 
 // ─── Chat Suggestion Cache ──────────────────────────
 const suggestionCache = new LRUCache(200);
@@ -54,55 +49,15 @@ function decryptMessage(data: string): string {
   } catch { return '[encrypted message]'; } // Graceful degradation on key mismatch
 }
 
-const DB_URL = process.env.DATABASE_URL || 'postgresql://miamo:miamo@localhost:5432/miamo?schema=public';
-export const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'production' ? ['error'] : ['warn', 'error'],
-  datasources: { db: { url: DB_URL + (DB_URL.includes('?') ? '&' : '?') + 'connection_limit=10&pool_timeout=20' } },
-});
+const prisma = createPrisma(10);
 export const app = express();
 const PORT = parseInt(process.env.PORT || '3204', 10);
 
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3100', credentials: true }));
-app.use(express.json({ limit: '1mb' }));
-app.use(cookieParser());
-if (process.env.NODE_ENV !== 'test') app.use(morgan('short'));
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 2000, standardHeaders: true, legacyHeaders: false }));
-
-interface AuthRequest extends Request { userId?: string; }
-function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
-  const userId = req.headers['x-user-id'] as string;
-  if (userId && req.headers['x-internal-key'] === env.internalServiceKey) {
-    req.userId = userId; return next();
-  }
-  return res.status(401).json({ error: { message: 'Authentication required', code: 'UNAUTHORIZED' } });
-}
-
-// Health
-app.get('/health', async (_req, res) => {
-  try { await prisma.$queryRaw`SELECT 1`; res.json({ status: 'ok', service: 'messaging', timestamp: new Date().toISOString(), db: 'connected' }); }
-  catch { res.status(503).json({ status: 'error', service: 'messaging', db: 'disconnected' }); }
-});
-app.get('/ready', async (_req, res) => {
-  try { await prisma.$queryRaw`SELECT 1`; res.json({ ready: true, service: 'messaging' }); }
-  catch { res.status(503).json({ ready: false, service: 'messaging' }); }
-});
-
-// ═══ GATEWAY SSE PUSH HELPER ═════════════════════════
-const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:3200';
-const INTERNAL_KEY = env.internalServiceKey;
-
-async function pushToUser(userId: string, event: string, data: any) {
-  try {
-    await fetch(`${GATEWAY_URL}/internal/push-event`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-internal-key': INTERNAL_KEY },
-      body: JSON.stringify({ userId, event, data }),
-    });
-  } catch (e) {
-    logger.warn('SSE push failed for user', userId, ':', (e as Error).message);
-  }
-}
+applyBaseMiddleware(app, { jsonLimit: '1mb' });
+interface AuthRequest extends Request { userId?: string }
+const authMiddleware = createInternalAuthMiddleware();
+installHealthRoutes(app, 'messaging', prisma);
+const pushToUser = createPushToUser();
 
 // ═══ CHAT MEMBERSHIP VERIFICATION ═══════════════════
 // Security: Ensures the requesting user is a member of the chat before any operation

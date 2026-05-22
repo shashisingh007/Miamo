@@ -1,33 +1,20 @@
 // ─── Miamo Social Service ────────────────────────────
 // Handles: Discover, Matches, AI-Match, Safety
 import express, { Request, Response, NextFunction } from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import cookieParser from 'cookie-parser';
-import rateLimit from 'express-rate-limit';
-import { PrismaClient } from '@prisma/client';
 import { LRUCache, MinHeap, BloomFilter, TTL, discoverCache, aiMatchCache, activityCache, profileCache } from '../../shared/cache';
 import { scoreForYou, scoreNew, scoreActive, scoreVerified, scoreSerious, scoreAiPicks, computeDeepCompatibility, computePersonalityArchetype, generateSmartMoves, computeFilterRelevanceBonus, type BehaviorVector, type VibeData, type MatchHistoryInsights, type CandidateUser, type UserProfile, type DeepCompatibilityInput, type SmartMoveInput, type CommStyleVector } from '../../shared/algorithms';
 import { logger } from '../../shared/src/logger';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
 import { env } from '../../shared/src/env';
+import { createPrisma, applyBaseMiddleware, createInternalAuthMiddleware, installHealthRoutes } from '../../shared/src/service';
 
-const DB_URL = process.env.DATABASE_URL || 'postgresql://miamo:miamo@localhost:5432/miamo?schema=public';
-export const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'production' ? ['error'] : ['warn', 'error'],
-  datasources: { db: { url: DB_URL + (DB_URL.includes('?') ? '&' : '?') + 'connection_limit=15&pool_timeout=20' } },
-});
+const prisma = createPrisma(15);
 export const app = express();
 const PORT = parseInt(process.env.PORT || '3203', 10);
 
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3100', credentials: true }));
-app.use(express.json({ limit: '10mb' }));
-app.use(cookieParser());
-if (process.env.NODE_ENV !== 'test') app.use(morgan('short'));
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 2000, standardHeaders: true, legacyHeaders: false }));
+applyBaseMiddleware(app, { jsonLimit: '10mb' });
+interface AuthRequest extends Request { userId?: string }
 
 // ─── Shared Constants ────────────────────────────────
 const ZODIAC_COMPAT: Record<string, string[]> = {
@@ -39,14 +26,7 @@ const ZODIAC_COMPAT: Record<string, string[]> = {
   Aquarius:['Gemini','Libra','Aries','Sagittarius'], Pisces:['Cancer','Scorpio','Taurus','Capricorn'],
 };
 
-interface AuthRequest extends Request { userId?: string; }
-function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
-  const userId = req.headers['x-user-id'] as string;
-  if (userId && req.headers['x-internal-key'] === env.internalServiceKey) {
-    req.userId = userId; return next();
-  }
-  return res.status(401).json({ error: { message: 'Authentication required', code: 'UNAUTHORIZED' } });
-}
+const authMiddleware = createInternalAuthMiddleware();
 
 // ─── User Behavior Vector Builder ───────────────────
 // Aggregates recent user actions into a weighted behavior profile for recommendations
@@ -290,15 +270,7 @@ async function getUserLastMessages(userId: string, limit = 10): Promise<string[]
   return [];
 }
 
-// Health
-app.get('/health', async (_req, res) => {
-  try { await prisma.$queryRaw`SELECT 1`; res.json({ status: 'ok', service: 'social', timestamp: new Date().toISOString(), db: 'connected' }); }
-  catch { res.status(503).json({ status: 'error', service: 'social', db: 'disconnected' }); }
-});
-app.get('/ready', async (_req, res) => {
-  try { await prisma.$queryRaw`SELECT 1`; res.json({ ready: true, service: 'social' }); }
-  catch { res.status(503).json({ ready: false, service: 'social' }); }
-});
+installHealthRoutes(app, 'social', prisma);
 
 // ═══ DISCOVER ════════════════════════════════════════
 // ─── Activity Track Endpoint (receives from gateway) ──

@@ -1,25 +1,16 @@
 // ─── Miamo Auth Service ──────────────────────────────
 import express, { Request, Response, NextFunction } from 'express';
-import cors from 'cors';
-import helmet from 'helmet';
-import morgan from 'morgan';
-import cookieParser from 'cookie-parser';
-import rateLimit from 'express-rate-limit';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
 import { logger } from '../../shared/src/logger';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog } from '../../shared/src/audit';
 import { env } from '../../shared/src/env';
+import { createPrisma, applyBaseMiddleware, installHealthRoutes } from '../../shared/src/service';
 
 import { randomBytes } from 'crypto';
 
-const DB_URL = process.env.DATABASE_URL || 'postgresql://miamo:miamo@localhost:5432/miamo?schema=public';
-export const prisma = new PrismaClient({
-  log: process.env.NODE_ENV === 'production' ? ['error'] : ['warn', 'error'],
-  datasources: { db: { url: DB_URL + (DB_URL.includes('?') ? '&' : '?') + 'connection_limit=10&pool_timeout=20' } },
-});
+const prisma = createPrisma(10);
 export const app = express();
 
 const PORT = parseInt(process.env.PORT || '3201', 10);
@@ -27,12 +18,7 @@ const JWT_SECRET = env.jwtSecret;
 const JWT_REFRESH_SECRET = env.jwtRefreshSecret;
 
 // ─── Middleware ───────────────────────────────────────
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors({ origin: process.env.FRONTEND_URL || 'http://localhost:3100', credentials: true }));
-app.use(express.json({ limit: '1mb' }));
-app.use(cookieParser());
-if (process.env.NODE_ENV !== 'test') app.use(morgan('short'));
-app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 1000, standardHeaders: true, legacyHeaders: false }));
+applyBaseMiddleware(app, { jsonLimit: '1mb', rateLimitMax: 1000 });
 
 // ─── Helpers ─────────────────────────────────────────
 class AppError extends Error {
@@ -86,16 +72,8 @@ async function createSession(userId: string, req: Request) {
   });
 }
 
-// ─── Health ──────────────────────────────────────────
-app.get('/health', async (_req, res) => {
-  try { await prisma.$queryRaw`SELECT 1`; res.json({ status: 'ok', service: 'auth', timestamp: new Date().toISOString(), db: 'connected' }); }
-  catch { res.status(503).json({ status: 'error', service: 'auth', db: 'disconnected' }); }
-});
-
-app.get('/ready', async (_req, res) => {
-  try { await prisma.$queryRaw`SELECT 1`; res.json({ ready: true, service: 'auth' }); }
-  catch { res.status(503).json({ ready: false, service: 'auth' }); }
-});
+// ─── Health ─────────────────────────────────────────────────────
+installHealthRoutes(app, 'auth', prisma);
 
 // ─── Routes ──────────────────────────────────────────
 // Register
