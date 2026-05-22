@@ -11,6 +11,7 @@ import { scoreSearch } from '../../shared/algorithms';
 import { logger } from '../../shared/src/logger';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog } from '../../shared/src/audit';
+import { env } from '../../shared/src/env';
 
 const DB_URL = process.env.DATABASE_URL || 'postgresql://miamo:miamo@localhost:5432/miamo?schema=public';
 export const prisma = new PrismaClient({
@@ -34,7 +35,7 @@ interface AuthRequest extends Request { userId?: string; }
 
 function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   const userId = req.headers['x-user-id'] as string;
-  if (userId && req.headers['x-internal-key'] === (process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key')) {
+  if (userId && req.headers['x-internal-key'] === env.internalServiceKey) {
     req.userId = userId; return next();
   }
   return res.status(401).json({ error: { message: 'Authentication required', code: 'UNAUTHORIZED' } });

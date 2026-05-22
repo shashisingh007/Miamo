@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
 import { logger } from '../../shared/src/logger';
 import { sanitize } from '../../shared/src/sanitize';
+import { env } from '../../shared/src/env';
 
 const DB_URL = process.env.DATABASE_URL || 'postgresql://miamo:miamo@localhost:5432/miamo?schema=public';
 export const prisma = new PrismaClient({
@@ -19,7 +20,7 @@ const PORT = parseInt(process.env.PORT || '3206', 10);
 
 // ═══ GATEWAY SSE PUSH HELPER ═════════════════════════
 const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:3200';
-const INTERNAL_KEY = process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key';
+const INTERNAL_KEY = env.internalServiceKey;
 
 async function pushToUser(userId: string, event: string, data: any) {
   try {
@@ -43,7 +44,7 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 2000, standardHeaders: true, 
 interface AuthRequest extends Request { userId?: string; }
 function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   const userId = req.headers['x-user-id'] as string;
-  if (userId && req.headers['x-internal-key'] === (process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key')) {
+  if (userId && req.headers['x-internal-key'] === env.internalServiceKey) {
     req.userId = userId; return next();
   }
   return res.status(401).json({ error: { message: 'Authentication required', code: 'UNAUTHORIZED' } });
@@ -108,7 +109,7 @@ app.post('/api/v1/notifications/mark-read', authMiddleware, async (req: AuthRequ
 app.post('/internal/notifications', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const key = req.headers['x-internal-key'];
-    if (key !== (process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key')) {
+    if (key !== INTERNAL_KEY) {
       return res.status(403).json({ error: { message: 'Forbidden' } });
     }
     const { userId, type, title: rawTitle, body: rawBody, data } = req.body;

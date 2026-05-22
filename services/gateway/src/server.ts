@@ -11,10 +11,12 @@ import compression from 'compression';
 import { createProxyMiddleware, Options } from 'http-proxy-middleware';
 import jwt from 'jsonwebtoken';
 import { logger } from '../../shared/src/logger';
+import { env } from '../../shared/src/env';
 
 const app = express();
 const PORT = parseInt(process.env.PORT || '3200', 10);
-const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('FATAL: JWT_SECRET must be set in production'); })() : 'miamo-dev-jwt-secret-change-in-production-2026') as string;
+const JWT_SECRET = env.jwtSecret;
+const INTERNAL_KEY = env.internalServiceKey;
 
 // ═══ SSE: Real-time event connections per user ═══════
 // In-memory map of userId → Set of active SSE response objects.
@@ -158,7 +160,7 @@ function extractUserId(req: express.Request, res: express.Response, next: expres
       const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string };
       // Pass user ID to downstream services
       req.headers['x-user-id'] = payload.userId;
-      req.headers['x-internal-key'] = process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key';
+      req.headers['x-internal-key'] = INTERNAL_KEY;
     } catch {
       // Token invalid — let downstream service handle 401
     }
@@ -248,7 +250,7 @@ app.get('/api/v1/events/stream', (req: express.Request, res: express.Response) =
 // Internal push endpoint (called by microservices)
 app.post('/internal/push-event', express.json({ limit: '1mb' }), (req: express.Request, res: express.Response) => {
   const key = req.headers['x-internal-key'];
-  if (key !== (process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key')) {
+  if (key !== INTERNAL_KEY) {
     return res.status(403).json({ error: 'Forbidden' });
   }
   const { userId, event, data } = req.body;
@@ -264,7 +266,7 @@ app.post('/api/v1/activity/track', express.json({ limit: '50kb' }), (req: expres
   // Forward to the appropriate service (social handles activity storage)
   fetch(`${SERVICES.social}/api/v1/activity/track`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-user-id': userId, 'x-internal-key': process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key' },
+    headers: { 'Content-Type': 'application/json', 'x-user-id': userId, 'x-internal-key': INTERNAL_KEY },
     body: JSON.stringify(req.body),
   }).catch((e: unknown) => logger.warn('Activity forward failed:', e));
   res.json({ ok: true });

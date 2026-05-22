@@ -11,6 +11,7 @@ import { PrismaClient } from '@prisma/client';
 import { logger } from '../../shared/src/logger';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog } from '../../shared/src/audit';
+import { env } from '../../shared/src/env';
 
 import { randomBytes } from 'crypto';
 
@@ -22,8 +23,8 @@ export const prisma = new PrismaClient({
 export const app = express();
 
 const PORT = parseInt(process.env.PORT || '3201', 10);
-const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('FATAL: JWT_SECRET must be set in production'); })() : 'miamo-dev-jwt-secret-change-in-production-2026') as string;
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || (process.env.NODE_ENV === 'production' ? (() => { throw new Error('FATAL: JWT_REFRESH_SECRET must be set in production'); })() : 'miamo-refresh-secret-change') as string;
+const JWT_SECRET = env.jwtSecret;
+const JWT_REFRESH_SECRET = env.jwtRefreshSecret;
 
 // ─── Middleware ───────────────────────────────────────
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
@@ -45,7 +46,7 @@ interface AuthRequest extends Request { userId?: string; }
 
 function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   const internalUserId = req.headers['x-user-id'] as string;
-  if (internalUserId && req.headers['x-internal-key'] === (process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key')) {
+  if (internalUserId && req.headers['x-internal-key'] === env.internalServiceKey) {
     req.userId = internalUserId; return next();
   }
   const token = req.headers.authorization?.startsWith('Bearer ') ? req.headers.authorization.slice(7) : null;

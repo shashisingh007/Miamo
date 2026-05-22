@@ -13,20 +13,17 @@ import { LRUCache, TTL } from '../../shared/cache';
 import { logger } from '../../shared/src/logger';
 import { sanitize } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
+import { env } from '../../shared/src/env';
 
 // ─── Chat Suggestion Cache ──────────────────────────
 const suggestionCache = new LRUCache(200);
 
 // ═══ AES-256-GCM ENCRYPTION ═════════════════════════
-// Derive a 32-byte key from the service key using scrypt (computationally expensive,
-// resistant to brute-force). The salt is derived from the encryption key env var
-// to provide per-deployment uniqueness while remaining deterministic across restarts.
-const ENC_SALT = process.env.ENCRYPTION_SALT || 'miamo-e2e-salt-2026';
-const ENC_KEY = crypto.scryptSync(
-  process.env.ENCRYPTION_KEY || process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key',
-  ENC_SALT,
-  32
-);
+// Derive a 32-byte key from the encryption secret using scrypt (computationally
+// expensive, resistant to brute-force). Salt provides per-deployment uniqueness
+// while remaining deterministic across restarts so existing ciphertexts decrypt.
+const ENC_SALT = env.encryptionSalt;
+const ENC_KEY = crypto.scryptSync(env.encryptionKey, ENC_SALT, 32);
 const ENC_ALGO = 'aes-256-gcm';
 
 // Encrypt plaintext to format: "enc:<iv_hex>:<authTag_hex>:<ciphertext_hex>"
@@ -75,7 +72,7 @@ app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 2000, standardHeaders: true, 
 interface AuthRequest extends Request { userId?: string; }
 function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   const userId = req.headers['x-user-id'] as string;
-  if (userId && req.headers['x-internal-key'] === (process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key')) {
+  if (userId && req.headers['x-internal-key'] === env.internalServiceKey) {
     req.userId = userId; return next();
   }
   return res.status(401).json({ error: { message: 'Authentication required', code: 'UNAUTHORIZED' } });
@@ -93,7 +90,7 @@ app.get('/ready', async (_req, res) => {
 
 // ═══ GATEWAY SSE PUSH HELPER ═════════════════════════
 const GATEWAY_URL = process.env.GATEWAY_URL || 'http://localhost:3200';
-const INTERNAL_KEY = process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key';
+const INTERNAL_KEY = env.internalServiceKey;
 
 async function pushToUser(userId: string, event: string, data: any) {
   try {
@@ -766,7 +763,7 @@ app.get('/api/v1/messages/comm-profile/:userId', authMiddleware, async (req: Aut
     if (req.userId !== targetUserId) {
       // Allow internal service-to-service calls (same internal key)
       const internalKey = req.headers['x-internal-key'];
-      if (internalKey !== (process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key')) {
+      if (internalKey !== env.internalServiceKey) {
         return res.status(403).json({ error: { message: 'Forbidden' } });
       }
     }
@@ -860,7 +857,7 @@ app.get('/api/v1/messages/sent-texts/:userId', authMiddleware, async (req: AuthR
     // Security: only allow the user themselves or internal service calls
     if (req.userId !== targetUserId) {
       const internalKey = req.headers['x-internal-key'];
-      if (internalKey !== (process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key')) {
+      if (internalKey !== env.internalServiceKey) {
         return res.status(403).json({ error: { message: 'Forbidden' } });
       }
     }

@@ -12,6 +12,7 @@ import { scoreForYou, scoreNew, scoreActive, scoreVerified, scoreSerious, scoreA
 import { logger } from '../../shared/src/logger';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
+import { env } from '../../shared/src/env';
 
 const DB_URL = process.env.DATABASE_URL || 'postgresql://miamo:miamo@localhost:5432/miamo?schema=public';
 export const prisma = new PrismaClient({
@@ -41,7 +42,7 @@ const ZODIAC_COMPAT: Record<string, string[]> = {
 interface AuthRequest extends Request { userId?: string; }
 function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
   const userId = req.headers['x-user-id'] as string;
-  if (userId && req.headers['x-internal-key'] === (process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key')) {
+  if (userId && req.headers['x-internal-key'] === env.internalServiceKey) {
     req.userId = userId; return next();
   }
   return res.status(401).json({ error: { message: 'Authentication required', code: 'UNAUTHORIZED' } });
@@ -250,7 +251,7 @@ async function getUserCommStyle(userId: string): Promise<CommStyleVector | null>
   if (cached) return cached;
   try {
     const resp = await fetch(`http://localhost:3204/api/v1/messages/comm-profile/${userId}`, {
-      headers: { 'x-user-id': userId, 'x-internal-key': process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key' },
+      headers: { 'x-user-id': userId, 'x-internal-key': env.internalServiceKey },
     });
     if (resp.ok) {
       const data: any = await resp.json();
@@ -282,7 +283,7 @@ async function getUserAnalysis(userId: string): Promise<{ cluster: any; temporal
 async function getUserLastMessages(userId: string, limit = 10): Promise<string[]> {
   try {
     const resp = await fetch(`http://localhost:3204/api/v1/messages/sent-texts/${userId}?limit=${limit}`, {
-      headers: { 'x-user-id': userId, 'x-internal-key': process.env.INTERNAL_SERVICE_KEY || 'miamo-internal-dev-key' },
+      headers: { 'x-user-id': userId, 'x-internal-key': env.internalServiceKey },
     });
     if (resp.ok) { const data: any = await resp.json(); return data?.data || []; }
   } catch {}
