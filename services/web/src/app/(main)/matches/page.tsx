@@ -328,7 +328,7 @@ export default function MatchesPage() {
  <p className="text-[13px] text-text-secondary mt-1">
  {incoming.length > 0 && <span className="text-rose">{incoming.length} incoming</span>}
  {incoming.length > 0 && matches.length > 0 && <span className="text-text-muted"> · </span>}
- {matches.length > 0 && <span>{matches.length} mutual</span>}
+ {matches.length > 0 && <span>{matches.length} {matches.length === 1 ? 'match' : 'matches'}</span>}
  {incoming.length === 0 && matches.length === 0 && 'Your matches will appear here'}
  </p>
  </div>
@@ -414,7 +414,7 @@ export default function MatchesPage() {
  <Sparkles className="w-6 h-6 text-rose" />
  </div>
  <h3 className="font-brand font-semibold text-xl text-text-primary mb-2">
- {searchQuery ? 'No matches found' : matchFilter !== 'all' ? `No ${matchFilter} matches` : 'No mutual matches yet'}
+ {searchQuery ? 'No matches found' : matchFilter !== 'all' ? `No ${matchFilter} matches` : 'No matches yet'}
  </h3>
  <p className="text-[13px] text-text-secondary max-w-xs mx-auto leading-relaxed">
  {searchQuery ? 'Try a different search.' : "When you match back with someone, they'll appear here — ready to chat."}

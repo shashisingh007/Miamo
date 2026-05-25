@@ -185,7 +185,7 @@ export default function DateToMarryPage() {
  // First time — enable profile gate
  if (!profileEnabled && section !== 'browse') {
  return (
- <div className="min-h-screen bg-gradient-to-br from-rose-soft via-white to-rose-soft flex items-center justify-center p-6">
+ <div className="min-h-full bg-gradient-to-br from-rose-soft via-white to-rose-soft flex items-center justify-center p-6">
  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
  className="bg-miamo-card rounded-3xl border border-zinc-200 shadow-xl max-w-md w-full p-8 text-center space-y-5">
  <div className="text-5xl">🕉</div>
@@ -208,7 +208,7 @@ export default function DateToMarryPage() {
 
  return (
  <ErrorBoundary>
- <div className="min-h-screen bg-gradient-to-br from-rose-soft/50 via-white to-rose-soft/50">
+ <div className="min-h-full bg-gradient-to-br from-rose-soft/50 via-white to-rose-soft/50">
  {/* HEADER */}
  <div className="sticky top-0 z-30 bg-miamo-card/80 backdrop-blur-xl border-b border-zinc-200/60">
  <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">

@@ -531,14 +531,14 @@ export function MiamoFavicon({ size = 32 }: { size?: number }) {
 
 export function MiamoLoader({ size = 56, text, className = '' }: { size?: number; text?: string; className?: string }) {
   return (
-    <div className={`flex flex-1 items-center justify-center ${className}`} style={{ minHeight: '60vh' }}>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-4">
+    <div className={`flex h-full w-full items-center justify-center ${className}`} style={{ minHeight: '60vh' }}>
+      <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} className="flex flex-col items-center justify-center gap-4 text-center">
         <MiamoWordmark height={Math.round(size * 0.45)} animated={true} />
         {text && (
           <motion.p
-            className="text-[13px] text-text-muted"
-            animate={{ opacity: [0.4, 0.8, 0.4] }}
-            transition={{ duration: 2, repeat: Infinity }}
+            className="text-[13px] text-text-muted leading-none"
+            animate={{ opacity: [0.4, 0.85, 0.4] }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
           >
             {text}
           </motion.p>

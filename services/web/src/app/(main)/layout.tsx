@@ -116,10 +116,16 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  if (!hydrated || !isAuthenticated) {
  return (
  <div className="flex h-screen items-center justify-center bg-miamo-bg">
- <div className="text-center">
+ <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-center gap-4">
  <AnimatedMiamoLogo animated={true} />
- <p className="text-text-muted mt-4 text-sm">{hydrated ? 'Redirecting to login...' : 'Loading...'}</p>
- </div>
+ <motion.p
+ className="text-text-muted text-[13px]"
+ animate={{ opacity: [0.4, 0.85, 0.4] }}
+ transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+ >
+ {hydrated ? 'Redirecting to login…' : 'Loading…'}
+ </motion.p>
+ </motion.div>
  </div>
  );
  }
@@ -278,7 +284,11 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
  {/* Page content — fills remaining space */}
  <div className="flex-1 min-h-0 overflow-hidden">
- {pathname.startsWith('/messages') || pathname.startsWith('/beats') || pathname.startsWith('/creativity') || pathname.startsWith('/videos') ? children : (
+ {pathname.startsWith('/messages') || pathname.startsWith('/beats') || pathname.startsWith('/creativity') || pathname.startsWith('/videos') ? (
+ children
+ ) : pathname.startsWith('/serious-mode') ? (
+ <div className="h-full overflow-y-auto">{children}</div>
+ ) : (
  <div style={{ height: '100%', overflow: 'auto' }}>
  <AnimatePresence mode="wait">
  <motion.div
