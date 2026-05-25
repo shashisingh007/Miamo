@@ -42,7 +42,7 @@ export default function LandingPage() {
       {/* ─── NAV ─── */}
       <nav className="relative z-10 flex items-center justify-between px-6 lg:px-12 h-16 backdrop-blur-md bg-white/60 border-b border-border-light">
         <Link href="/" aria-label="Miamo home">
-          <MiamoWordmark height={22} animated={false} />
+          <MiamoWordmark height={22} animated={true} />
         </Link>
         <div className="flex items-center gap-2">
           <Link href="/login">
@@ -306,7 +306,7 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 py-14">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-10">
             <div className="col-span-2 md:col-span-1">
-              <MiamoWordmark height={20} animated={false} />
+              <MiamoWordmark height={20} animated={true} />
               <p className="text-sm text-text-muted mt-4 leading-relaxed max-w-[220px]">
                 Where hearts connect. A premium dating platform for meaningful relationships.
               </p>

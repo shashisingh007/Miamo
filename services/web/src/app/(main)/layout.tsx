@@ -117,7 +117,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  return (
  <div className="flex h-screen items-center justify-center bg-miamo-bg">
  <div className="text-center">
- <AnimatedMiamoLogo animated={false} />
+ <AnimatedMiamoLogo animated={true} />
  <p className="text-text-muted mt-4 text-sm">{hydrated ? 'Redirecting to login...' : 'Loading...'}</p>
  </div>
  </div>
