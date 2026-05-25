@@ -27,6 +27,7 @@ const INTERNAL_KEY = env.internalServiceKey;
 // with >1 replica — set REDIS_URL in any multi-replica deployment).
 let redisStore: RedisStore | undefined;
 let authRedisStore: RedisStore | undefined;
+let sensitiveRedisStore: RedisStore | undefined;
 if (process.env.REDIS_URL) {
   const redisClient = createClient({ url: process.env.REDIS_URL });
   redisClient.on('error', (err) => logger.warn('Redis rate-limit client error:', err.message));
@@ -37,6 +38,7 @@ if (process.env.REDIS_URL) {
   // Separate key prefixes so the two limiters don't share counters
   redisStore = new RedisStore({ sendCommand: (...args: string[]) => redisClient.sendCommand(args), prefix: 'rl:global:' });
   authRedisStore = new RedisStore({ sendCommand: (...args: string[]) => redisClient.sendCommand(args), prefix: 'rl:auth:' });
+  sensitiveRedisStore = new RedisStore({ sendCommand: (...args: string[]) => redisClient.sendCommand(args), prefix: 'rl:sensitive:' });
 }
 
 // ═══ SSE: Real-time event connections per user ═══════
@@ -150,6 +152,32 @@ const authLimiter = rateLimit({
   message: { error: { message: 'Too many auth attempts. Please try again later.', code: 'RATE_LIMITED' } },
   store: authRedisStore,
   keyGenerator: (req) => req.ip || 'unknown',
+});
+
+// Sensitive-action limiter: forgot-password, /auth/refresh abuse, report spam.
+// Tighter than authLimiter, also IP-keyed so a hostile client can't burn
+// through email-delivery quota or SMS-cost for a victim address.
+const forgotPasswordLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1h
+  max: 5,
+  message: { error: { message: 'Too many password reset requests. Try again later.', code: 'RATE_LIMITED' } },
+  store: sensitiveRedisStore,
+  keyGenerator: (req) => req.ip || 'unknown',
+  skipSuccessfulRequests: false,
+});
+const refreshLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60, // 4/min — generous for legit page reloads, blocks token-pumping abuse
+  message: { error: { message: 'Too many refresh attempts.', code: 'RATE_LIMITED' } },
+  store: sensitiveRedisStore,
+  keyGenerator: (req) => req.ip || 'unknown',
+});
+const reportLimiter = rateLimit({
+  windowMs: 24 * 60 * 60 * 1000, // 24h
+  max: 30,
+  message: { error: { message: 'Report quota reached for today.', code: 'RATE_LIMITED' } },
+  store: sensitiveRedisStore,
+  keyGenerator: (req) => (req.headers['x-user-id'] as string) || req.ip || 'unknown',
 });
 
 // ─── Security: Input Sanitization Middleware ─────────
@@ -326,6 +354,8 @@ function proxyTo(target: string): Options {
 
 // ─── Route Definitions ───────────────────────────────
 // Auth routes (public)
+app.use('/api/v1/auth/forgot-password', forgotPasswordLimiter);
+app.use('/api/v1/auth/refresh', refreshLimiter);
 app.use('/api/v1/auth', authLimiter, createProxyMiddleware(proxyTo(SERVICES.auth)));
 
 // User routes (protected)
@@ -340,7 +370,7 @@ app.use('/api/v1/user-data', requireAuth, createProxyMiddleware(proxyTo(SERVICES
 app.use('/api/v1/discover', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
 app.use('/api/v1/matches', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
 app.use('/api/v1/ai-match', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
-app.use('/api/v1/safety', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
+app.use('/api/v1/safety', requireAuth, reportLimiter, createProxyMiddleware(proxyTo(SERVICES.social)));
 app.use('/api/v1/vibe-check', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
 app.use('/api/v1/activity', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
 
