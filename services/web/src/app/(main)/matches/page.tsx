@@ -322,12 +322,12 @@ export default function MatchesPage() {
  <div className="max-w-3xl mx-auto px-6 py-6">
 
  {/* ─── Header ─── */}
- <div className="flex items-center justify-between mb-5">
+ <div className="flex items-center justify-between mb-6">
  <div>
- <h1 className="text-xl font-extrabold text-text-primary tracking-tight">Matches</h1>
- <p className="text-[12px] text-text-muted mt-0.5 font-medium">
- {incoming.length > 0 && <span className="text-rose-light">{incoming.length} incoming</span>}
- {incoming.length > 0 && matches.length > 0 && <span> · </span>}
+ <h1 className="font-brand font-semibold text-3xl text-text-primary">Matches</h1>
+ <p className="text-[13px] text-text-secondary mt-1">
+ {incoming.length > 0 && <span className="text-rose">{incoming.length} incoming</span>}
+ {incoming.length > 0 && matches.length > 0 && <span className="text-text-muted"> · </span>}
  {matches.length > 0 && <span>{matches.length} mutual</span>}
  {incoming.length === 0 && matches.length === 0 && 'Your matches will appear here'}
  </p>
@@ -361,17 +361,18 @@ export default function MatchesPage() {
  {activeTab === 'incoming' && (
  <div>
  {incoming.length === 0 ? (
- <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-20">
- <div className="w-20 h-20 rounded-full bg-gradient-to-b from-[#C97856]/12 to-[#D4896A]/8 border border-[#C97856]/15 flex items-center justify-center mx-auto mb-5 shadow-[0_8px_24px_rgba(201,120,86,0.08)]">
- <Heart className="w-8 h-8 text-[#C97856] heartbeat" />
+ <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center py-20">
+ <div className="w-16 h-16 rounded-full bg-rose-soft border border-rose-main/15 flex items-center justify-center mx-auto mb-5">
+ <Heart className="w-7 h-7 text-rose" />
  </div>
- <h3 className="text-[16px] font-bold text-text-primary mb-2">No matches for now</h3>
- <p className="text-[13px] text-text-muted max-w-[280px] mx-auto leading-relaxed">
- When someone likes your profile, they&apos;ll appear here. Keep your profile active and engaging!
+ <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-rose mb-3">Quiet</p>
+ <h3 className="font-brand font-semibold text-2xl text-text-primary mb-2">No incoming yet.</h3>
+ <p className="text-[14px] text-text-secondary max-w-[320px] mx-auto leading-relaxed">
+ When someone likes your profile, they’ll appear here. Keep showing up — the right people find you.
  </p>
  <button onClick={() => router.push('/discover')}
- className="mt-6 h-10 px-6 rounded-xl bg-gradient-to-r from-[#C97856] to-[#D4896A] text-white text-[12px] font-semibold shadow-[0_4px_12px_rgba(201,120,86,0.2)] hover:shadow-[0_8px_20px_rgba(201,120,86,0.3)] hover:-translate-y-0.5 transition-all duration-300">
- Explore Discover →
+ className="mt-7 h-10 px-6 rounded-xl bg-rose-main text-white text-[13px] font-semibold shadow-soft hover:bg-rose-dark hover:-translate-y-0.5 transition-all duration-300">
+ Explore Discover
  </button>
  </motion.div>
  ) : (
@@ -408,15 +409,15 @@ export default function MatchesPage() {
  </div>
 
  {matches.length === 0 ? (
- <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
- <div className="w-16 h-16 rounded-full bg-miamo-surface border border-border flex items-center justify-center mx-auto mb-4">
- <Sparkles className="w-7 h-7 text-text-secondary" />
+ <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
+ <div className="w-14 h-14 rounded-full bg-rose-soft border border-rose-main/15 flex items-center justify-center mx-auto mb-4">
+ <Sparkles className="w-6 h-6 text-rose" />
  </div>
- <h3 className="text-[15px] font-bold text-text-primary mb-1.5">
+ <h3 className="font-brand font-semibold text-xl text-text-primary mb-2">
  {searchQuery ? 'No matches found' : matchFilter !== 'all' ? `No ${matchFilter} matches` : 'No mutual matches yet'}
  </h3>
- <p className="text-[12px] text-text-muted max-w-xs mx-auto">
- {searchQuery ? 'Try a different search' : "When you match back with someone, they'll appear here and you can start chatting!"}
+ <p className="text-[13px] text-text-secondary max-w-xs mx-auto leading-relaxed">
+ {searchQuery ? 'Try a different search.' : "When you match back with someone, they'll appear here — ready to chat."}
  </p>
  </motion.div>
  ) : (
@@ -438,14 +439,14 @@ export default function MatchesPage() {
  {activeTab === 'held' && (
  <div>
  {heldItems.length === 0 ? (
- <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
- <div className="w-16 h-16 rounded-full bg-miamo-surface border border-border flex items-center justify-center mx-auto mb-4">
- <Pause className="w-7 h-7 text-text-secondary" />
+ <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="text-center py-16">
+ <div className="w-14 h-14 rounded-full bg-rose-soft border border-rose-main/15 flex items-center justify-center mx-auto mb-4">
+ <Pause className="w-6 h-6 text-rose" />
  </div>
- <h3 className="text-[15px] font-bold text-text-primary mb-1.5">Nothing on hold</h3>
- <p className="text-[12px] text-text-muted max-w-xs mx-auto">When you&apos;re not sure about someone, put them on hold to revisit later.</p>
+ <h3 className="font-brand font-semibold text-xl text-text-primary mb-2">Nothing on hold</h3>
+ <p className="text-[13px] text-text-secondary max-w-xs mx-auto leading-relaxed">When you’re not sure about someone, put them on hold to revisit later.</p>
  {incomingMeta?.heldCount > 0 && (
- <button onClick={loadData} className="mt-4 px-4 py-2 rounded-lg bg-miamo-surface text-text-muted text-[12px] font-medium hover:bg-miamo-surface transition">
+ <button onClick={loadData} className="mt-4 px-4 py-2 rounded-lg bg-white border border-border-light text-text-secondary text-[12px] font-medium hover:border-rose-main/30 hover:text-rose transition">
  Refresh
  </button>
  )}

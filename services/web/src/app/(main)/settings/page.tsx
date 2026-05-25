@@ -55,8 +55,8 @@ function TwoFactorModal({ open, onClose }: { open: boolean; onClose: () => void 
  </div>
  <p className="text-xs text-text-muted">Scan with your authenticator app</p>
  </div>
- <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 mb-4">
- <p className="text-xs text-amber-400 font-medium">Coming in the next update</p>
+ <div className="bg-rose-soft/40 border border-rose-main/15 rounded-xl p-3 mb-4">
+ <p className="text-xs text-rose font-medium">Coming in the next update</p>
  </div>
  <Button variant="secondary" size="sm" onClick={onClose} className="w-full">Got it</Button>
  </motion.div>
@@ -76,13 +76,13 @@ function SessionsModal({ open, onClose }: { open: boolean; onClose: () => void }
  <button onClick={onClose}><X className="w-4 h-4 text-text-muted" /></button>
  </div>
  <div className="p-5 space-y-3">
- <div className="flex items-center gap-3 p-3 bg-emerald-500/5 border border-emerald-500/20 rounded-xl">
- <Wifi className="w-5 h-5 text-emerald-400" />
+ <div className="flex items-center gap-3 p-3 bg-rose-soft/40 border border-rose-main/15 rounded-xl">
+ <Wifi className="w-5 h-5 text-rose" />
  <div className="flex-1">
  <p className="text-sm font-medium text-text-primary">Current Browser</p>
  <p className="text-xs text-text-muted">Active now</p>
  </div>
- <span className="text-[10px] font-medium text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full">Active</span>
+ <span className="text-[10px] font-medium text-rose bg-rose-soft px-2 py-1 rounded-full">Active</span>
  </div>
  <p className="text-xs text-text-muted text-center py-2">No other active sessions.</p>
  <Button variant="secondary" size="sm" onClick={onClose} className="w-full">Close</Button>
@@ -213,10 +213,10 @@ export default function SettingsPage() {
 
  {loading ? <SettingsSkeleton /> : (<>
  <div className="flex items-center justify-between mb-6">
- <h1 className="text-xl font-bold">Settings</h1>
+ <h1 className="font-brand font-semibold text-3xl text-text-primary">Settings</h1>
  <div className="flex items-center gap-2">
- {saved && <span className="text-xs text-emerald-400 flex items-center gap-1"><CheckIcon className="w-3 h-3" /> Saved</span>}
- <Button variant="danger" size="sm" onClick={handleLogout}><LogOut className="w-3.5 h-3.5" /> Sign Out</Button>
+ {saved && <span className="text-xs text-rose flex items-center gap-1"><CheckIcon className="w-3 h-3" /> Saved</span>}
+ <Button variant="ghost" size="sm" onClick={handleLogout}><LogOut className="w-3.5 h-3.5" /> Sign out</Button>
  </div>
  </div>
 
@@ -235,7 +235,7 @@ export default function SettingsPage() {
  <h2 className="text-base font-semibold mb-4">Account</h2>
  <SettingRow label="Email" description={user?.email || 'Not set'}><Button variant="ghost" size="sm" onClick={() => setEmailModal(true)}>Change</Button></SettingRow>
  <SettingRow label="Password" description="Last changed 30 days ago"><Button variant="ghost" size="sm" onClick={() => setPasswordModal(true)}>Update</Button></SettingRow>
- <SettingRow label="Miamo ID" description={`@${user?.username || 'user'} \u2014 System-generated, read-only`}><Button variant="ghost" size="sm" onClick={copyMiamoId}>{copiedId ? <><CheckIcon className="w-3.5 h-3.5 text-emerald-400" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy ID</>}</Button></SettingRow>
+ <SettingRow label="Miamo ID" description={`@${user?.username || 'user'} \u2014 System-generated, read-only`}><Button variant="ghost" size="sm" onClick={copyMiamoId}>{copiedId ? <><CheckIcon className="w-3.5 h-3.5 text-rose" /> Copied</> : <><Copy className="w-3.5 h-3.5" /> Copy ID</>}</Button></SettingRow>
  <SettingRow label="Phone" description="Not set"><Button variant="ghost" size="sm" onClick={() => setPhoneModal(true)}>Add</Button></SettingRow>
  <SettingRow label="Two-factor authentication" description="Add extra security"><Button variant="ghost" size="sm" onClick={() => setTwoFactorModal(true)}>Enable</Button></SettingRow>
  <SettingRow label="Active sessions" description="1 active session"><Button variant="ghost" size="sm" onClick={() => setSessionsModal(true)}>Manage</Button></SettingRow>
@@ -306,7 +306,7 @@ export default function SettingsPage() {
  </SettingRow>
  <SettingRow label="Accent color">
  <div className="flex gap-1.5">
- {['bg-rose-main','bg-rose-dark','bg-sky-400','bg-emerald-400','bg-amber-400'].map(c => (
+ {['bg-rose-main','bg-rose-dark','bg-[#C97856]','bg-[#D4896A]','bg-[#E8B4A0]'].map(c => (
  <div key={c} className={cn('w-5 h-5 rounded-full', c, c === 'bg-rose-main' && 'ring-2 ring-offset-2 ring-offset-miamo-card ring-rose-main')} />
  ))}
  </div>
@@ -360,8 +360,8 @@ export default function SettingsPage() {
  <SettingRow label="Delete account" description="Permanently delete everything">
  {showDeleteConfirm ? (
  <div className="flex items-center gap-2">
- <span className="text-xs text-red-400">Are you sure?</span>
- <Button variant="danger" size="sm" onClick={async () => { try { await api.deleteAccount(); clearAuth(); router.push('/login'); } catch { showToast('Failed','error'); } }}>Yes, Delete</Button>
+ <span className="text-xs text-rose">Are you sure?</span>
+ <Button variant="danger" size="sm" onClick={async () => { try { await api.deleteAccount(); clearAuth(); router.push('/login'); } catch { showToast('Failed','error'); } }}>Yes, delete</Button>
  <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(false)}>Cancel</Button>
  </div>
  ) : (

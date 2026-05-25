@@ -163,18 +163,23 @@ export default function DiscoverPage() {
  return (
  <div className="h-full flex items-center justify-center">
  <motion.div
- initial={{ opacity: 0, y: 20 }}
+ initial={{ opacity: 0, y: 12 }}
  animate={{ opacity: 1, y: 0 }}
- className="text-center max-w-sm px-8"
+ className="text-center max-w-md px-8"
  >
- <div className="w-20 h-20 rounded-full bg-[#C97856]/8 border border-[#C97856]/15 flex items-center justify-center mx-auto mb-5 shadow-[0_8px_24px_rgba(201,120,86,0.06)]">
- <Heart className="w-8 h-8 text-[#C97856] heartbeat" />
+ <div className="w-16 h-16 rounded-full bg-rose-soft border border-rose-main/15 flex items-center justify-center mx-auto mb-6">
+ <Heart className="w-7 h-7 text-rose" />
  </div>
- <h3 className="text-lg font-bold text-text-primary mb-2">No more profiles</h3>
- <p className="text-[13px] text-text-muted mb-6 leading-relaxed">Check back later or adjust your filters</p>
+ <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-rose mb-3">A quiet moment</p>
+ <h3 className="font-brand font-semibold text-3xl text-text-primary mb-3 leading-tight">
+ You&apos;ve seen everyone <span className="italic text-rose">for now</span>.
+ </h3>
+ <p className="text-[15px] text-text-secondary mb-7 leading-relaxed">
+   Take a breath. Adjust your filters, or come back in a little while — new people arrive every day.
+ </p>
  <button onClick={() => setShowFilters(true)}
- className="h-11 px-6 rounded-xl bg-gradient-to-r from-[#C97856] to-[#D4896A] text-white text-sm font-bold hover:shadow-[0_8px_20px_rgba(201,120,86,0.25)] hover:-translate-y-0.5 transition-all duration-300 inline-flex items-center gap-2 shadow-[0_4px_12px_rgba(201,120,86,0.2)]">
- <SlidersHorizontal className="w-4 h-4" /> Adjust Filters
+   className="h-11 px-6 rounded-xl bg-rose-main text-white text-sm font-semibold hover:bg-rose-dark hover:-translate-y-0.5 transition-all duration-300 inline-flex items-center gap-2 shadow-soft">
+ <SlidersHorizontal className="w-4 h-4" /> Adjust filters
  </button>
  </motion.div>
  </div>

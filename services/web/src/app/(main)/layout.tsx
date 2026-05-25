@@ -129,23 +129,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
 
  return (
  <div className="flex h-screen overflow-hidden bg-miamo-bg relative">
- {/* Ambient gradient orbs */}
- <div className="orb-pink w-[300px] h-[300px] top-[-50px] right-[20%] opacity-50" />
- <div className="orb-gold w-[200px] h-[200px] bottom-[10%] left-[30%] opacity-40" />
- <div className="orb-pink w-[250px] h-[250px] bottom-[-80px] right-[5%] opacity-30" />
-
-          {/* Subtle floating hearts */}
-          <div className="floating-hearts">
-            <span className="heart">♥</span>
-            <span className="heart">✦</span>
-            <span className="heart">♥</span>
-            <span className="heart">♥</span>
-            <span className="heart">✦</span>
-            <span className="heart">♥</span>
-            <span className="heart">♥</span>
-            <span className="heart">✦</span>
-          </div>
-          {/* ═══ PREMIUM SIDEBAR ═══ */}
+ {/* Single soft copper bloom — quiet, no clutter */}
+ <div
+ aria-hidden
+ className="pointer-events-none absolute top-[-15%] right-[-10%] w-[55vw] h-[55vw] rounded-full blur-[120px] opacity-40"
+ style={{ background: 'radial-gradient(circle, rgba(201,120,86,0.16) 0%, rgba(232,180,160,0.08) 40%, transparent 70%)' }}
+ />
+ {/* ═══ PREMIUM SIDEBAR ═══ */}
  <aside className="hidden lg:flex flex-col w-[270px] glass-sidebar relative z-10">
  {/* Brand header */}
  <div className="flex items-center h-[72px] relative" style={{ paddingLeft: 28, paddingRight: 16 }}>
@@ -153,12 +143,12 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  <MiamoWordmark height={18} animated={true} className="!min-h-0 !h-[50px] !w-[100px]" />
  </div>
  <div className="ml-auto flex flex-col items-center gap-0.5">
- <Link href="/premium" className="relative group">
- <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br from-amber-100 to-amber-50 border border-amber-200/50 group-hover:border-amber-300 transition-all group-hover:shadow-[0_0_12px_rgba(212,175,55,0.3)]">
- <Crown className="w-4 h-4 text-amber-600 group-hover:text-amber-500 transition-colors" />
+ <Link href="/premium" className="relative group" aria-label="Premium">
+ <div className="w-8 h-8 rounded-full flex items-center justify-center bg-rose-soft border border-rose-main/20 group-hover:border-rose-main/40 group-hover:bg-rose-main/15 transition-all">
+ <Crown className="w-4 h-4 text-rose group-hover:text-rose-main transition-colors" />
  </div>
  </Link>
- <span className="text-[8px] font-bold uppercase tracking-[0.15em] text-[#C97856]/80">Premium</span>
+ <span className="text-[8px] font-semibold uppercase tracking-[0.18em] text-rose">Premium</span>
  </div>
  </div>
 
@@ -238,7 +228,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  <Link href="/profile" className="flex items-center gap-3 group p-2 rounded-xl hover:bg-miamo-surface/50 transition-all">
  <div className="relative">
  <Avatar name={displayUser.displayName || 'User'} size="sm" online />
- <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-gradient-to-r from-emerald-400 to-green-400 border-2 border-white shadow-sm" />
+ <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-rose-main border-2 border-white shadow-sm" />
  </div>
  <div className="flex-1 min-w-0">
  <p className="text-[13px] font-semibold text-text-primary truncate group-hover:text-rose- transition-colors">
@@ -248,8 +238,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  </div>
  <ScoreRing score={profileScore} size={34} strokeWidth={2.5} />
  </Link>
- <button onClick={handleLogout} className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-[12px] text-text-muted hover:text-red-500 hover:bg-red-50/60 transition-all font-medium">
- <LogOut className="w-3.5 h-3.5" /> Sign Out
+ <button onClick={handleLogout} className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl text-[12px] text-text-secondary hover:text-rose hover:bg-rose-soft/40 transition-all font-medium">
+ <LogOut className="w-3.5 h-3.5" /> Sign out
  </button>
  </div>
  </aside>
@@ -265,13 +255,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  <MiamoCompactIcon size={28} />
  </div>
  <div className="flex items-center gap-3">
- <h1 className="text-lg font-bold text-text-primary capitalize tracking-tight">
+ <h1 className="font-brand font-semibold text-2xl text-text-primary capitalize tracking-tight">
  {pathname === '/' ? 'Home' : pathname.split('/').filter(Boolean)[0]?.replace(/-/g, ' ')}
  </h1>
- <div className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-[#C97856]/10 to-[#D4896A]/8 border border-[#C97856]/15 shadow-[0_2px_8px_rgba(201,120,86,0.06)]">
- <Sparkles className="w-3 h-3 text-[#C97856]" />
- <span className="text-[10px] font-bold text-[#C97856] uppercase tracking-wider">Elite</span>
- </div>
  </div>
  <div className="ml-auto flex items-center gap-3">
  <Link href="/notifications" className="relative group">

@@ -194,10 +194,10 @@ function MessagesPageInner() {
  <div className={cn('w-full lg:w-[360px] border-r border-border/50 flex flex-col bg-miamo-surface/20', activeChat && 'hidden lg:flex')}>
  <div className="p-4 space-y-3">
  <div className="flex items-center justify-between">
- <h2 className="text-lg font-bold flex items-center gap-2">
- <MessageCircle className="w-5 h-5 text-rose-main" /> Messages
+ <h2 className="font-brand font-semibold text-2xl text-text-primary flex items-center gap-2.5">
+ Messages
  {totalMsgCount > 0 && (
- <span className="ml-1 min-w-[22px] h-[22px] bg-rose-main rounded-full text-[11px] font-bold text-text-primary flex items-center justify-center px-1.5">
+ <span className="min-w-[22px] h-[22px] bg-rose-main rounded-full text-[11px] font-semibold text-white flex items-center justify-center px-1.5">
  {totalMsgCount > 99 ? '99+' : totalMsgCount}
  </span>
  )}
@@ -337,7 +337,7 @@ function MessagesPageInner() {
  </div>
  ) : (
  <div className="p-3 border-t border-border/30">
- <div className="flex items-center justify-center gap-2 py-1"><Lock className="w-3 h-3 text-emerald-400" /><span className="text-[10px] text-text-muted">End-to-end encrypted</span></div>
+ <div className="flex items-center justify-center gap-2 py-1"><Lock className="w-3 h-3 text-text-muted" /><span className="text-[10px] text-text-muted">End-to-end encrypted</span></div>
  </div>
  )}
  </div>
@@ -360,14 +360,18 @@ function MessagesPageInner() {
  }}
  />
  ) : (
- <div className="flex-1 flex items-center justify-center">
- <div className="text-center space-y-4">
- <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-rose-main/10 to-rose- /10 flex items-center justify-center"><MessageCircle className="w-10 h-10 text-rose-main/40" /></div>
- <div>
- <h3 className="text-base font-semibold text-text-primary">Your Messages</h3>
- <p className="text-sm text-text-muted mt-1">Select a conversation to start chatting</p>
+ <div className="flex-1 flex items-center justify-center px-6">
+ <div className="text-center max-w-sm">
+ <div className="w-16 h-16 mx-auto rounded-full bg-rose-soft border border-rose-main/15 flex items-center justify-center mb-5">
+ <MessageCircle className="w-7 h-7 text-rose" />
  </div>
- <div className="flex items-center justify-center gap-2"><Shield className="w-3.5 h-3.5 text-emerald-400" /><span className="text-xs text-text-muted">All messages are private and encrypted</span></div>
+ <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-rose mb-3">Your messages</p>
+ <h3 className="font-brand font-semibold text-2xl text-text-primary mb-2">A quiet space — just yours.</h3>
+ <p className="text-[14px] text-text-secondary leading-relaxed">Select a conversation to begin. Everything you say here stays between the two of you.</p>
+ <div className="flex items-center justify-center gap-1.5 mt-6 text-text-muted">
+ <Shield className="w-3.5 h-3.5" />
+ <span className="text-[11px]">End-to-end encrypted</span>
+ </div>
  </div>
  </div>
  )}
