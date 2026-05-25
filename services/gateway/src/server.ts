@@ -229,6 +229,29 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
 app.use(extractUserId);
 
 // ─── Health Check ────────────────────────────────────
+// /healthz — liveness, no deps. /readyz — aggregate downstream /readyz probes.
+app.get('/healthz', (_req, res) => {
+  res.json({ status: 'ok', service: 'gateway', uptime: process.uptime() });
+});
+app.get('/readyz', async (_req, res) => {
+  const checks: Record<string, string> = {};
+  let ok = true;
+  await Promise.all(Object.entries(SERVICES).map(async ([name, url]) => {
+    try {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 2000);
+      const r = await fetch(`${url}/readyz`, { signal: ctrl.signal });
+      clearTimeout(t);
+      checks[name] = r.ok ? 'ok' : `error:${r.status}`;
+      if (!r.ok) ok = false;
+    } catch (e: unknown) {
+      checks[name] = e instanceof Error ? `unreachable:${e.message}` : 'unreachable';
+      ok = false;
+    }
+  }));
+  res.status(ok ? 200 : 503).json({ ready: ok, service: 'gateway', checks });
+});
+
 app.get('/health', async (_req, res) => {
   const checks: Record<string, string> = {};
   for (const [name, url] of Object.entries(SERVICES)) {

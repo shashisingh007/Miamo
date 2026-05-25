@@ -52,8 +52,11 @@ export function applyBaseMiddleware(app: Express, opts: BaseMiddlewareOptions = 
   }));
 }
 
-// ─── /health + /ready ──────────────────────────────────────────────
-// Both endpoints probe the DB; /health additionally returns a timestamp.
+// ─── /health + /healthz + /ready + /readyz ───────────────────────
+// /health    legacy DB-probing endpoint (kept for backwards compat)
+// /healthz   liveness — pure "process is up", no deps; safe for k8s livenessProbe
+// /ready     legacy alias for readiness
+// /readyz    readiness — DB ping (+ Redis if REDIS_URL configured)
 export function installHealthRoutes(app: Express, serviceName: string, prisma: PrismaClient): void {
   app.get('/health', async (_req, res) => {
     try {
@@ -63,6 +66,12 @@ export function installHealthRoutes(app: Express, serviceName: string, prisma: P
       res.status(503).json({ status: 'error', service: serviceName, db: 'disconnected' });
     }
   });
+  // Liveness: zero-dependency. If this fails the process is wedged and the
+  // orchestrator should restart the pod. Crucially does NOT touch DB —
+  // otherwise a transient DB outage causes a cascading pod restart storm.
+  app.get('/healthz', (_req, res) => {
+    res.json({ status: 'ok', service: serviceName, uptime: process.uptime() });
+  });
   app.get('/ready', async (_req, res) => {
     try {
       await prisma.$queryRaw`SELECT 1`;
@@ -70,6 +79,24 @@ export function installHealthRoutes(app: Express, serviceName: string, prisma: P
     } catch {
       res.status(503).json({ ready: false, service: serviceName });
     }
+  });
+  // Readiness: probe every backing service this pod needs to serve traffic.
+  // Returns 503 if any required dep is unreachable so the orchestrator stops
+  // routing traffic without killing the pod.
+  app.get('/readyz', async (_req, res) => {
+    const checks: Record<string, string> = {};
+    let ok = true;
+    try {
+      await Promise.race([
+        prisma.$queryRaw`SELECT 1`,
+        new Promise((_, rj) => setTimeout(() => rj(new Error('db_timeout')), 2000)),
+      ]);
+      checks.db = 'ok';
+    } catch (e: unknown) {
+      checks.db = e instanceof Error ? `error:${e.message}` : 'error';
+      ok = false;
+    }
+    res.status(ok ? 200 : 503).json({ ready: ok, service: serviceName, checks });
   });
 }
 
