@@ -13,79 +13,80 @@ datasource db {
 
 // ─── Users & Auth ─────────────────────────────────────
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  passwordHash  String
-  displayName   String
-  username      String    @unique
-  miamoId       String    @unique
-  verified      Boolean   @default(false)
-  active        Boolean   @default(true)
-  deactivated   Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String
+  username     String   @unique
+  miamoId      String   @unique
+  verified     Boolean  @default(false)
+  active       Boolean  @default(true)
+  deactivated  Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  profile       Profile?
-  settings      Settings?
+  profile         Profile?
+  settings        Settings?
   privacySettings PrivacySettings?
-  photos        ProfilePhoto[]
-  prompts       ProfilePrompt[]
-  interests     ProfileInterest[]
+  photos          ProfilePhoto[]
+  prompts         ProfilePrompt[]
+  interests       ProfileInterest[]
 
-  sentLikes       Like[]          @relation("SentLikes")
-  receivedLikes   Like[]          @relation("ReceivedLikes")
-  sentRequests    MatchRequest[]  @relation("SentRequests")
+  sentLikes        Like[]         @relation("SentLikes")
+  receivedLikes    Like[]         @relation("ReceivedLikes")
+  sentRequests     MatchRequest[] @relation("SentRequests")
   receivedRequests MatchRequest[] @relation("ReceivedRequests")
-  matchesAsUser1  Match[]         @relation("MatchUser1")
-  matchesAsUser2  Match[]         @relation("MatchUser2")
-  sentMessages    Message[]       @relation("SentMessages")
-  chatsAsUser1    Chat[]          @relation("ChatUser1")
-  chatsAsUser2    Chat[]          @relation("ChatUser2")
+  matchesAsUser1   Match[]        @relation("MatchUser1")
+  matchesAsUser2   Match[]        @relation("MatchUser2")
+  sentMessages     Message[]      @relation("SentMessages")
+  chatsAsUser1     Chat[]         @relation("ChatUser1")
+  chatsAsUser2     Chat[]         @relation("ChatUser2")
 
-  beatsAsUser1    Beat[]          @relation("BeatUser1")
-  beatsAsUser2    Beat[]          @relation("BeatUser2")
-  beatEvents      BeatEvent[]
+  beatsAsUser1 Beat[]      @relation("BeatUser1")
+  beatsAsUser2 Beat[]      @relation("BeatUser2")
+  beatEvents   BeatEvent[]
 
-  feedPosts       FeedPost[]
-  feedComments    FeedComment[]
-  feedReactions   FeedReaction[]
+  feedPosts     FeedPost[]
+  feedComments  FeedComment[]
+  feedReactions FeedReaction[]
 
-  stories         Story[]
-  storyViews      StoryView[]
-  storyComments   StoryComment[]
-  storyLikes      StoryLike[]
+  stories       Story[]
+  storyViews    StoryView[]
+  storyComments StoryComment[]
+  storyLikes    StoryLike[]
 
   matrimonialProfile MatrimonialProfile?
 
-  videos          Video[]
-  videoComments   VideoComment[]
-  videoReactions  VideoReaction[]
+  videos         Video[]
+  videoComments  VideoComment[]
+  videoReactions VideoReaction[]
 
-  creativityItems  CreativityItem[]
-  creativityViews  CreativityView[]
+  creativityItems     CreativityItem[]
+  creativityViews     CreativityView[]
   creativityReactions CreativityReaction[]
   creativityComments  CreativityComment[]
 
   searchLogs      SearchLog[]
-  sentReports     Report[]        @relation("Reporter")
-  receivedReports Report[]        @relation("Reported")
-  sentBlocks      Block[]         @relation("Blocker")
-  receivedBlocks  Block[]         @relation("Blocked")
+  sentReports     Report[]       @relation("Reporter")
+  receivedReports Report[]       @relation("Reported")
+  sentBlocks      Block[]        @relation("Blocker")
+  receivedBlocks  Block[]        @relation("Blocked")
   notifications   Notification[]
   auditLogs       AuditLog[]
   sessions        Session[]
-  bookmarks       Bookmark[]      @relation("BookmarkOwner")
-  bookmarkedBy    Bookmark[]      @relation("BookmarkTarget")
+  bookmarks       Bookmark[]     @relation("BookmarkOwner")
+  bookmarkedBy    Bookmark[]     @relation("BookmarkTarget")
 
-  sentMoves       MiamoMove[]     @relation("MiamoMoveSent")
-  receivedMoves   MiamoMove[]     @relation("MiamoMoveReceived")
-  discoverFilter  DiscoverFilter?
-  matchFeedback   MatchFeedback[] @relation("MatchFeedbackUser")
+  sentMoves            MiamoMove[]     @relation("MiamoMoveSent")
+  receivedMoves        MiamoMove[]     @relation("MiamoMoveReceived")
+  discoverFilter       DiscoverFilter?
+  matchFeedback        MatchFeedback[] @relation("MatchFeedbackUser")
   matchFeedbackTargets MatchFeedback[] @relation("MatchFeedbackTarget")
-  vibeChecks      VibeCheck[]
-  sentDtmMessages DtmMessage[]    @relation("DtmSender")
-  receivedDtmMessages DtmMessage[] @relation("DtmRecipient")
-  activities      UserActivity[]
+  vibeChecks           VibeCheck[]
+  sentDtmMessages      DtmMessage[]    @relation("DtmSender")
+  receivedDtmMessages  DtmMessage[]    @relation("DtmRecipient")
+  activities           UserActivity[]
+  userData             UserData[]
 
   @@index([email])
   @@index([username])
@@ -93,40 +94,40 @@ model User {
 }
 
 model Profile {
-  id              String   @id @default(uuid())
-  userId          String   @unique
-  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  age             Int
-  gender          String
-  city            String
-  profession      String
-  bio             String   @default("")
-  datingIntent    String   @default("casual")
-  seriousMode     Boolean  @default(false)
-  profileScore    Int      @default(30)
-  online          Boolean  @default(false)
-  lastActive      DateTime @default(now())
-  avatarGradient  String   @default("from-lavender-400 to-violet-deep")
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  age            Int
+  gender         String
+  city           String
+  profession     String
+  bio            String   @default("")
+  datingIntent   String   @default("casual")
+  seriousMode    Boolean  @default(false)
+  profileScore   Int      @default(30)
+  online         Boolean  @default(false)
+  lastActive     DateTime @default(now())
+  avatarGradient String   @default("from-lavender-400 to-violet-deep")
 
   // Lifestyle / dating preferences
-  height          Int?
-  sexuality       String   @default("straight")
-  lookingFor      String   @default("open")
-  smoking         String   @default("never")
-  drinking        String   @default("socially")
-  exercise        String   @default("sometimes")
-  education       String   @default("")
-  religion        String   @default("")
-  zodiac          String   @default("")
-  languages       String   @default("")
-  pets            String   @default("")
-  children        String   @default("")
+  height     Int?
+  sexuality  String @default("straight")
+  lookingFor String @default("open")
+  smoking    String @default("never")
+  drinking   String @default("socially")
+  exercise   String @default("sometimes")
+  education  String @default("")
+  religion   String @default("")
+  zodiac     String @default("")
+  languages  String @default("")
+  pets       String @default("")
+  children   String @default("")
 
-  politicalViews  String   @default("")
-  diet            String   @default("")
+  politicalViews String @default("")
+  diet           String @default("")
 
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([city])
   @@index([gender])
@@ -176,53 +177,53 @@ model ProfileInterest {
 
 // ─── Settings ─────────────────────────────────────────
 model Settings {
-  id               String   @id @default(uuid())
-  userId           String   @unique
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  theme            String   @default("dark")
-  accentColor      String   @default("#A78BFA")
-  reduceMotion     Boolean  @default(false)
-  highContrast     Boolean  @default(false)
-  readReceipts     Boolean  @default(true)
-  typingIndicator  Boolean  @default(true)
-  onlineStatus     Boolean  @default(true)
-  lastActiveVisible Boolean @default(true)
-  whoCanMessage    String   @default("matches")
-  whoCanSendMedia  String   @default("matches")
-  whoCanStartBeat  String   @default("matches")
-  whoCanBroadcast  String   @default("matches")
-  whoCanVoiceCall  String   @default("matches")
-  whoCanVideoCall  String   @default("matches")
-  storyVisibility  String   @default("everyone")
-  feedVisibility   String   @default("everyone")
-  videoVisibility  String   @default("everyone")
-  creativityVisibility String @default("everyone")
-  notificationsEnabled Boolean @default(true)
-  beatReminders    Boolean  @default(true)
-  messageNotifications Boolean @default(true)
-  storyNotifications Boolean @default(true)
-  privacyMode      Boolean  @default(false)
-  invisibleMode    Boolean  @default(false)
-  seriousModeEnabled Boolean @default(false)
-  aiPersonalization Boolean @default(true)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                   String   @id @default(uuid())
+  userId               String   @unique
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme                String   @default("dark")
+  accentColor          String   @default("#A78BFA")
+  reduceMotion         Boolean  @default(false)
+  highContrast         Boolean  @default(false)
+  readReceipts         Boolean  @default(true)
+  typingIndicator      Boolean  @default(true)
+  onlineStatus         Boolean  @default(true)
+  lastActiveVisible    Boolean  @default(true)
+  whoCanMessage        String   @default("matches")
+  whoCanSendMedia      String   @default("matches")
+  whoCanStartBeat      String   @default("matches")
+  whoCanBroadcast      String   @default("matches")
+  whoCanVoiceCall      String   @default("matches")
+  whoCanVideoCall      String   @default("matches")
+  storyVisibility      String   @default("everyone")
+  feedVisibility       String   @default("everyone")
+  videoVisibility      String   @default("everyone")
+  creativityVisibility String   @default("everyone")
+  notificationsEnabled Boolean  @default(true)
+  beatReminders        Boolean  @default(true)
+  messageNotifications Boolean  @default(true)
+  storyNotifications   Boolean  @default(true)
+  privacyMode          Boolean  @default(false)
+  invisibleMode        Boolean  @default(false)
+  seriousModeEnabled   Boolean  @default(false)
+  aiPersonalization    Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 }
 
 model PrivacySettings {
-  id               String   @id @default(uuid())
-  userId           String   @unique
-  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  profileVisible   Boolean  @default(true)
-  searchable       Boolean  @default(true)
-  miamoIdSearchable Boolean @default(true)
-  nameSearchable   Boolean  @default(true)
-  citySearchable   Boolean  @default(true)
-  hideExactCity    Boolean  @default(false)
-  showApproxCity   Boolean  @default(true)
-  disableSearch    Boolean  @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profileVisible    Boolean  @default(true)
+  searchable        Boolean  @default(true)
+  miamoIdSearchable Boolean  @default(true)
+  nameSearchable    Boolean  @default(true)
+  citySearchable    Boolean  @default(true)
+  hideExactCity     Boolean  @default(false)
+  showApproxCity    Boolean  @default(true)
+  disableSearch     Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }
 
 // ─── Likes & Matching ────────────────────────────────
@@ -243,18 +244,18 @@ model Like {
 }
 
 model MatchRequest {
-  id           String   @id @default(uuid())
-  fromUserId   String
-  toUserId     String
-  fromUser     User     @relation("SentRequests", fields: [fromUserId], references: [id], onDelete: Cascade)
-  toUser       User     @relation("ReceivedRequests", fields: [toUserId], references: [id], onDelete: Cascade)
-  type         String   @default("comment")
-  message      String   @default("")
-  targetType   String   @default("profile")
-  targetId     String?
-  status       String   @default("pending")
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id         String   @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  fromUser   User     @relation("SentRequests", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("ReceivedRequests", fields: [toUserId], references: [id], onDelete: Cascade)
+  type       String   @default("comment")
+  message    String   @default("")
+  targetType String   @default("profile")
+  targetId   String?
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   @@unique([fromUserId, toUserId])
   @@index([toUserId, status])
@@ -273,12 +274,14 @@ model Match {
   pinned2   Boolean  @default(false)
   createdAt DateTime @default(now())
 
-  chat      Chat?
-  feedback  MatchFeedback[]
+  chat     Chat?
+  feedback MatchFeedback[]
 
   @@unique([user1Id, user2Id])
   @@index([user1Id])
   @@index([user2Id])
+  @@index([active, user1Id])
+  @@index([active, user2Id])
 }
 
 model MatchFeedback {
@@ -350,25 +353,25 @@ model DiscoverFilter {
 
 // ─── Messages & Chats ────────────────────────────────
 model Chat {
-  id          String    @id @default(uuid())
-  matchId     String    @unique
-  match       Match     @relation(fields: [matchId], references: [id], onDelete: Cascade)
-  user1Id     String
-  user2Id     String
-  user1       User      @relation("ChatUser1", fields: [user1Id], references: [id], onDelete: Cascade)
-  user2       User      @relation("ChatUser2", fields: [user2Id], references: [id], onDelete: Cascade)
-  pinned1     Boolean   @default(false)
-  pinned2     Boolean   @default(false)
-  muted1      Boolean   @default(false)
-  muted2      Boolean   @default(false)
-  archived1   Boolean   @default(false)
-  archived2   Boolean   @default(false)
-  background  String    @default("default")
-  theme       String    @default("default")
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  id         String   @id @default(uuid())
+  matchId    String   @unique
+  match      Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user1Id    String
+  user2Id    String
+  user1      User     @relation("ChatUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2      User     @relation("ChatUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+  pinned1    Boolean  @default(false)
+  pinned2    Boolean  @default(false)
+  muted1     Boolean  @default(false)
+  muted2     Boolean  @default(false)
+  archived1  Boolean  @default(false)
+  archived2  Boolean  @default(false)
+  background String   @default("default")
+  theme      String   @default("default")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  messages    Message[]
+  messages Message[]
 
   @@index([user1Id])
   @@index([user2Id])
@@ -394,23 +397,24 @@ model Message {
 
   @@index([chatId, createdAt])
   @@index([senderId])
+  @@index([senderId, createdAt])
 }
 
 // ─── Beats (Streaks) ─────────────────────────────────
 model Beat {
-  id         String     @id @default(uuid())
-  user1Id    String
-  user2Id    String
-  user1      User       @relation("BeatUser1", fields: [user1Id], references: [id], onDelete: Cascade)
-  user2      User       @relation("BeatUser2", fields: [user2Id], references: [id], onDelete: Cascade)
-  count      Int        @default(0)
-  state      String     @default("active")
-  lastUser1  DateTime?
-  lastUser2  DateTime?
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  id        String    @id @default(uuid())
+  user1Id   String
+  user2Id   String
+  user1     User      @relation("BeatUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2     User      @relation("BeatUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+  count     Int       @default(0)
+  state     String    @default("active")
+  lastUser1 DateTime?
+  lastUser2 DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  events     BeatEvent[]
+  events BeatEvent[]
 
   @@unique([user1Id, user2Id])
   @@index([state])
@@ -441,8 +445,8 @@ model FeedPost {
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
 
-  comments   FeedComment[]
-  reactions  FeedReaction[]
+  comments  FeedComment[]
+  reactions FeedReaction[]
 
   @@index([authorId, createdAt])
   @@index([visibility])
@@ -485,9 +489,9 @@ model Story {
   expiresAt  DateTime
   createdAt  DateTime @default(now())
 
-  views      StoryView[]
-  comments   StoryComment[]
-  likes      StoryLike[]
+  views    StoryView[]
+  comments StoryComment[]
+  likes    StoryLike[]
 
   @@index([authorId, createdAt])
   @@index([expiresAt])
@@ -507,16 +511,16 @@ model StoryView {
 }
 
 model StoryComment {
-  id        String   @id @default(uuid())
+  id        String         @id @default(uuid())
   storyId   String
-  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  story     Story          @relation(fields: [storyId], references: [id], onDelete: Cascade)
   authorId  String
-  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  author    User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
   content   String
   parentId  String?
-  parent    StoryComment? @relation("StoryCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  parent    StoryComment?  @relation("StoryCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
   replies   StoryComment[] @relation("StoryCommentReplies")
-  createdAt DateTime @default(now())
+  createdAt DateTime       @default(now())
 
   @@index([storyId, createdAt])
   @@index([parentId])
@@ -536,20 +540,20 @@ model StoryLike {
 
 // ─── Videos ──────────────────────────────────────────
 model Video {
-  id          String   @id @default(uuid())
-  authorId    String
-  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  title       String
-  description String   @default("")
-  url         String   @default("")
-  thumbnailUrl String  @default("")
-  category    String   @default("general")
-  visibility  String   @default("everyone")
-  views       Int      @default(0)
-  createdAt   DateTime @default(now())
+  id           String   @id @default(uuid())
+  authorId     String
+  author       User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  title        String
+  description  String   @default("")
+  url          String   @default("")
+  thumbnailUrl String   @default("")
+  category     String   @default("general")
+  visibility   String   @default("everyone")
+  views        Int      @default(0)
+  createdAt    DateTime @default(now())
 
-  comments    VideoComment[]
-  reactions   VideoReaction[]
+  comments  VideoComment[]
+  reactions VideoReaction[]
 
   @@index([authorId])
   @@index([category])
@@ -582,29 +586,29 @@ model VideoReaction {
 
 // ─── Creativity ──────────────────────────────────────
 model CreativityCategory {
-  id    String @id @default(uuid())
-  name  String @unique
-  icon  String @default("sparkles")
-  color String @default("#A78BFA")
+  id    String           @id @default(uuid())
+  name  String           @unique
+  icon  String           @default("sparkles")
+  color String           @default("#A78BFA")
   items CreativityItem[]
 }
 
 model CreativityItem {
-  id          String   @id @default(uuid())
-  authorId    String
-  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
-  categoryId  String
-  category    CreativityCategory @relation(fields: [categoryId], references: [id])
-  type        String   @default("text")
-  title       String
-  content     String
-  mediaUrl    String?
-  visibility  String   @default("everyone")
-  featured    Boolean  @default(false)
-  views       Int      @default(0)
-  trendScore  Float    @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String             @id @default(uuid())
+  authorId   String
+  author     User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   CreativityCategory @relation(fields: [categoryId], references: [id])
+  type       String             @default("text")
+  title      String
+  content    String
+  mediaUrl   String?
+  visibility String             @default("everyone")
+  featured   Boolean            @default(false)
+  views      Int                @default(0)
+  trendScore Float              @default(0)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
 
   reactions   CreativityReaction[]
   comments    CreativityComment[]
@@ -653,20 +657,20 @@ model CreativityComment {
 
 // ─── Trends ──────────────────────────────────────────
 model Trend {
-  id           String   @id @default(uuid())
-  itemId       String
-  itemType     String
-  category     String
-  score        Float    @default(0)
-  views        Int      @default(0)
-  likes        Int      @default(0)
-  comments     Int      @default(0)
-  saves        Int      @default(0)
-  shares       Int      @default(0)
-  matchRequests Int     @default(0)
-  rank         Int      @default(0)
-  categoryRank Int      @default(0)
-  calculatedAt DateTime @default(now())
+  id            String   @id @default(uuid())
+  itemId        String
+  itemType      String
+  category      String
+  score         Float    @default(0)
+  views         Int      @default(0)
+  likes         Int      @default(0)
+  comments      Int      @default(0)
+  saves         Int      @default(0)
+  shares        Int      @default(0)
+  matchRequests Int      @default(0)
+  rank          Int      @default(0)
+  categoryRank  Int      @default(0)
+  calculatedAt  DateTime @default(now())
 
   @@unique([itemId, itemType])
   @@index([score(sort: Desc)])
@@ -688,32 +692,32 @@ model SearchLog {
 
 // ─── Safety ──────────────────────────────────────────
 model Report {
-  id           String   @id @default(uuid())
-  reporterId   String
-  reportedId   String
-  reporter     User     @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  reported     User     @relation("Reported", fields: [reportedId], references: [id], onDelete: Cascade)
-  reason       String
-  details      String   @default("")
-  targetType   String   @default("user")
-  targetId     String?
-  status       String   @default("pending")
-  createdAt    DateTime @default(now())
+  id         String   @id @default(uuid())
+  reporterId String
+  reportedId String
+  reporter   User     @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported   User     @relation("Reported", fields: [reportedId], references: [id], onDelete: Cascade)
+  reason     String
+  details    String   @default("")
+  targetType String   @default("user")
+  targetId   String?
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
 
   @@index([reportedId])
   @@index([status])
 }
 
 model Block {
-  id         String   @id @default(uuid())
-  blockerId  String
-  blockedId  String
-  blocker    User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
-  blocked    User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
-  reason     String   @default("")
-  details    String   @default("")
-  evidence   String   @default("")
-  createdAt  DateTime @default(now())
+  id        String   @id @default(uuid())
+  blockerId String
+  blockedId String
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  reason    String   @default("")
+  details   String   @default("")
+  evidence  String   @default("")
+  createdAt DateTime @default(now())
 
   @@unique([blockerId, blockedId])
   @@index([blockerId])
@@ -732,6 +736,7 @@ model Notification {
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 
+  @@index([userId])
   @@index([userId, read, createdAt])
 }
 
@@ -788,110 +793,110 @@ model Bookmark {
 
 // ─── Matrimonial / Serious Mode ──────────────────────
 model MatrimonialProfile {
-  id                String   @id @default(uuid())
-  userId            String   @unique
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  fullName          String   @default("")
-  dateOfBirth       DateTime?
-  birthTime         String   @default("")
-  birthPlace        String   @default("")
-  height            String   @default("")
-  weight            String   @default("")
-  complexion        String   @default("")
-  bloodGroup        String   @default("")
-  bodyType          String   @default("")
-  physicalStatus    String   @default("Normal")
+  fullName       String    @default("")
+  dateOfBirth    DateTime?
+  birthTime      String    @default("")
+  birthPlace     String    @default("")
+  height         String    @default("")
+  weight         String    @default("")
+  complexion     String    @default("")
+  bloodGroup     String    @default("")
+  bodyType       String    @default("")
+  physicalStatus String    @default("Normal")
 
-  religion          String   @default("")
-  caste             String   @default("")
-  subCaste          String   @default("")
-  gotra             String   @default("")
-  manglik           String   @default("No")
-  star              String   @default("")
-  raasi             String   @default("")
-  dosham            String   @default("No")
-  motherTongue      String   @default("")
+  religion     String @default("")
+  caste        String @default("")
+  subCaste     String @default("")
+  gotra        String @default("")
+  manglik      String @default("No")
+  star         String @default("")
+  raasi        String @default("")
+  dosham       String @default("No")
+  motherTongue String @default("")
 
-  education         String   @default("")
-  educationDetail   String   @default("")
-  college           String   @default("")
-  occupation        String   @default("")
-  company           String   @default("")
-  annualIncome      String   @default("")
-  workingCity       String   @default("")
-  workingCountry    String   @default("India")
+  education       String @default("")
+  educationDetail String @default("")
+  college         String @default("")
+  occupation      String @default("")
+  company         String @default("")
+  annualIncome    String @default("")
+  workingCity     String @default("")
+  workingCountry  String @default("India")
 
-  fatherName        String   @default("")
-  fatherOccupation  String   @default("")
-  motherName        String   @default("")
-  motherOccupation  String   @default("")
-  brothers          Int      @default(0)
-  brothersMarried   Int      @default(0)
-  sisters           Int      @default(0)
-  sistersMarried    Int      @default(0)
-  familyType        String   @default("Nuclear")
-  familyStatus      String   @default("Middle Class")
-  familyValues      String   @default("Moderate")
-  nativePlace       String   @default("")
-  familyIncome      String   @default("")
+  fatherName       String @default("")
+  fatherOccupation String @default("")
+  motherName       String @default("")
+  motherOccupation String @default("")
+  brothers         Int    @default(0)
+  brothersMarried  Int    @default(0)
+  sisters          Int    @default(0)
+  sistersMarried   Int    @default(0)
+  familyType       String @default("Nuclear")
+  familyStatus     String @default("Middle Class")
+  familyValues     String @default("Moderate")
+  nativePlace      String @default("")
+  familyIncome     String @default("")
 
-  maritalStatus     String   @default("Never Married")
-  diet              String   @default("Vegetarian")
-  drinking          String   @default("No")
-  smoking           String   @default("No")
+  maritalStatus String @default("Never Married")
+  diet          String @default("Vegetarian")
+  drinking      String @default("No")
+  smoking       String @default("No")
 
-  horoscopeMatch    Boolean  @default(false)
-  kundliUrl         String   @default("")
-  kundliData        String   @default("")
-  nakshatra         String   @default("")
-  numerologyNumber  Int      @default(0)
-  destinyNumber     Int      @default(0)
-  soulNumber        Int      @default(0)
+  horoscopeMatch   Boolean @default(false)
+  kundliUrl        String  @default("")
+  kundliData       String  @default("")
+  nakshatra        String  @default("")
+  numerologyNumber Int     @default(0)
+  destinyNumber    Int     @default(0)
+  soulNumber       Int     @default(0)
 
-  aboutMe           String   @default("")
-  aboutFamily       String   @default("")
+  aboutMe     String @default("")
+  aboutFamily String @default("")
 
-  partnerAgeMin     Int      @default(21)
-  partnerAgeMax     Int      @default(35)
-  partnerHeightMin  String   @default("")
-  partnerHeightMax  String   @default("")
-  partnerReligion   String   @default("")
-  partnerCaste      String   @default("")
-  partnerEducation  String   @default("")
-  partnerOccupation String   @default("")
-  partnerIncome     String   @default("")
-  partnerCity       String   @default("")
-  partnerManglik    String   @default("")
+  partnerAgeMin        Int    @default(21)
+  partnerAgeMax        Int    @default(35)
+  partnerHeightMin     String @default("")
+  partnerHeightMax     String @default("")
+  partnerReligion      String @default("")
+  partnerCaste         String @default("")
+  partnerEducation     String @default("")
+  partnerOccupation    String @default("")
+  partnerIncome        String @default("")
+  partnerCity          String @default("")
+  partnerManglik       String @default("")
   partnerMaritalStatus String @default("")
-  partnerMotherTongue String @default("")
-  partnerDiet       String   @default("")
-  partnerExpectation String  @default("")
+  partnerMotherTongue  String @default("")
+  partnerDiet          String @default("")
+  partnerExpectation   String @default("")
 
-  bioDataTemplate   String   @default("royal-rajasthani")
-  bioDataGenerated  Boolean  @default(false)
+  bioDataTemplate  String  @default("royal-rajasthani")
+  bioDataGenerated Boolean @default(false)
 
-  phoneNumber       String   @default("")
-  alternatePhone    String   @default("")
-  linkedIn          String   @default("")
-  contactEmail      String   @default("")
+  phoneNumber    String @default("")
+  alternatePhone String @default("")
+  linkedIn       String @default("")
+  contactEmail   String @default("")
 
-  bioDataPublic     Boolean  @default(false)
-  phonePublic       Boolean  @default(false)
-  linkedInPublic    Boolean  @default(false)
-  emailPublic       Boolean  @default(false)
-  photosPublic      Boolean  @default(true)
+  bioDataPublic  Boolean @default(false)
+  phonePublic    Boolean @default(false)
+  linkedInPublic Boolean @default(false)
+  emailPublic    Boolean @default(false)
+  photosPublic   Boolean @default(true)
 
-  idVerified        Boolean  @default(false)
-  incomeVerified    Boolean  @default(false)
-  educationVerified Boolean  @default(false)
-  photoVerified     Boolean  @default(false)
+  idVerified        Boolean @default(false)
+  incomeVerified    Boolean @default(false)
+  educationVerified Boolean @default(false)
+  photoVerified     Boolean @default(false)
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  accessRequests    BioDataAccessRequest[] @relation("AccessOwner")
-  sentRequests      BioDataAccessRequest[] @relation("AccessRequester")
+  accessRequests BioDataAccessRequest[] @relation("AccessOwner")
+  sentRequests   BioDataAccessRequest[] @relation("AccessRequester")
 
   @@index([religion, caste])
   @@index([workingCity])
@@ -901,17 +906,17 @@ model MatrimonialProfile {
 }
 
 model BioDataAccessRequest {
-  id            String   @id @default(uuid())
-  ownerId       String
-  owner         MatrimonialProfile @relation("AccessOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  requesterId   String
-  requester     MatrimonialProfile @relation("AccessRequester", fields: [requesterId], references: [id], onDelete: Cascade)
-  accessType    String
-  status        String   @default("pending")
-  message       String   @default("")
-  grantedAt     DateTime?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id          String             @id @default(uuid())
+  ownerId     String
+  owner       MatrimonialProfile @relation("AccessOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  requesterId String
+  requester   MatrimonialProfile @relation("AccessRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  accessType  String
+  status      String             @default("pending")
+  message     String             @default("")
+  grantedAt   DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   @@unique([ownerId, requesterId, accessType])
   @@index([ownerId, status])
@@ -937,22 +942,37 @@ model VibeCheck {
 
 // ─── User Activity Tracking (behavioral analytics) ──
 model UserActivity {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  action      String   // view, like, pass, swipe, click, scroll, search, dwell, share, comment, match, unmatch, block, move
-  targetType  String   @default("profile") // profile, feed, story, video, creativity, chat, notification
-  targetId    String?
-  metadata    String?  @default("{}") // JSON: duration_ms, scroll_depth, search_query, etc.
-  durationMs  Int?     // time spent on target (dwell time)
-  sessionId   String?
-  createdAt   DateTime @default(now())
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action     String // view, like, pass, swipe, click, scroll, search, dwell, share, comment, match, unmatch, block, move
+  targetType String   @default("profile") // profile, feed, story, video, creativity, chat, notification
+  targetId   String?
+  metadata   String?  @default("{}") // JSON: duration_ms, scroll_depth, search_query, etc.
+  durationMs Int? // time spent on target (dwell time)
+  sessionId  String?
+  createdAt  DateTime @default(now())
 
   @@index([userId, createdAt])
   @@index([userId, action, targetType])
+  @@index([userId, action, createdAt])
   @@index([targetType, targetId])
   @@index([action, createdAt])
   @@index([userId, targetType, createdAt])
+}
+
+// ─── User Data (generic feature persistence) ────────
+model UserData {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // love_language_result, date_plan, date_idea_saved, compatibility_result, search_history, premium_interest
+  data      Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, type])
+  @@index([userId, type, createdAt])
 }
 
 // ─── DTM Chat Messages (persistent) ─────────────────
