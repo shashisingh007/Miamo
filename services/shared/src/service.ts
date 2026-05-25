@@ -16,7 +16,14 @@ import { env } from './env';
 // Appends connection_limit + pool_timeout query params to the URL so each
 // service can keep its tuned pool size without re-implementing the URL math.
 export function createPrisma(connectionLimit: number, poolTimeout = 20): PrismaClient {
-  const base = process.env.DATABASE_URL || 'postgresql://miamo:miamo@localhost:5432/miamo?schema=public';
+  let base = process.env.DATABASE_URL;
+  if (!base) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('FATAL: DATABASE_URL must be set in production');
+    }
+    base = 'postgresql://miamo:miamo@localhost:5432/miamo?schema=public';
+    logger.warn('[env] DATABASE_URL not set, using insecure dev default');
+  }
   const sep = base.includes('?') ? '&' : '?';
   const url = `${base}${sep}connection_limit=${connectionLimit}&pool_timeout=${poolTimeout}`;
   return new PrismaClient({
