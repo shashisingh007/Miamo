@@ -306,13 +306,13 @@ function BeatsPageInner() {
  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
  <StatCard label="Active Beats" value={activeCount} color="from-rose to-rose-dark"
  icon={<BeatsIcon size={18} />} />
- <StatCard label="Longest Streak" value={longest} color="from-amber-400 to-orange-500"
+ <StatCard label="Longest Streak" value={longest} color="from-rose-alt to-rose-main"
  icon={<Trophy className="w-5 h-5 text-text-primary" />} />
- <StatCard label="Total Sent" value={totalSent} color="from-sky-400 to-blue-500"
+ <StatCard label="Total Sent" value={totalSent} color="from-rose-alt to-rose-main"
  icon={<ArrowUp className="w-5 h-5 text-text-primary" />} clickable
  subtitle={activeView === 'sent' ? '\u2190 Back' : 'Tap to view \u2192'}
  onClick={() => setActiveView(activeView === 'sent' ? 'dashboard' : 'sent')} />
- <StatCard label="Total Received" value={totalReceived} color="from-emerald-400 to-green-500"
+ <StatCard label="Total Received" value={totalReceived} color="from-rose-alt to-rose-main"
  icon={<ArrowDown className="w-5 h-5 text-text-primary" />} clickable
  subtitle={activeView === 'received' ? '\u2190 Back' : 'Tap to view \u2192'}
  onClick={() => setActiveView(activeView === 'received' ? 'dashboard' : 'received')} />
@@ -397,7 +397,7 @@ function BeatsPageInner() {
  <p className="text-[11px] text-text-muted">{beat.count} day streak</p>
  </div>
  {beat.iSentToday ? (
- <Badge variant="default" className="text-[10px] gap-1 bg-blue-50 text-blue-600 border-blue-100">
+ <Badge variant="default" className="text-[10px] gap-1 bg-rose-soft text-rose-main border-rose-soft">
  <Check className="w-3 h-3" /> Sent
  </Badge>
  ) : (
@@ -417,13 +417,13 @@ function BeatsPageInner() {
  {/* ICE BREAKER TOGGLE */}
  <motion.button
  onClick={() => setShowIceBreakers(!showIceBreakers)}
- className="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-amber-50/80 to-orange-50/60 border border-amber-100/50 hover:border-amber-200 transition-all"
+ className="w-full flex items-center justify-between p-3 rounded-xl bg-gradient-to-r from-rose-soft/80 to-rose-soft/60 border border-rose-soft/50 hover:border-rose-light transition-all"
  >
  <div className="flex items-center gap-2">
- <Lightbulb className="w-4 h-4 text-amber-500" />
- <span className="text-[12px] font-bold text-amber-700">Ice Breakers — Don&apos;t know what to say?</span>
+ <Lightbulb className="w-4 h-4 text-rose-main" />
+ <span className="text-[12px] font-bold text-rose-dark">Ice Breakers — Don&apos;t know what to say?</span>
  </div>
- <ChevronDown className={cn('w-4 h-4 text-amber-400 transition-transform', showIceBreakers && 'rotate-180')} />
+ <ChevronDown className={cn('w-4 h-4 text-rose-alt transition-transform', showIceBreakers && 'rotate-180')} />
  </motion.button>
  <AnimatePresence>
  {showIceBreakers && (
@@ -470,7 +470,7 @@ function BeatsPageInner() {
  <motion.div key={beat.id}
  initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.04 }}
  >
- <Card hover className={cn('p-4', isUrgent && 'border-amber-400/30 shadow-[0_0_16px_rgba(245,158,11,0.06)]')}>
+ <Card hover className={cn('p-4', isUrgent && 'border-rose-alt/30 shadow-[0_0_16px_rgba(245,158,11,0.06)]')}>
  <div className="flex items-center gap-3">
  {/* Avatar + streak badge */}
  <button onClick={() => handleSelectMatch(beat)} className="relative shrink-0">
@@ -499,7 +499,7 @@ function BeatsPageInner() {
  <ArrowUp className="w-2.5 h-2.5 text-rose-light" /> {beat.totalSent || 0} sent
  </span>
  <span className="text-[10px] text-text-muted flex items-center gap-0.5">
- <ArrowDown className="w-2.5 h-2.5 text-emerald-400" /> {beat.totalReceived || 0} received
+ <ArrowDown className="w-2.5 h-2.5 text-rose-alt" /> {beat.totalReceived || 0} received
  </span>
  {/* Countdown timer */}
  <StreakCountdown deadline={beat.streakDeadline} />
@@ -511,14 +511,14 @@ function BeatsPageInner() {
  {beat.todayCompleted ? (
  <Button size="sm" variant="secondary"
  disabled
- className="text-[11px] gap-1 bg-emerald-50 text-emerald-600 border-emerald-100 cursor-default"
+ className="text-[11px] gap-1 bg-rose-soft text-rose-main border-rose-soft cursor-default"
  >
  <CheckCheck className="w-3 h-3" /> Done ✓
  </Button>
  ) : beat.iSentToday ? (
  <Button size="sm" variant="secondary"
  disabled
- className="text-[11px] gap-1 bg-blue-50 text-blue-600 border-blue-100 cursor-default"
+ className="text-[11px] gap-1 bg-rose-soft text-rose-main border-rose-soft cursor-default"
  >
  <Clock className="w-3 h-3" /> Waiting
  </Button>
@@ -552,9 +552,9 @@ function BeatsPageInner() {
  )}
  {beat.state === 'weak' && !beat.todayCompleted && (
  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
- className="mt-3 flex items-center gap-2 bg-amber-50 px-3 py-2 rounded-lg border border-amber-100">
- <Clock className="w-3.5 h-3.5 text-amber-400 shrink-0" />
- <span className="text-[11px] text-amber-600 font-medium">{beat.iSentToday ? `You sent — waiting for ${other.displayName}` : 'Your turn! Don\'t let it fade!'}</span>
+ className="mt-3 flex items-center gap-2 bg-rose-soft px-3 py-2 rounded-lg border border-rose-soft">
+ <Clock className="w-3.5 h-3.5 text-rose-alt shrink-0" />
+ <span className="text-[11px] text-rose-main font-medium">{beat.iSentToday ? `You sent — waiting for ${other.displayName}` : 'Your turn! Don\'t let it fade!'}</span>
  </motion.div>
  )}
  </Card>
@@ -568,7 +568,7 @@ function BeatsPageInner() {
  {/* HOW BEATS WORK */}
  <Card className="p-5 border-border/30">
  <div className="flex items-start gap-3">
- <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-main/15 to-rose-100 flex items-center justify-center shrink-0 shadow-sm">
+ <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-main/15 to-rose-soft flex items-center justify-center shrink-0 shadow-sm">
  <BeatsIcon size={20} />
  </div>
  <div>
@@ -589,14 +589,14 @@ function BeatsPageInner() {
  {beats.some(b => b.count >= 3) && (
  <Card className="p-4">
  <h3 className="text-sm font-bold text-text-primary flex items-center gap-2 mb-3">
- <Crown className="w-4 h-4 text-amber-500" /> Streak Milestones
+ <Crown className="w-4 h-4 text-rose-main" /> Streak Milestones
  </h3>
  <div className="flex items-center gap-3 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
  {Object.entries(MILESTONE_EMOJIS).map(([days, data]) => {
  const achieved = beats.some(b => b.count >= Number(days));
  return (
  <div key={days} className={cn('flex flex-col items-center gap-1 px-3 py-2 rounded-xl min-w-[60px] transition-all',
- achieved ? 'bg-gradient-to-b from-amber-50 to-orange-50 border border-amber-100' : 'bg-miamo-surface opacity-40'
+ achieved ? 'bg-gradient-to-b from-rose-soft to-rose-soft border border-rose-soft' : 'bg-miamo-surface opacity-40'
  )}>
  <span className="text-lg">{data.emoji}</span>
  <span className={cn('text-[9px] font-bold', achieved ? data.color : 'text-text-muted')}>{days}d</span>

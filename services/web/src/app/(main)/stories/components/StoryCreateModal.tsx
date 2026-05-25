@@ -64,9 +64,9 @@ export function StoryCreateModal({ onClose, onCreated }: { onClose: () => void; 
  <p className="text-sm text-text-muted">What kind of story?</p>
  <div className="grid grid-cols-3 gap-3">
  {[
- { id: 'text' as const, icon: Type, label: 'Text', desc: 'Share a thought', color: 'from-violet-400 to-purple-500' },
- { id: 'photo' as const, icon: Image, label: 'Photo', desc: 'Share an image', color: 'from-rose-main to-rose-500' },
- { id: 'mood' as const, icon: Smile, label: 'Mood', desc: 'Share your vibe', color: 'from-amber-400 to-orange-500' },
+ { id: 'text' as const, icon: Type, label: 'Text', desc: 'Share a thought', color: 'from-rose-alt to-rose-main' },
+ { id: 'photo' as const, icon: Image, label: 'Photo', desc: 'Share an image', color: 'from-rose-main to-rose-main' },
+ { id: 'mood' as const, icon: Smile, label: 'Mood', desc: 'Share your vibe', color: 'from-rose-alt to-rose-main' },
  ].map(t => (
  <motion.button key={t.id} whileHover={{ y: -4 }} whileTap={{ scale: 0.95 }}
  onClick={() => { setStoryType(t.id); setStep('compose'); }}

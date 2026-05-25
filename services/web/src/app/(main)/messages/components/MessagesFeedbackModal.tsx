@@ -20,7 +20,7 @@ export function MessagesFeedbackModal({ type, userName, onClose, onSubmit }: {
  const reasons = type === 'report' ? REPORT_REASONS : type === 'block' ? BLOCK_REASONS : UNMATCH_REASONS;
  const title = type === 'report' ? 'Report' : type === 'block' ? 'Block' : 'Unmatch';
  const subtitle = type === 'report' ? 'Help keep Miamo safe' : type === 'block' ? 'They won\'t be able to contact you' : 'Help us improve your matches';
- const iconColor = type === 'report' ? 'text-red-400 bg-red-400/10' : type === 'block' ? 'text-red-400 bg-red-400/10' : 'text-amber-400 bg-amber-400/10';
+ const iconColor = type === 'report' ? 'text-red-400 bg-red-400/10' : type === 'block' ? 'text-red-400 bg-red-400/10' : 'text-rose-alt bg-rose-alt/10';
  const submitColor = type === 'unmatch' ? 'bg-miamo-card text-[#FAF8F5]' : 'bg-red-500 text-text-primary';
 
  const handleSubmit = async () => {
@@ -61,8 +61,8 @@ export function MessagesFeedbackModal({ type, userName, onClose, onSubmit }: {
  {done ? (
  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex-1 flex items-center justify-center py-16">
  <div className="text-center">
- <div className="w-14 h-14 rounded-full bg-emerald-400/10 flex items-center justify-center mx-auto mb-4">
- <Check className="w-7 h-7 text-emerald-400" />
+ <div className="w-14 h-14 rounded-full bg-rose-alt/10 flex items-center justify-center mx-auto mb-4">
+ <Check className="w-7 h-7 text-rose-alt" />
  </div>
  <p className="text-[14px] font-semibold text-text-primary">Thank you for your feedback</p>
  <p className="text-[11px] text-text-muted mt-1">This helps our AI improve your experience</p>

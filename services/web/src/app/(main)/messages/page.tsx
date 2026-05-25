@@ -19,7 +19,7 @@ import { MessagesFeedbackModal } from './components/MessagesFeedbackModal';
 // ═══════════════════════════════════════════════════════════
 function GlassTooltipButton({ label, active, activeColor = 'lavender', onClick, children }: { label: string; active?: boolean; activeColor?: 'lavender' | 'amber'; onClick: () => void; children: React.ReactNode }) {
  const [hovered, setHovered] = useState(false);
- const colorActive = activeColor === 'amber' ? 'text-amber-400 bg-amber-400/10' : 'text-rose-main bg-rose-main/10';
+ const colorActive = activeColor === 'amber' ? 'text-rose-alt bg-rose-alt/10' : 'text-rose-main bg-rose-main/10';
  return (
  <div className="relative" onMouseEnter={() => setHovered(true)} onMouseLeave={() => setHovered(false)}>
  <button onClick={onClick} className={cn('p-1.5 rounded-lg transition-all text-text-muted hover:text-text-primary', active && colorActive)}>
@@ -297,7 +297,7 @@ function MessagesPageInner() {
  updateHeldChats(prev => { const n = new Set(prev); Array.from(selectedChats).forEach(id => n.delete(id)); return n; });
  setSelectedChats(new Set()); setSelectMode(false); loadChats();
  }}
- className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[11px] font-medium hover:bg-emerald-500/20 transition-colors">
+ className="flex-1 flex items-center justify-center gap-1.5 h-8 rounded-lg bg-rose-main/10 border border-rose-main/20 text-rose-alt text-[11px] font-medium hover:bg-rose-main/20 transition-colors">
  <PlayCircle className="w-3 h-3" /> Resume
  </button>
  <button onClick={async () => { for (const id of Array.from(selectedChats)) { try { await api.unmatch(id, 'bulk_unmatch'); } catch {} } setSelectedChats(new Set()); setSelectMode(false); loadChats(); }}

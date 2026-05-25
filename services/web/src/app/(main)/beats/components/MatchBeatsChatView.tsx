@@ -32,7 +32,7 @@ function BeatEntryRow({ entry, onDelete, onToggleChat }: {
  <p className="text-[13px] text-text-secondary leading-relaxed">{entry.content}</p>
  <div className={cn('flex items-center gap-2 mt-1', isMine ? 'justify-end' : '')}>
  <span className="text-[10px] text-text-muted">{formatRelativeTime(entry.sentAt)}</span>
- {isMine && entry.seen && <CheckCheck className="w-3 h-3 text-sky-400" />}
+ {isMine && entry.seen && <CheckCheck className="w-3 h-3 text-rose-alt" />}
  {entry.showInChat && <span className="text-[9px] bg-miamo-surface text-rose px-1.5 py-0.5 rounded-full font-medium">In Chat</span>}
  </div>
  </div>
@@ -43,14 +43,14 @@ function BeatEntryRow({ entry, onDelete, onToggleChat }: {
  el.setAttribute('download', `beat-${entry.id.slice(0,8)}.txt`);
  el.click();
  }} title="Download beat"
- className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-blue-500 hover:bg-blue-50 transition-all">
+ className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-rose-main hover:bg-rose-soft transition-all">
  <Download className="w-3.5 h-3.5" />
  </button>
  <button onClick={() => {
  const text = `\u2764\ufe0f Beat from Miamo\n\n${entry.content}\n\nType: ${beatType.label}\nSent: ${new Date(entry.sentAt).toLocaleString()}`;
  navigator.clipboard?.writeText(text).then(() => { /* copied */ });
  }} title="Copy to clipboard"
- className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-emerald-500 hover:bg-emerald-50 transition-all">
+ className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-rose-main hover:bg-rose-soft transition-all">
  <Camera className="w-3.5 h-3.5" />
  </button>
  <button onClick={() => onToggleChat(entry.id)} title={entry.showInChat ? 'Hide from chat' : 'Show in chat'}
@@ -111,7 +111,7 @@ export function MatchBeatsChatView({ beat, entries, onBack, onSendBeat, onDelete
  return (
  <div className="flex flex-col" style={{ height: '100%' }}>
  {/* ─── Header ─── */}
- <div className="shrink-0 flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-rose-main/10/80 to-rose-50/60 border-b border-border/40 backdrop-blur-sm">
+ <div className="shrink-0 flex items-center gap-3 px-4 py-3 bg-gradient-to-r from-rose-main/10 to-rose-soft/60 border-b border-border/40 backdrop-blur-sm">
  <button onClick={onBack} className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-miamo-card/60 transition-all">
  <ChevronLeft className="w-5 h-5 text-text-secondary" />
  </button>
@@ -144,7 +144,7 @@ export function MatchBeatsChatView({ beat, entries, onBack, onSendBeat, onDelete
  </div>
 
  {/* ─── Beat entries (scrollable area) ─── */}
- <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-1 bg-gradient-to-b from-rose-main/10/20 to-rose-50/10">
+ <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-3 py-3 space-y-1 bg-gradient-to-b from-rose-main/10 to-rose-soft/10">
  {filtered.length === 0 ? (
  <div className="text-center py-20">
  <BeatsIcon size={48} className="mx-auto mb-4 opacity-30" />
@@ -163,11 +163,11 @@ export function MatchBeatsChatView({ beat, entries, onBack, onSendBeat, onDelete
  </div>
 
  {/* ─── Compose / Send area ─── */}
- <div className="shrink-0 border-t border-border/40 bg-gradient-to-r from-white to-rose-main/10/30">
+ <div className="shrink-0 border-t border-border/40 bg-gradient-to-r from-white to-rose-main/10">
  {alreadySent ? (
  /* Already sent today — show status */
  <div className="p-4 text-center">
- <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100">
+ <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-soft text-rose-main border border-rose-soft">
  <CheckCheck className="w-4 h-4" />
  <span className="text-sm font-semibold">
  {beat.todayCompleted ? 'Both sent today! Streak saved!' : "You've sent today's beat — waiting for " + (other.displayName?.split(' ')[0] || 'them')}

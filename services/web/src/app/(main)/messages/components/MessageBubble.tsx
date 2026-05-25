@@ -72,7 +72,7 @@ export function MessageBubble({
  {liked && (
  <motion.div initial={{ scale: 0, opacity: 0 }} animate={{ scale: 1.5, opacity: 1 }} exit={{ scale: 0, opacity: 0 }}
  transition={{ type: 'spring', stiffness: 400 }} className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
- <Heart className="w-12 h-12 text-rose fill-rose-500" />
+ <Heart className="w-12 h-12 text-rose fill-rose-main" />
  </motion.div>
  )}
  </AnimatePresence>
@@ -174,7 +174,7 @@ export function MessageBubble({
  {isMedia && onDownload && <button onClick={() => { onDownload(); setShowMenu(false); }} className="w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-miamo-elevated flex items-center gap-2"><Download className="w-3 h-3" /> Download</button>}
  <button onClick={() => { onHide(); setShowMenu(false); }} className="w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-miamo-elevated flex items-center gap-2"><EyeOff className="w-3 h-3" /> Hide message</button>
  <div className="h-px bg-border/30 my-0.5" />
- <button onClick={() => { onDeleteForMe(); setShowMenu(false); }} className="w-full text-left px-3 py-2 text-xs text-orange-400 hover:bg-orange-500/10 flex items-center gap-2"><Trash2 className="w-3 h-3" /> Delete for me</button>
+ <button onClick={() => { onDeleteForMe(); setShowMenu(false); }} className="w-full text-left px-3 py-2 text-xs text-rose-alt hover:bg-rose-main/10 flex items-center gap-2"><Trash2 className="w-3 h-3" /> Delete for me</button>
  {canDeleteForAll && (
  <button onClick={() => { onDeleteForAll(); setShowMenu(false); }} className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 flex items-center gap-2">
  <Trash2 className="w-3 h-3" /> Delete for everyone

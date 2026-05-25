@@ -72,7 +72,7 @@ export default function PremiumPage() {
  <Button variant="secondary" className="w-full" disabled>Current Plan</Button>
  ) : selectedPlan === plan.name ? (
  <div className="text-center space-y-2">
- <p className="text-xs text-emerald-400">✓ Selected! Payment coming soon.</p>
+ <p className="text-xs text-rose-alt">✓ Selected! Payment coming soon.</p>
  <Button variant="ghost" className="w-full" onClick={() => setSelectedPlan(null)}>Cancel</Button>
  </div>
  ) : (

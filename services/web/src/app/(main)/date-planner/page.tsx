@@ -33,31 +33,31 @@ interface DatePlan {
 
 /* ═══ Constants ═══ */
 const DATE_VIBES = [
- { id: 'romantic', label: 'Romantic', emoji: '🌹', color: 'from-rose-400 to-rose-main', bg: 'bg-miamo-surface' },
- { id: 'adventurous', label: 'Adventurous', emoji: '🏔️', color: 'from-emerald-400 to-teal-500', bg: 'bg-emerald-50' },
- { id: 'chill', label: 'Chill & Cozy', emoji: '☕', color: 'from-amber-400 to-orange-500', bg: 'bg-amber-50' },
- { id: 'luxe', label: 'Luxe Night', emoji: '✨', color: 'from-violet-400 to-purple-500', bg: 'bg-violet-50' },
- { id: 'creative', label: 'Creative', emoji: '🎨', color: 'from-sky-400 to-blue-500', bg: 'bg-sky-50' },
- { id: 'playful', label: 'Playful', emoji: '🎮', color: 'from-rose-main to-fuchsia-500', bg: 'bg-miamo-surface' },
+ { id: 'romantic', label: 'Romantic', emoji: '🌹', color: 'from-rose-alt to-rose-main', bg: 'bg-miamo-surface' },
+ { id: 'adventurous', label: 'Adventurous', emoji: '🏔️', color: 'from-rose-alt to-rose-main', bg: 'bg-rose-soft' },
+ { id: 'chill', label: 'Chill & Cozy', emoji: '☕', color: 'from-rose-alt to-rose-main', bg: 'bg-rose-soft' },
+ { id: 'luxe', label: 'Luxe Night', emoji: '✨', color: 'from-rose-alt to-rose-main', bg: 'bg-rose-soft' },
+ { id: 'creative', label: 'Creative', emoji: '🎨', color: 'from-rose-alt to-rose-main', bg: 'bg-rose-soft' },
+ { id: 'playful', label: 'Playful', emoji: '🎮', color: 'from-rose-main to-rose-main', bg: 'bg-miamo-surface' },
 ];
 
 const VENUES = [
- { id: 'restaurant', label: 'Restaurant', icon: UtensilsCrossed, color: 'text-orange-500' },
- { id: 'cafe', label: 'Café', icon: Coffee, color: 'text-amber-600' },
- { id: 'bar', label: 'Bar & Drinks', icon: Wine, color: 'text-violet-500' },
- { id: 'park', label: 'Park / Nature', icon: TreePine, color: 'text-emerald-500' },
- { id: 'cinema', label: 'Cinema', icon: Film, color: 'text-sky-500' },
+ { id: 'restaurant', label: 'Restaurant', icon: UtensilsCrossed, color: 'text-rose-main' },
+ { id: 'cafe', label: 'Café', icon: Coffee, color: 'text-rose-main' },
+ { id: 'bar', label: 'Bar & Drinks', icon: Wine, color: 'text-rose-main' },
+ { id: 'park', label: 'Park / Nature', icon: TreePine, color: 'text-rose-main' },
+ { id: 'cinema', label: 'Cinema', icon: Film, color: 'text-rose-main' },
  { id: 'concert', label: 'Concert / Live', icon: Music, color: 'text-rose' },
- { id: 'gallery', label: 'Art Gallery', icon: Palette, color: 'text-indigo-500' },
- { id: 'arcade', label: 'Arcade / Games', icon: Gamepad2, color: 'text-fuchsia-500' },
+ { id: 'gallery', label: 'Art Gallery', icon: Palette, color: 'text-rose-main' },
+ { id: 'arcade', label: 'Arcade / Games', icon: Gamepad2, color: 'text-rose-main' },
 ];
 
 const TIMES_OF_DAY = [
- { id: 'morning', label: 'Morning', icon: Sunrise, time: '9:00 AM', color: 'text-amber-500' },
- { id: 'afternoon', label: 'Afternoon', icon: Sun, time: '2:00 PM', color: 'text-orange-500' },
+ { id: 'morning', label: 'Morning', icon: Sunrise, time: '9:00 AM', color: 'text-rose-main' },
+ { id: 'afternoon', label: 'Afternoon', icon: Sun, time: '2:00 PM', color: 'text-rose-main' },
  { id: 'golden', label: 'Golden Hour', icon: Sunset, time: '5:00 PM', color: 'text-rose' },
- { id: 'evening', label: 'Evening', icon: CloudSun, time: '7:00 PM', color: 'text-violet-500' },
- { id: 'night', label: 'Night Out', icon: Moon, time: '9:00 PM', color: 'text-indigo-500' },
+ { id: 'evening', label: 'Evening', icon: CloudSun, time: '7:00 PM', color: 'text-rose-main' },
+ { id: 'night', label: 'Night Out', icon: Moon, time: '9:00 PM', color: 'text-rose-main' },
 ];
 
 const BUDGETS = ['💸 Budget-Friendly', '💰 Moderate', '💎 Splurge', '👑 No Limit'];
@@ -406,7 +406,7 @@ export default function DatePlannerPage() {
  <div className="relative z-10 space-y-4">
  {plans.length > 0 && (
  <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
- <Star className="w-5 h-5 text-amber-400" /> Your Date Plans
+ <Star className="w-5 h-5 text-rose-alt" /> Your Date Plans
  </h2>
  )}
  {plans.map((plan, i) => {
@@ -414,7 +414,7 @@ export default function DatePlannerPage() {
  return (
  <motion.div key={plan.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.1 }}>
  <Card hover className="p-5 relative overflow-hidden">
- <div className={cn('absolute top-0 right-0 w-24 h-24 rounded-bl-full opacity-20 bg-gradient-to-br', vibe?.color || 'from-rose-main to-rose-500')} />
+ <div className={cn('absolute top-0 right-0 w-24 h-24 rounded-bl-full opacity-20 bg-gradient-to-br', vibe?.color || 'from-rose-main to-rose-main')} />
  <div className="flex items-start gap-4">
  <motion.div animate={{ rotate: [0, 5, -5, 0] }} transition={{ duration: 4, repeat: Infinity }}
  className={cn('w-14 h-14 rounded-2xl flex items-center justify-center text-2xl shadow-lg', vibe?.bg || 'bg-miamo-surface')}>
@@ -442,7 +442,7 @@ export default function DatePlannerPage() {
  <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
  onClick={() => setPlans(prev => prev.map(p => p.id === plan.id ? { ...p, confirmed: !p.confirmed } : p))}
  className={cn('w-10 h-10 rounded-xl flex items-center justify-center transition-all',
- plan.confirmed ? 'bg-emerald-100 text-emerald-600' : 'bg-miamo-surface text-text-secondary hover:text-rose')}>
+ plan.confirmed ? 'bg-rose-soft text-rose-main' : 'bg-miamo-surface text-text-secondary hover:text-rose')}>
  <Check className="w-5 h-5" />
  </motion.button>
  </div>

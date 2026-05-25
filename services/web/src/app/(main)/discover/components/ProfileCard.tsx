@@ -48,13 +48,13 @@ export function ProfileCard({
 
  // Lifestyle items
  const lifestyleItems = useMemo(() => [
- profile.smoking && { icon: Cigarette, label: profile.smoking, color: 'text-orange-400' },
- profile.drinking && { icon: Wine, label: profile.drinking, color: 'text-purple-400' },
- profile.exercise && { icon: Dumbbell, label: profile.exercise, color: 'text-emerald-400' },
- profile.education && { icon: GraduationCap, label: profile.education, color: 'text-blue-400' },
- profile.zodiac && { icon: Moon, label: profile.zodiac, color: 'text-indigo-400' },
- profile.languages && { icon: Globe, label: profile.languages, color: 'text-cyan-400' },
- profile.pets && profile.pets !== 'none' && { icon: Dog, label: profile.pets, color: 'text-amber-400' },
+ profile.smoking && { icon: Cigarette, label: profile.smoking, color: 'text-rose-alt' },
+ profile.drinking && { icon: Wine, label: profile.drinking, color: 'text-rose-alt' },
+ profile.exercise && { icon: Dumbbell, label: profile.exercise, color: 'text-rose-alt' },
+ profile.education && { icon: GraduationCap, label: profile.education, color: 'text-rose-alt' },
+ profile.zodiac && { icon: Moon, label: profile.zodiac, color: 'text-rose-alt' },
+ profile.languages && { icon: Globe, label: profile.languages, color: 'text-rose-alt' },
+ profile.pets && profile.pets !== 'none' && { icon: Dog, label: profile.pets, color: 'text-rose-alt' },
  profile.children && { icon: Baby, label: profile.children, color: 'text-rose-light' },
  ].filter(Boolean) as { icon: any; label: string; color: string }[], [profile]);
 
@@ -137,8 +137,8 @@ export function ProfileCard({
  </span>
  )}
  {profile.online && (
- <span className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-emerald-400/15 text-emerald-300 border border-emerald-400/20 flex items-center gap-1">
- <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" /> Online
+ <span className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-rose-alt/15 text-rose-light border border-rose-alt/20 flex items-center gap-1">
+ <span className="w-1.5 h-1.5 rounded-full bg-rose-alt animate-pulse" /> Online
  </span>
  )}
  {profile.height && (
@@ -259,9 +259,9 @@ export function ProfileCard({
  whileHover={{ scale: 1.05 }}
  whileTap={{ scale: 0.9 }}
  onClick={onSuperLike}
- className="haptic-super w-14 h-14 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center hover:bg-amber-100 hover:border-amber-300 transition-all group"
+ className="haptic-super w-14 h-14 rounded-full bg-rose-soft border border-rose-light flex items-center justify-center hover:bg-rose-soft hover:border-rose-light transition-all group"
  >
- <Star className="w-6 h-6 text-amber-400 group-hover:text-amber-500 transition-colors" />
+ <Star className="w-6 h-6 text-rose-alt group-hover:text-rose-main transition-colors" />
  </motion.button>
  )}
  <p className="text-[12px] text-text-muted leading-relaxed">Like any photo or prompt to send a Miamo Move</p>

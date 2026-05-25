@@ -235,7 +235,7 @@ export function StoryViewer({ storyGroup, initialIndex, onClose, onRefresh }: {
  {isOwn && (
  <>
  <button onClick={handlePostToFeed} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-miamo-surface text-left text-sm">
- <Share2 className="w-4 h-4 text-indigo-500" /> Post to Feed
+ <Share2 className="w-4 h-4 text-rose-main" /> Post to Feed
  </button>
  <button onClick={handleDelete} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-red-50 text-left text-sm text-red-500">
  <Trash2 className="w-4 h-4" /> Delete Story
@@ -244,7 +244,7 @@ export function StoryViewer({ storyGroup, initialIndex, onClose, onRefresh }: {
  )}
  {!isOwn && (
  <button onClick={() => { api.reportUser({ reportedId: author.id, reason: 'inappropriate', targetType: 'story', targetId: story.id }).catch(() => {}); setShowMenu(false); }} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-miamo-surface text-left text-sm">
- <AlertCircle className="w-4 h-4 text-amber-500" /> Report
+ <AlertCircle className="w-4 h-4 text-rose-main" /> Report
  </button>
  )}
  <button onClick={() => setShowMenu(false)} className="w-full flex items-center gap-3 px-4 py-3 hover:bg-miamo-surface text-left text-sm text-text-muted">

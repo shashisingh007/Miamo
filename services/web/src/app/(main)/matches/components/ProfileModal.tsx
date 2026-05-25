@@ -88,7 +88,7 @@ export function ProfileModal({
  >
  <div className="px-4 py-3 flex gap-2 flex-wrap">
  <button onClick={() => { onReport(); onClose(); }}
- className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-400 text-[11px] font-semibold hover:bg-orange-500/20 transition">
+ className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-main/10 border border-rose-main/20 text-rose-alt text-[11px] font-semibold hover:bg-rose-main/20 transition">
  <Flag className="w-3 h-3" /> Report
  </button>
  <button onClick={() => { onBlock(); onClose(); }}
@@ -128,8 +128,8 @@ export function ProfileModal({
  <h2 className="text-xl font-extrabold text-text-primary">{name}</h2>
  {age && <span className="text-[14px] text-text-muted font-medium">{age}</span>}
  {verified && (
- <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center">
- <Shield className="w-3 h-3 text-blue-400" />
+ <div className="w-5 h-5 rounded-full bg-rose-main/20 flex items-center justify-center">
+ <Shield className="w-3 h-3 text-rose-alt" />
  </div>
  )}
  </div>
@@ -141,7 +141,7 @@ export function ProfileModal({
  {/* Their message/move */}
  {incoming.message && (
  <div className="mb-4 p-4 rounded-2xl bg-gradient-to-r from-rose-main/10 to-rose- /10 border border-rose-main/15">
- <p className="text-[10px] font-bold text-purple-300/60 uppercase tracking-wider mb-1.5">
+ <p className="text-[10px] font-bold text-rose-light/60 uppercase tracking-wider mb-1.5">
  {incoming.type === 'move' ? '💫 Their Miamo Move' : '💬 Their Message'}
  </p>
  <p className="text-[13px] text-text-primary leading-relaxed">&ldquo;{incoming.message}&rdquo;</p>
@@ -227,12 +227,12 @@ export function ProfileModal({
  ) : suggestions.length > 0 && (
  <div>
  <p className="text-[10px] font-bold text-text-secondary uppercase tracking-wider mb-2 flex items-center gap-1">
- <Wand2 className="w-3 h-3 text-purple-400" /> AI Suggestions
+ <Wand2 className="w-3 h-3 text-rose-alt" /> AI Suggestions
  </p>
  <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-1">
  {suggestions.map((s, i) => (
  <button key={i} onClick={() => setMoveMessage(s)}
- className="shrink-0 max-w-[200px] px-3 py-2 rounded-lg bg-purple-500/10 border border-purple-500/15 text-[11px] text-purple-700 text-left hover:bg-purple-500/20 transition truncate">
+ className="shrink-0 max-w-[200px] px-3 py-2 rounded-lg bg-rose-main/10 border border-rose-main/15 text-[11px] text-rose-dark text-left hover:bg-rose-main/20 transition truncate">
  {s}
  </button>
  ))}
@@ -251,14 +251,14 @@ export function ProfileModal({
  onKeyDown={e => { if (e.key === 'Enter' && moveMessage.trim()) onMatchMove(moveMessage.trim()); }}
  placeholder="Write your Miamo Move..."
  autoFocus
- className="flex-1 h-10 rounded-xl bg-miamo-surface border border-border text-text-primary text-[12px] px-4 focus:border-purple-500/30 focus:outline-none placeholder:text-text-muted transition"
+ className="flex-1 h-10 rounded-xl bg-miamo-surface border border-border text-text-primary text-[12px] px-4 focus:border-rose-main/30 focus:outline-none placeholder:text-text-muted transition"
  />
  <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
  onClick={() => { if (moveMessage.trim()) onMatchMove(moveMessage.trim()); }}
  disabled={!moveMessage.trim()}
  className={cn(
  'w-10 h-10 rounded-xl flex items-center justify-center transition flex-shrink-0',
- moveMessage.trim() ? 'bg-purple-500 text-text-primary' : 'bg-miamo-surface text-text-secondary',
+ moveMessage.trim() ? 'bg-rose-main text-text-primary' : 'bg-miamo-surface text-text-secondary',
  )}>
  <Send className="w-4 h-4" />
  </motion.button>

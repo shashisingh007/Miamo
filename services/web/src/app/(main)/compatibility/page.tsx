@@ -137,7 +137,7 @@ export default function CompatibilityPage() {
  <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
  <div className="flex items-center gap-4">
  <motion.div animate={{ rotate: [0, 360] }} transition={{ duration: 20, repeat: Infinity, ease: 'linear' }}
- className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-xl shadow-violet-200/50">
+ className="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-main to-rose-main flex items-center justify-center shadow-xl shadow-rose-light/50">
  <Puzzle className="w-7 h-7 text-text-primary" />
  </motion.div>
  <div>
@@ -154,17 +154,17 @@ export default function CompatibilityPage() {
  {/* Progress */}
  <div className="mb-6">
  <div className="flex items-center justify-between mb-2">
- <span className="text-xs font-bold text-violet-500">{QUIZ_SECTIONS[sectionIdx].title}</span>
+ <span className="text-xs font-bold text-rose-main">{QUIZ_SECTIONS[sectionIdx].title}</span>
  <span className="text-xs text-text-muted">{Math.round(progress)}%</span>
  </div>
  <div className="h-2 bg-miamo-surface rounded-full overflow-hidden">
- <motion.div animate={{ width: `${progress}%` }} className="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full" />
+ <motion.div animate={{ width: `${progress}%` }} className="h-full bg-gradient-to-r from-rose-main to-rose-main rounded-full" />
  </div>
  </div>
 
  <motion.div key={`${sectionIdx}-${questionIdx}`} initial={{ opacity: 0, x: 60 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -60 }}>
  <Card className="p-8 text-center relative overflow-hidden">
- <div className="absolute inset-0 bg-gradient-to-br from-violet-50/50 to-purple-50/30" />
+ <div className="absolute inset-0 bg-gradient-to-br from-rose-soft/50 to-rose-soft/30" />
  <div className="relative z-10">
  <motion.p animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 2, repeat: Infinity }}
  className="text-2xl font-black text-text-primary mb-8">{currentQ.q}</motion.p>
@@ -172,7 +172,7 @@ export default function CompatibilityPage() {
  {currentQ.options.map((opt, i) => (
  <motion.button key={i} whileHover={{ y: -4, scale: 1.02 }} whileTap={{ scale: 0.95 }}
  onClick={() => handleAnswer(i)}
- className="p-4 rounded-2xl bg-miamo-card border-2 border-violet-100 hover:border-violet-400 text-left font-semibold text-text-secondary transition-all hover:shadow-lg hover:shadow-violet-100/50">
+ className="p-4 rounded-2xl bg-miamo-card border-2 border-rose-soft hover:border-rose-alt text-left font-semibold text-text-secondary transition-all hover:shadow-lg hover:shadow-rose-soft/50">
  {opt}
  </motion.button>
  ))}
@@ -187,7 +187,7 @@ export default function CompatibilityPage() {
  {showResult && (
  <motion.div key="result" initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }}>
  <Card className="p-8 text-center relative overflow-hidden">
- <div className="absolute inset-0 bg-gradient-to-br from-rose-main/10 to-violet-50" />
+ <div className="absolute inset-0 bg-gradient-to-br from-rose-main/10 to-rose-soft" />
  <div className="relative z-10">
  <motion.div animate={{ y: [0, -8, 0] }} transition={{ duration: 2, repeat: Infinity }}>
  <CompatibilityRing score={score} />
@@ -204,8 +204,8 @@ export default function CompatibilityPage() {
  const sectionScore = Math.round(50 + Math.random() * 45);
  return (
  <motion.div key={i} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 2 + i * 0.2 }}
- className="p-3 rounded-xl bg-miamo-card/80 border border-violet-100">
- <p className="text-lg font-black text-violet-600">{sectionScore}%</p>
+ className="p-3 rounded-xl bg-miamo-card/80 border border-rose-soft">
+ <p className="text-lg font-black text-rose-main">{sectionScore}%</p>
  <p className="text-[10px] text-text-muted font-bold">{s.title}</p>
  </motion.div>
  );
@@ -228,7 +228,7 @@ export default function CompatibilityPage() {
  {results.length > 0 && (
  <div className="space-y-3">
  <h2 className="text-lg font-bold text-text-primary flex items-center gap-2">
- <Star className="w-5 h-5 text-amber-400" /> Past Results
+ <Star className="w-5 h-5 text-rose-alt" /> Past Results
  </h2>
  {results.map((r, i) => (
  <motion.div key={i} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}>
@@ -238,7 +238,7 @@ export default function CompatibilityPage() {
  <p className="font-bold text-text-primary">{r.matchName}</p>
  <p className="text-xs text-text-muted">{r.date}</p>
  </div>
- <div className={cn('text-2xl font-black', r.score >= 80 ? 'text-rose' : r.score >= 60 ? 'text-amber-500' : 'text-blue-500')}>
+ <div className={cn('text-2xl font-black', r.score >= 80 ? 'text-rose' : r.score >= 60 ? 'text-rose-main' : 'text-rose-main')}>
  {r.score}%
  </div>
  </Card>
@@ -250,7 +250,7 @@ export default function CompatibilityPage() {
  {/* Start New */}
  <Card className="p-6">
  <h2 className="text-lg font-bold text-text-primary mb-2 flex items-center gap-2">
- <Zap className="w-5 h-5 text-violet-500" /> Take the Quiz
+ <Zap className="w-5 h-5 text-rose-main" /> Take the Quiz
  </h2>
  <p className="text-sm text-text-muted mb-4">Answer 12 questions to discover your compatibility score</p>
  <div className="space-y-2 max-h-[40vh] overflow-y-auto mb-4">
@@ -261,16 +261,16 @@ export default function CompatibilityPage() {
  return (
  <motion.button key={m.id} whileHover={{ x: 4 }} onClick={() => setSelectedMatch(m)}
  className={cn('flex items-center gap-3 w-full p-3 rounded-xl transition-all border-2',
- sel ? 'border-violet-400 bg-violet-50' : 'border-transparent hover:bg-miamo-surface')}>
+ sel ? 'border-rose-alt bg-rose-soft' : 'border-transparent hover:bg-miamo-surface')}>
  <Avatar src={photo} name={user.displayName || 'Match'} size="sm" />
  <span className="font-semibold text-sm text-text-secondary">{user.displayName || 'Match'}</span>
- {sel && <Check className="w-4 h-4 text-violet-500 ml-auto" />}
+ {sel && <Check className="w-4 h-4 text-rose-main ml-auto" />}
  </motion.button>
  );
  })}
  </div>
  <Button onClick={() => setQuizActive(true)} disabled={!selectedMatch}
- className="w-full gap-2 bg-gradient-to-r from-violet-500 to-purple-500 shadow-lg">
+ className="w-full gap-2 bg-gradient-to-r from-rose-main to-rose-main shadow-lg">
  <Puzzle className="w-4 h-4" /> Start Compatibility Quiz
  </Button>
  </Card>

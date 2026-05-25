@@ -144,8 +144,8 @@ function FeedPost({ post, onDelete }: { post: any; onDelete?: () => void }) {
  <MessageCircle className="w-4 h-4" /> {commentCount}
  </button>
  <button onClick={() => setBookmarked(!bookmarked)} className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
- bookmarked ? 'text-amber-400 bg-amber-400/10' : 'text-text-muted hover:text-text-secondary hover:bg-miamo-elevated')}>
- <Bookmark className={cn('w-4 h-4', bookmarked && 'fill-amber-400')} />
+ bookmarked ? 'text-rose-alt bg-rose-alt/10' : 'text-text-muted hover:text-text-secondary hover:bg-miamo-elevated')}>
+ <Bookmark className={cn('w-4 h-4', bookmarked && 'fill-rose-alt')} />
  </button>
  <button onClick={handleShare} className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-text-muted hover:text-text-secondary hover:bg-miamo-elevated transition-all ml-auto">
  <Share2 className="w-4 h-4" />

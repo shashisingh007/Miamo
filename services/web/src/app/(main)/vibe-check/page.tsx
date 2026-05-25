@@ -16,14 +16,14 @@ import { ErrorBoundary } from '@/components/ui/error-boundary';
 
 /* ═══ Mood Emojis ═══ */
 const MOODS = [
- { id: 'ecstatic', emoji: '🤩', label: 'Ecstatic', color: 'from-amber-400 to-yellow-500', wave: '#fbbf24' },
- { id: 'happy', emoji: '😊', label: 'Happy', color: 'from-emerald-400 to-green-500', wave: '#34d399' },
- { id: 'flirty', emoji: '😏', label: 'Flirty', color: 'from-rose-main to-rose-500', wave: '#f472b6' },
- { id: 'chill', emoji: '😌', label: 'Chill', color: 'from-sky-400 to-blue-500', wave: '#38bdf8' },
- { id: 'curious', emoji: '🤔', label: 'Curious', color: 'from-violet-400 to-purple-500', wave: '#a78bfa' },
- { id: 'nervous', emoji: '😅', label: 'Nervous', color: 'from-orange-400 to-amber-500', wave: '#fb923c' },
+ { id: 'ecstatic', emoji: '🤩', label: 'Ecstatic', color: 'from-rose-alt to-rose-main', wave: '#fbbf24' },
+ { id: 'happy', emoji: '😊', label: 'Happy', color: 'from-rose-alt to-rose-main', wave: '#34d399' },
+ { id: 'flirty', emoji: '😏', label: 'Flirty', color: 'from-rose-main to-rose-main', wave: '#f472b6' },
+ { id: 'chill', emoji: '😌', label: 'Chill', color: 'from-rose-alt to-rose-main', wave: '#38bdf8' },
+ { id: 'curious', emoji: '🤔', label: 'Curious', color: 'from-rose-alt to-rose-main', wave: '#a78bfa' },
+ { id: 'nervous', emoji: '😅', label: 'Nervous', color: 'from-rose-alt to-rose-main', wave: '#fb923c' },
  { id: 'meh', emoji: '😐', label: 'Meh', color: 'from-border-light to-miamo-elevated', wave: '#94a3b8' },
- { id: 'romantic', emoji: '🥰', label: 'Romantic', color: 'from-rose-400 to-rose-main', wave: '#fb7185' },
+ { id: 'romantic', emoji: '🥰', label: 'Romantic', color: 'from-rose-alt to-rose-main', wave: '#fb7185' },
 ];
 
 const VIBE_QUESTIONS = [
@@ -79,7 +79,7 @@ function Particles({ count = 12 }: { count?: number }) {
  {[...Array(count)].map((_, i) => (
  <motion.div
  key={i}
- className="absolute w-2 h-2 rounded-full bg-gradient-to-r from-rose-light to-violet-300"
+ className="absolute w-2 h-2 rounded-full bg-gradient-to-r from-rose-light to-rose-light"
  style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }}
  animate={{
  y: [0, -30, 0], x: [0, Math.random() * 20 - 10, 0],
@@ -156,7 +156,7 @@ export default function VibeCheckPage() {
  <motion.div
  animate={{ rotate: [0, 5, -5, 0] }}
  transition={{ duration: 2, repeat: Infinity }}
- className="w-14 h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center shadow-xl shadow-indigo-200/50"
+ className="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-main to-rose-main flex items-center justify-center shadow-xl shadow-rose-light/50"
  >
  <AudioLines className="w-7 h-7 text-text-primary" />
  </motion.div>
@@ -192,7 +192,7 @@ export default function VibeCheckPage() {
  </motion.button>
  ))}
  </div>
- <Button onClick={nextStep} disabled={!mood} className="gap-2 bg-gradient-to-r from-indigo-500 to-violet-500">
+ <Button onClick={nextStep} disabled={!mood} className="gap-2 bg-gradient-to-r from-rose-main to-rose-main">
  Next <ChevronRight className="w-4 h-4" />
  </Button>
  </div>
@@ -214,7 +214,7 @@ export default function VibeCheckPage() {
  whileTap={{ scale: 0.9 }}
  onClick={() => setEnergy(o.value)}
  className={cn('px-6 py-4 rounded-2xl border-2 transition-all min-w-[100px]',
- energy === o.value ? 'border-indigo-400 bg-indigo-50 shadow-lg' : 'border-border hover:bg-miamo-surface')}
+ energy === o.value ? 'border-rose-alt bg-rose-soft shadow-lg' : 'border-border hover:bg-miamo-surface')}
  >
  <motion.span className="text-3xl block mb-1"
  animate={energy === o.value ? { scale: [1, 1.3, 1] } : {}}
@@ -225,7 +225,7 @@ export default function VibeCheckPage() {
  </div>
  <div className="flex gap-3 justify-center">
  <Button variant="secondary" onClick={() => setStep(0)}>Back</Button>
- <Button onClick={nextStep} disabled={!energy} className="gap-2 bg-gradient-to-r from-indigo-500 to-violet-500">
+ <Button onClick={nextStep} disabled={!energy} className="gap-2 bg-gradient-to-r from-rose-main to-rose-main">
  Next <ChevronRight className="w-4 h-4" />
  </Button>
  </div>
@@ -247,7 +247,7 @@ export default function VibeCheckPage() {
  whileTap={{ scale: 0.9 }}
  onClick={() => toggleTopic(t)}
  className={cn('px-4 py-3 rounded-xl border-2 font-semibold text-sm transition-all',
- topics.includes(t) ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-border text-text-secondary hover:bg-miamo-surface')}
+ topics.includes(t) ? 'border-rose-alt bg-rose-soft text-rose-dark' : 'border-border text-text-secondary hover:bg-miamo-surface')}
  >
  {t}
  </motion.button>
@@ -255,7 +255,7 @@ export default function VibeCheckPage() {
  </div>
  <div className="flex gap-3 justify-center">
  <Button variant="secondary" onClick={() => setStep(1)}>Back</Button>
- <Button onClick={nextStep} disabled={topics.length === 0} className="gap-2 bg-gradient-to-r from-indigo-500 to-violet-500">
+ <Button onClick={nextStep} disabled={topics.length === 0} className="gap-2 bg-gradient-to-r from-rose-main to-rose-main">
  Next <ChevronRight className="w-4 h-4" />
  </Button>
  </div>
@@ -276,7 +276,7 @@ export default function VibeCheckPage() {
  whileTap={{ scale: 0.9 }}
  onClick={() => setIntent(o.label)}
  className={cn('p-5 rounded-2xl border-2 transition-all',
- intent === o.label ? 'border-indigo-400 bg-indigo-50 shadow-lg' : 'border-border hover:bg-miamo-surface')}
+ intent === o.label ? 'border-rose-alt bg-rose-soft shadow-lg' : 'border-border hover:bg-miamo-surface')}
  >
  <span className="text-3xl block mb-2">{o.emoji}</span>
  <span className="text-sm font-bold text-text-secondary">{o.label}</span>
@@ -285,7 +285,7 @@ export default function VibeCheckPage() {
  </div>
  <div className="flex gap-3 justify-center">
  <Button variant="secondary" onClick={() => setStep(2)}>Back</Button>
- <Button onClick={nextStep} disabled={!intent} className="gap-2 bg-gradient-to-r from-indigo-500 to-violet-500">
+ <Button onClick={nextStep} disabled={!intent} className="gap-2 bg-gradient-to-r from-rose-main to-rose-main">
  <Sparkles className="w-4 h-4" /> Set My Vibe
  </Button>
  </div>
@@ -321,14 +321,14 @@ export default function VibeCheckPage() {
  <div className="flex flex-wrap gap-2">
  {topics.map(t => (
  <motion.span key={t} initial={{ scale: 0 }} animate={{ scale: 1 }}
- className="px-3 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 text-xs font-bold">{t}</motion.span>
+ className="px-3 py-1.5 rounded-lg bg-rose-soft text-rose-main text-xs font-bold">{t}</motion.span>
  ))}
  </div>
  </div>
 
  <div className="flex gap-3">
  <Button variant="secondary" onClick={reset} className="flex-1 gap-2"><RotateCcw className="w-4 h-4" /> New Check</Button>
- <Button onClick={shareVibe} disabled={saving} className="flex-1 gap-2 bg-gradient-to-r from-indigo-500 to-violet-500">
+ <Button onClick={shareVibe} disabled={saving} className="flex-1 gap-2 bg-gradient-to-r from-rose-main to-rose-main">
  {saving ? <motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity }} className="w-4 h-4 border-2 border-white border-t-transparent rounded-full" /> : <Send className="w-4 h-4" />}
  {saving ? 'Sharing...' : 'Share Vibe'}
  </Button>
@@ -339,7 +339,7 @@ export default function VibeCheckPage() {
  {/* Vibe Matches */}
  {vibeMatches.length > 0 && (
  <div className="mt-6 space-y-2">
- <h3 className="font-bold text-text-primary flex items-center gap-2"><Zap className="w-4 h-4 text-indigo-400" /> Vibe Matches</h3>
+ <h3 className="font-bold text-text-primary flex items-center gap-2"><Zap className="w-4 h-4 text-rose-alt" /> Vibe Matches</h3>
  <p className="text-xs text-text-muted mb-2">People on your wavelength right now</p>
  {vibeMatches.slice(0, 5).map((vm: any, i: number) => {
  const photo = vm.user?.photos?.[0]?.url || vm.user?.photos?.[0];
@@ -347,7 +347,7 @@ export default function VibeCheckPage() {
  return (
  <motion.div key={i} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}>
  <Card hover className="p-3 flex items-center gap-3">
- <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-400 to-violet-500 flex items-center justify-center text-lg overflow-hidden">
+ <div className="w-10 h-10 rounded-full bg-gradient-to-br from-rose-alt to-rose-main flex items-center justify-center text-lg overflow-hidden">
  {photo ? <img loading="lazy" src={photo} alt="" className="w-full h-full object-cover" /> : vmMood?.emoji || '✨'}
  </div>
  <div className="flex-1">
@@ -355,7 +355,7 @@ export default function VibeCheckPage() {
  <p className="text-[10px] text-text-muted">{vmMood?.label || vm.mood} · Looking for {vm.intent}</p>
  </div>
  <div className="text-right">
- <span className="text-xs font-bold text-indigo-500">{vm.vibeScore}%</span>
+ <span className="text-xs font-bold text-rose-main">{vm.vibeScore}%</span>
  <p className="text-[9px] text-text-muted">vibe match</p>
  </div>
  </Card>
@@ -368,7 +368,7 @@ export default function VibeCheckPage() {
  {/* History */}
  {vibeHistory.length > 0 && (
  <div className="mt-6 space-y-2">
- <h3 className="font-bold text-text-primary flex items-center gap-2"><Star className="w-4 h-4 text-amber-400" /> Vibe History</h3>
+ <h3 className="font-bold text-text-primary flex items-center gap-2"><Star className="w-4 h-4 text-rose-alt" /> Vibe History</h3>
  {vibeHistory.slice(0, 10).map((v, i) => {
  const m = MOODS.find(x => x.id === v.mood);
  return (
@@ -380,7 +380,7 @@ export default function VibeCheckPage() {
  <p className="text-[10px] text-text-muted">{v.date}</p>
  </div>
  <div className="flex gap-1">{[...Array(5)].map((_, j) => (
- <div key={j} className={cn('w-3 h-3 rounded-full', j < v.energy ? 'bg-indigo-400' : 'bg-miamo-surface')} />
+ <div key={j} className={cn('w-3 h-3 rounded-full', j < v.energy ? 'bg-rose-alt' : 'bg-miamo-surface')} />
  ))}</div>
  </Card>
  </motion.div>

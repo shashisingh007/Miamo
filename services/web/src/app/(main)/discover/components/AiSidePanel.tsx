@@ -38,9 +38,9 @@ function MoreMovesSection({
  <button key={i} onClick={() => !isSent && onSend(rec, idx)} disabled={isSent}
  className={cn(
  'w-full text-left px-4 py-3 rounded-xl border transition-all',
- isSent ? 'bg-emerald-400/[0.06] border-emerald-400/20' : 'bg-miamo-surface/50 border-border hover:bg-miamo-surface hover:border-border',
+ isSent ? 'bg-rose-alt/[0.06] border-rose-alt/20' : 'bg-miamo-surface/50 border-border hover:bg-miamo-surface hover:border-border',
  )}>
- <p className={cn('text-[12px] leading-relaxed', isSent ? 'text-emerald-300' : 'text-text-secondary')}>{rec.text}</p>
+ <p className={cn('text-[12px] leading-relaxed', isSent ? 'text-rose-light' : 'text-text-secondary')}>{rec.text}</p>
  <div className="flex items-center gap-3 mt-1.5">
  <span className="text-[9px] text-text-muted capitalize font-medium">{rec.type.replace(/-/g, ' ')}</span>
  <div className="flex gap-[3px]">
@@ -48,7 +48,7 @@ function MoreMovesSection({
  <div key={j} className={cn('w-[5px] h-[5px] rounded-full', j < Math.round(rec.confidence * 5) ? 'bg-miamo-card/40' : 'bg-miamo-surface')} />
  ))}
  </div>
- {isSent && <Check className="w-3 h-3 text-emerald-400 ml-auto" />}
+ {isSent && <Check className="w-3 h-3 text-rose-alt ml-auto" />}
  </div>
  </button>
  );
@@ -117,8 +117,8 @@ export function AiSidePanel({
 
  if (!aiData) return null;
 
- const scoreColor = aiData.score >= 70 ? 'text-emerald-400' : aiData.score >= 40 ? 'text-amber-400' : 'text-rose-light';
- const scoreBg = aiData.score >= 70 ? 'from-emerald-400/10' : aiData.score >= 40 ? 'from-amber-400/10' : 'from-rose-400/10';
+ const scoreColor = aiData.score >= 70 ? 'text-rose-alt' : aiData.score >= 40 ? 'text-rose-alt' : 'text-rose-light';
+ const scoreBg = aiData.score >= 70 ? 'from-rose-alt/10' : aiData.score >= 40 ? 'from-rose-alt/10' : 'from-rose-alt/10';
 
  const breakdownEntries = aiData.breakdown
  ? Object.entries(aiData.breakdown).filter(([_, v]) => (v as number) >= 0).sort((a, b) => (b[1] as number) - (a[1] as number)).slice(0, 5)
@@ -229,7 +229,7 @@ export function AiSidePanel({
  className={cn(
  'w-full text-left rounded-2xl p-5 border transition-all group',
  isSent
- ? 'bg-emerald-400/[0.06] border-emerald-400/20'
+ ? 'bg-rose-alt/[0.06] border-rose-alt/20'
  : 'bg-miamo-surface/50 border-border hover:bg-miamo-surface hover:border-border hover:shadow-md',
  )}
  >
@@ -238,7 +238,7 @@ export function AiSidePanel({
  </p>
  <p className={cn(
  'text-[14px] leading-[1.65] font-medium',
- isSent ? 'text-emerald-300' : 'text-text-primary',
+ isSent ? 'text-rose-light' : 'text-text-primary',
  )}>
  {rec.text}
  </p>
@@ -274,7 +274,7 @@ export function AiSidePanel({
  </div>
  <div className="space-y-2.5">
  <div className="flex items-center gap-2.5">
- <div className={cn('w-2 h-2 rounded-full', user.verified ? 'bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.4)]' : 'bg-amber-400')} />
+ <div className={cn('w-2 h-2 rounded-full', user.verified ? 'bg-rose-alt shadow-[0_0_6px_rgba(52,211,153,0.4)]' : 'bg-rose-alt')} />
  <span className="text-[12px] text-text-muted font-medium">
  {user.verified ? (
  <>Identity <span className="px-2 py-0.5 bg-miamo-surface text-text-primary rounded-md text-[10px] font-bold ml-1">VERIFIED</span></>
@@ -282,18 +282,18 @@ export function AiSidePanel({
  </span>
  </div>
  <div className="flex items-center gap-2.5">
- <div className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.4)]" />
+ <div className="w-2 h-2 rounded-full bg-rose-alt shadow-[0_0_6px_rgba(52,211,153,0.4)]" />
  <span className="text-[12px] text-text-muted font-medium">No reports</span>
  </div>
  {profile.profileScore && (
  <div className="flex items-center gap-2.5">
- <div className={cn('w-2 h-2 rounded-full', profile.profileScore >= 80 ? 'bg-emerald-400' : profile.profileScore >= 60 ? 'bg-amber-400' : 'bg-rose-400')} />
+ <div className={cn('w-2 h-2 rounded-full', profile.profileScore >= 80 ? 'bg-rose-alt' : profile.profileScore >= 60 ? 'bg-rose-alt' : 'bg-rose-alt')} />
  <span className="text-[12px] text-text-muted font-medium">Profile {profile.profileScore}% complete</span>
  </div>
  )}
  {profile.online && (
  <div className="flex items-center gap-2.5">
- <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.6)]" />
+ <div className="w-2 h-2 rounded-full bg-rose-alt animate-pulse shadow-[0_0_6px_rgba(52,211,153,0.6)]" />
  <span className="text-[12px] text-text-muted font-medium">Currently online</span>
  </div>
  )}
@@ -325,9 +325,9 @@ export function AiSidePanel({
  disabled={customSent}
  className={cn(
  'absolute bottom-2.5 right-2.5 w-8 h-8 rounded-full flex items-center justify-center transition-all',
- customSent ? 'bg-emerald-400/20' : 'bg-miamo-card hover:shadow-[0_0_12px_rgba(255,255,255,0.2)]',
+ customSent ? 'bg-rose-alt/20' : 'bg-miamo-card hover:shadow-[0_0_12px_rgba(255,255,255,0.2)]',
  )}>
- {customSent ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Send className="w-3.5 h-3.5 text-text-primary" />}
+ {customSent ? <Check className="w-3.5 h-3.5 text-rose-alt" /> : <Send className="w-3.5 h-3.5 text-text-primary" />}
  </motion.button>
  </div>
  <p className="text-[10px] text-text-secondary mt-2 font-medium">Or send blank — just press send</p>

@@ -45,8 +45,8 @@ export function FeedbackModal({
  >
  <div className="px-6 py-5 border-b border-border flex items-center justify-between flex-shrink-0">
  <div className="flex items-center gap-3">
- <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', type === 'unmatch' ? 'bg-amber-400/10' : 'bg-red-400/10')}>
- {type === 'unmatch' ? <UserMinus className="w-5 h-5 text-amber-400" /> : type === 'block' ? <Ban className="w-5 h-5 text-red-400" /> : <Flag className="w-5 h-5 text-red-400" />}
+ <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', type === 'unmatch' ? 'bg-rose-alt/10' : 'bg-red-400/10')}>
+ {type === 'unmatch' ? <UserMinus className="w-5 h-5 text-rose-alt" /> : type === 'block' ? <Ban className="w-5 h-5 text-red-400" /> : <Flag className="w-5 h-5 text-red-400" />}
  </div>
  <div>
  <h3 className="text-[15px] font-bold text-text-primary">{type === 'unmatch' ? 'Unmatch' : type === 'block' ? 'Block' : 'Report'} {matchName}</h3>
@@ -60,8 +60,8 @@ export function FeedbackModal({
  {done ? (
  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex-1 flex items-center justify-center py-16">
  <div className="text-center">
- <div className="w-14 h-14 rounded-full bg-emerald-400/10 flex items-center justify-center mx-auto mb-4">
- <Check className="w-7 h-7 text-emerald-400" />
+ <div className="w-14 h-14 rounded-full bg-rose-alt/10 flex items-center justify-center mx-auto mb-4">
+ <Check className="w-7 h-7 text-rose-alt" />
  </div>
  <p className="text-[14px] font-semibold text-text-primary">Thank you for your feedback</p>
  </div>

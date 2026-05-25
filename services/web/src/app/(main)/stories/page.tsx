@@ -26,7 +26,7 @@ function MyStoryInsights({ stories, onView, onDelete, onPostToFeed }: {
 
  return (
  <Card className="p-0 overflow-hidden">
- <div className="p-4 bg-gradient-to-r from-rose-main/10 to-rose-50 border-b border-border/50">
+ <div className="p-4 bg-gradient-to-r from-rose-main/10 to-rose-soft border-b border-border/50">
  <h3 className="font-bold text-text-primary flex items-center gap-2">
  <Sparkles className="w-4 h-4 text-rose-light" /> Your Active Stories
  </h3>
@@ -46,7 +46,7 @@ function MyStoryInsights({ stories, onView, onDelete, onPostToFeed }: {
  {s.mediaUrl ? <img loading="lazy" src={s.mediaUrl} alt="" className="w-full h-full object-cover" /> :
  <p className="absolute inset-0 flex items-center justify-center p-1 text-text-primary text-[8px] font-bold text-center leading-tight">{text?.substring(0, 40)}</p>}
  {isPopular && (
- <div className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-amber-400 flex items-center justify-center">
+ <div className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-rose-alt flex items-center justify-center">
  <Sparkles className="w-2.5 h-2.5 text-text-primary" />
  </div>
  )}
@@ -70,8 +70,8 @@ function MyStoryInsights({ stories, onView, onDelete, onPostToFeed }: {
  <div className="flex gap-1">
  {isPopular && (
  <motion.button whileTap={{ scale: 0.9 }} onClick={() => onPostToFeed(s.id)} title="Post to Feed"
- className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center hover:bg-indigo-100 transition-colors">
- <Share2 className="w-3.5 h-3.5 text-indigo-500" />
+ className="w-8 h-8 rounded-lg bg-rose-soft flex items-center justify-center hover:bg-rose-soft transition-colors">
+ <Share2 className="w-3.5 h-3.5 text-rose-main" />
  </motion.button>
  )}
  <motion.button whileTap={{ scale: 0.9 }} onClick={() => onDelete(s.id)} title="Delete"
@@ -146,7 +146,7 @@ export default function StoriesPage() {
  <div className="flex items-center justify-between">
  <div className="flex items-center gap-4">
  <motion.div animate={{ rotate: [0, 5, -5, 0] }} transition={{ duration: 3, repeat: Infinity }}
- className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-main to-rose-600 flex items-center justify-center shadow-xl shadow-medium/50">
+ className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-main to-rose-main flex items-center justify-center shadow-xl shadow-medium/50">
  <Sparkles className="w-6 h-6 text-text-primary" />
  </motion.div>
  <div>
@@ -169,7 +169,7 @@ export default function StoriesPage() {
  className="flex flex-col items-center gap-2 shrink-0 group">
  <div className="relative">
  <div className={cn('rounded-full p-[3px] transition-all',
- ownGroup && ownGroup.stories.length > 0 ? 'bg-gradient-to-br from-rose-main via-rose-500 to-purple-500 shadow-lg shadow-medium/40' : 'bg-border')}>
+ ownGroup && ownGroup.stories.length > 0 ? 'bg-gradient-to-br from-rose-main via-rose-main to-rose-main shadow-lg shadow-medium/40' : 'bg-border')}>
  <div className="w-16 h-16 sm:w-[72px] sm:h-[72px] rounded-full bg-miamo-card border-[3px] border-white flex items-center justify-center overflow-hidden">
  <Avatar name="You" size="xl" />
  </div>
@@ -192,7 +192,7 @@ export default function StoriesPage() {
  className="flex flex-col items-center gap-2 shrink-0 group">
  <div className="relative">
  <div className={cn('rounded-full p-[3px] transition-all',
- !group.viewed ? 'bg-gradient-to-br from-rose-main via-rose-500 to-purple-500 shadow-lg shadow-medium/40 animate-pulse' : 'bg-border')}>
+ !group.viewed ? 'bg-gradient-to-br from-rose-main via-rose-main to-rose-main shadow-lg shadow-medium/40 animate-pulse' : 'bg-border')}>
  <Avatar src={gPhoto} name={author.displayName || 'User'} size="xl" className="border-[3px] border-white" />
  </div>
  {unviewedCount > 0 && (
@@ -273,7 +273,7 @@ export default function StoriesPage() {
 
  {/* Unviewed indicator */}
  {!group.viewed && (
- <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-gradient-to-r from-rose-main to-rose-500 shadow-lg animate-pulse" />
+ <div className="absolute top-2 right-2 w-3 h-3 rounded-full bg-gradient-to-r from-rose-main to-rose-main shadow-lg animate-pulse" />
  )}
 
  {/* Author + story count */}
@@ -317,7 +317,7 @@ export default function StoriesPage() {
  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
  className="text-center py-16 px-6">
  <motion.div animate={{ y: [0, -10, 0] }} transition={{ duration: 2, repeat: Infinity }}
- className="w-20 h-20 rounded-3xl bg-gradient-to-br from-rose-main/15 to-rose-100 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-soft/50">
+ className="w-20 h-20 rounded-3xl bg-gradient-to-br from-rose-main/15 to-rose-soft flex items-center justify-center mx-auto mb-4 shadow-lg shadow-soft/50">
  <Sparkles className="w-10 h-10 text-rose-light" />
  </motion.div>
  <h3 className="text-lg font-black text-text-primary mb-1">No Stories Yet</h3>
@@ -330,10 +330,10 @@ export default function StoriesPage() {
 
  {/* Tips Card */}
  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.4 }}>
- <Card className="p-4 bg-gradient-to-r from-indigo-50/50 to-purple-50/50 border border-indigo-100/30">
+ <Card className="p-4 bg-gradient-to-r from-rose-soft/50 to-rose-soft/50 border border-rose-soft/30">
  <div className="flex items-start gap-3">
- <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center flex-shrink-0">
- <Sparkles className="w-4 h-4 text-indigo-500" />
+ <div className="w-8 h-8 rounded-lg bg-rose-soft flex items-center justify-center flex-shrink-0">
+ <Sparkles className="w-4 h-4 text-rose-main" />
  </div>
  <div>
  <h4 className="font-bold text-sm text-text-primary">Story Tips</h4>

@@ -146,7 +146,7 @@ function CallOverlay({ type, user, onEnd }: { type: 'voice' | 'video'; user: any
  <button onClick={onEnd} className="w-16 h-16 rounded-full bg-red-500 flex items-center justify-center text-text-primary hover:bg-red-600 shadow-lg shadow-red-500/30"><Phone className="w-7 h-7 rotate-[135deg]" /></button>
  <button className="w-14 h-14 rounded-full bg-miamo-elevated border border-border flex items-center justify-center text-text-muted hover:text-text-primary"><VolumeX className="w-6 h-6" /></button>
  </div>
- <div className="flex items-center gap-2 mt-4"><Lock className="w-3 h-3 text-emerald-400" /><span className="text-[11px] text-text-muted">End-to-end encrypted</span></div>
+ <div className="flex items-center gap-2 mt-4"><Lock className="w-3 h-3 text-rose-alt" /><span className="text-[11px] text-text-muted">End-to-end encrypted</span></div>
  <p className="text-[10px] text-text-muted/50 mt-2">Audio/video calls coming soon — this is a preview</p>
  </div>
  </motion.div>
@@ -399,7 +399,7 @@ export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, on
  <div className="text-left">
  <h3 className="text-sm font-semibold text-text-primary">{other.displayName || 'User'}</h3>
  <p className="text-[11px] text-text-muted flex items-center gap-1">
- {other.online ? <><span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" /> Active now</> : 'Tap to view profile'}
+ {other.online ? <><span className="w-1.5 h-1.5 rounded-full bg-rose-alt inline-block" /> Active now</> : 'Tap to view profile'}
  </p>
  </div>
  </button>
@@ -410,10 +410,10 @@ export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, on
  className={cn(
  'flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-[11px] font-bold transition-all cursor-pointer hover:scale-105',
  beatStreak.todayCompleted
- ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+ ? 'bg-rose-soft text-rose-dark border border-rose-light'
  : beatStreak.iSentToday
- ? 'bg-blue-50 text-blue-600 border border-blue-100'
- : 'bg-emerald-50 text-emerald-600 border border-emerald-200 animate-pulse'
+ ? 'bg-rose-soft text-rose-main border border-rose-soft'
+ : 'bg-rose-soft text-rose-main border border-rose-light animate-pulse'
  )}
  title="View Beats — Click to open Beats page"
  >
@@ -441,7 +441,7 @@ export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, on
  <div className="h-px bg-border/30 my-0.5" />
  <button onClick={goToProfile} className="w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-miamo-elevated flex items-center gap-2"><UserIcon className="w-3 h-3" /> View profile</button>
  <button onClick={() => { setShowMenu(false); api.archiveChat(chat.id).catch(() => {}); onBack(); }} className="w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-miamo-elevated flex items-center gap-2"><EyeOff className="w-3 h-3" /> Hide chat</button>
- <button onClick={() => { setShowMenu(false); onReport(); }} className="w-full text-left px-3 py-2 text-xs text-amber-400 hover:bg-amber-400/10 flex items-center gap-2"><Flag className="w-3 h-3" /> Report</button>
+ <button onClick={() => { setShowMenu(false); onReport(); }} className="w-full text-left px-3 py-2 text-xs text-rose-alt hover:bg-rose-alt/10 flex items-center gap-2"><Flag className="w-3 h-3" /> Report</button>
  <button onClick={() => { setShowMenu(false); onBlock(); }} className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 flex items-center gap-2"><Ban className="w-3 h-3" /> Block</button>
  <button onClick={() => { setShowMenu(false); onUnmatch(); }} className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 flex items-center gap-2"><UserMinus className="w-3 h-3" /> Unmatch</button>
  <div className="h-px bg-border/30 my-0.5" />
@@ -485,7 +485,7 @@ export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, on
  style={{ background: chatBackground.startsWith('linear') || chatBackground.startsWith('radial') ? chatBackground : chatBackground.startsWith('#') ? chatBackground : undefined }}>
  <div className="flex justify-center mb-4">
  <div className="flex items-center gap-2 bg-black/20 backdrop-blur-sm px-3 py-1.5 rounded-full">
- <Lock className="w-3 h-3 text-emerald-400" />
+ <Lock className="w-3 h-3 text-rose-alt" />
  <span className="text-[11px] text-text-muted">End-to-end encrypted</span>
  </div>
  </div>
@@ -508,13 +508,13 @@ export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, on
  <div className={cn(
  'backdrop-blur-sm px-4 py-1.5 rounded-full',
  msg.content?.includes('⚡') ? 'bg-miamo-surface0/15 border border-rose/20'
- : msg.content?.includes('💜') ? 'bg-violet-500/15 border border-violet-300/20'
+ : msg.content?.includes('💜') ? 'bg-rose-main/15 border border-rose-light/20'
  : 'bg-black/20'
  )}>
  <span className={cn(
  'text-[11px]',
  msg.content?.includes('⚡') ? 'text-rose font-medium'
- : msg.content?.includes('💜') ? 'text-violet-600 font-medium'
+ : msg.content?.includes('💜') ? 'text-rose-main font-medium'
  : 'text-text-muted'
  )}>{msg.content}</span>
  </div>
@@ -614,14 +614,14 @@ export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, on
  <button onClick={() => setShowBeatPanel(false)} className="text-text-muted hover:text-text-primary"><X className="w-3.5 h-3.5" /></button>
  </div>
  {beatStreak.todayCompleted ? (
- <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
- <Check className="w-3.5 h-3.5 text-emerald-400" />
- <span className="text-[11px] text-emerald-400 font-medium">Both sent today — streak saved! You can still send more beats.</span>
+ <div className="flex items-center gap-2 bg-rose-main/10 border border-rose-main/20 rounded-lg px-3 py-2">
+ <Check className="w-3.5 h-3.5 text-rose-alt" />
+ <span className="text-[11px] text-rose-alt font-medium">Both sent today — streak saved! You can still send more beats.</span>
  </div>
  ) : beatStreak.iSentToday ? (
- <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
- <Clock className="w-3.5 h-3.5 text-blue-400" />
- <span className="text-[11px] text-blue-400 font-medium">You sent — waiting for {other.displayName?.split(' ')[0]} to send back.</span>
+ <div className="flex items-center gap-2 bg-rose-main/10 border border-rose-main/20 rounded-lg px-3 py-2">
+ <Clock className="w-3.5 h-3.5 text-rose-alt" />
+ <span className="text-[11px] text-rose-alt font-medium">You sent — waiting for {other.displayName?.split(' ')[0]} to send back.</span>
  </div>
  ) : beatStreak.theyCompletedToday ? (
  <div className="flex items-center gap-2 bg-miamo-surface0/10 border border-rose-main/20 rounded-lg px-3 py-2 animate-pulse">
@@ -632,9 +632,9 @@ export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, on
  <div className="grid grid-cols-4 gap-2">
  {[
  { type: 'text', icon: MessageCircle, label: 'Text', color: 'text-rose-light', bg: 'bg-miamo-surface0/10' },
- { type: 'photo', icon: Image, label: 'Photo', color: 'text-blue-400', bg: 'bg-blue-500/10' },
- { type: 'voice', icon: Mic, label: 'Voice', color: 'text-emerald-400', bg: 'bg-emerald-500/10' },
- { type: 'video', icon: Film, label: 'Video', color: 'text-violet-400', bg: 'bg-violet-500/10' },
+ { type: 'photo', icon: Image, label: 'Photo', color: 'text-rose-alt', bg: 'bg-rose-main/10' },
+ { type: 'voice', icon: Mic, label: 'Voice', color: 'text-rose-alt', bg: 'bg-rose-main/10' },
+ { type: 'video', icon: Film, label: 'Video', color: 'text-rose-alt', bg: 'bg-rose-main/10' },
  ].map(bt => (
  <button key={bt.type} onClick={() => handleSendBeatFromChat(bt.type)}
  className="flex flex-col items-center gap-1.5 p-3 rounded-xl bg-miamo-elevated/30 border border-border/20 hover:bg-rose-main/10 hover:border-rose-main/20 transition-all group">
@@ -655,9 +655,9 @@ export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, on
  {(replyTo || editingMsg) && (
  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="border-t border-border/30 overflow-hidden">
  <div className="flex items-center gap-3 px-4 py-2 bg-miamo-elevated/30">
- <div className={cn('w-1 h-8 rounded-full', editingMsg ? 'bg-amber-400' : 'bg-rose-main')} />
+ <div className={cn('w-1 h-8 rounded-full', editingMsg ? 'bg-rose-alt' : 'bg-rose-main')} />
  <div className="flex-1 min-w-0">
- <p className="text-[10px] font-semibold">{editingMsg ? <span className="text-amber-400">Editing message</span> : <span className="text-rose-main">Replying to {replyTo?.isOwn ? 'yourself' : other.displayName}</span>}</p>
+ <p className="text-[10px] font-semibold">{editingMsg ? <span className="text-rose-alt">Editing message</span> : <span className="text-rose-main">Replying to {replyTo?.isOwn ? 'yourself' : other.displayName}</span>}</p>
  <p className="text-xs text-text-muted truncate">{editingMsg?.content || replyTo?.content}</p>
  </div>
  <button onClick={() => { setReplyTo(null); setEditingMsg(null); setMessage(''); }} className="text-text-muted hover:text-text-primary"><X className="w-4 h-4" /></button>
@@ -706,16 +706,16 @@ export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, on
  <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
  className="absolute bottom-full mb-2 left-0 z-40 bg-miamo-card border border-border rounded-xl shadow-xl p-2 space-y-1 w-40">
  <button onClick={() => handleFilePick('image/*', 'photo')} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-text-secondary hover:bg-miamo-elevated">
- <div className="w-7 h-7 rounded-full bg-blue-500/20 flex items-center justify-center"><Image className="w-3.5 h-3.5 text-blue-400" /></div> Photo
+ <div className="w-7 h-7 rounded-full bg-rose-main/20 flex items-center justify-center"><Image className="w-3.5 h-3.5 text-rose-alt" /></div> Photo
  </button>
  <button onClick={() => handleFilePick('video/*', 'video')} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-text-secondary hover:bg-miamo-elevated">
  <div className="w-7 h-7 rounded-full bg-miamo-surface0/20 flex items-center justify-center"><Film className="w-3.5 h-3.5 text-rose-light" /></div> Video
  </button>
  <button onClick={() => handleFilePick('audio/*', 'audio')} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-text-secondary hover:bg-miamo-elevated">
- <div className="w-7 h-7 rounded-full bg-emerald-500/20 flex items-center justify-center"><Music className="w-3.5 h-3.5 text-emerald-400" /></div> Audio
+ <div className="w-7 h-7 rounded-full bg-rose-main/20 flex items-center justify-center"><Music className="w-3.5 h-3.5 text-rose-alt" /></div> Audio
  </button>
  <button onClick={() => handleFilePick('*/*', 'file')} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-text-secondary hover:bg-miamo-elevated">
- <div className="w-7 h-7 rounded-full bg-amber-500/20 flex items-center justify-center"><Paperclip className="w-3.5 h-3.5 text-amber-400" /></div> File
+ <div className="w-7 h-7 rounded-full bg-rose-main/20 flex items-center justify-center"><Paperclip className="w-3.5 h-3.5 text-rose-alt" /></div> File
  </button>
  </motion.div>
  </>
@@ -739,7 +739,7 @@ export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, on
  )}
  <button onClick={() => loadSuggestions()} className="p-1.5 text-text-muted hover:text-rose-main transition-colors" title="AI suggestions"><Sparkles className="w-3.5 h-3.5" /></button>
  <button onClick={() => setShowEntertainment(!showEntertainment)} className="p-1.5 text-text-muted hover:text-rose-main transition-colors" title="Entertainment"><Gamepad2 className="w-3.5 h-3.5" /></button>
- <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={cn('p-1.5 transition-colors', showEmojiPicker ? 'text-amber-500' : 'text-text-muted hover:text-amber-400')} title="Emoji"><Smile className="w-3.5 h-3.5" /></button>
+ <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className={cn('p-1.5 transition-colors', showEmojiPicker ? 'text-rose-main' : 'text-text-muted hover:text-rose-alt')} title="Emoji"><Smile className="w-3.5 h-3.5" /></button>
  </div>
  </div>
  <button

@@ -69,11 +69,11 @@ export function HeldItemMenu({ userId, onResume, onReport, onBlock, onUnmatch }:
  <motion.div initial={{ opacity: 0, scale: 0.9, y: -5 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: -5 }}
  className="absolute right-0 top-full mt-1 z-50 w-52 py-1 rounded-xl bg-miamo-card border border-border shadow-2xl"
  >
- <button onClick={() => { setOpen(false); onResume(); }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[12px] font-medium text-emerald-400 hover:bg-emerald-400/10 transition">
+ <button onClick={() => { setOpen(false); onResume(); }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[12px] font-medium text-rose-alt hover:bg-rose-alt/10 transition">
  <Play className="w-3.5 h-3.5" /> Resume
  </button>
  <div className="h-px bg-miamo-surface my-0.5" />
- <button onClick={() => { setOpen(false); onReport(); }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[12px] font-medium text-amber-400/70 hover:bg-amber-400/5 transition">
+ <button onClick={() => { setOpen(false); onReport(); }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[12px] font-medium text-rose-alt/70 hover:bg-rose-alt/5 transition">
  <Flag className="w-3.5 h-3.5" /> Report
  </button>
  <button onClick={() => { setOpen(false); onBlock(); }} className="w-full flex items-center gap-2.5 px-3 py-2.5 text-[12px] font-medium text-red-400/70 hover:bg-red-400/5 transition">
@@ -129,7 +129,7 @@ export function IncomingCard({ item, onClick }: { item: any; onClick: () => void
  )}
  </div>
  <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-miamo-card flex items-center justify-center">
- {item.type === 'move' ? <span className="text-[11px]">💫</span> : item.type === 'like' ? <Heart className="w-3 h-3 text-rose-light fill-rose-main" /> : <MessageCircle className="w-3 h-3 text-purple-400" />}
+ {item.type === 'move' ? <span className="text-[11px]">💫</span> : item.type === 'like' ? <Heart className="w-3 h-3 text-rose-light fill-rose-main" /> : <MessageCircle className="w-3 h-3 text-rose-alt" />}
  </div>
  </div>
 
@@ -138,10 +138,10 @@ export function IncomingCard({ item, onClick }: { item: any; onClick: () => void
  <div className="flex items-center gap-2 mb-0.5">
  <h3 className="text-[14px] font-bold text-text-primary truncate">{name}</h3>
  {age && <span className="text-[12px] text-text-muted">{age}</span>}
- {user.verified && <Shield className="w-3.5 h-3.5 text-blue-400/60 flex-shrink-0" />}
+ {user.verified && <Shield className="w-3.5 h-3.5 text-rose-alt/60 flex-shrink-0" />}
  </div>
  {city && <p className="text-[11px] text-text-muted flex items-center gap-1 mb-1"><MapPin className="w-2.5 h-2.5" />{city}</p>}
- {item.message && <p className="text-[11px] text-purple-300/70 truncate italic">&ldquo;{item.message}&rdquo;</p>}
+ {item.message && <p className="text-[11px] text-rose-light/70 truncate italic">&ldquo;{item.message}&rdquo;</p>}
  {!item.message && interests.length > 0 && (
  <div className="flex gap-1 mt-1">
  {interests.map((i: any) => <span key={i.name} className="px-1.5 py-0.5 rounded bg-miamo-surface text-[9px] text-text-muted">{i.name}</span>)}
@@ -188,21 +188,21 @@ export function MatchCard({ match, onOpenMenu, onChat, onVideoCall }: { match: a
  <div className="w-14 h-14 rounded-2xl overflow-hidden bg-miamo-surface">
  {photo ? <img loading="lazy" src={photo} alt={name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-lg font-black text-text-secondary">{name[0]}</div>}
  </div>
- {online && <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-miamo-bg flex items-center justify-center"><div className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" /></div>}
+ {online && <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-miamo-bg flex items-center justify-center"><div className="w-2.5 h-2.5 rounded-full bg-rose-alt animate-pulse" /></div>}
  {isPinned && <div className="absolute -top-1 -left-1 w-5 h-5 rounded-full bg-miamo-card flex items-center justify-center shadow-md"><Pin className="w-2.5 h-2.5 text-text-primary" /></div>}
  </div>
  <div className="flex-1 min-w-0">
  <div className="flex items-center gap-2 mb-0.5">
  <h3 className="text-[14px] font-bold text-text-primary truncate">{name}</h3>
- {verified && <Shield className="w-3.5 h-3.5 text-blue-400/40 flex-shrink-0" />}
- {isNew && <span className="px-2 py-0.5 rounded-md bg-purple-400/15 text-purple-300 text-[9px] font-bold uppercase">New</span>}
- {isFavorite && <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400 flex-shrink-0" />}
+ {verified && <Shield className="w-3.5 h-3.5 text-rose-alt/40 flex-shrink-0" />}
+ {isNew && <span className="px-2 py-0.5 rounded-md bg-rose-alt/15 text-rose-light text-[9px] font-bold uppercase">New</span>}
+ {isFavorite && <Star className="w-3.5 h-3.5 text-rose-alt fill-rose-alt flex-shrink-0" />}
  </div>
  <div className="flex items-center gap-2 text-[11px] text-text-muted">
  {city && <span className="flex items-center gap-1"><MapPin className="w-2.5 h-2.5" />{city}</span>}
  {age && <span>{age}</span>}
  </div>
- {lastMsg ? <p className="text-[11px] text-text-muted mt-1.5 truncate max-w-[260px]">{lastMsg.content}</p> : <p className="text-[11px] text-purple-400/50 mt-1.5 italic">No messages yet — say hi!</p>}
+ {lastMsg ? <p className="text-[11px] text-text-muted mt-1.5 truncate max-w-[260px]">{lastMsg.content}</p> : <p className="text-[11px] text-rose-alt/50 mt-1.5 italic">No messages yet — say hi!</p>}
  </div>
  <div className="flex items-center gap-1 flex-shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
  <span className="text-[10px] text-text-secondary font-medium mr-2 hidden sm:block">{timeLabel}</span>
@@ -234,11 +234,11 @@ export function ContextMenu({
 
  if (!isOpen) return null;
  const menuItems = [
- { label: isFavorite ? 'Remove Favorite' : 'Add to Favorites', icon: isFavorite ? StarOff : Star, onClick: onFavorite, color: 'text-amber-400' },
+ { label: isFavorite ? 'Remove Favorite' : 'Add to Favorites', icon: isFavorite ? StarOff : Star, onClick: onFavorite, color: 'text-rose-alt' },
  { label: isPinned ? 'Unpin' : 'Pin to Top', icon: isPinned ? PinOff : Pin, onClick: onPin, color: 'text-text-secondary' },
- { label: 'Put on Hold', icon: Pause, onClick: onHold, color: 'text-amber-400/70' },
+ { label: 'Put on Hold', icon: Pause, onClick: onHold, color: 'text-rose-alt/70' },
  { divider: true },
- { label: 'Report', icon: Flag, onClick: onReport, color: 'text-orange-400' },
+ { label: 'Report', icon: Flag, onClick: onReport, color: 'text-rose-alt' },
  { label: 'Block', icon: Ban, onClick: onBlock, color: 'text-red-400' },
  { label: 'Unmatch', icon: UserMinus, onClick: onUnmatch, color: 'text-red-400' },
  ];

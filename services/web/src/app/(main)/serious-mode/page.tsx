@@ -37,16 +37,16 @@ import { ProfileEditor } from './components/ProfileEditor';
  SIDEBAR MENU — DTM sections (3-bar menu)
  ═══════════════════════════════════════════════════════════ */
 const DTM_SECTIONS = [
- { id: 'browse', label: 'Browse Profiles', icon: Search, color: 'text-amber-500' },
- { id: 'profile', label: 'My Profile / Bio Data', icon: FileText, color: 'text-blue-500' },
+ { id: 'browse', label: 'Browse Profiles', icon: Search, color: 'text-rose-main' },
+ { id: 'profile', label: 'My Profile / Bio Data', icon: FileText, color: 'text-rose-main' },
  { id: 'matches', label: 'My Matches', icon: Heart, color: 'text-rose' },
- { id: 'numerology', label: 'Numerology', icon: Hash, color: 'text-purple-500' },
- { id: 'kundli', label: 'Kundli / Horoscope', icon: Moon, color: 'text-indigo-500' },
- { id: 'chat', label: 'DTM Chat', icon: MessageCircle, color: 'text-emerald-500' },
- { id: 'access', label: 'Access Control', icon: Shield, color: 'text-teal-500' },
+ { id: 'numerology', label: 'Numerology', icon: Hash, color: 'text-rose-main' },
+ { id: 'kundli', label: 'Kundli / Horoscope', icon: Moon, color: 'text-rose-main' },
+ { id: 'chat', label: 'DTM Chat', icon: MessageCircle, color: 'text-rose-main' },
+ { id: 'access', label: 'Access Control', icon: Shield, color: 'text-rose-main' },
  { id: 'preferences', label: 'Partner Preferences', icon: Heart, color: 'text-rose' },
  { id: 'privacy', label: 'Privacy & Security', icon: Lock, color: 'text-zinc-500' },
- { id: 'templates', label: 'Bio Data Templates', icon: Palette, color: 'text-orange-500' },
+ { id: 'templates', label: 'Bio Data Templates', icon: Palette, color: 'text-rose-main' },
 ] as const;
 type SectionId = typeof DTM_SECTIONS[number]['id'];
 
@@ -185,18 +185,18 @@ export default function DateToMarryPage() {
  // First time — enable profile gate
  if (!profileEnabled && section !== 'browse') {
  return (
- <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-rose-50 flex items-center justify-center p-6">
+ <div className="min-h-screen bg-gradient-to-br from-rose-soft via-white to-rose-soft flex items-center justify-center p-6">
  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
  className="bg-miamo-card rounded-3xl border border-zinc-200 shadow-xl max-w-md w-full p-8 text-center space-y-5">
  <div className="text-5xl">🕉</div>
  <h2 className="text-xl font-bold text-zinc-900">Welcome to Date to Marry</h2>
  <p className="text-sm text-zinc-500">Build your matrimonial profile to access all features. Complete at least 60% to enable browsing & matching.</p>
  <div className="w-full bg-zinc-100 rounded-full h-3">
- <div className="h-full bg-gradient-to-r from-amber-400 to-rose-400 rounded-full transition-all" style={{ width: `${profileCompletion}%` }} />
+ <div className="h-full bg-gradient-to-r from-rose-alt to-rose-alt rounded-full transition-all" style={{ width: `${profileCompletion}%` }} />
  </div>
  <p className="text-xs text-zinc-400">{profileCompletion}% complete • Need 60% minimum</p>
  <button onClick={() => { setProfileEnabled(true); setSection('profile'); }}
- className="w-full py-3 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 text-text-primary font-bold text-sm hover:shadow-lg transition">
+ className="w-full py-3 rounded-xl bg-gradient-to-r from-rose-main to-rose-main text-text-primary font-bold text-sm hover:shadow-lg transition">
  {profileCompletion >= 60 ? 'Enter Date to Marry' : 'Build Your Profile First'} →
  </button>
  <button onClick={() => { setProfileEnabled(true); setSection('browse'); }}
@@ -208,7 +208,7 @@ export default function DateToMarryPage() {
 
  return (
  <ErrorBoundary>
- <div className="min-h-screen bg-gradient-to-br from-amber-50/50 via-white to-rose-50/50">
+ <div className="min-h-screen bg-gradient-to-br from-rose-soft/50 via-white to-rose-soft/50">
  {/* HEADER */}
  <div className="sticky top-0 z-30 bg-miamo-card/80 backdrop-blur-xl border-b border-zinc-200/60">
  <div className="max-w-6xl mx-auto px-4 py-3 flex items-center gap-3">
@@ -216,7 +216,7 @@ export default function DateToMarryPage() {
  <Menu className="w-5 h-5 text-zinc-700" />
  </button>
  <div className="flex items-center gap-2.5 flex-1">
- <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center shadow-lg shadow-amber-200">
+ <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-rose-main to-rose-main flex items-center justify-center shadow-lg shadow-rose-light">
  <HeartHandshake className="w-5 h-5 text-text-primary" />
  </div>
  <div>
@@ -225,7 +225,7 @@ export default function DateToMarryPage() {
  </div>
  </div>
  {profileCompletion < 60 && (
- <button onClick={() => setSection('profile')} className="text-[10px] bg-amber-50 text-amber-700 px-3 py-1.5 rounded-lg font-semibold border border-amber-200 hover:bg-amber-100 transition">
+ <button onClick={() => setSection('profile')} className="text-[10px] bg-rose-soft text-rose-dark px-3 py-1.5 rounded-lg font-semibold border border-rose-light hover:bg-rose-soft transition">
  Complete Profile ({profileCompletion}%)
  </button>
  )}
@@ -242,7 +242,7 @@ export default function DateToMarryPage() {
  <div className="p-5 border-b border-zinc-100">
  <div className="flex items-center justify-between">
  <div className="flex items-center gap-2.5">
- <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500 to-rose-500 flex items-center justify-center">
+ <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-main to-rose-main flex items-center justify-center">
  <HeartHandshake className="w-5 h-5 text-text-primary" />
  </div>
  <div>
@@ -256,8 +256,8 @@ export default function DateToMarryPage() {
  <div className="p-3 space-y-1">
  {DTM_SECTIONS.map(s => (
  <button key={s.id} onClick={() => { setSection(s.id); setSidebarOpen(false); }}
- className={cn('w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition', section === s.id ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900')}>
- <s.icon className={cn('w-4.5 h-4.5', section === s.id ? 'text-amber-500' : s.color)} />
+ className={cn('w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition', section === s.id ? 'bg-rose-soft text-rose-dark border border-rose-light' : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900')}>
+ <s.icon className={cn('w-4.5 h-4.5', section === s.id ? 'text-rose-main' : s.color)} />
  {s.label}
  </button>
  ))}
@@ -265,7 +265,7 @@ export default function DateToMarryPage() {
  <div className="p-4 mx-3 mb-3 bg-zinc-50 rounded-xl border border-zinc-100">
  <p className="text-[10px] text-zinc-400 font-semibold mb-2">PROFILE COMPLETION</p>
  <div className="w-full bg-zinc-200 rounded-full h-2 mb-1">
- <div className="h-full bg-gradient-to-r from-amber-400 to-rose-400 rounded-full transition-all" style={{ width: `${profileCompletion}%` }} />
+ <div className="h-full bg-gradient-to-r from-rose-alt to-rose-alt rounded-full transition-all" style={{ width: `${profileCompletion}%` }} />
  </div>
  <p className="text-[10px] text-zinc-500">{profileCompletion}%</p>
  </div>
@@ -278,7 +278,7 @@ export default function DateToMarryPage() {
  <AnimatePresence>
  {saveMsg && (
  <motion.div initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -50, opacity: 0 }}
- className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-emerald-500 text-text-primary text-sm font-medium px-5 py-2.5 rounded-full shadow-xl">
+ className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-rose-main text-text-primary text-sm font-medium px-5 py-2.5 rounded-full shadow-xl">
  <CheckCircle className="w-4 h-4 inline mr-2" />{saveMsg}
  </motion.div>
  )}
@@ -293,7 +293,7 @@ export default function DateToMarryPage() {
  <div className="flex items-center justify-end">
  <button onClick={() => setShowFilters(!showFilters)}
  className={cn('flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold transition border',
- showFilters ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-miamo-card text-zinc-600 border-zinc-200 hover:bg-zinc-50')}>
+ showFilters ? 'bg-rose-soft text-rose-dark border-rose-light' : 'bg-miamo-card text-zinc-600 border-zinc-200 hover:bg-zinc-50')}>
  <Filter className="w-3.5 h-3.5" /> Filters {Object.values(filters).filter(Boolean).length > 0 && `(${Object.values(filters).filter(Boolean).length})`}
  </button>
  </div>
@@ -325,17 +325,17 @@ export default function DateToMarryPage() {
  <div className="flex flex-wrap gap-2">
  <button onClick={() => setFilters(f => ({ ...f, numerologyMatch: f.numerologyMatch === 'true' ? '' : 'true' }))}
  className={cn('px-3 py-1.5 rounded-full text-xs font-semibold border transition',
- filters.numerologyMatch === 'true' ? 'bg-purple-50 text-purple-700 border-purple-200' : 'bg-miamo-card text-zinc-500 border-zinc-200')}>
+ filters.numerologyMatch === 'true' ? 'bg-rose-soft text-rose-dark border-rose-light' : 'bg-miamo-card text-zinc-500 border-zinc-200')}>
  <Hash className="w-3 h-3 inline mr-1" /> Numerology Match
  </button>
  <button onClick={() => setFilters(f => ({ ...f, sortBy: f.sortBy === 'numerology' ? '' : 'numerology' }))}
  className={cn('px-3 py-1.5 rounded-full text-xs font-semibold border transition',
- filters.sortBy === 'numerology' ? 'bg-indigo-50 text-indigo-700 border-indigo-200' : 'bg-miamo-card text-zinc-500 border-zinc-200')}>
+ filters.sortBy === 'numerology' ? 'bg-rose-soft text-rose-dark border-rose-light' : 'bg-miamo-card text-zinc-500 border-zinc-200')}>
  Sort by Numerology
  </button>
  </div>
  <div className="flex gap-2">
- <button onClick={applyFilters} className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-rose-500 text-text-primary hover:shadow-lg transition">
+ <button onClick={applyFilters} className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-rose-main to-rose-main text-text-primary hover:shadow-lg transition">
  <Search className="w-3.5 h-3.5 inline mr-1.5" /> Search
  </button>
  <button onClick={async () => { setFilters({}); try { const res = await api.browseMatrimonialAdvanced({}).catch(() => api.browseMatrimonial({})); setBrowseProfiles(res.data || []); } catch {} }} className="px-4 py-2.5 rounded-xl text-xs font-medium text-zinc-500 bg-zinc-100 hover:bg-zinc-200 transition">Clear</button>
@@ -382,10 +382,10 @@ export default function DateToMarryPage() {
  <div className="space-y-5">
  <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Heart className="w-5 h-5 text-rose" /> My Matches</h2>
  {/* Tab bar */}
- <div className="flex gap-1 bg-amber-50/60 rounded-xl p-1 border border-amber-100">
+ <div className="flex gap-1 bg-rose-soft/60 rounded-xl p-1 border border-rose-soft">
  {([['matches', 'My Matches', matches.length], ['incoming', 'Incoming', pendingRequestCount], ['hold', 'On Hold', 0]] as const).map(([key, label, count]) => (
- <button key={key} onClick={() => setMatchTab(key as any)} className={cn('flex-1 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all', matchTab === key ? 'bg-amber-50 text-amber-700 shadow-sm border border-amber-200' : 'text-zinc-500 hover:text-zinc-700')}>
- {label} {count > 0 && <span className="ml-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded-full text-[10px]">{count}</span>}
+ <button key={key} onClick={() => setMatchTab(key as any)} className={cn('flex-1 py-2.5 px-3 rounded-lg text-xs font-semibold transition-all', matchTab === key ? 'bg-rose-soft text-rose-dark shadow-sm border border-rose-light' : 'text-zinc-500 hover:text-zinc-700')}>
+ {label} {count > 0 && <span className="ml-1 px-1.5 py-0.5 bg-rose-soft text-rose-dark rounded-full text-[10px]">{count}</span>}
  </button>
  ))}
  </div>
@@ -418,23 +418,23 @@ export default function DateToMarryPage() {
  const user = req.requester?.user;
  return (
  <div key={req.id} className="bg-miamo-card rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-sm">
- <div className="w-11 h-11 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center shrink-0">
+ <div className="w-11 h-11 rounded-full bg-gradient-to-br from-rose-alt to-rose-main flex items-center justify-center shrink-0">
  <span className="text-base font-bold text-text-primary">{user?.displayName?.[0] || '?'}</span>
  </div>
  <div className="flex-1 min-w-0">
  <p className="text-sm font-semibold text-zinc-900">{user?.displayName || 'User'}</p>
- <p className="text-xs text-zinc-500">Wants: <span className="text-amber-600 font-medium">{req.accessType}</span></p>
+ <p className="text-xs text-zinc-500">Wants: <span className="text-rose-main font-medium">{req.accessType}</span></p>
  {req.message && <p className="text-xs text-zinc-400 mt-0.5 truncate">&ldquo;{req.message}&rdquo;</p>}
  </div>
  <div className="flex gap-1.5 shrink-0">
  {req.status === 'pending' ? (
  <>
- <button onClick={() => handleAccessAction(req.id, 'grant')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors">✓ Grant</button>
+ <button onClick={() => handleAccessAction(req.id, 'grant')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-soft text-rose-dark hover:bg-rose-soft border border-rose-light transition-colors">✓ Grant</button>
  <button onClick={() => handleAccessAction(req.id, 'deny')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors">✕ Deny</button>
  </>
  ) : req.status === 'granted' ? (
  <div className="flex items-center gap-1.5">
- <span className="text-xs font-medium px-3 py-1.5 rounded-lg bg-emerald-50 text-emerald-700">Granted</span>
+ <span className="text-xs font-medium px-3 py-1.5 rounded-lg bg-rose-soft text-rose-dark">Granted</span>
  <button onClick={() => handleAccessAction(req.id, 'revoke')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-100 text-zinc-600 hover:bg-zinc-200 border border-zinc-200 transition-colors">Revoke</button>
  </div>
  ) : (
@@ -461,13 +461,13 @@ export default function DateToMarryPage() {
  {/* ═══ NUMEROLOGY ════════════════════════════ */}
  {section === 'numerology' && (
  <div className="space-y-5">
- <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Hash className="w-5 h-5 text-purple-500" /> Numerology</h2>
+ <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Hash className="w-5 h-5 text-rose-main" /> Numerology</h2>
  {!numerologyData ? (
  <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-8 text-center shadow-sm">
  <div className="text-5xl mb-4">🔢</div>
  <h3 className="text-base font-bold text-zinc-900 mb-2">Discover Your Numbers</h3>
  <p className="text-sm text-zinc-500 mb-5">Calculate your Life Path, Destiny & Soul numbers using Pythagorean + Vedic analysis.</p>
- <button onClick={loadNumerology} className="px-6 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-text-primary text-sm font-bold hover:shadow-lg transition">
+ <button onClick={loadNumerology} className="px-6 py-3 rounded-xl bg-gradient-to-r from-rose-main to-rose-main text-text-primary text-sm font-bold hover:shadow-lg transition">
  Calculate My Numerology
  </button>
  </div>
@@ -475,21 +475,21 @@ export default function DateToMarryPage() {
  <div className="space-y-5">
  {/* 4-Card Grid: Life Path, Destiny, Soul, Personal Year */}
  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
- <div className="bg-purple-50 rounded-2xl p-5 text-center border border-purple-100">
- <p className="text-4xl font-black text-purple-600">{numerologyData.lifePath}</p>
- <p className="text-xs text-purple-500 font-semibold mt-2">Life Path</p>
+ <div className="bg-rose-soft rounded-2xl p-5 text-center border border-rose-soft">
+ <p className="text-4xl font-black text-rose-main">{numerologyData.lifePath}</p>
+ <p className="text-xs text-rose-main font-semibold mt-2">Life Path</p>
  </div>
- <div className="bg-indigo-50 rounded-2xl p-5 text-center border border-indigo-100">
- <p className="text-4xl font-black text-indigo-600">{numerologyData.destiny}</p>
- <p className="text-xs text-indigo-500 font-semibold mt-2">Destiny</p>
+ <div className="bg-rose-soft rounded-2xl p-5 text-center border border-rose-soft">
+ <p className="text-4xl font-black text-rose-main">{numerologyData.destiny}</p>
+ <p className="text-xs text-rose-main font-semibold mt-2">Destiny</p>
  </div>
- <div className="bg-violet-50 rounded-2xl p-5 text-center border border-violet-100">
- <p className="text-4xl font-black text-violet-600">{numerologyData.soul}</p>
- <p className="text-xs text-violet-500 font-semibold mt-2">Soul</p>
+ <div className="bg-rose-soft rounded-2xl p-5 text-center border border-rose-soft">
+ <p className="text-4xl font-black text-rose-main">{numerologyData.soul}</p>
+ <p className="text-xs text-rose-main font-semibold mt-2">Soul</p>
  </div>
- <div className="bg-fuchsia-50 rounded-2xl p-5 text-center border border-fuchsia-100">
- <p className="text-4xl font-black text-fuchsia-600">{numerologyData.personalYear || '—'}</p>
- <p className="text-xs text-fuchsia-500 font-semibold mt-2">Personal Year</p>
+ <div className="bg-rose-soft rounded-2xl p-5 text-center border border-rose-soft">
+ <p className="text-4xl font-black text-rose-main">{numerologyData.personalYear || '—'}</p>
+ <p className="text-xs text-rose-main font-semibold mt-2">Personal Year</p>
  </div>
  </div>
 
@@ -508,11 +508,11 @@ export default function DateToMarryPage() {
 
  {/* Karmic Debt Warning */}
  {numerologyData.hasKarmicDebt && (
- <div className="bg-orange-50 border border-orange-200 rounded-2xl p-4 flex items-start gap-3">
- <span className="text-orange-500 text-lg mt-0.5">⚠️</span>
+ <div className="bg-rose-soft border border-rose-light rounded-2xl p-4 flex items-start gap-3">
+ <span className="text-rose-main text-lg mt-0.5">⚠️</span>
  <div>
- <p className="text-sm font-bold text-orange-800">Karmic Debt Detected</p>
- <p className="text-xs text-orange-600 mt-1">{numerologyData.karmicLesson || 'Past-life lessons require attention in this lifetime.'}</p>
+ <p className="text-sm font-bold text-rose-dark">Karmic Debt Detected</p>
+ <p className="text-xs text-rose-main mt-1">{numerologyData.karmicLesson || 'Past-life lessons require attention in this lifetime.'}</p>
  </div>
  </div>
  )}
@@ -523,7 +523,7 @@ export default function DateToMarryPage() {
  <p className="text-xs text-zinc-500 font-semibold mb-2">Compatible Numbers</p>
  <div className="flex gap-2">
  {numerologyData.compatibleNumbers?.map((n: number) => (
- <span key={n} className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm flex items-center justify-center border border-indigo-200">{n}</span>
+ <span key={n} className="w-8 h-8 rounded-full bg-rose-soft text-rose-dark font-bold text-sm flex items-center justify-center border border-rose-light">{n}</span>
  ))}
  </div>
  </div>
@@ -546,14 +546,14 @@ export default function DateToMarryPage() {
  <p className="text-xs text-zinc-500 font-semibold mb-2">Traits</p>
  <div className="flex flex-wrap gap-2">
  {numerologyData.traits?.map((t: string, i: number) => (
- <span key={i} className="px-3 py-1.5 text-xs font-medium bg-purple-50 text-purple-700 rounded-full border border-purple-100">{t}</span>
+ <span key={i} className="px-3 py-1.5 text-xs font-medium bg-rose-soft text-rose-dark rounded-full border border-rose-soft">{t}</span>
  ))}
  </div>
  </div>
  </div>
 
  <button onClick={() => { setFilters({ numerologyMatch: 'true', sortBy: 'numerology' }); setSection('browse'); applyFilters(); }}
- className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-500 to-indigo-500 text-text-primary text-sm font-bold hover:shadow-lg transition">
+ className="w-full py-3 rounded-xl bg-gradient-to-r from-rose-main to-rose-main text-text-primary text-sm font-bold hover:shadow-lg transition">
  Browse Numerology-Compatible Profiles →
  </button>
  </div>
@@ -564,7 +564,7 @@ export default function DateToMarryPage() {
  {/* ═══ KUNDLI / HOROSCOPE ══════════════════ */}
  {section === 'kundli' && (
  <div className="space-y-5">
- <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Moon className="w-5 h-5 text-indigo-500" /> Kundli / Horoscope</h2>
+ <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Moon className="w-5 h-5 text-rose-main" /> Kundli / Horoscope</h2>
  <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
  <h3 className="text-sm font-bold text-zinc-900">Upload Your Kundli</h3>
  <p className="text-xs text-zinc-500">Upload your kundli/horoscope data. When both partners have kundli data, AI will analyze match compatibility using Ashtakoota system.</p>
@@ -575,7 +575,7 @@ export default function DateToMarryPage() {
  <Field label="Gotra"><Input value={myProfile?.gotra} onChange={(v: string) => updateField('gotra', v)} placeholder="Gotra" /></Field>
  </div>
  <button onClick={async () => { await saveProfile(); setSaveMsg('Kundli data saved!'); setTimeout(() => setSaveMsg(''), 3000); }}
- className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-indigo-500 to-purple-500 text-text-primary hover:shadow-lg transition">
+ className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-rose-main to-rose-main text-text-primary hover:shadow-lg transition">
  Save Kundli Data
  </button>
  </div>
@@ -589,7 +589,7 @@ export default function DateToMarryPage() {
  {/* ═══ DTM CHAT ═══════════════════════════════ */}
  {section === 'chat' && (
  <div className="space-y-5">
- <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><MessageCircle className="w-5 h-5 text-emerald-500" /> DTM Chat</h2>
+ <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><MessageCircle className="w-5 h-5 text-rose-main" /> DTM Chat</h2>
  {!activeChatUserId ? (
  <div className="space-y-3">
  {dtmChats.length === 0 ? (
@@ -601,14 +601,14 @@ export default function DateToMarryPage() {
  ) : dtmChats.map(c => (
  <button key={c.userId} onClick={() => openChat(c.userId)}
  className="w-full bg-miamo-card rounded-xl border border-zinc-200 p-4 flex items-center gap-4 hover:bg-zinc-50 transition text-left">
- <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center shrink-0">
+ <div className="w-10 h-10 rounded-full bg-gradient-to-br from-rose-alt to-rose-main flex items-center justify-center shrink-0">
  <span className="text-base font-bold text-text-primary">?</span>
  </div>
  <div className="flex-1 min-w-0">
  <p className="text-sm font-semibold text-zinc-900">{c.userId.slice(0, 8)}...</p>
  <p className="text-xs text-zinc-500 truncate">{c.lastMessage?.message || 'No messages'}</p>
  </div>
- {c.unreadCount > 0 && <span className="w-6 h-6 rounded-full bg-amber-500 text-text-primary text-xs font-bold flex items-center justify-center">{c.unreadCount}</span>}
+ {c.unreadCount > 0 && <span className="w-6 h-6 rounded-full bg-rose-main text-text-primary text-xs font-bold flex items-center justify-center">{c.unreadCount}</span>}
  </button>
  ))}
  </div>
@@ -621,16 +621,16 @@ export default function DateToMarryPage() {
  <div className="h-80 overflow-y-auto p-4 space-y-3 bg-zinc-50">
  {chatMessages.length === 0 && <p className="text-center text-xs text-zinc-400 py-10">No messages yet. Say hello!</p>}
  {chatMessages.map(m => (
- <div key={m.id} className={cn('max-w-[75%] rounded-2xl p-3', m.senderId === myProfile?.userId ? 'ml-auto bg-amber-500 text-text-primary' : 'bg-miamo-card border border-zinc-200 text-zinc-800')}>
+ <div key={m.id} className={cn('max-w-[75%] rounded-2xl p-3', m.senderId === myProfile?.userId ? 'ml-auto bg-rose-main text-text-primary' : 'bg-miamo-card border border-zinc-200 text-zinc-800')}>
  <p className="text-sm">{m.message}</p>
- <p className={cn('text-[10px] mt-1', m.senderId === myProfile?.userId ? 'text-amber-100' : 'text-zinc-400')}>{new Date(m.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</p>
+ <p className={cn('text-[10px] mt-1', m.senderId === myProfile?.userId ? 'text-rose-soft' : 'text-zinc-400')}>{new Date(m.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</p>
  </div>
  ))}
  </div>
  <div className="p-3 border-t border-zinc-100 flex gap-2">
  <input value={chatInput} onChange={e => setChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendChatMessage()}
- className="flex-1 bg-zinc-100 border border-zinc-200 rounded-xl px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-amber-500/40" placeholder="Type a message..." />
- <button onClick={sendChatMessage} className="w-10 h-10 rounded-xl bg-gradient-to-r from-amber-500 to-rose-500 flex items-center justify-center hover:shadow-lg transition">
+ className="flex-1 bg-zinc-100 border border-zinc-200 rounded-xl px-4 py-2.5 text-sm text-zinc-900 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-rose-main/40" placeholder="Type a message..." />
+ <button onClick={sendChatMessage} className="w-10 h-10 rounded-xl bg-gradient-to-r from-rose-main to-rose-main flex items-center justify-center hover:shadow-lg transition">
  <Send className="w-4 h-4 text-text-primary" />
  </button>
  </div>
@@ -642,36 +642,36 @@ export default function DateToMarryPage() {
  {/* ═══ ACCESS CONTROL (3-way: Grant / Deny / Revoke) ══════════════════════════ */}
  {section === 'access' && (
  <div className="space-y-6">
- <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Shield className="w-5 h-5 text-teal-500" /> Access Control</h2>
+ <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Shield className="w-5 h-5 text-rose-main" /> Access Control</h2>
  <p className="text-xs text-zinc-500 -mt-3">Manage who can see your biodata, photos, and contact details</p>
 
  {/* Incoming Requests */}
  <div className="space-y-3">
- <h3 className="text-sm font-semibold text-zinc-800 flex items-center gap-2">📥 Incoming Requests <span className="text-[10px] px-2 py-0.5 bg-amber-100 text-amber-700 rounded-full">{incomingRequests.filter(r => r.status === 'pending').length} pending</span></h3>
+ <h3 className="text-sm font-semibold text-zinc-800 flex items-center gap-2">📥 Incoming Requests <span className="text-[10px] px-2 py-0.5 bg-rose-soft text-rose-dark rounded-full">{incomingRequests.filter(r => r.status === 'pending').length} pending</span></h3>
  {incomingRequests.length === 0 ? (
  <div className="text-center py-10 bg-miamo-card rounded-2xl border border-zinc-200"><Shield className="w-10 h-10 text-zinc-300 mx-auto mb-3" /><p className="text-sm text-zinc-500">No incoming requests</p></div>
  ) : incomingRequests.map(req => {
  const user = req.requester?.user;
  return (
  <div key={req.id} className="bg-miamo-card rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
- <div className="w-11 h-11 rounded-full bg-gradient-to-br from-amber-400 to-rose-500 flex items-center justify-center shrink-0">
+ <div className="w-11 h-11 rounded-full bg-gradient-to-br from-rose-alt to-rose-main flex items-center justify-center shrink-0">
  <span className="text-base font-bold text-text-primary">{user?.displayName?.[0] || '?'}</span>
  </div>
  <div className="flex-1 min-w-0">
  <p className="text-sm font-semibold text-zinc-900">{user?.displayName || 'User'}</p>
- <p className="text-xs text-zinc-500">Wants: <span className="text-amber-600 font-medium">{req.accessType}</span></p>
+ <p className="text-xs text-zinc-500">Wants: <span className="text-rose-main font-medium">{req.accessType}</span></p>
  {req.message && <p className="text-xs text-zinc-400 mt-0.5 truncate italic">&ldquo;{req.message}&rdquo;</p>}
  </div>
  <div className="flex gap-1.5 shrink-0">
  {req.status === 'pending' ? (
  <>
- <button onClick={() => handleAccessAction(req.id, 'grant')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 transition-colors">✓ Grant</button>
+ <button onClick={() => handleAccessAction(req.id, 'grant')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-soft text-rose-dark hover:bg-rose-soft border border-rose-light transition-colors">✓ Grant</button>
  <button onClick={() => handleAccessAction(req.id, 'deny')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 transition-colors">✕ Deny</button>
  </>
  ) : req.status === 'granted' ? (
  <div className="flex items-center gap-1.5">
- <span className="text-xs font-medium px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200">✓ Granted</span>
- <button onClick={() => handleAccessAction(req.id, 'revoke')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-orange-50 text-orange-700 hover:bg-orange-100 border border-orange-200 transition-colors">⟲ Revoke</button>
+ <span className="text-xs font-medium px-2.5 py-1 rounded-lg bg-rose-soft text-rose-dark border border-rose-light">✓ Granted</span>
+ <button onClick={() => handleAccessAction(req.id, 'revoke')} className="px-3 py-1.5 rounded-lg text-xs font-medium bg-rose-soft text-rose-dark hover:bg-rose-soft border border-rose-light transition-colors">⟲ Revoke</button>
  </div>
  ) : (
  <span className="text-xs font-medium px-3 py-1.5 rounded-lg bg-red-50 text-red-700 border border-red-200">✕ Denied</span>
@@ -684,14 +684,14 @@ export default function DateToMarryPage() {
 
  {/* Sent Requests */}
  <div className="space-y-3">
- <h3 className="text-sm font-semibold text-zinc-800 flex items-center gap-2">📤 Sent Requests <span className="text-[10px] px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-full">{sentRequests.filter(r => r.status === 'pending').length} awaiting</span></h3>
+ <h3 className="text-sm font-semibold text-zinc-800 flex items-center gap-2">📤 Sent Requests <span className="text-[10px] px-2 py-0.5 bg-rose-soft text-rose-dark rounded-full">{sentRequests.filter(r => r.status === 'pending').length} awaiting</span></h3>
  {sentRequests.length === 0 ? (
  <div className="text-center py-10 bg-miamo-card rounded-2xl border border-zinc-200"><Send className="w-10 h-10 text-zinc-300 mx-auto mb-3" /><p className="text-sm text-zinc-500">No sent requests</p></div>
  ) : sentRequests.map(req => (
  <div key={req.id} className="bg-miamo-card rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-sm">
- <div className="w-11 h-11 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center shrink-0"><span className="text-base font-bold text-text-primary">{req.owner?.user?.displayName?.[0] || '?'}</span></div>
- <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-zinc-900">{req.owner?.user?.displayName || 'User'}</p><p className="text-xs text-zinc-500">Requested: <span className="text-amber-600 font-medium">{req.accessType}</span></p></div>
- <span className={cn('text-xs font-medium px-3 py-1.5 rounded-lg border', req.status === 'pending' ? 'bg-amber-50 text-amber-700 border-amber-200' : req.status === 'granted' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200')}>
+ <div className="w-11 h-11 rounded-full bg-gradient-to-br from-rose-alt to-rose-main flex items-center justify-center shrink-0"><span className="text-base font-bold text-text-primary">{req.owner?.user?.displayName?.[0] || '?'}</span></div>
+ <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-zinc-900">{req.owner?.user?.displayName || 'User'}</p><p className="text-xs text-zinc-500">Requested: <span className="text-rose-main font-medium">{req.accessType}</span></p></div>
+ <span className={cn('text-xs font-medium px-3 py-1.5 rounded-lg border', req.status === 'pending' ? 'bg-rose-soft text-rose-dark border-rose-light' : req.status === 'granted' ? 'bg-rose-soft text-rose-dark border-rose-light' : 'bg-red-50 text-red-700 border-red-200')}>
  {req.status === 'pending' ? '⏳ Awaiting' : req.status === 'granted' ? '✓ Granted' : '✕ Denied'}
  </span>
  </div>
@@ -721,7 +721,7 @@ export default function DateToMarryPage() {
  </div>
  <Field label="What you expect in a life partner"><Textarea value={myProfile.partnerExpectation} onChange={(v: string) => updateField('partnerExpectation', v)} placeholder="Describe ideal partner..." rows={4} /></Field>
  </div>
- <button onClick={saveProfile} disabled={saving} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-amber-500 to-rose-500 text-text-primary hover:shadow-lg transition disabled:opacity-50">
+ <button onClick={saveProfile} disabled={saving} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-rose-main to-rose-main text-text-primary hover:shadow-lg transition disabled:opacity-50">
  {saving ? 'Saving...' : 'Save Preferences'}
  </button>
  </div>
@@ -743,13 +743,13 @@ export default function DateToMarryPage() {
  <div key={item.key} className="flex items-center justify-between py-3 border-b border-zinc-50 last:border-0">
  <div><p className="text-sm text-zinc-800 font-medium">{item.label}</p><p className="text-[10px] text-zinc-400">{item.desc}</p></div>
  <button onClick={() => updateField(item.key, !myProfile?.[item.key])}
- className={cn('w-12 h-7 rounded-full transition-colors relative', myProfile?.[item.key] ? 'bg-amber-500' : 'bg-zinc-200')}>
+ className={cn('w-12 h-7 rounded-full transition-colors relative', myProfile?.[item.key] ? 'bg-rose-main' : 'bg-zinc-200')}>
  <div className={cn('w-5 h-5 rounded-full bg-miamo-card shadow-sm absolute top-1 transition-all', myProfile?.[item.key] ? 'right-1' : 'left-1')} />
  </button>
  </div>
  ))}
  </div>
- <button onClick={saveProfile} disabled={saving} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-amber-500 to-rose-500 text-text-primary hover:shadow-lg transition disabled:opacity-50">
+ <button onClick={saveProfile} disabled={saving} className="px-6 py-3 rounded-xl text-sm font-bold bg-gradient-to-r from-rose-main to-rose-main text-text-primary hover:shadow-lg transition disabled:opacity-50">
  {saving ? 'Saving...' : 'Save Privacy Settings'}
  </button>
  </div>
@@ -758,17 +758,17 @@ export default function DateToMarryPage() {
  {/* ═══ TEMPLATES ══════════════════════════════ */}
  {section === 'templates' && (
  <div className="space-y-5">
- <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Palette className="w-5 h-5 text-orange-500" /> Bio Data Templates</h2>
+ <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Palette className="w-5 h-5 text-rose-main" /> Bio Data Templates</h2>
  <p className="text-sm text-zinc-500">Choose a template theme. Preview will use the selected template with your profile data.</p>
  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
  {TEMPLATES.map(t => (
  <button key={t.id} onClick={() => { updateField('bioDataTemplate', t.id); setPreviewTemplate(t.id); }}
  className={cn('relative rounded-2xl p-4 text-left transition border overflow-hidden',
- (myProfile?.bioDataTemplate || previewTemplate) === t.id ? 'border-amber-400 bg-amber-50 ring-2 ring-amber-200' : 'border-zinc-200 hover:border-zinc-300 bg-miamo-card')}>
- {t.premium && <div className="absolute top-2 right-2"><Crown className="w-3.5 h-3.5 text-amber-500" /></div>}
+ (myProfile?.bioDataTemplate || previewTemplate) === t.id ? 'border-rose-alt bg-rose-soft ring-2 ring-rose-light' : 'border-zinc-200 hover:border-zinc-300 bg-miamo-card')}>
+ {t.premium && <div className="absolute top-2 right-2"><Crown className="w-3.5 h-3.5 text-rose-main" /></div>}
  <div className="flex items-center gap-2 mb-2">
  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg" style={{ background: `linear-gradient(135deg, ${t.colors[0]}40, ${t.colors[1]}40)` }}>{t.emoji}</div>
- {(myProfile?.bioDataTemplate || previewTemplate) === t.id && <Check className="w-4 h-4 text-amber-500" />}
+ {(myProfile?.bioDataTemplate || previewTemplate) === t.id && <Check className="w-4 h-4 text-rose-main" />}
  </div>
  <p className="text-xs font-semibold text-zinc-800 truncate">{t.name}</p>
  <div className="flex gap-1 mt-2">{t.colors.map((c, i) => <div key={i} className="w-4 h-4 rounded-full border border-zinc-200" style={{ background: c }} />)}</div>
@@ -776,10 +776,10 @@ export default function DateToMarryPage() {
  ))}
  </div>
  <div className="flex gap-3">
- <button onClick={saveProfile} className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-amber-500 to-rose-500 text-text-primary hover:shadow-lg transition">Save Template</button>
+ <button onClick={saveProfile} className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-rose-main to-rose-main text-text-primary hover:shadow-lg transition">Save Template</button>
  {myProfile?.fullName && (
  <button onClick={() => { setPreviewTemplate(myProfile.bioDataTemplate || previewTemplate || 'royal-rajasthani'); setShowPreview(true); }}
- className="px-5 py-2.5 rounded-xl text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-200 hover:bg-amber-100 transition flex items-center gap-1.5">
+ className="px-5 py-2.5 rounded-xl text-xs font-semibold text-rose-dark bg-rose-soft border border-rose-light hover:bg-rose-soft transition flex items-center gap-1.5">
  <Eye className="w-3.5 h-3.5" /> Preview with this Template
  </button>
  )}
@@ -797,7 +797,7 @@ export default function DateToMarryPage() {
  className="bg-miamo-card rounded-3xl max-w-xl w-full max-h-[90vh] overflow-y-auto border border-zinc-200 shadow-2xl p-6"
  onClick={(e: any) => e.stopPropagation()}>
  <div className="flex items-center justify-between mb-4">
- <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><ScrollText className="w-5 h-5 text-amber-500" /> Bio Data Preview</h2>
+ <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><ScrollText className="w-5 h-5 text-rose-main" /> Bio Data Preview</h2>
  <button onClick={() => setShowPreview(false)} className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center hover:bg-zinc-200"><X className="w-4 h-4 text-zinc-600" /></button>
  </div>
  <BioDataPreview profile={myProfile} templateId={previewTemplate || myProfile.bioDataTemplate || 'royal-rajasthani'} />

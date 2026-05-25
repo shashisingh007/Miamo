@@ -140,8 +140,8 @@ export function UploadModal({
  {done ? (
  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="flex-1 flex items-center justify-center py-16">
  <div className="text-center">
- <div className="w-14 h-14 rounded-full bg-emerald-400/10 flex items-center justify-center mx-auto mb-4">
- <Check className="w-7 h-7 text-emerald-400" />
+ <div className="w-14 h-14 rounded-full bg-rose-alt/10 flex items-center justify-center mx-auto mb-4">
+ <Check className="w-7 h-7 text-rose-alt" />
  </div>
  <p className="text-[14px] font-semibold text-text-primary">Published!</p>
  </div>

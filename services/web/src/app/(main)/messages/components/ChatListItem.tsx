@@ -40,7 +40,7 @@ export function ChatListItem({ chat, active, onClick, onAction, selectMode, sele
  <div className="flex items-center justify-between">
  <div className="flex items-center gap-1.5">
  <h4 className="text-sm font-semibold text-text-primary truncate">{name}</h4>
- {chat._isHeld && <PauseCircle className="w-3 h-3 text-amber-400/70" />}
+ {chat._isHeld && <PauseCircle className="w-3 h-3 text-rose-alt/70" />}
  {chat.muted && !chat._isHeld && <VolumeX className="w-3 h-3 text-text-muted/50" />}
  {chat.pinned && <Pin className="w-3 h-3 text-rose-main" />}
  </div>
@@ -74,7 +74,7 @@ export function ChatListItem({ chat, active, onClick, onAction, selectMode, sele
  <button onClick={() => handleAction('mute')} className="w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-miamo-elevated flex items-center gap-2">
  <VolumeX className="w-3 h-3" /> {chat.muted ? 'Unmute' : 'Mute notifications'}
  </button>
- <button onClick={() => handleAction('hold')} className="w-full text-left px-3 py-2 text-xs text-amber-400 hover:bg-amber-500/10 flex items-center gap-2">
+ <button onClick={() => handleAction('hold')} className="w-full text-left px-3 py-2 text-xs text-rose-alt hover:bg-rose-main/10 flex items-center gap-2">
  {chat._isHeld ? <><PlayCircle className="w-3 h-3" /> Resume</> : <><PauseCircle className="w-3 h-3" /> Hold</>}
  </button>
  <button onClick={() => handleAction('archive')} className="w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-miamo-elevated flex items-center gap-2">
@@ -87,7 +87,7 @@ export function ChatListItem({ chat, active, onClick, onAction, selectMode, sele
  <button onClick={() => router.push(`/profile?id=${other.id}`)} className="w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-miamo-elevated flex items-center gap-2">
  <UserIcon className="w-3 h-3" /> View profile
  </button>
- <button onClick={() => handleAction('report')} className="w-full text-left px-3 py-2 text-xs text-amber-400 hover:bg-amber-400/10 flex items-center gap-2">
+ <button onClick={() => handleAction('report')} className="w-full text-left px-3 py-2 text-xs text-rose-alt hover:bg-rose-alt/10 flex items-center gap-2">
  <Flag className="w-3 h-3" /> Report
  </button>
  <button onClick={() => handleAction('block')} className="w-full text-left px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 flex items-center gap-2">

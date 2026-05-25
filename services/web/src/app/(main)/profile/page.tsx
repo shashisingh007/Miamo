@@ -183,7 +183,7 @@ export default function ProfilePage() {
  />
  {/* Decorative orbs */}
  <div className="absolute top-4 right-8 w-20 h-20 rounded-full bg-rose-light/10 animate-float blur-lg" />
- <div className="absolute bottom-2 left-12 w-16 h-16 rounded-full bg-amber-400/10 animate-float-delayed blur-lg" />
+ <div className="absolute bottom-2 left-12 w-16 h-16 rounded-full bg-rose-alt/10 animate-float-delayed blur-lg" />
  <button onClick={() => coverInputRef.current?.click()} className="absolute top-3 right-3 bg-black/30 backdrop-blur-sm text-text-primary p-2 rounded-xl hover:bg-black/50 transition-colors z-10">
  <Camera className="w-4 h-4" />
  </button>
@@ -203,7 +203,7 @@ export default function ProfilePage() {
  <motion.div
  initial={{ scale: 0 }}
  animate={{ scale: 1 }}
- className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-r from-emerald-400 to-green-400 rounded-full flex items-center justify-center border-2 border-white shadow-md"
+ className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-r from-rose-alt to-rose-alt rounded-full flex items-center justify-center border-2 border-white shadow-md"
  title={`Verified ${user.verifiedAt ? `on ${new Date(user.verifiedAt).toLocaleDateString()}` : ''}`}
  >
  <Shield className="w-3 h-3 text-text-primary" />
@@ -238,7 +238,7 @@ export default function ProfilePage() {
  initial={{ opacity: 0, y: 10 }}
  animate={{ opacity: 1, y: 0 }}
  transition={{ delay: 0.3 }}
- className="flex items-center gap-4 mt-4 p-3 rounded-xl bg-gradient-to-r from-rose-main/10/60 to-rose-50/40 border border-border/30"
+ className="flex items-center gap-4 mt-4 p-3 rounded-xl bg-gradient-to-r from-rose-main/10 to-rose-soft/40 border border-border/30"
  >
  <div className="flex items-center gap-2">
  <div className="flex -space-x-2">
@@ -249,8 +249,8 @@ export default function ProfilePage() {
  </span>
  </div>
  <div className="ml-auto flex items-center gap-1.5">
- <TrendingUp className="w-3 h-3 text-emerald-500" />
- <span className="text-[10px] font-bold text-emerald-600">+12%</span>
+ <TrendingUp className="w-3 h-3 text-rose-main" />
+ <span className="text-[10px] font-bold text-rose-main">+12%</span>
  </div>
  </motion.div>
  </div>
@@ -345,7 +345,7 @@ export default function ProfilePage() {
  </div>
  {showAddPrompt && (
  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }}
- className="mb-3 bg-gradient-to-br from-rose-main/10/60 to-rose-50/40 rounded-2xl p-4 border border-border/30 space-y-2">
+ className="mb-3 bg-gradient-to-br from-rose-main/10 to-rose-soft/40 rounded-2xl p-4 border border-border/30 space-y-2">
  <select value={newPromptQ} onChange={e => setNewPromptQ(e.target.value)} className="input-premium w-full text-sm">
  <option value="">Select a prompt…</option>
  {PROFILE_PROMPTS.map(p => <option key={p} value={p}>{p}</option>)}
@@ -367,7 +367,7 @@ export default function ProfilePage() {
  initial={{ opacity: 0, y: 10 }}
  animate={{ opacity: 1, y: 0 }}
  transition={{ delay: i * 0.1 }}
- className="bg-gradient-to-br from-miamo-elevated/50 to-rose-main/10/30 rounded-2xl p-4 border border-border/20"
+ className="bg-gradient-to-br from-miamo-elevated/50 to-rose-main/10 rounded-2xl p-4 border border-border/20"
  >
  <p className="text-xs text-rose font-semibold mb-1.5 flex items-center gap-1"><Sparkles className="w-3 h-3" /> {p.question}</p>
  <p className="text-sm text-text-secondary leading-relaxed">{p.answer}</p>
@@ -388,7 +388,7 @@ export default function ProfilePage() {
  animate={{ opacity: 1, scale: 1 }}
  transition={{ delay: i * 0.04 }}
  whileHover={{ scale: 1.08, y: -2 }}
- className="px-3 py-1.5 bg-gradient-to-r from-rose-main/15 to-rose-100/60 text-rose rounded-full text-xs font-medium border border-border/40 cursor-default shadow-sm hover:shadow-md transition-shadow"
+ className="px-3 py-1.5 bg-gradient-to-r from-rose-main/15 to-rose-soft/60 text-rose rounded-full text-xs font-medium border border-border/40 cursor-default shadow-sm hover:shadow-md transition-shadow"
  >
  {interest.name || interest}
  </motion.span>
@@ -425,7 +425,7 @@ export default function ProfilePage() {
  <p className="text-sm font-semibold text-text-primary">{profilePercent}% Complete</p>
  <p className="text-xs text-text-muted mt-1">
  {profilePercent >= 70
- ? <span className="text-emerald-500">✓ Matching unlocked!</span>
+ ? <span className="text-rose-main">✓ Matching unlocked!</span>
  : `Complete ${70 - profilePercent}% more to unlock matching`}
  </p>
  </Card>
@@ -445,7 +445,7 @@ export default function ProfilePage() {
  >
  {step.done ? (
  <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }}>
- <CheckCircle className="w-4.5 h-4.5 text-emerald-400" />
+ <CheckCircle className="w-4.5 h-4.5 text-rose-alt" />
  </motion.div>
  ) : (
  <div className="w-4.5 h-4.5 border-2 border-border rounded-full group-hover:border-rose-main transition-colors" />
@@ -461,7 +461,7 @@ export default function ProfilePage() {
  {/* Verification CTA */}
  {!user.verified && (
  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
- <Card className="p-5 border-rose-main/20 bg-gradient-to-br from-rose-main/10/60 to-rose-50/40">
+ <Card className="p-5 border-rose-main/20 bg-gradient-to-br from-rose-main/10 to-rose-soft/40">
  <div className="flex items-center gap-2 mb-2">
  <Shield className="w-4 h-4 text-rose" />
  <h3 className="text-sm font-semibold">Get Verified</h3>

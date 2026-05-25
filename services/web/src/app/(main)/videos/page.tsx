@@ -65,8 +65,8 @@ function VideoCard({ video }: { video: any }) {
  <button onClick={() => setShowComments(!showComments)} className={cn('flex items-center gap-1 text-xs', showComments ? 'text-rose-main' : 'text-text-muted')}>
  <MessageCircle className="w-3.5 h-3.5" /> {commentCount}
  </button>
- <button onClick={() => setBookmarked(!bookmarked)} className={cn('text-xs', bookmarked ? 'text-amber-400' : 'text-text-muted')}>
- <Bookmark className={cn('w-3.5 h-3.5', bookmarked && 'fill-amber-400')} />
+ <button onClick={() => setBookmarked(!bookmarked)} className={cn('text-xs', bookmarked ? 'text-rose-alt' : 'text-text-muted')}>
+ <Bookmark className={cn('w-3.5 h-3.5', bookmarked && 'fill-rose-alt')} />
  </button>
  <button onClick={handleShare} className="text-text-muted"><Share2 className="w-3.5 h-3.5" /></button>
  </div>

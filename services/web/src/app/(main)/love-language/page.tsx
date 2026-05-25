@@ -20,22 +20,22 @@ const LANGUAGES = [
  tips: ['Leave sweet notes', 'Compliment their outfit', 'Say "I\'m proud of you"', 'Text good morning/night'],
  example: '"The way you handled that was amazing. I\'m so lucky to have you."' },
  { id: 'acts', name: 'Acts of Service', emoji: '🎁', icon: Gift,
- color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50', accent: 'text-emerald-600',
+ color: 'from-rose-main to-rose-main', bg: 'bg-rose-soft', accent: 'text-rose-main',
  desc: 'You feel loved when someone does things for you — actions speak louder than words',
  tips: ['Cook their favorite meal', 'Handle a chore they hate', 'Fill up their gas tank', 'Plan the whole date'],
  example: '"I noticed you were stressed, so I took care of everything tonight."' },
  { id: 'time', name: 'Quality Time', emoji: '⏰', icon: Clock,
- color: 'from-violet-500 to-purple-500', bg: 'bg-violet-50', accent: 'text-violet-600',
+ color: 'from-rose-main to-rose-main', bg: 'bg-rose-soft', accent: 'text-rose-main',
  desc: 'You feel loved through undivided attention and meaningful moments together',
  tips: ['Put phones away during dinner', 'Plan a no-agenda hangout', 'Take walks together', 'Learn something new together'],
  example: '"Let\'s just stay in tonight — just us, no distractions."' },
  { id: 'touch', name: 'Physical Touch', emoji: '🤝', icon: Hand,
- color: 'from-amber-500 to-orange-500', bg: 'bg-amber-50', accent: 'text-amber-600',
+ color: 'from-rose-main to-rose-main', bg: 'bg-rose-soft', accent: 'text-rose-main',
  desc: 'You feel loved through physical closeness — hugs, holding hands, cuddles',
  tips: ['Hold their hand in public', 'Give a back rub after a long day', 'Sit close on the couch', 'Greet them with a hug'],
  example: '"Come here — you look like you could use a 20-second hug."' },
  { id: 'gifts', name: 'Receiving Gifts', emoji: '🎀', icon: Star,
- color: 'from-sky-500 to-blue-500', bg: 'bg-sky-50', accent: 'text-sky-600',
+ color: 'from-rose-main to-rose-main', bg: 'bg-rose-soft', accent: 'text-rose-main',
  desc: 'You feel loved through thoughtful gifts that show someone was thinking of you',
  tips: ['Surprise with their favorite snack', 'Pick a flower on your walk', 'Remember what they mention wanting', 'Celebrate small milestones'],
  example: '"I saw this and immediately thought of you — I had to get it."' },
@@ -211,7 +211,7 @@ export default function LoveLanguagePage() {
  <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
  <div className="flex items-center gap-4">
  <motion.div animate={{ scale: [1, 1.15, 1] }} transition={{ duration: 2, repeat: Infinity }}
- className="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-500 to-rose- flex items-center justify-center shadow-xl shadow-rose-200/50">
+ className="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-main to-rose- flex items-center justify-center shadow-xl shadow-rose-light/50">
  <Heart className="w-7 h-7 text-text-primary" fill="white" />
  </motion.div>
  <div>
@@ -226,7 +226,7 @@ export default function LoveLanguagePage() {
  {!started && !done && (
  <motion.div key="intro" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
  <Card className="p-8 text-center relative overflow-hidden">
- <div className="absolute inset-0 bg-gradient-to-br from-rose-50/60 to-rose-main/10/40" />
+ <div className="absolute inset-0 bg-gradient-to-br from-rose-soft/60 to-rose-main/10" />
  <div className="relative z-10">
  <motion.div animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
  transition={{ duration: 3, repeat: Infinity }} className="text-7xl mb-4">💝</motion.div>
@@ -243,7 +243,7 @@ export default function LoveLanguagePage() {
  </motion.div>
  ))}
  </div>
- <Button onClick={() => setStarted(true)} size="lg" className="gap-2 bg-gradient-to-r from-rose-500 to-rose-main shadow-xl">
+ <Button onClick={() => setStarted(true)} size="lg" className="gap-2 bg-gradient-to-r from-rose-main to-rose-main shadow-xl">
  <Heart className="w-5 h-5" /> Discover My Language
  </Button>
  </div>
@@ -262,7 +262,7 @@ export default function LoveLanguagePage() {
  </div>
  <div className="h-2 bg-miamo-surface rounded-full overflow-hidden">
  <motion.div animate={{ width: `${(qIdx / QUESTIONS.length) * 100}%` }}
- className="h-full bg-gradient-to-r from-rose-500 to-rose-main rounded-full" />
+ className="h-full bg-gradient-to-r from-rose-main to-rose-main rounded-full" />
  </div>
  </div>
 

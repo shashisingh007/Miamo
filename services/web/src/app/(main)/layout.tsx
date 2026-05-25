@@ -346,7 +346,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  onClick={() => { setMsgToast(null); router.push('/notifications'); }}
  >
  <div className="flex items-center gap-3">
- <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-main/15 to-rose-100 flex items-center justify-center shrink-0 shadow-inner">
+ <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-rose-main/15 to-rose-soft flex items-center justify-center shrink-0 shadow-inner">
  <Bell className="w-5 h-5 text-rose" />
  </div>
  <div className="flex-1 min-w-0">

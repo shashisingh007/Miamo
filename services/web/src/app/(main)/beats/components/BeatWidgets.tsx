@@ -50,7 +50,7 @@ export function BeatsIcon({ size = 24, className, animate = false }: { size?: nu
  ═══════════════════════════════════════════════════════════ */
 export function StreakFlame({ count, size = 'md' }: { count: number; size?: 'sm' | 'md' | 'lg' }) {
  const sizeMap = { sm: 'w-7 h-7 text-[9px]', md: 'w-9 h-9 text-[11px]', lg: 'w-12 h-12 text-sm' };
- const color = count >= 30 ? 'from-amber-400 to-orange-500' : count >= 14 ? 'from-rose to-rose-dark' : count >= 7 ? 'from-rose-main to-rose-main' : 'from-miamo-elevated to-border-light';
+ const color = count >= 30 ? 'from-rose-alt to-rose-main' : count >= 14 ? 'from-rose to-rose-dark' : count >= 7 ? 'from-rose-main to-rose-main' : 'from-miamo-elevated to-border-light';
  return (
  <motion.div
  animate={count >= 7 ? { scale: [1, 1.1, 1] } : undefined}
@@ -89,11 +89,11 @@ export function StreakCountdown({ deadline }: { deadline: string }) {
  className={cn(
  'flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold',
  critical ? 'bg-red-50 text-red-600 border border-red-200' :
- urgent ? 'bg-amber-50 text-amber-600 border border-amber-200' :
+ urgent ? 'bg-rose-soft text-rose-main border border-rose-light' :
  'bg-miamo-surface text-text-muted border border-border'
  )}
  >
- <Hourglass className={cn('w-3 h-3', critical ? 'text-red-500' : urgent ? 'text-amber-500' : 'text-text-muted')} />
+ <Hourglass className={cn('w-3 h-3', critical ? 'text-red-500' : urgent ? 'text-rose-main' : 'text-text-muted')} />
  {h > 0 ? `${h}h ${m}m` : `${m}m`}
  </motion.div>
  );
@@ -108,14 +108,14 @@ export function BeatDayStatus({ beat }: { beat: BeatMatch }) {
 
  if (todayCompleted) {
  return (
- <div className="flex items-center gap-1.5 text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100">
+ <div className="flex items-center gap-1.5 text-[10px] font-semibold text-rose-main bg-rose-soft px-2.5 py-1 rounded-lg border border-rose-soft">
  <CheckCheck className="w-3 h-3" /> Both sent — streak saved!
  </div>
  );
  }
  if (iSentToday && !theyCompletedToday) {
  return (
- <div className="flex items-center gap-1.5 text-[10px] font-semibold text-sky-600 bg-sky-50 px-2.5 py-1 rounded-lg border border-sky-100">
+ <div className="flex items-center gap-1.5 text-[10px] font-semibold text-rose-main bg-rose-soft px-2.5 py-1 rounded-lg border border-rose-soft">
  <Clock className="w-3 h-3" /> You sent — waiting for {name}
  </div>
  );
@@ -131,7 +131,7 @@ export function BeatDayStatus({ beat }: { beat: BeatMatch }) {
  // Neither sent
  return (
  <motion.div animate={{ scale: [1, 1.03, 1] }} transition={{ duration: 2, repeat: Infinity }}
- className="flex items-center gap-1.5 text-[10px] font-semibold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200">
+ className="flex items-center gap-1.5 text-[10px] font-semibold text-rose-main bg-rose-soft px-2.5 py-1 rounded-lg border border-rose-light">
  <AlertTriangle className="w-3 h-3" /> No one sent yet!
  </motion.div>
  );
@@ -153,7 +153,7 @@ export function MilestoneCelebration({ count, onClose }: { count: number; onClos
  initial={{ y: 50 }} animate={{ y: 0 }} onClick={(e: React.MouseEvent) => e.stopPropagation()}
  className="card-premium p-8 text-center max-w-sm mx-4 relative overflow-hidden"
  >
- <div className="absolute inset-0 bg-gradient-to-br from-rose-main/10/50 to-amber-50/50" />
+ <div className="absolute inset-0 bg-gradient-to-br from-rose-main/10 to-rose-soft/50" />
  <div className="relative z-10">
  <motion.div animate={{ scale: [1, 1.3, 1], rotate: [0, 10, -10, 0] }} transition={{ duration: 1, repeat: 2 }}
  className="text-6xl mb-4">{data.emoji}</motion.div>
@@ -261,7 +261,7 @@ export function BeatListView({ beats, direction, onSelectMatch }: {
  <div className="space-y-3">
  <div className="flex items-center justify-between">
  <h3 className="text-sm font-bold text-text-secondary flex items-center gap-2">
- {direction === 'sent' ? <ArrowUp className="w-4 h-4 text-rose" /> : <ArrowDown className="w-4 h-4 text-emerald-500" />}
+ {direction === 'sent' ? <ArrowUp className="w-4 h-4 text-rose" /> : <ArrowDown className="w-4 h-4 text-rose-main" />}
  Total {direction === 'sent' ? 'Sent' : 'Received'}: <span className="text-rose">{total}</span>
  </h3>
  </div>
@@ -299,10 +299,10 @@ export function IceBreakerPanel({ onSend }: { onSend: (text: string) => void }) 
  const category = ICE_BREAKERS[activeCategory];
 
  return (
- <Card className="p-4 border-amber-200/30">
+ <Card className="p-4 border-rose-light/30">
  <div className="flex items-center gap-2 mb-3">
- <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-100 to-orange-100 flex items-center justify-center">
- <Lightbulb className="w-4 h-4 text-amber-600" />
+ <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-soft to-rose-soft flex items-center justify-center">
+ <Lightbulb className="w-4 h-4 text-rose-main" />
  </div>
  <div>
  <h3 className="text-sm font-bold text-text-primary">Ice Breakers</h3>
@@ -315,7 +315,7 @@ export function IceBreakerPanel({ onSend }: { onSend: (text: string) => void }) 
  return (
  <button key={cat.category} onClick={() => setActiveCategory(i)}
  className={cn('flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-semibold whitespace-nowrap transition-all',
- activeCategory === i ? 'bg-amber-100 text-amber-700 border border-amber-200' : 'text-text-muted hover:text-text-secondary hover:bg-miamo-surface'
+ activeCategory === i ? 'bg-rose-soft text-rose-dark border border-rose-light' : 'text-text-muted hover:text-text-secondary hover:bg-miamo-surface'
  )}>
  <CatIcon className="w-3 h-3" /> {cat.category}
  </button>
@@ -325,7 +325,7 @@ export function IceBreakerPanel({ onSend }: { onSend: (text: string) => void }) 
  <div className="space-y-1.5">
  {category.prompts.map((prompt, i) => (
  <motion.button key={i} whileHover={{ x: 4 }} onClick={() => onSend(prompt)}
- className="flex items-center gap-2 w-full text-left p-2.5 rounded-lg hover:bg-amber-50/50 transition-all group"
+ className="flex items-center gap-2 w-full text-left p-2.5 rounded-lg hover:bg-rose-soft/50 transition-all group"
  >
  <span className="text-[12px] text-text-secondary leading-relaxed flex-1">{prompt}</span>
  <Send className="w-3.5 h-3.5 text-text-secondary group-hover:text-rose transition-colors shrink-0" />
@@ -347,19 +347,19 @@ export function NudgeBar({ beats }: { beats: BeatMatch[] }) {
 
  return (
  <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
- className="card-premium p-4 border-amber-200/40 bg-gradient-to-r from-amber-50/60 to-orange-50/40"
+ className="card-premium p-4 border-rose-light/40 bg-gradient-to-r from-rose-soft/60 to-rose-soft/40"
  >
  <div className="flex items-center gap-2 mb-2">
- <Activity className="w-4 h-4 text-amber-600" />
- <span className="text-xs font-bold text-amber-700">Attention Needed</span>
+ <Activity className="w-4 h-4 text-rose-main" />
+ <span className="text-xs font-bold text-rose-dark">Attention Needed</span>
  </div>
  {needsAttention.length > 0 && (
- <p className="text-[11px] text-amber-600 mb-1">
+ <p className="text-[11px] text-rose-main mb-1">
  {needsAttention.length} streak{needsAttention.length > 1 ? 's' : ''} fading — send a beat to keep {needsAttention.length > 1 ? 'them' : 'it'} alive!
  </p>
  )}
  {ghosted.length > 0 && (
- <p className="text-[11px] text-amber-600">
+ <p className="text-[11px] text-rose-main">
  {ghosted.length} match{ghosted.length > 1 ? 'es' : ''} haven&apos;t responded in 48h — try an ice breaker?
  </p>
  )}

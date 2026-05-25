@@ -63,7 +63,7 @@ export function FilterPanel({
  <button onClick={() => setLocal(DEFAULT_FILTERS)} className="text-[11px] text-rose-main hover:text-text-primary transition-colors font-semibold">Reset</button>
  </div>
  <div className="px-6 py-6 space-y-7">
- <Section title="Quick Filters" icon={<Zap className="w-3 h-3 text-amber-400" />}>
+ <Section title="Quick Filters" icon={<Zap className="w-3 h-3 text-rose-alt" />}>
  <div className="flex flex-wrap gap-2">
  <Chip label="Active Today" active={local.activeToday} onClick={() => set('activeToday', !local.activeToday)} />
  <Chip label="New Here" active={local.newHere} onClick={() => set('newHere', !local.newHere)} />
@@ -89,7 +89,7 @@ export function FilterPanel({
  className="w-20 h-10 rounded-xl bg-miamo-surface border border-border text-text-primary text-center text-sm focus:border-border focus:outline-none" placeholder="Max" />
  </div>
  </Section>
- <Section title="City" icon={<MapPin className="w-3 h-3 text-blue-400" />}>
+ <Section title="City" icon={<MapPin className="w-3 h-3 text-rose-alt" />}>
  <input value={local.city} onChange={e => set('city', e.target.value)}
  className="w-full h-10 rounded-xl bg-miamo-surface border border-border text-text-primary px-4 text-sm focus:border-border focus:outline-none placeholder:text-text-muted" placeholder="Any city..." />
  </Section>
@@ -114,35 +114,35 @@ export function FilterPanel({
  ))}
  </div>
  </Section>
- <Section title="Smoking" icon={<Cigarette className="w-3 h-3 text-orange-400" />}>
+ <Section title="Smoking" icon={<Cigarette className="w-3 h-3 text-rose-alt" />}>
  <div className="flex flex-wrap gap-2">
  {['never', 'sometimes', 'regularly'].map(s => (
  <Chip key={s} label={s.charAt(0).toUpperCase() + s.slice(1)} active={isChipActive('smoking', s)} onClick={() => toggleChip('smoking', s)} />
  ))}
  </div>
  </Section>
- <Section title="Drinking" icon={<Wine className="w-3 h-3 text-purple-400" />}>
+ <Section title="Drinking" icon={<Wine className="w-3 h-3 text-rose-alt" />}>
  <div className="flex flex-wrap gap-2">
  {['never', 'socially', 'regularly'].map(d => (
  <Chip key={d} label={d.charAt(0).toUpperCase() + d.slice(1)} active={isChipActive('drinking', d)} onClick={() => toggleChip('drinking', d)} />
  ))}
  </div>
  </Section>
- <Section title="Exercise" icon={<Dumbbell className="w-3 h-3 text-green-400" />}>
+ <Section title="Exercise" icon={<Dumbbell className="w-3 h-3 text-rose-alt" />}>
  <div className="flex flex-wrap gap-2">
  {['never', 'sometimes', 'active', 'very-active'].map(e => (
  <Chip key={e} label={e.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} active={isChipActive('exercise', e)} onClick={() => toggleChip('exercise', e)} />
  ))}
  </div>
  </Section>
- <Section title="Education" icon={<GraduationCap className="w-3 h-3 text-blue-400" />}>
+ <Section title="Education" icon={<GraduationCap className="w-3 h-3 text-rose-alt" />}>
  <div className="flex flex-wrap gap-2">
  {['high-school', 'bachelors', 'masters', 'phd'].map(e => (
  <Chip key={e} label={e.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} active={isChipActive('education', e)} onClick={() => toggleChip('education', e)} />
  ))}
  </div>
  </Section>
- <Section title="Pets" icon={<Dog className="w-3 h-3 text-amber-400" />}>
+ <Section title="Pets" icon={<Dog className="w-3 h-3 text-rose-alt" />}>
  <div className="flex flex-wrap gap-2">
  {['none', 'dog', 'cat', 'both', 'other'].map(p => (
  <Chip key={p} label={p.charAt(0).toUpperCase() + p.slice(1)} active={isChipActive('pets', p)} onClick={() => toggleChip('pets', p)} />
@@ -156,7 +156,7 @@ export function FilterPanel({
  ))}
  </div>
  </Section>
- <Section title="Zodiac" icon={<Moon className="w-3 h-3 text-indigo-400" />}>
+ <Section title="Zodiac" icon={<Moon className="w-3 h-3 text-rose-alt" />}>
  <div className="flex flex-wrap gap-2">
  {['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'].map(z => (
  <Chip key={z} label={z} active={isChipActive('zodiac', z)} onClick={() => toggleChip('zodiac', z)} />

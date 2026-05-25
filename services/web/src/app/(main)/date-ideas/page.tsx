@@ -18,13 +18,13 @@ import { ErrorBoundary } from '@/components/ui/error-boundary';
 /* ═══ Categories ═══ */
 const CATEGORIES = [
  { id: 'all', label: 'All', emoji: '✨', color: 'from-border-light to-miamo-elevated' },
- { id: 'romantic', label: 'Romantic', emoji: '💕', color: 'from-rose-400 to-rose-main', icon: Heart },
- { id: 'adventure', label: 'Adventure', emoji: '🏔️', color: 'from-emerald-400 to-teal-500', icon: TreePine },
- { id: 'foodie', label: 'Foodie', emoji: '🍽️', color: 'from-amber-400 to-orange-500', icon: UtensilsCrossed },
- { id: 'creative', label: 'Creative', emoji: '🎨', color: 'from-violet-400 to-purple-500', icon: Palette },
- { id: 'cozy', label: 'Cozy', emoji: '☕', color: 'from-orange-300 to-amber-400', icon: Coffee },
- { id: 'active', label: 'Active', emoji: '💪', color: 'from-blue-400 to-cyan-500', icon: Dumbbell },
- { id: 'free', label: 'Free / Budget', emoji: '🆓', color: 'from-lime-400 to-green-500', icon: Star },
+ { id: 'romantic', label: 'Romantic', emoji: '💕', color: 'from-rose-alt to-rose-main', icon: Heart },
+ { id: 'adventure', label: 'Adventure', emoji: '🏔️', color: 'from-rose-alt to-rose-main', icon: TreePine },
+ { id: 'foodie', label: 'Foodie', emoji: '🍽️', color: 'from-rose-alt to-rose-main', icon: UtensilsCrossed },
+ { id: 'creative', label: 'Creative', emoji: '🎨', color: 'from-rose-alt to-rose-main', icon: Palette },
+ { id: 'cozy', label: 'Cozy', emoji: '☕', color: 'from-rose-light to-rose-alt', icon: Coffee },
+ { id: 'active', label: 'Active', emoji: '💪', color: 'from-rose-alt to-rose-main', icon: Dumbbell },
+ { id: 'free', label: 'Free / Budget', emoji: '🆓', color: 'from-rose-alt to-rose-main', icon: Star },
 ];
 
 /* ═══ Date Ideas ═══ */
@@ -77,7 +77,7 @@ function FloatingSparkles() {
  style={{ left: `${10 + Math.random() * 80}%`, top: `${10 + Math.random() * 80}%` }}
  animate={{ y: [0, -20, 0], opacity: [0, 1, 0], scale: [0.5, 1, 0.5] }}
  transition={{ duration: 3 + Math.random() * 2, repeat: Infinity, delay: Math.random() * 4 }}>
- <Sparkles className="w-4 h-4 text-amber-300" />
+ <Sparkles className="w-4 h-4 text-rose-light" />
  </motion.div>
  ))}
  </div>
@@ -116,14 +116,14 @@ export default function DateIdeasPage() {
  <div className="flex items-center gap-4">
  <motion.div animate={{ rotate: [0, 10, -10, 0] }}
  transition={{ duration: 3, repeat: Infinity }}
- className="w-14 h-14 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-xl shadow-amber-200/50">
+ className="w-14 h-14 rounded-2xl bg-gradient-to-br from-rose-alt to-rose-main flex items-center justify-center shadow-xl shadow-rose-light/50">
  <Lightbulb className="w-7 h-7 text-text-primary" />
  </motion.div>
  <div className="flex-1">
  <h1 className="text-2xl font-black text-text-primary">Date Ideas</h1>
  <p className="text-sm text-text-muted">{filtered.length} ideas to spark your next date ✨</p>
  </div>
- <Button onClick={randomIdea} className="gap-2 bg-gradient-to-r from-amber-500 to-orange-500 shadow-lg shadow-orange-100">
+ <Button onClick={randomIdea} className="gap-2 bg-gradient-to-r from-rose-main to-rose-main shadow-lg shadow-rose-soft">
  <RefreshCcw className="w-4 h-4" /> Surprise Me
  </Button>
  </div>
@@ -134,8 +134,8 @@ export default function DateIdeasPage() {
  {spotlight && (
  <motion.div initial={{ opacity: 0, scale: 0.9, y: -20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9 }}
  className="relative z-20 mb-6">
- <Card className="p-0 overflow-hidden border-2 border-amber-200">
- <div className="bg-gradient-to-r from-amber-400 to-orange-500 p-6 text-text-primary relative">
+ <Card className="p-0 overflow-hidden border-2 border-rose-light">
+ <div className="bg-gradient-to-r from-rose-alt to-rose-main p-6 text-text-primary relative">
  <FloatingSparkles />
  <div className="relative z-10">
  <p className="text-xs font-bold uppercase tracking-wider mb-1 opacity-80">🎲 Random Pick</p>
@@ -161,7 +161,7 @@ export default function DateIdeasPage() {
  {ideas.find(i => i.id === spotlight.id)?.saved ? <BookmarkCheck className="w-4 h-4" /> : <Bookmark className="w-4 h-4" />}
  {ideas.find(i => i.id === spotlight.id)?.saved ? 'Saved' : 'Save idea'}
  </Button>
- <Button className="flex-1 gap-2 bg-gradient-to-r from-amber-500 to-orange-500" onClick={randomIdea}>
+ <Button className="flex-1 gap-2 bg-gradient-to-r from-rose-main to-rose-main" onClick={randomIdea}>
  <RefreshCcw className="w-4 h-4" /> Another
  </Button>
  </div>
@@ -185,9 +185,9 @@ export default function DateIdeasPage() {
  {/* Saved Bar */}
  {savedIdeas.length > 0 && (
  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}
- className="mb-6 p-3 rounded-xl bg-amber-50 border border-amber-100 flex items-center gap-2 relative z-10">
- <BookmarkCheck className="w-4 h-4 text-amber-500" />
- <span className="font-bold text-sm text-amber-700">{savedIdeas.length} saved idea{savedIdeas.length !== 1 && 's'}</span>
+ className="mb-6 p-3 rounded-xl bg-rose-soft border border-rose-soft flex items-center gap-2 relative z-10">
+ <BookmarkCheck className="w-4 h-4 text-rose-main" />
+ <span className="font-bold text-sm text-rose-dark">{savedIdeas.length} saved idea{savedIdeas.length !== 1 && 's'}</span>
  <div className="flex-1 flex gap-1 overflow-x-auto scrollbar-hide">
  {savedIdeas.slice(0, 6).map(s => (
  <span key={s.id} className="text-lg">{s.vibe}</span>
@@ -213,12 +213,12 @@ export default function DateIdeasPage() {
  <motion.div whileHover={{ rotate: 15, scale: 1.2 }} className="text-3xl flex-shrink-0 mt-1">{idea.vibe}</motion.div>
  <div className="flex-1 min-w-0">
  <div className="flex items-start justify-between gap-2">
- <h3 className="font-black text-text-primary group-hover:text-indigo-600 transition-colors">{idea.title}</h3>
+ <h3 className="font-black text-text-primary group-hover:text-rose-main transition-colors">{idea.title}</h3>
  <motion.button whileTap={{ scale: 0.8 }}
  onClick={e => { e.stopPropagation(); toggleSave(idea.id); }}
  className="flex-shrink-0 mt-0.5">
  {idea.saved ?
- <BookmarkCheck className="w-5 h-5 text-amber-500" /> :
+ <BookmarkCheck className="w-5 h-5 text-rose-main" /> :
  <Bookmark className="w-5 h-5 text-text-secondary group-hover:text-text-muted" />}
  </motion.button>
  </div>
@@ -230,8 +230,8 @@ export default function DateIdeasPage() {
  <span className="px-2 py-0.5 rounded-md bg-miamo-surface text-[10px] font-bold text-text-muted">⏱️ {idea.time}</span>
  <span className="px-2 py-0.5 rounded-md bg-miamo-surface text-[10px] font-bold text-text-muted">💰 {idea.budget}</span>
  <span className={cn('px-2 py-0.5 rounded-md text-[10px] font-bold',
- idea.difficulty === 'easy' ? 'bg-green-50 text-green-600' :
- idea.difficulty === 'medium' ? 'bg-amber-50 text-amber-600' : 'bg-red-50 text-red-600')}>
+ idea.difficulty === 'easy' ? 'bg-rose-soft text-rose-main' :
+ idea.difficulty === 'medium' ? 'bg-rose-soft text-rose-main' : 'bg-red-50 text-red-600')}>
  {idea.difficulty === 'easy' ? '😊' : idea.difficulty === 'medium' ? '💪' : '🔥'} {idea.difficulty}
  </span>
  </div>

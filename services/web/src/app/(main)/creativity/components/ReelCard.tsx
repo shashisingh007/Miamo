@@ -148,7 +148,7 @@ export function ReelCard({
  <div className="flex items-center gap-4 mt-3 text-[10px] text-text-primary/50 font-medium">
  <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{fmt(item.views || item.viewCount || 0)} views</span>
  <span>{timeAgo(item.createdAt)}</span>
- {item.featured && <span className="flex items-center gap-0.5 text-amber-300"><Flame className="w-3 h-3" />Featured</span>}
+ {item.featured && <span className="flex items-center gap-0.5 text-rose-light"><Flame className="w-3 h-3" />Featured</span>}
  </div>
  </div>
  </div>

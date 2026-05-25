@@ -33,7 +33,7 @@ function MoreMenu({
  { label: 'View Profile', icon: ExternalLink, color: 'text-text-secondary', onClick: () => { router.push(`/profile?id=${item.authorId}`); onClose(); } },
  { label: "Don't show this", icon: EyeOff, color: 'text-text-secondary', onClick: () => { onHide(); onClose(); } },
  { divider: true },
- { label: 'Report Content', icon: Flag, color: 'text-orange-400', onClick: () => { api.reportUser({ reportedId: item.authorId, reason: 'inappropriate', targetType: 'creativity', targetId: item.id }); onClose(); } },
+ { label: 'Report Content', icon: Flag, color: 'text-rose-alt', onClick: () => { api.reportUser({ reportedId: item.authorId, reason: 'inappropriate', targetType: 'creativity', targetId: item.id }); onClose(); } },
  { label: 'Block Creator', icon: Ban, color: 'text-red-400', onClick: () => { api.blockUser(item.authorId); onClose(); } },
  ];
 
@@ -252,7 +252,7 @@ export default function CreativityPage() {
  'absolute top-14 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-xl text-[12px] font-semibold shadow-lg backdrop-blur-xl border',
  toast.type === 'error'
  ? 'bg-red-500/20 border-red-500/30 text-red-300'
- : 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300',
+ : 'bg-rose-main/20 border-rose-main/30 text-rose-light',
  )}
  >
  {toast.msg}

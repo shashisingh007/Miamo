@@ -37,14 +37,14 @@ export interface BeatEntry {
  BEAT TYPES
  ═══════════════════════════════════════════════════════════ */
 export const BEAT_TYPES = [
- { type: 'photo', icon: Camera, label: 'Photo', color: 'text-sky-500', bg: 'bg-sky-500/10', desc: 'Share a moment' },
- { type: 'video', icon: Film, label: 'Video', color: 'text-purple-500', bg: 'bg-purple-500/10', desc: 'Send a clip' },
- { type: 'voice', icon: Mic, label: 'Voice', color: 'text-emerald-500', bg: 'bg-emerald-500/10', desc: 'Voice note' },
+ { type: 'photo', icon: Camera, label: 'Photo', color: 'text-rose-main', bg: 'bg-rose-main/10', desc: 'Share a moment' },
+ { type: 'video', icon: Film, label: 'Video', color: 'text-rose-main', bg: 'bg-rose-main/10', desc: 'Send a clip' },
+ { type: 'voice', icon: Mic, label: 'Voice', color: 'text-rose-main', bg: 'bg-rose-main/10', desc: 'Voice note' },
  { type: 'text', icon: MessageSquare, label: 'Text', color: 'text-rose', bg: 'bg-miamo-surface0/10', desc: 'Quick thought' },
- { type: 'creative', icon: Palette, label: 'Creative', color: 'text-amber-500', bg: 'bg-amber-500/10', desc: 'Art & doodles' },
+ { type: 'creative', icon: Palette, label: 'Creative', color: 'text-rose-main', bg: 'bg-rose-main/10', desc: 'Art & doodles' },
  { type: 'mood', icon: Heart, label: 'Mood', color: 'text-rose', bg: 'bg-miamo-surface0/10', desc: 'How you feel' },
- { type: 'music', icon: Music, label: 'Music', color: 'text-violet-500', bg: 'bg-violet-500/10', desc: 'Share a song' },
- { type: 'gif', icon: Play, label: 'GIF', color: 'text-orange-500', bg: 'bg-orange-500/10', desc: 'Fun reaction' },
+ { type: 'music', icon: Music, label: 'Music', color: 'text-rose-main', bg: 'bg-rose-main/10', desc: 'Share a song' },
+ { type: 'gif', icon: Play, label: 'GIF', color: 'text-rose-main', bg: 'bg-rose-main/10', desc: 'Fun reaction' },
 ];
 
 export const ICE_BREAKERS: { category: string; icon: any; prompts: string[] }[] = [
@@ -79,20 +79,20 @@ export const ICE_BREAKERS: { category: string; icon: any; prompts: string[] }[] 
 ];
 
 export const MILESTONE_EMOJIS: Record<number, { emoji: string; label: string; color: string }> = {
- 3: { emoji: '🔥', label: 'First Spark!', color: 'text-orange-500' },
- 7: { emoji: '⭐', label: 'Week Warrior!', color: 'text-amber-500' },
- 14: { emoji: '💫', label: 'Two Week Champion!', color: 'text-purple-500' },
- 30: { emoji: '🏆', label: 'Monthly Master!', color: 'text-yellow-500' },
- 50: { emoji: '💎', label: 'Diamond Streak!', color: 'text-cyan-500' },
- 100: { emoji: '👑', label: 'Beat Royalty!', color: 'text-amber-400' },
- 150: { emoji: '🌟', label: 'Legendary!', color: 'text-yellow-300' },
- 200: { emoji: '🔱', label: 'Unstoppable!', color: 'text-blue-400' },
+ 3: { emoji: '🔥', label: 'First Spark!', color: 'text-rose-main' },
+ 7: { emoji: '⭐', label: 'Week Warrior!', color: 'text-rose-main' },
+ 14: { emoji: '💫', label: 'Two Week Champion!', color: 'text-rose-main' },
+ 30: { emoji: '🏆', label: 'Monthly Master!', color: 'text-rose-main' },
+ 50: { emoji: '💎', label: 'Diamond Streak!', color: 'text-rose-main' },
+ 100: { emoji: '👑', label: 'Beat Royalty!', color: 'text-rose-alt' },
+ 150: { emoji: '🌟', label: 'Legendary!', color: 'text-rose-light' },
+ 200: { emoji: '🔱', label: 'Unstoppable!', color: 'text-rose-alt' },
  365: { emoji: '🎂', label: '1 Year Anniversary!', color: 'text-rose' },
  500: { emoji: '💝', label: 'Soulmate Streak!', color: 'text-rose' },
- 730: { emoji: '💍', label: '2 Year Bond!', color: 'text-violet-500' },
- 1095: { emoji: '🏛️', label: '3 Year Legacy!', color: 'text-indigo-500' },
- 1460: { emoji: '🌍', label: '4 Year Journey!', color: 'text-emerald-500' },
- 1825: { emoji: '♾️', label: '5 Year Forever!', color: 'text-amber-300' },
+ 730: { emoji: '💍', label: '2 Year Bond!', color: 'text-rose-main' },
+ 1095: { emoji: '🏛️', label: '3 Year Legacy!', color: 'text-rose-main' },
+ 1460: { emoji: '🌍', label: '4 Year Journey!', color: 'text-rose-main' },
+ 1825: { emoji: '♾️', label: '5 Year Forever!', color: 'text-rose-light' },
 };
 
 export const REMOVE_REASONS = [

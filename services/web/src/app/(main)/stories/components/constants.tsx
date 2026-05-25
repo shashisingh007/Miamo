@@ -6,15 +6,15 @@ import { Sparkles } from 'lucide-react';
 
 /* ═══ Story Backgrounds ═══ */
 export const STORY_BACKGROUNDS = [
- { id: 'sunset', gradient: 'from-orange-400 via-rose-main to-purple-600', label: 'Sunset' },
- { id: 'ocean', gradient: 'from-cyan-400 via-blue-500 to-indigo-600', label: 'Ocean' },
- { id: 'forest', gradient: 'from-emerald-400 via-green-500 to-teal-600', label: 'Forest' },
- { id: 'lavender', gradient: 'from-violet-400 via-purple-500 to-fuchsia-600', label: 'Lavender' },
+ { id: 'sunset', gradient: 'from-rose-alt via-rose-main to-rose-main', label: 'Sunset' },
+ { id: 'ocean', gradient: 'from-rose-alt via-rose-main to-rose-main', label: 'Ocean' },
+ { id: 'forest', gradient: 'from-rose-alt via-rose-main to-rose-main', label: 'Forest' },
+ { id: 'lavender', gradient: 'from-rose-alt via-rose-main to-rose-main', label: 'Lavender' },
  { id: 'midnight', gradient: 'from-miamo-surface via-slate-900 to-black', label: 'Midnight' },
  { id: 'peach', gradient: 'from-rose-light via-rose-main to-red-500', label: 'Peach' },
- { id: 'aurora', gradient: 'from-green-400 via-cyan-500 to-blue-600', label: 'Aurora' },
- { id: 'golden', gradient: 'from-amber-300 via-yellow-400 to-orange-500', label: 'Golden' },
- { id: 'candy', gradient: 'from-rose-light via-rose-400 to-fuchsia-500', label: 'Candy' },
+ { id: 'aurora', gradient: 'from-rose-alt via-rose-main to-rose-main', label: 'Aurora' },
+ { id: 'golden', gradient: 'from-rose-light via-rose-alt to-rose-main', label: 'Golden' },
+ { id: 'candy', gradient: 'from-rose-light via-rose-alt to-rose-main', label: 'Candy' },
  { id: 'storm', gradient: 'from-slate-400 via-gray-600 to-zinc-800', label: 'Storm' },
 ];
 
@@ -47,6 +47,6 @@ export function parseStoryContent(content: string): { text: string; background?:
 }
 
 export function getBackgroundGradient(bgId?: string): string {
- if (!bgId) return 'from-violet-400 via-purple-500 to-fuchsia-600';
- return STORY_BACKGROUNDS.find(b => b.id === bgId)?.gradient || 'from-violet-400 via-purple-500 to-fuchsia-600';
+ if (!bgId) return 'from-rose-alt via-rose-main to-rose-main';
+ return STORY_BACKGROUNDS.find(b => b.id === bgId)?.gradient || 'from-rose-alt via-rose-main to-rose-main';
 }
