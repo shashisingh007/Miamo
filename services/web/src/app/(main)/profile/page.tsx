@@ -98,7 +98,7 @@ export default function ProfilePage() {
  const [newPromptQ, setNewPromptQ] = useState('');
  const [newPromptA, setNewPromptA] = useState('');
  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
- const { updateUser } = useAuthStore();
+ const { updateUser, user: authUser } = useAuthStore();
  const photoInputRef = useRef<HTMLInputElement>(null);
  const coverInputRef = useRef<HTMLInputElement>(null);
  const heroRef = useRef<HTMLDivElement>(null);
@@ -150,7 +150,7 @@ export default function ProfilePage() {
  </div>
  );
 
- const user = profile.user || profile;
+ const user = { ...(authUser || {}), ...(profile.user || {}) };
  const prof = profile.profile || profile;
  const photos = user.photos || profile.photos || [];
  const interests = profile.interests || user.interests || [];
