@@ -1,29 +1,40 @@
 'use client';
 
+import Link from 'next/link';
 import { MiamoWordmark } from '@/components/ui/miamo-logo';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
- return (
- <div className="min-h-screen bg-miamo-bg flex flex-col items-center justify-center p-4 relative overflow-hidden">
-   {/* Animated gradient orbs */}
-   <div className="absolute top-10 left-10 w-64 h-64 bg-rose/10 rounded-full blur-3xl animate-pulse" />
-   <div className="absolute bottom-20 right-10 w-80 h-80 bg-rose/8 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }} />
-   
-   {/* Floating hearts */}
-   <div className="floating-hearts">
-     <span className="heart">♥</span>
-     <span className="heart">♥</span>
-     <span className="heart">♥</span>
-     <span className="heart">♥</span>
-     <span className="heart">♥</span>
-   </div>
+  return (
+    <div className="min-h-screen bg-miamo-bg relative overflow-hidden">
+      {/* Single soft copper bloom — no orbs, no floating hearts */}
+      <div
+        aria-hidden
+        className="absolute top-[-20%] right-[-10%] w-[60vw] h-[60vw] rounded-full blur-[120px] opacity-50 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(circle, rgba(201,120,86,0.18) 0%, rgba(232,180,160,0.10) 40%, transparent 70%)',
+        }}
+      />
 
-   <div className="relative z-10 mb-6 animate-fade-in-up flex flex-col items-center gap-3">
-     <MiamoWordmark height={36} animated={true} />
-   </div>
-   <div className="relative z-10">
-     {children}
-   </div>
- </div>
- );
+      {/* Minimal top bar */}
+      <header className="relative z-20">
+        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+          <Link href="/" aria-label="Miamo home" className="flex items-center">
+            <MiamoWordmark height={22} animated={false} />
+          </Link>
+          <Link
+            href="/"
+            className="text-sm text-text-secondary hover:text-text-primary transition-colors"
+          >
+            Back to home
+          </Link>
+        </div>
+      </header>
+
+      {/* Centered content */}
+      <main className="relative z-10 flex items-center justify-center px-6 pt-6 pb-20 min-h-[calc(100vh-4rem)]">
+        {children}
+      </main>
+    </div>
+  );
 }
