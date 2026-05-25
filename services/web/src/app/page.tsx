@@ -55,8 +55,20 @@ export default function LandingPage() {
       </nav>
 
       {/* ─── HERO ─── */}
-      <section className="relative z-10 max-w-5xl mx-auto px-6 pt-20 pb-24 lg:pt-32 lg:pb-32 text-center">
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 backdrop-blur-sm border border-border-light text-[11px] font-semibold uppercase tracking-[0.18em] text-text-secondary mb-8 animate-fade-in">
+      <section className="relative z-10 max-w-5xl mx-auto px-6 pt-16 pb-24 lg:pt-24 lg:pb-32 text-center">
+        {/* Animated brand mark — the heart traces the wordmark, then the headline */}
+        {/* below resolves the gesture: "Where hearts connect." */}
+        <div className="flex flex-col items-center mb-10 animate-fade-in">
+          <div className="origin-center scale-90 sm:scale-100 lg:scale-110">
+            <MiamoWordmark height={64} animated={true} />
+          </div>
+          <span
+            aria-hidden
+            className="mt-7 block h-px w-12 bg-gradient-to-r from-transparent via-rose-main/40 to-transparent"
+          />
+        </div>
+
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-white/70 backdrop-blur-sm border border-border-light text-[11px] font-semibold uppercase tracking-[0.18em] text-text-secondary mb-7 animate-fade-in">
           <span className="w-1.5 h-1.5 rounded-full bg-rose-main" />
           A premium dating platform
         </span>
@@ -299,6 +311,9 @@ export default function LandingPage() {
             <ArrowRight className="w-5 h-5 ml-1" />
           </Button>
         </Link>
+        <p className="mt-5 text-[12px] text-text-muted tracking-wide">
+          Free to join · No credit card · Delete anytime
+        </p>
       </section>
 
       {/* ─── FOOTER ─── */}

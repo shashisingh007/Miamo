@@ -388,7 +388,7 @@ export default function ProfilePage() {
  animate={{ opacity: 1, scale: 1 }}
  transition={{ delay: i * 0.04 }}
  whileHover={{ scale: 1.08, y: -2 }}
- className="px-3 py-1.5 bg-gradient-to-r from-rose-main/15/80 to-rose-100/60 text-rose- rounded-full text-xs font-medium border border-border/40 cursor-default shadow-sm hover:shadow-md transition-shadow"
+ className="px-3 py-1.5 bg-gradient-to-r from-rose-main/15 to-rose-100/60 text-rose rounded-full text-xs font-medium border border-border/40 cursor-default shadow-sm hover:shadow-md transition-shadow"
  >
  {interest.name || interest}
  </motion.span>

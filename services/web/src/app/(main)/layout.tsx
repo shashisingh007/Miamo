@@ -231,7 +231,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-rose-main border-2 border-white shadow-sm" />
  </div>
  <div className="flex-1 min-w-0">
- <p className="text-[13px] font-semibold text-text-primary truncate group-hover:text-rose- transition-colors">
+ <p className="text-[13px] font-semibold text-text-primary truncate group-hover:text-rose transition-colors">
  {displayUser.displayName || 'Your Profile'}
  </p>
  <p className="text-[11px] text-text-muted font-medium">@{displayUser.username || 'user'}</p>
