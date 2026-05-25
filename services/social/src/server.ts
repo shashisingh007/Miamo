@@ -981,6 +981,8 @@ app.post('/api/v1/matches/:id/report', authMiddleware, async (req: AuthRequest, 
     const details = sanitize(rawDetails || '');
     const match = await prisma.match.findUnique({ where: { id: req.params.id } });
     if (!match) return res.status(404).json({ error: { message: 'Match not found' } });
+    // Security: verify user is a member of this match before reporting
+    if (match.user1Id !== userId && match.user2Id !== userId) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
     const targetUserId = match.user1Id === userId ? match.user2Id : match.user1Id;
     try {
       await prisma.$executeRaw`INSERT INTO "MatchFeedback" (id, "matchId", "userId", "targetUserId", type, reason, details, "createdAt") VALUES (gen_random_uuid(), ${match.id}, ${userId}, ${targetUserId}, 'report', ${reason || 'other'}, ${details || ''}, NOW())`;
@@ -1049,6 +1051,8 @@ app.delete('/api/v1/matches/:id', authMiddleware, async (req: AuthRequest, res: 
     const details = rawDetails ? sanitize(rawDetails) : '';
     const match = await prisma.match.findUnique({ where: { id: req.params.id } });
     if (!match) return res.status(404).json({ error: { message: 'Match not found' } });
+    // Security: verify user is a member of this match before unmatching
+    if (match.user1Id !== userId && match.user2Id !== userId) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
     const targetUserId = match.user1Id === userId ? match.user2Id : match.user1Id;
     if (reason) {
       try {
