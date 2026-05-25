@@ -254,13 +254,15 @@ app.get('/health', async (_req, res) => {
 app.get('/api/v1/events/stream', (req: express.Request, res: express.Response) => {
   // EventSource can't send custom headers — accept token from query param
   let userId = req.headers['x-user-id'] as string;
+  let tokenExp: number | undefined; // unix seconds, for proactive expiry
   if (!userId && req.query.token) {
     // Validate token length before attempting verification (prevent DoS via long tokens)
     const tokenStr = req.query.token as string;
     if (tokenStr.length > 2048) return res.status(400).json({ error: { message: 'Invalid token' } });
     try {
-      const payload = jwt.verify(tokenStr, JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string };
+      const payload = jwt.verify(tokenStr, JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string; exp?: number };
       userId = payload.userId;
+      tokenExp = payload.exp;
     } catch {}
   }
   if (!userId) return res.status(401).json({ error: { message: 'Authentication required' } });
@@ -287,12 +289,27 @@ app.get('/api/v1/events/stream', (req: express.Request, res: express.Response) =
   }
   userClients.add(res);
 
-  // Keep alive every 30s to prevent proxy/firewall timeout (e.g., nginx default 60s)
-  const keepAlive = setInterval(() => { try { res.write(': keepalive\n\n'); } catch {} }, 30000);
+  // Heartbeat every 25s — under most proxy idle thresholds (nginx default 60s,
+  // ALB 60s, Cloudflare 100s). Comment lines are ignored by EventSource clients.
+  const keepAlive = setInterval(() => { try { res.write(': keepalive\n\n'); } catch {} }, 25000);
+
+  // Proactive token-expiry: emit a `token-expired` event 30s before exp and
+  // gracefully close so the client can re-auth and reconnect with a fresh JWT.
+  let expiryTimer: NodeJS.Timeout | undefined;
+  if (tokenExp) {
+    const msUntilExpiry = (tokenExp * 1000) - Date.now() - 30_000;
+    if (msUntilExpiry > 0) {
+      expiryTimer = setTimeout(() => {
+        try { res.write('event: token-expired\ndata: {"reason":"jwt_exp_imminent"}\n\n'); } catch {}
+        try { res.end(); } catch {}
+      }, msUntilExpiry);
+    }
+  }
 
   // Clean up on disconnect: remove this response from the map
   req.on('close', () => {
     clearInterval(keepAlive);
+    if (expiryTimer) clearTimeout(expiryTimer);
     sseClients.get(userId)?.delete(res);
     if (sseClients.get(userId)?.size === 0) sseClients.delete(userId); // Garbage collect empty sets
   });

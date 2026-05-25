@@ -4,6 +4,7 @@ import { logger } from '../../shared/src/logger';
 import { sanitize } from '../../shared/src/sanitize';
 import { env } from '../../shared/src/env';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware, createPushToUser } from '../../shared/src/service';
+import { cursorOpt } from '../../shared/src/coerce';
 
 const prisma = createPrisma(5);
 export const app = express();
@@ -18,11 +19,17 @@ const pushToUser = createPushToUser();
 // Routes
 app.get('/api/v1/notifications', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { unreadOnly } = req.query;
+    const { unreadOnly, cursor } = req.query;
     const where: any = { userId: req.userId! };
     if (unreadOnly === 'true') where.read = false;
-    const notifications = await prisma.notification.findMany({ where, orderBy: { createdAt: 'desc' }, take: 50 });
-    res.json({ data: notifications });
+    const notifications = await prisma.notification.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      ...cursorOpt(cursor),
+    });
+    const nextCursor = notifications.length === 50 ? notifications[notifications.length - 1].id : null;
+    res.json({ data: notifications, nextCursor });
   } catch (e) { next(e); }
 });
 
