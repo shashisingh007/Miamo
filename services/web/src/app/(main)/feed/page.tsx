@@ -9,6 +9,7 @@ import { FeedSkeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { useAuthStore } from '@/stores';
+import { useToast } from '@/components/ui/toast';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 
@@ -18,11 +19,19 @@ function ComposeBox({ onPost }: { onPost: () => void }) {
  const [content, setContent] = useState('');
  const [posting, setPosting] = useState(false);
  const { user } = useAuthStore();
+ const toast = useToast();
 
  const handlePost = async () => {
  if (!content.trim()) return;
  setPosting(true);
- try { await api.createPost({ content: content.trim() }); setContent(''); onPost(); } catch { /* post failed silently - form stays filled */ }
+ try {
+ await api.createPost({ content: content.trim() });
+ setContent('');
+ onPost();
+ toast.success('Posted');
+ } catch (e: any) {
+ toast.error('Could not post', e?.message || 'Please try again');
+ }
  setPosting(false);
  };
 
@@ -58,6 +67,7 @@ function FeedPost({ post, onDelete }: { post: any; onDelete?: () => void }) {
  const [loadingComments, setLoadingComments] = useState(false);
  const [showMenu, setShowMenu] = useState(false);
  const [bookmarked, setBookmarked] = useState(false);
+ const toast = useToast();
  const author = post.author || {};
  const photo = author.photos?.[0]?.url || author.photos?.[0];
 
@@ -70,7 +80,8 @@ function FeedPost({ post, onDelete }: { post: any; onDelete?: () => void }) {
 
  const loadComments = async () => {
  setLoadingComments(true);
- try { const res = await api.getPostComments(post.id); setComments(res.data || []); } catch (e) {}
+ try { const res = await api.getPostComments(post.id); setComments(res.data || []); }
+ catch { toast.error('Could not load comments'); }
  setLoadingComments(false);
  };
 
@@ -81,16 +92,21 @@ function FeedPost({ post, onDelete }: { post: any; onDelete?: () => void }) {
 
  const submitComment = async () => {
  if (!commentText.trim()) return;
- try {
- const res = await api.commentOnPost(post.id, commentText.trim());
- if (res.data) setComments((prev: any[]) => [...prev, res.data]);
+ const text = commentText.trim();
  setCommentText('');
+ try {
+ const res = await api.commentOnPost(post.id, text);
+ if (res.data) setComments((prev: any[]) => [...prev, res.data]);
  setCommentCount((prev: number) => prev + 1);
- } catch (e) {}
+ } catch (e: any) {
+ setCommentText(text);
+ toast.error('Comment failed', e?.message || 'Try again');
+ }
  };
 
  const handleDelete = async () => {
- try { await api.deletePost(post.id); onDelete?.(); } catch (e) {}
+ try { await api.deletePost(post.id); onDelete?.(); toast.success('Post deleted'); }
+ catch (e: any) { toast.error('Delete failed', e?.message || 'Try again'); }
  setShowMenu(false);
  };
 

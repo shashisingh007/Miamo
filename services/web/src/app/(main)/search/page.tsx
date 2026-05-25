@@ -10,10 +10,12 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useTrackPageView, useTrackActivity, useTrackScrollDepth } from '@/hooks/useTrackActivity';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { useToast } from '@/components/ui/toast';
 import { useDebounce } from '@/hooks/usePerformance';
 
 export default function SearchPage() {
  const router = useRouter();
+ const toast = useToast();
  const [query, setQuery] = useState('');
  const [searchType, setSearchType] = useState<'name' | 'id' | 'city'>('name');
  const [results, setResults] = useState<any[]>([]);
@@ -32,8 +34,11 @@ export default function SearchPage() {
  try {
  const res = await api.search(q.trim(), searchType);
  setResults(res.data || []);
- } catch { setResults([]); }
- }, [searchType]);
+ } catch (e: any) {
+ setResults([]);
+ toast.error('Search failed', e?.message || 'Try again');
+ }
+ }, [searchType, trackActivity, toast]);
 
  // Trigger search when debounced query changes
  useEffect(() => { doSearch(debouncedQuery); }, [debouncedQuery, doSearch]);

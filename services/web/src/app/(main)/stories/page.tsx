@@ -11,6 +11,7 @@ import { Avatar, Card } from '@/components/ui';
 import { MiamoLoader } from '@/components/ui/miamo-logo';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/components/ui/toast';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { FloatingSparkles, parseStoryContent, getBackgroundGradient } from './components/constants';
@@ -96,6 +97,7 @@ export default function StoriesPage() {
  const [viewingGroup, setViewingGroup] = useState<any>(null);
  const [viewingIndex, setViewingIndex] = useState(0);
  const [hideViewed, setHideViewed] = useState(true);
+ const toast = useToast();
 
  useTrackPageView('stories');
  useTrackScrollDepth('stories');
@@ -127,11 +129,13 @@ export default function StoriesPage() {
  };
 
  const handleDeleteStory = async (id: string) => {
- try { await api.deleteStory(id); loadStories(); } catch {}
+ try { await api.deleteStory(id); loadStories(); toast.success('Story deleted'); }
+ catch (e: any) { toast.error('Delete failed', e?.message || 'Try again'); }
  };
 
  const handlePostToFeed = async (id: string) => {
- try { await api.postStoryToFeed(id); } catch {}
+ try { await api.postStoryToFeed(id); toast.success('Shared to feed'); }
+ catch (e: any) { toast.error('Could not share', e?.message || 'Try again'); }
  };
 
  if (loading) return <MiamoLoader text="Loading stories..." />;

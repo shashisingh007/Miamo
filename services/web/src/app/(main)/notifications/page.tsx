@@ -7,6 +7,7 @@ import { NotificationsSkeleton } from '@/components/ui/skeleton';
 import { api } from '@/lib/api';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/ui/toast';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 
@@ -34,6 +35,7 @@ export default function NotificationsPage() {
  const [notifications, setNotifications] = useState<any[]>([]);
  const [loading, setLoading] = useState(true);
  const router = useRouter();
+ const toast = useToast();
 
  useTrackPageView('notifications');
  useTrackScrollDepth('notifications');
@@ -51,7 +53,13 @@ export default function NotificationsPage() {
  }, []);
 
  const markAllRead = async () => {
- try { await api.markAllNotificationsRead(); setNotifications(prev => prev.map(n => ({ ...n, read: true }))); } catch (e) {}
+ try {
+ await api.markAllNotificationsRead();
+ setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+ toast.success('All caught up');
+ } catch (e: any) {
+ toast.error('Could not mark all read', e?.message || 'Try again');
+ }
  };
 
  if (loading) return <NotificationsSkeleton />;

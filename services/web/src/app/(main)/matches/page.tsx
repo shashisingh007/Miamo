@@ -47,8 +47,9 @@ export default function MatchesPage() {
 
  // Toast
  const toastCtx = useToast();
- const showToast = (msg: string, type: 'success' | 'info' = 'success') => {
+ const showToast = (msg: string, type: 'success' | 'info' | 'error' = 'success') => {
  if (type === 'success') toastCtx.success(msg);
+ else if (type === 'error') toastCtx.error(msg);
  else toastCtx.info(msg);
  };
 
@@ -217,7 +218,8 @@ export default function MatchesPage() {
  const handleHide = async (userId?: string) => {
  const id = userId || selectedIncoming?.user?.id;
  if (!id) return;
- try { await api.hideIncoming(id); showToast('Hidden'); if (selectedIncoming) setSelectedIncoming(null); loadData(); } catch {}
+ try { await api.hideIncoming(id); showToast('Hidden'); if (selectedIncoming) setSelectedIncoming(null); loadData(); }
+ catch (e: any) { showToast(e?.message || 'Could not hide', 'error'); }
  };
 
  const handleReport = async (userId?: string) => {
