@@ -9,6 +9,7 @@ import { sanitize } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
 import { env } from '../../shared/src/env';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware, createPushToUser } from '../../shared/src/service';
+import { cursorOpt } from '../../shared/src/coerce';
 
 // ─── Chat Suggestion Cache ──────────────────────────
 const suggestionCache = new LRUCache(200);
@@ -156,7 +157,7 @@ app.get('/api/v1/messages/chats/:chatId/messages', authMiddleware, async (req: A
         replyTo: { select: { id: true, content: true, senderId: true, sender: { select: { displayName: true } } } },
       },
       orderBy: { createdAt: 'desc' }, take: 50,
-      ...(cursor ? { cursor: { id: cursor as string }, skip: 1 } : {}),
+      ...cursorOpt(cursor),
     });
     await prisma.message.updateMany({ where: { chatId, senderId: { not: userId }, read: false }, data: { read: true } });
     // Decrypt messages and add isOwn flag

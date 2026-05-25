@@ -7,6 +7,7 @@ import { logger } from '../../shared/src/logger';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware } from '../../shared/src/service';
+import { cursorOpt } from '../../shared/src/coerce';
 
 const prisma = createPrisma(15);
 export const app = express();
@@ -32,7 +33,7 @@ app.get('/api/v1/feed', authMiddleware, async (req: AuthRequest, res: Response, 
         _count: { select: { reactions: true, comments: true } },
       },
       orderBy: { createdAt: 'desc' }, take: 20,
-      ...(cursor ? { cursor: { id: cursor as string }, skip: 1 } : {}),
+      ...cursorOpt(cursor),
     });
     const userId = req.userId!;
     const result = posts.map(p => {
@@ -336,7 +337,7 @@ app.get('/api/v1/videos', authMiddleware, async (req: AuthRequest, res: Response
     const videos = await prisma.video.findMany({
       where, include: { author: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } }, reactions: true, _count: { select: { reactions: true, comments: true } } },
       orderBy: { createdAt: 'desc' }, take: 20,
-      ...(cursor ? { cursor: { id: cursor as string }, skip: 1 } : {}),
+      ...cursorOpt(cursor),
     });
     const userId = req.userId!;
     const result = videos.map(v => { const { passwordHash, ...author } = v.author; const { reactions, ...rest } = v; return { ...rest, author, liked: reactions.some(r => r.userId === userId), likeCount: v._count.reactions, commentCount: v._count.comments }; });
@@ -488,7 +489,7 @@ app.get('/api/v1/creativity/feed', authMiddleware, async (req: AuthRequest, res:
       },
       orderBy: [{ trendScore: 'desc' }, { createdAt: 'desc' }],
       take: 80,
-      ...(cursor ? { cursor: { id: cursor as string }, skip: 1 } : {}),
+      ...cursorOpt(cursor),
     });
 
     // 5. Score each candidate using algorithm engine
@@ -708,7 +709,7 @@ app.get('/api/v1/creativity/items', authMiddleware, async (req: AuthRequest, res
     const items = await prisma.creativityItem.findMany({
       where, include: { author: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } }, category: true, reactions: true, _count: { select: { reactions: true, comments: true, viewRecords: true } } },
       orderBy, take: 20,
-      ...(cursor ? { cursor: { id: cursor as string }, skip: 1 } : {}),
+      ...cursorOpt(cursor),
     });
     const userId = req.userId!;
     const result = items.map(i => { const { passwordHash, ...author } = i.author; const { reactions, ...rest } = i; return { ...rest, author, liked: reactions.some(r => r.userId === userId), likeCount: i._count.reactions, commentCount: i._count.comments, viewCount: i._count.viewRecords }; });
@@ -889,7 +890,7 @@ app.get('/api/v1/matrimonial/browse', authMiddleware, async (req: AuthRequest, r
       },
       orderBy: { updatedAt: 'desc' },
       take: 20,
-      ...(cursor ? { cursor: { id: cursor as string }, skip: 1 } : {}),
+      ...cursorOpt(cursor),
     });
 
     // Check access granted for each profile
@@ -1467,7 +1468,7 @@ app.get('/api/v1/matrimonial/browse/advanced', authMiddleware, async (req: AuthR
     if (complexion) where.complexion = complexion as string;
     if (bodyType) where.bodyType = bodyType as string;
     if (gotra) where.gotra = { not: gotra as string };
-    const profiles = await prisma.matrimonialProfile.findMany({ where, include: { user: { select: { id: true, displayName: true, username: true, verified: true, profile: { select: { age: true, gender: true, city: true, profession: true, avatarGradient: true, online: true, bio: true } }, photos: { take: 3, orderBy: { position: 'asc' } } } } }, orderBy: { updatedAt: 'desc' }, take: 40, ...(cursor ? { cursor: { id: cursor as string }, skip: 1 } : {}) });
+    const profiles = await prisma.matrimonialProfile.findMany({ where, include: { user: { select: { id: true, displayName: true, username: true, verified: true, profile: { select: { age: true, gender: true, city: true, profession: true, avatarGradient: true, online: true, bio: true } }, photos: { take: 3, orderBy: { position: 'asc' } } } } }, orderBy: { updatedAt: 'desc' }, take: 40, ...cursorOpt(cursor) });
     let filtered = profiles;
     if (minAge) filtered = filtered.filter(p => (p.user?.profile?.age || 0) >= parseInt(minAge as string));
     if (maxAge) filtered = filtered.filter(p => (p.user?.profile?.age || 99) <= parseInt(maxAge as string));
