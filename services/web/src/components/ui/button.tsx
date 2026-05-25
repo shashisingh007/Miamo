@@ -11,8 +11,8 @@ const buttonVariants = cva(
  secondary: 'btn-glass',
  ghost: 'btn-ghost',
  outline: 'btn-outline',
- danger: 'bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-2xl shadow-[0_4px_16px_rgba(239,68,68,0.25)] hover:shadow-[0_8px_24px_rgba(239,68,68,0.35)] hover:-translate-y-0.5',
-    link: 'text-[#C97856] hover:text-[#B8694A] underline-offset-4 hover:underline p-0 h-auto font-medium',
+ danger: 'bg-red-500 text-white rounded-2xl shadow-[0_4px_16px_rgba(239,68,68,0.22)] hover:bg-red-600 hover:shadow-[0_8px_24px_rgba(239,68,68,0.32)] hover:-translate-y-0.5',
+    link: 'text-rose hover:text-rose-dark underline-offset-4 hover:underline p-0 h-auto font-medium',
  },
  size: {
  sm: 'h-9 px-4 text-[12px] rounded-xl',

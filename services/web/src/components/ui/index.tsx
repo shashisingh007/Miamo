@@ -92,7 +92,7 @@ const badgeVariants: Record<string, string> = {
  default: 'bg-[#C97856]/8 text-[#C97856] border-[#C97856]/15',
  success: 'bg-gradient-to-r from-emerald-50 to-green-50 text-emerald-700 border-emerald-200/50',
  warning: 'bg-gradient-to-r from-amber-50 to-yellow-50 text-amber-700 border-amber-200/50',
- danger: 'bg-gradient-to-r from-red-50 to-rose-50 text-red-700 border-red-200/50',
+ danger: 'bg-gradient-to-r from-red-50 to-red-100/60 text-red-700 border-red-200/50',
  info: 'bg-gradient-to-r from-sky-50 to-blue-50 text-sky-700 border-sky-200/50',
  muted: 'bg-miamo-surface text-text-muted border-border/50',
 };

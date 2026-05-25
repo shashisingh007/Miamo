@@ -48,7 +48,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
  <div className="flex flex-col items-center justify-center min-h-[400px] px-8 py-16 text-center">
  {/* Animated error illustration */}
  <div className="relative mb-6">
- <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-red-50 to-rose-50 border border-red-200/50 flex items-center justify-center shadow-[0_8px_32px_rgba(239,68,68,0.08)]">
+ <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-red-50 to-red-100/50 border border-red-200/50 flex items-center justify-center shadow-[0_8px_32px_rgba(239,68,68,0.08)]">
  <AlertTriangle className="w-8 h-8 text-red-400" />
  </div>
  <div className="absolute -inset-4 rounded-[28px] bg-red-400/5 animate-pulse-slow" />

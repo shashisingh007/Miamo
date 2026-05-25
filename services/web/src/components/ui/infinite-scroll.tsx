@@ -57,7 +57,7 @@ export function InfiniteScrollSentinel({ onLoadMore, hasMore, loading, rootMargi
  {[0, 1, 2].map(i => (
  <motion.div
  key={i}
- className="w-2 h-2 rounded-full bg-gradient-to-r from-rose-main to-rose-400"
+ className="w-2 h-2 rounded-full bg-gradient-to-r from-rose-main to-rose-light"
  animate={{ scale: [1, 1.4, 1], opacity: [0.5, 1, 0.5] }}
  transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.15 }}
  />
