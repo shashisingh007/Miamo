@@ -65,8 +65,9 @@ const config: Config = {
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
+        display: ['var(--font-inter)', 'Inter', 'system-ui', 'sans-serif'],
+        brand: ['var(--font-brand)', 'Cormorant Garamond', 'Georgia', 'serif'],
         serif: ['Georgia', "'Times New Roman'", 'serif'],
       },
       backgroundImage: {
