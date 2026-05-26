@@ -8,6 +8,7 @@
 import { MAX_ENVELOPE_BYTES, MAX_EVENTS_PER_BATCH, type TrackEvent } from '../types';
 import { buildEnvelope } from '../envelope';
 import { EventQueue } from './queue';
+import { persistBatch, deleteBatch, loadOutbox, prune } from './idb';
 
 export type BatcherOptions = {
   endpoint: string;
@@ -23,6 +24,8 @@ export type BatcherOptions = {
   isEnabled: () => boolean;
   /** optional transport override for tests */
   sender?: (url: string, body: string) => boolean | Promise<boolean>;
+  /** persist outgoing batches to IndexedDB and replay on next mount (default true) */
+  persistence?: boolean;
 };
 
 export class Batcher {
@@ -40,6 +43,11 @@ export class Batcher {
     document.addEventListener('visibilitychange', this.onVisibility);
     window.addEventListener('pagehide', this.onPageHide);
     window.addEventListener('beforeunload', this.onPageHide);
+    if (this.opts.persistence !== false) {
+      // Replay any batches stranded by a prior crash / hard close.
+      void this.replayOutbox();
+      void prune(7 * 24 * 60 * 60 * 1000); // 7d cap
+    }
   }
 
   unmount(): void {
@@ -79,16 +87,37 @@ export class Batcher {
 
   private send(body: string): boolean {
     this.inFlight = true;
-    const ok = (this.opts.sender || defaultSender)(this.opts.endpoint, body);
-    // sender returns sync bool (beacon) or Promise (fetch fallback).
-    if (typeof (ok as Promise<boolean>).then === 'function') {
-      (ok as Promise<boolean>).finally(() => {
-        this.inFlight = false;
-      });
+    const id = `b_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+    const persist = this.opts.persistence !== false;
+    if (persist) void persistBatch({ id, body, ts: Date.now() });
+    const result = (this.opts.sender || defaultSender)(this.opts.endpoint, body);
+    if (typeof (result as Promise<boolean>).then === 'function') {
+      (result as Promise<boolean>).then((ok) => {
+        if (ok && persist) void deleteBatch(id);
+      }).finally(() => { this.inFlight = false; });
       return true;
     }
+    const sync = result as boolean;
+    if (sync && persist) void deleteBatch(id);
     this.inFlight = false;
-    return ok as boolean;
+    return sync;
+  }
+
+  private async replayOutbox(): Promise<void> {
+    try {
+      const rows = await loadOutbox();
+      for (const row of rows) {
+        if (!this.opts.isEnabled()) return;
+        const result = (this.opts.sender || defaultSender)(this.opts.endpoint, row.body);
+        if (typeof (result as Promise<boolean>).then === 'function') {
+          // eslint-disable-next-line no-await-in-loop
+          const ok = await (result as Promise<boolean>);
+          if (ok) await deleteBatch(row.id);
+        } else if (result) {
+          await deleteBatch(row.id);
+        }
+      }
+    } catch { /* silent */ }
   }
 
   private onVisibility = (): void => {

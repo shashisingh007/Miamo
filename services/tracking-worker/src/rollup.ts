@@ -12,7 +12,16 @@
  */
 import Redis from 'ioredis';
 import type { PrismaClient } from '@prisma/client';
+import { createHmac } from 'node:crypto';
 import { hourBucket, dayBucket, PercentileEstimator, DistinctCounter } from './buckets';
+
+const HASH_SECRET = process.env.TRACKING_HASH_SECRET || 'dev-only-tracking-hash-secret-change-me';
+
+/** Hash a raw target id with the tracking secret so meta.targets can join on uidHash. */
+function hashTid(id: string): string {
+  if (!id) return '';
+  return createHmac('sha256', HASH_SECRET).update(id).digest('base64url').slice(0, 22);
+}
 
 const STREAM_KEY = process.env.TRACKING_STREAM_KEY || 'events:raw';
 const GROUP = process.env.TRACKING_GROUP || 'rollup';
@@ -39,6 +48,8 @@ type DayBucketAgg = {
   count: number;
   durSum: number;
   uniq: DistinctCounter;
+  /** per-target interaction counts for the prior-interaction signal (cap 64) */
+  targets: Map<string, number>;
 };
 
 export class RollupConsumer {
@@ -144,12 +155,19 @@ export class RollupConsumer {
     const dkey = `${uidHash}|${evt}|${db.getTime()}`;
     let d = this.day.get(dkey);
     if (!d) {
-      d = { uidHash, evt, day: db, count: 0, durSum: 0, uniq: new DistinctCounter() };
+      d = { uidHash, evt, day: db, count: 0, durSum: 0, uniq: new DistinctCounter(), targets: new Map() };
       this.day.set(dkey, d);
     }
     d.count += 1;
     if (dur > 0) d.durSum += dur;
     d.uniq.add(tid);
+    if (tid && d.targets.size < 64) {
+      const th = hashTid(tid);
+      if (th) d.targets.set(th, (d.targets.get(th) || 0) + 1);
+    } else if (tid && d.targets.size >= 64) {
+      const th = hashTid(tid);
+      if (th && d.targets.has(th)) d.targets.set(th, (d.targets.get(th) || 0) + 1);
+    }
 
     this.pendingIds.push(id);
   }
@@ -184,14 +202,24 @@ export class RollupConsumer {
     // Daily upserts.
     for (const d of dayEntries) {
       try {
+        // Build a {targetId: count} object; capped at 64 entries during ingest.
+        const targetsObj: Record<string, number> = {};
+        for (const [tid, c] of d.targets) targetsObj[tid] = c;
+        // Merge into existing meta.targets: incremental sum keyed by tid,
+        // total entries capped at 128 via jsonb_object_keys filter.
         await this.prisma.$executeRawUnsafe(
           `INSERT INTO "EventAggDaily" ("uidHash","evt","day","count","durSum","uniqTargets","meta")
-           VALUES ($1,$2,$3,$4,$5,$6,'{}'::jsonb)
+           VALUES ($1,$2,$3,$4,$5,$6, jsonb_build_object('targets', $7::jsonb))
            ON CONFLICT ("uidHash","evt","day") DO UPDATE SET
              "count"       = "EventAggDaily"."count" + EXCLUDED."count",
              "durSum"      = "EventAggDaily"."durSum" + EXCLUDED."durSum",
-             "uniqTargets" = GREATEST("EventAggDaily"."uniqTargets", EXCLUDED."uniqTargets")`,
-          d.uidHash, d.evt, d.day, d.count, d.durSum, d.uniq.count,
+             "uniqTargets" = GREATEST("EventAggDaily"."uniqTargets", EXCLUDED."uniqTargets"),
+             "meta"        = jsonb_set(
+               COALESCE("EventAggDaily"."meta", '{}'::jsonb),
+               '{targets}',
+               COALESCE("EventAggDaily"."meta"->'targets', '{}'::jsonb) || EXCLUDED."meta"->'targets'
+             )`,
+          d.uidHash, d.evt, d.day, d.count, d.durSum, d.uniq.count, JSON.stringify(targetsObj),
         );
       } catch (e) {
         // eslint-disable-next-line no-console

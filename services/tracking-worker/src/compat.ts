@@ -100,6 +100,27 @@ export class CompatWriter {
     const byHash = new Map<string, Snap>();
     for (const s of snaps) byHash.set(s.uidHash, s);
 
+    // Prior-interaction signal: pull meta.targets aggregates for the active pool
+    // over the last 14 days. Result is a {aHash → {bHash → count}} nested map
+    // populated only for aHash ∈ actives; missing entries score 0.
+    const priorRows = (await this.prisma.$queryRawUnsafe(
+      `SELECT "uidHash", meta->'targets' AS targets
+       FROM "EventAggDaily"
+       WHERE "uidHash" = ANY($1::text[])
+         AND "day" >= NOW() - INTERVAL '14 days'
+         AND meta ? 'targets'`,
+      actives.map((a) => a.uidHash),
+    )) as Array<{ uidHash: string; targets: Record<string, number> | null }>;
+    const priorByHash = new Map<string, Map<string, number>>();
+    for (const row of priorRows) {
+      if (!row.targets) continue;
+      let m = priorByHash.get(row.uidHash);
+      if (!m) { m = new Map(); priorByHash.set(row.uidHash, m); }
+      for (const [bHash, c] of Object.entries(row.targets)) {
+        m.set(bHash, (m.get(bHash) || 0) + Number(c));
+      }
+    }
+
     let written = 0;
     for (const { uidHash: aHash } of actives) {
       const a = byHash.get(aHash);
@@ -107,14 +128,15 @@ export class CompatWriter {
       // candidate pool: other active users, capped
       const pool = actives.filter((c) => c.uidHash !== aHash).slice(0, CANDIDATES_PER_USER);
       const scored: Array<{ bHash: string; chrono: number; behavior: number; prior: number; final: number }> = [];
+      const myPrior = priorByHash.get(aHash);
       for (const { uidHash: bHash } of pool) {
         const b = byHash.get(bHash);
         if (!b) continue;
         const chrono = chronoOverlap(a.chronotype, b.chronotype);
         const behavior = behaviorSim(a, b);
-        // priorInteractionScore: log-scaled count of shared targets in EventAggDaily.
-        // In Phase 1 we don't have shared-target tracking, so use 0 placeholder.
-        const prior = 0;
+        const priorCount = myPrior?.get(bHash) || 0;
+        // log1p scaled: 0 interactions → 0, 10 → ~0.4, 100 → ~0.7, 1k → ~1.0
+        const prior = priorCount > 0 ? Math.min(1, Math.log1p(priorCount) / Math.log(1000)) : 0;
         const final = compose(chrono, behavior, prior);
         scored.push({ bHash, chrono, behavior, prior, final });
       }

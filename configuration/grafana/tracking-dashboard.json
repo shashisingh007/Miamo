@@ -1,0 +1,81 @@
+{
+  "title": "Miamo Tracking Pipeline",
+  "uid": "miamo-tracking",
+  "schemaVersion": 38,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["miamo", "tracking", "v3.1"],
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "browser",
+  "panels": [
+    {
+      "id": 1,
+      "title": "Ingest — events accepted / sec",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "rate(miamo_ingest_events_accepted_total[1m])",
+          "legendFormat": "accepted",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(miamo_ingest_events_dropped_total[1m])",
+          "legendFormat": "dropped",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "Ingest — kill / DNT / invalid",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "targets": [
+        { "expr": "rate(miamo_ingest_kill_total[5m])", "legendFormat": "kill", "refId": "A" },
+        { "expr": "rate(miamo_ingest_dnt_total[5m])", "legendFormat": "dnt", "refId": "B" },
+        { "expr": "rate(miamo_ingest_invalid_total[5m])", "legendFormat": "invalid", "refId": "C" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "Ingest — request rate",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 8, "w": 6, "h": 4 },
+      "targets": [
+        { "expr": "rate(miamo_ingest_requests_total[1m])", "refId": "A" }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Ingest — drop ratio (1h)",
+      "type": "stat",
+      "gridPos": { "x": 6, "y": 8, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "expr": "increase(miamo_ingest_events_dropped_total[1h]) / clamp_min(increase(miamo_ingest_events_accepted_total[1h]) + increase(miamo_ingest_events_dropped_total[1h]), 1)",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit", "max": 1, "min": 0 } }
+    },
+    {
+      "id": 5,
+      "title": "Redis Stream — pending events",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "targets": [
+        {
+          "expr": "redis_stream_pending_messages{stream=\"events:raw\"}",
+          "legendFormat": "pending",
+          "refId": "A"
+        },
+        {
+          "expr": "redis_stream_length{stream=\"events:raw\"}",
+          "legendFormat": "length",
+          "refId": "B"
+        }
+      ]
+    }
+  ]
+}
