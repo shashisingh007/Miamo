@@ -42,7 +42,13 @@ export default function LoginPage() {
       const response = await api.login(data);
       setAuth(response.data.user, response.data.accessToken);
       setSuccess(true);
-      router.push('/discover');
+      // v3.2 — send to /onboarding when profile is below threshold
+      let dest = '/discover';
+      try {
+        const c = await api.getCompletion();
+        if (c?.data && c.data.score < c.data.threshold) dest = '/onboarding';
+      } catch {}
+      router.push(dest);
     } catch (err: any) {
       setError(err.message || 'Invalid email or password');
     }

@@ -63,6 +63,12 @@ class ApiClient {
  useAuthStore.getState().clearAuth();
  } catch {}
  }
+ // v3.2 — Onboarding gate: redirect to /onboarding on any 403 ONBOARDING_INCOMPLETE.
+ if (typeof window !== 'undefined' && res.status === 403 && err.error?.code === 'ONBOARDING_INCOMPLETE') {
+ if (!window.location.pathname.startsWith('/onboarding')) {
+ window.location.href = '/onboarding';
+ }
+ }
  throw apiErr;
  }
  return res.json();
@@ -84,6 +90,10 @@ class ApiClient {
  }
  async getMe() {
  return this.request<any>('/api/v1/auth/me');
+ }
+ // v3.2 — Onboarding completion score
+ async getCompletion() {
+ return this.request<{ data: { score: number; threshold: number; missing: string[]; dtm: boolean } }>('/api/v1/profiles/me/completion');
  }
  async updatePassword(data: { currentPassword: string; newPassword: string }) {
  return this.request<any>('/api/v1/auth/password', { method: 'PUT', body: JSON.stringify(data) });

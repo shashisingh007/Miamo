@@ -113,6 +113,27 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  }
  }, [hydrated, isAuthenticated]);
 
+ // v3.2 — Onboarding gate. Pages exempt: profile, settings, onboarding itself,
+ // notifications (so users can clear pings), and access (so users can act on inbox).
+ useEffect(() => {
+   if (!hydrated || !isAuthenticated) return;
+   const exempt = ['/onboarding', '/profile', '/settings', '/notifications', '/access'];
+   if (exempt.some(p => pathname.startsWith(p))) return;
+   let cancelled = false;
+   (async () => {
+     try {
+       const r = await api.getCompletion();
+       if (cancelled) return;
+       if (r?.data && r.data.score < r.data.threshold) {
+         router.replace('/onboarding');
+       }
+     } catch {
+       // fail-open — don't block on completion lookup hiccups
+     }
+   })();
+   return () => { cancelled = true; };
+ }, [hydrated, isAuthenticated, pathname, router]);
+
  if (!hydrated || !isAuthenticated) {
  return (
  <div className="flex h-screen items-center justify-center bg-miamo-bg">

@@ -58,7 +58,8 @@ export default function RegisterPage() {
       const response = await api.register({ email: data.email, password: data.password, displayName: data.displayName });
       setAuth(response.data.user, response.data.accessToken);
       setSuccess(true);
-      router.push('/discover');
+      // v3.2 — brand-new accounts always start at /onboarding
+      router.push('/onboarding');
     } catch (err: any) {
       setError(err.message || 'Registration failed');
     }
