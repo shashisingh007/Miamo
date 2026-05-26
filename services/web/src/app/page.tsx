@@ -251,31 +251,50 @@ function SwipeDeck() {
 /* ── floating background bubbles ───────────────────────── */
 function FloatingBackgroundCards() {
   const reduce = useReducedMotion();
-  const bubbles = useMemo(
-    () => Array.from({ length: 8 }).map((_, i) => ({
-      hue: (i * 47 + 12) % 360,
-      initial: ['A', 'R', 'M', 'K', 'S', 'P', 'I', 'N'][i],
-      top:  ['6%', '14%', '58%', '78%', '32%', '82%', '46%', '22%'][i],
-      left: ['4%', '90%', '2%', '92%', '12%', '74%', '86%', '50%'][i],
-      delay: i * 0.4,
-      size: 52 + (i % 4) * 14,
-      opacity: 0.55 + (i % 3) * 0.1,
-    })),
-    [],
-  );
+  // ~28 pastel bubbles spread across the entire page height (0–100%)
+  const bubbles = useMemo(() => {
+    const initials = ['A','R','M','K','S','P','I','N','V','T','J','D','L','Z','Y','O','H','U','E','C','B','F','G','Q','X','W'];
+    return Array.from({ length: 28 }).map((_, i) => {
+      const hue = (i * 37 + 8) % 360;
+      // deterministic-ish spread using i
+      const top  = ((i * 11) % 96) + 1;            // 1–97%
+      const left = ((i * 23 + 7) % 94) + 1;        // 1–95%
+      const size = 36 + ((i * 13) % 60);           // 36–96px
+      const delay = (i % 6) * 0.6;
+      const dur   = 8 + (i % 7);
+      return {
+        hue, initial: initials[i % initials.length],
+        top: `${top}%`, left: `${left}%`,
+        size, delay, dur,
+        // very light pastel: high lightness, low-ish saturation, low opacity
+        from: `hsl(${hue}, 70%, 88%)`,
+        to:   `hsl(${(hue + 30) % 360}, 70%, 82%)`,
+        opacity: 0.32 + ((i % 4) * 0.06),          // 0.32–0.50
+        drift:   18 + (i % 4) * 6,                  // 18–36 px
+      };
+    });
+  }, []);
   return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden z-0">
       {bubbles.map((b, i) => (
         <motion.div
           key={i}
-          className="absolute rounded-full shadow-[0_20px_50px_-12px_rgba(190,90,70,0.4)] flex items-center justify-center font-brand font-semibold text-white"
+          className="absolute rounded-full flex items-center justify-center font-brand font-semibold"
           style={{
-            top: b.top, left: b.left, width: b.size, height: b.size,
-            fontSize: b.size * 0.42, opacity: b.opacity,
-            background: `linear-gradient(135deg, hsl(${b.hue},80%,72%), hsl(${(b.hue + 30) % 360},78%,58%))`,
+            top: b.top, left: b.left,
+            width: b.size, height: b.size,
+            fontSize: b.size * 0.4,
+            opacity: b.opacity,
+            color: `hsl(${b.hue}, 55%, 45%)`,
+            background: `linear-gradient(135deg, ${b.from}, ${b.to})`,
+            boxShadow: `0 14px 30px -12px hsl(${b.hue}, 55%, 70%)`,
           }}
-          animate={reduce ? {} : { y: [0, -22, 0], rotate: [0, i % 2 ? 6 : -6, 0] }}
-          transition={{ duration: 7 + i, repeat: Infinity, delay: b.delay, ease: 'easeInOut' }}
+          animate={reduce ? {} : {
+            y: [0, -b.drift, 0],
+            x: [0, i % 2 ? b.drift / 2 : -b.drift / 2, 0],
+            rotate: [0, i % 2 ? 8 : -8, 0],
+          }}
+          transition={{ duration: b.dur, repeat: Infinity, delay: b.delay, ease: 'easeInOut' }}
         >
           {b.initial}
         </motion.div>
