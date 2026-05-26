@@ -14,7 +14,7 @@ const prisma = createPrisma(15);
 export const app = express();
 const PORT = parseInt(process.env.PORT || '3205', 10);
 
-applyBaseMiddleware(app, { jsonLimit: '10mb' });
+applyBaseMiddleware(app, { jsonLimit: '10mb', serviceName: 'content' });
 interface AuthRequest extends Request { userId?: string }
 const authMiddleware = createInternalAuthMiddleware();
 installHealthRoutes(app, 'content', prisma);

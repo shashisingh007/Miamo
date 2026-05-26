@@ -21,7 +21,14 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 - **web** `Button` base class gains `focus-visible:ring-2 focus-visible:ring-rose-main focus-visible:ring-offset-2 focus-visible:ring-offset-white`. Keyboard users now see a visible focus state matching the brand.
 - **web** Root viewport now declares `viewportFit: 'cover'` so iOS notch/home-indicator devices render fullscreen with `env(safe-area-inset-*)` available.
 - **web** Mobile bottom nav (`(main)/layout.tsx`) now applies `pb-[max(0.5rem,env(safe-area-inset-bottom))]` and bumps every tap target to ≥ 44×44 px.
-- **web** Fixed-bottom sheets in `creativity/{page,UploadModal,CommentSheet}` and the discover-card action bar now pad against `env(safe-area-inset-bottom)` so the home-indicator no longer overlaps tappable controls.: removed `'unsafe-inline'` from `scriptSrc` and `styleSrc`; added `baseUri 'none'` and `formAction 'none'`. Gateway serves JSON+SSE only, so no inline assets are needed.
+- **web** Fixed-bottom sheets in `creativity/{page,UploadModal,CommentSheet}` and the discover-card action bar now pad against `env(safe-area-inset-bottom)` so the home-indicator no longer overlaps tappable controls.
+
+### Observability
+- **shared** New `services/shared/src/metrics.ts` ships `metricsMiddleware(service)` that auto-mounts a Prometheus `/metrics` endpoint on every service (auth/users/social/messaging/content/notifications/gateway). Exposes `miamo_http_requests_total`, `miamo_http_request_duration_seconds` (11 latency buckets), `miamo_http_errors_total`, plus default Node.js process metrics — all labeled `service|method|route|status`.
+
+### Validation
+- **shared** New `services/shared/src/validate.ts` (zod middleware) + `services/shared/src/schemas.ts` (reusable primitives: email, password, displayName, register/login/refresh/forgot-password bodies, cursor pagination, id/userId params). Errors respond with `{ error: { code: 'VALIDATION_ERROR', fields: [...] } }`.
+- **auth** `/api/v1/auth/{register,login,refresh}` now use zod schemas instead of hand-rolled `if (!field)` chains. Email is auto-lowercased+trimmed by zod; sanitize() still runs for HTML/control-char stripping.: removed `'unsafe-inline'` from `scriptSrc` and `styleSrc`; added `baseUri 'none'` and `formAction 'none'`. Gateway serves JSON+SSE only, so no inline assets are needed.
 - **gateway** Pre-verify JWT format with `/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/` before `jwt.verify()` on both Authorization header and SSE `?token=`. Cheap rejection of malformed probes.
 - **gateway** New per-user rate limiter (`expensiveLimiter`, 20/min) applied to `/api/v1/discover` and `/api/v1/search` to throttle heavy DB/ML queries.
 - **social** Self-report/self-block/self-unmatch guards on `/api/v1/matches/by-user/:userId/{report,block,DELETE}`.

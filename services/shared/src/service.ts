@@ -11,6 +11,7 @@ import rateLimit from 'express-rate-limit';
 import { PrismaClient } from '@prisma/client';
 import { logger } from './logger';
 import { env } from './env';
+import { metricsMiddleware } from './metrics';
 
 // ─── Prisma factory ────────────────────────────────────────────────
 // Appends connection_limit + pool_timeout query params to the URL so each
@@ -40,10 +41,14 @@ export interface BaseMiddlewareOptions {
   rateLimitMax?: number;      // requests per 15-min window
   rateLimitWindowMs?: number; // default 15 minutes
   corsOrigin?: string;        // default FRONTEND_URL or http://localhost:3100
+  serviceName?: string;       // labels metrics; defaults to 'unknown' if absent
 }
 
 export function applyBaseMiddleware(app: Express, opts: BaseMiddlewareOptions = {}): void {
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  // Mount metrics BEFORE rate-limiter so /metrics scrapes never trip the limiter
+  // and timing covers the full request lifecycle (incl. JSON parse).
+  app.use(metricsMiddleware(opts.serviceName || 'unknown'));
   app.use(cors({
     origin: opts.corsOrigin || process.env.FRONTEND_URL || 'http://localhost:3100',
     credentials: true,

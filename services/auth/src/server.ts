@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { logger } from '../../shared/src/logger';
 import { errorHandler } from '../../shared/src/errorHandler';
+import { validate } from '../../shared/src/validate';
+import { registerBodySchema, loginBodySchema, refreshBodySchema, forgotPasswordBodySchema } from '../../shared/src/schemas';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog } from '../../shared/src/audit';
 import { env } from '../../shared/src/env';
@@ -19,7 +21,7 @@ const JWT_SECRET = env.jwtSecret;
 const JWT_REFRESH_SECRET = env.jwtRefreshSecret;
 
 // ─── Middleware ───────────────────────────────────────
-applyBaseMiddleware(app, { jsonLimit: '1mb', rateLimitMax: 1000 });
+applyBaseMiddleware(app, { jsonLimit: '1mb', rateLimitMax: 1000, serviceName: 'auth' });
 
 // ─── Helpers ─────────────────────────────────────────
 class AppError extends Error {
@@ -78,19 +80,12 @@ installHealthRoutes(app, 'auth', prisma);
 
 // ─── Routes ──────────────────────────────────────────
 // Register
-app.post('/api/v1/auth/register', async (req: Request, res: Response, next: NextFunction) => {
+app.post('/api/v1/auth/register', validate({ body: registerBodySchema }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email: rawEmail, password, displayName: rawDisplayName } = req.body;
-    if (!rawEmail || !password || !rawDisplayName) throw new AppError('Missing required fields', 400, 'VALIDATION_ERROR');
-    if (password.length < 8) throw new AppError('Password must be at least 8 characters', 400, 'VALIDATION_ERROR');
-    if (password.length > 128) throw new AppError('Password too long', 400, 'VALIDATION_ERROR');
-    // Email format validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(rawEmail)) throw new AppError('Invalid email format', 400, 'VALIDATION_ERROR');
-    if (rawEmail.length > 254) throw new AppError('Email too long', 400, 'VALIDATION_ERROR');
-    // Display name length validation
-    if (rawDisplayName.length > 50) throw new AppError('Display name too long (max 50 characters)', 400, 'VALIDATION_ERROR');
-    const email = sanitize(rawEmail).toLowerCase();
+    // zod has already normalized email to lowercase + trimmed both strings;
+    // still run sanitize() to strip any HTML/control chars before storage.
+    const email = sanitize(rawEmail);
     const displayName = sanitize(rawDisplayName);
 
     const existing = await prisma.user.findUnique({ where: { email } });
@@ -134,10 +129,9 @@ app.post('/api/v1/auth/register', async (req: Request, res: Response, next: Next
 });
 
 // Login
-app.post('/api/v1/auth/login', async (req: Request, res: Response, next: NextFunction) => {
+app.post('/api/v1/auth/login', validate({ body: loginBodySchema }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { email: rawEmail, password } = req.body;
-    if (!rawEmail || !password) throw new AppError('Email and password required', 400, 'VALIDATION_ERROR');
     const email = sanitize(rawEmail);
 
     const user = await prisma.user.findUnique({ where: { email }, include: { profile: true, photos: { orderBy: { position: 'asc' }, take: 1 } } });
@@ -228,10 +222,9 @@ app.get('/api/v1/auth/me', authMiddleware, async (req: AuthRequest, res: Respons
 });
 
 // Refresh token
-app.post('/api/v1/auth/refresh', async (req: Request, res: Response, next: NextFunction) => {
+app.post('/api/v1/auth/refresh', validate({ body: refreshBodySchema }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { refreshToken } = req.body;
-    if (!refreshToken) throw new AppError('Refresh token required', 400, 'VALIDATION_ERROR');
     const payload = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as { userId: string };
     // Security: verify user still has active sessions (prevents use after logout/password change)
     const activeSession = await prisma.session.findFirst({ where: { userId: payload.userId, revoked: false } });

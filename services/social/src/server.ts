@@ -14,7 +14,7 @@ const prisma = createPrisma(15);
 export const app = express();
 const PORT = parseInt(process.env.PORT || '3203', 10);
 
-applyBaseMiddleware(app, { jsonLimit: '10mb' });
+applyBaseMiddleware(app, { jsonLimit: '10mb', serviceName: 'social' });
 interface AuthRequest extends Request { userId?: string }
 
 // ─── Shared Constants ────────────────────────────────

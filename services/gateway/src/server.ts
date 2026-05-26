@@ -13,6 +13,7 @@ import compression from 'compression';
 import { createProxyMiddleware, Options } from 'http-proxy-middleware';
 import jwt from 'jsonwebtoken';
 import { logger } from '../../shared/src/logger';
+import { metricsMiddleware } from '../../shared/src/metrics';
 import { env } from '../../shared/src/env';
 
 const app = express();
@@ -78,6 +79,7 @@ const SERVICES = {
 // ─── Security: Enhanced Helmet CSP ───────────────────
 // Gateway serves JSON + SSE only — no HTML. Strict CSP is safe and blocks any
 // accidental script/style injection via reflected error pages.
+app.use(metricsMiddleware('gateway'));
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: {
