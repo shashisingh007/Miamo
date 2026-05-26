@@ -1038,4 +1038,18 @@
     50% { box-shadow: 0 0 14px rgba(201, 120, 86, 0.3), 0 0 28px rgba(212, 137, 106, 0.15); opacity: 1; }
   }
 
+  /* ═══ REDUCED MOTION ═══ */
+  /* Honour the OS-level "Reduce Motion" preference: collapse all custom
+     animations/transitions to ~0ms and pause infinite keyframes. Tailwind's
+     `motion-reduce:` utilities still apply on top of this, but this rule
+     is a safety net for the many bespoke @keyframes in this file. */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+
 }
