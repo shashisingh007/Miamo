@@ -302,7 +302,7 @@ export default function DateToMarryPage() {
  <AnimatePresence>
  {showFilters && (
  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
- <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
+ <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-soft">
  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
  <Select value={filters.religion || ''} onChange={v => setFilters(f => ({ ...f, religion: v }))} options={RELIGIONS} placeholder="Religion" />
  <Select value={filters.caste || ''} onChange={v => setFilters(f => ({ ...f, caste: v }))} options={filters.religion ? (CASTES_BY_RELIGION[filters.religion] || ['Other']) : []} placeholder="Caste" />
@@ -417,7 +417,7 @@ export default function DateToMarryPage() {
  {incomingRequests.map(req => {
  const user = req.requester?.user;
  return (
- <div key={req.id} className="bg-miamo-card rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-sm">
+ <div key={req.id} className="bg-miamo-card rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-soft">
  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-rose-alt to-rose-main flex items-center justify-center shrink-0">
  <span className="text-base font-bold text-text-primary">{user?.displayName?.[0] || '?'}</span>
  </div>
@@ -463,7 +463,7 @@ export default function DateToMarryPage() {
  <div className="space-y-5">
  <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Hash className="w-5 h-5 text-rose-main" /> Numerology</h2>
  {!numerologyData ? (
- <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-8 text-center shadow-sm">
+ <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-8 text-center shadow-soft">
  <div className="text-5xl mb-4">🔢</div>
  <h3 className="text-base font-bold text-zinc-900 mb-2">Discover Your Numbers</h3>
  <p className="text-sm text-zinc-500 mb-5">Calculate your Life Path, Destiny & Soul numbers using Pythagorean + Vedic analysis.</p>
@@ -494,7 +494,7 @@ export default function DateToMarryPage() {
  </div>
 
  {/* Info Rows */}
- <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 shadow-sm">
+ <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 shadow-soft">
  <h3 className="text-xs font-bold text-zinc-900 mb-3 flex items-center gap-2">🕉 Vedic Numerology Details</h3>
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
  <div className="flex items-center gap-3 bg-zinc-50 rounded-xl p-3"><span className="text-xs font-semibold text-zinc-500 w-28">Ruling Planet</span><span className="text-sm text-zinc-800 font-medium">{numerologyData.rulingPlanet}</span></div>
@@ -518,7 +518,7 @@ export default function DateToMarryPage() {
  )}
 
  {/* Compatible Numbers */}
- <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
+ <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-soft">
  <div>
  <p className="text-xs text-zinc-500 font-semibold mb-2">Compatible Numbers</p>
  <div className="flex gap-2">
@@ -565,7 +565,7 @@ export default function DateToMarryPage() {
  {section === 'kundli' && (
  <div className="space-y-5">
  <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Moon className="w-5 h-5 text-rose-main" /> Kundli / Horoscope</h2>
- <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
+ <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-soft">
  <h3 className="text-sm font-bold text-zinc-900">Upload Your Kundli</h3>
  <p className="text-xs text-zinc-500">Upload your kundli/horoscope data. When both partners have kundli data, AI will analyze match compatibility using Ashtakoota system.</p>
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -613,7 +613,7 @@ export default function DateToMarryPage() {
  ))}
  </div>
  ) : (
- <div className="bg-miamo-card rounded-2xl border border-zinc-200 overflow-hidden shadow-sm">
+ <div className="bg-miamo-card rounded-2xl border border-zinc-200 overflow-hidden shadow-soft">
  <div className="flex items-center gap-3 p-4 border-b border-zinc-100">
  <button onClick={() => setActiveChatUserId(null)} className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center hover:bg-zinc-200"><ChevronLeft className="w-4 h-4 text-zinc-600" /></button>
  <p className="text-sm font-semibold text-zinc-900">Chat</p>
@@ -653,7 +653,7 @@ export default function DateToMarryPage() {
  ) : incomingRequests.map(req => {
  const user = req.requester?.user;
  return (
- <div key={req.id} className="bg-miamo-card rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-sm hover:shadow-md transition-shadow">
+ <div key={req.id} className="bg-miamo-card rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-soft hover:shadow-md transition-shadow">
  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-rose-alt to-rose-main flex items-center justify-center shrink-0">
  <span className="text-base font-bold text-text-primary">{user?.displayName?.[0] || '?'}</span>
  </div>
@@ -688,7 +688,7 @@ export default function DateToMarryPage() {
  {sentRequests.length === 0 ? (
  <div className="text-center py-10 bg-miamo-card rounded-2xl border border-zinc-200"><Send className="w-10 h-10 text-zinc-300 mx-auto mb-3" /><p className="text-sm text-zinc-500">No sent requests</p></div>
  ) : sentRequests.map(req => (
- <div key={req.id} className="bg-miamo-card rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-sm">
+ <div key={req.id} className="bg-miamo-card rounded-xl border border-zinc-200 p-4 flex items-center gap-4 shadow-soft">
  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-rose-alt to-rose-main flex items-center justify-center shrink-0"><span className="text-base font-bold text-text-primary">{req.owner?.user?.displayName?.[0] || '?'}</span></div>
  <div className="flex-1 min-w-0"><p className="text-sm font-semibold text-zinc-900">{req.owner?.user?.displayName || 'User'}</p><p className="text-xs text-zinc-500">Requested: <span className="text-rose-main font-medium">{req.accessType}</span></p></div>
  <span className={cn('text-xs font-medium px-3 py-1.5 rounded-lg border', req.status === 'pending' ? 'bg-rose-soft text-rose-dark border-rose-light' : req.status === 'granted' ? 'bg-rose-soft text-rose-dark border-rose-light' : 'bg-red-50 text-red-700 border-red-200')}>
@@ -704,7 +704,7 @@ export default function DateToMarryPage() {
  {section === 'preferences' && myProfile && (
  <div className="space-y-5">
  <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Heart className="w-5 h-5 text-rose" /> Partner Preferences</h2>
- <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
+ <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-soft">
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <Field label="Min Age"><Input type="number" value={myProfile.partnerAgeMin} onChange={(v: string) => updateField('partnerAgeMin', parseInt(v) || 21)} /></Field>
  <Field label="Max Age"><Input type="number" value={myProfile.partnerAgeMax} onChange={(v: string) => updateField('partnerAgeMax', parseInt(v) || 35)} /></Field>
@@ -731,7 +731,7 @@ export default function DateToMarryPage() {
  {section === 'privacy' && (
  <div className="space-y-5">
  <h2 className="text-lg font-bold text-zinc-900 flex items-center gap-2"><Lock className="w-5 h-5 text-zinc-600" /> Privacy & Security</h2>
- <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
+ <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-soft">
  <h3 className="text-sm font-bold text-zinc-900">Who can see your info</h3>
  {[
  { key: 'bioDataPublic', label: 'Bio Data', desc: 'Allow everyone to view your bio data' },

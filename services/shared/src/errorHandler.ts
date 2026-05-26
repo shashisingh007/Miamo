@@ -16,12 +16,17 @@ export interface ErrorLike {
   stack?: string;
 }
 
-export function errorHandler(err: unknown, _req: Request, res: Response, _next: NextFunction): void {
+interface RequestWithId extends Request {
+  id?: string;
+}
+
+export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction): void {
   const error = err as ErrorLike;
+  const requestId = (req as RequestWithId).id;
   // Prisma FK violation on userId means the user's session is stale (deleted/reseeded).
   // Treat as 401 so the web app can prompt re-login instead of showing a generic 500.
   if (error?.code === 'P2003' && error?.message?.includes('userId')) {
-    res.status(401).json({ error: { message: 'Session expired — please log in again', code: 'UNAUTHORIZED', statusCode: 401 } });
+    res.status(401).json({ error: { message: 'Session expired — please log in again', code: 'UNAUTHORIZED', statusCode: 401, requestId } });
     return;
   }
   const statusCode = error.statusCode || 500;
@@ -29,8 +34,8 @@ export function errorHandler(err: unknown, _req: Request, res: Response, _next: 
   const message = statusCode === 500 && isProd
     ? 'Internal server error'
     : (error.message || 'Internal server error');
-  if (statusCode >= 500) logger.error('Unhandled error:', error.message, error.stack);
+  if (statusCode >= 500) logger.error('Unhandled error:', { requestId, message: error.message, stack: error.stack });
   res.status(statusCode).json({
-    error: { message, code: error.code || 'INTERNAL_ERROR', statusCode },
+    error: { message, code: error.code || 'INTERNAL_ERROR', statusCode, requestId },
   });
 }

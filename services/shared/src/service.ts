@@ -12,6 +12,7 @@ import { PrismaClient } from '@prisma/client';
 import { logger } from './logger';
 import { env } from './env';
 import { metricsMiddleware } from './metrics';
+import { requestId } from './requestId';
 
 // ─── Prisma factory ────────────────────────────────────────────────
 // Appends connection_limit + pool_timeout query params to the URL so each
@@ -46,6 +47,8 @@ export interface BaseMiddlewareOptions {
 
 export function applyBaseMiddleware(app: Express, opts: BaseMiddlewareOptions = {}): void {
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
+  // requestId must run before metrics + logging so every log line has a trace id.
+  app.use(requestId);
   // Mount metrics BEFORE rate-limiter so /metrics scrapes never trip the limiter
   // and timing covers the full request lifecycle (incl. JSON parse).
   app.use(metricsMiddleware(opts.serviceName || 'unknown'));

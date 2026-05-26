@@ -14,6 +14,7 @@ import { createProxyMiddleware, Options } from 'http-proxy-middleware';
 import jwt from 'jsonwebtoken';
 import { logger } from '../../shared/src/logger';
 import { metricsMiddleware } from '../../shared/src/metrics';
+import { requestId } from '../../shared/src/requestId';
 import { env } from '../../shared/src/env';
 
 const app = express();
@@ -80,6 +81,7 @@ const SERVICES = {
 // Gateway serves JSON + SSE only — no HTML. Strict CSP is safe and blocks any
 // accidental script/style injection via reflected error pages.
 app.use(metricsMiddleware('gateway'));
+app.use(requestId);
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: {
@@ -400,6 +402,8 @@ function proxyTo(target: string): Options {
         if (req.headers.authorization) {
           proxyReq.setHeader('authorization', req.headers.authorization);
         }
+        // Forward the request-id so downstream logs stitch into the same trace.
+        if (req.id) proxyReq.setHeader('x-request-id', req.id);
       },
       error: (err, _req, res: any) => {
         logger.error('Proxy error:', err.message);

@@ -29,15 +29,19 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 ### Validation
 - **shared** New `services/shared/src/validate.ts` (zod middleware) + `services/shared/src/schemas.ts` (reusable primitives: email, password, displayName, register/login/refresh/forgot-password bodies, cursor pagination, id/userId params). Errors respond with `{ error: { code: 'VALIDATION_ERROR', fields: [...] } }`.
 - **auth** `/api/v1/auth/{register,login,refresh}` now use zod schemas instead of hand-rolled `if (!field)` chains. Email is auto-lowercased+trimmed by zod; sanitize() still runs for HTML/control-char stripping.
+- **users** `PUT /api/v1/profiles/me`, `/profiles/me/prompts`, `/profiles/me/interests` validated with zod (`updateProfileBodySchema`, `profilePromptsBodySchema`, `profileInterestsBodySchema`). All field-level length and range checks (age 18-120, height 50-250, bio ≤2000, etc.) now run in middleware.
+- **social** `POST /api/v1/discover/{like,pass,comment}`, `/safety/report`, `/vibe-check` validated with zod.
+- **messaging** `POST /api/v1/messages/chats/:chatId/messages`, `/messages/:id/react`, `/chats/:chatId/theme` validated with zod (`sendMessageBodySchema` caps content at 5000 chars and restricts `type` to a known enum).
+
+### Tracing
+- **shared** New `services/shared/src/requestId.ts` middleware auto-mounted via `applyBaseMiddleware` and the gateway. Mints a UUID for each request (or echoes a safe incoming `X-Request-Id`), attaches to `req.id`, sets `X-Request-Id` response header, and the gateway forwards it to downstream services. Now surfaced in `errorHandler` response envelopes and 5xx log lines.
+
+### Polish
+- **web** Shadow-ladder consistency sweep: 17 card-tier surfaces in `serious-mode/page.tsx` and `serious-mode/components/ProfileEditor.tsx` migrated from default `shadow-sm` to brand token `shadow-soft` (the lowest tier in `tailwind.config.ts` boxShadow ladder). Micro shadows (status dots, swatches) kept on `shadow-sm`.
 
 ### Testing
 - **repo** Added Vitest 2 + supertest 7. Root `vitest.config.ts` excludes `services/web/**` (Next.js has its own test setup). Scripts: `npm test`, `npm run test:watch`, `npm run test:coverage` (python suite moved to `npm run test:python`).
-- **shared** 22 unit tests covering `schemas.ts` (11), `validate.ts` (4), and `errorHandler.ts` (4 incl. Prisma P2003 mapping + production message masking). All passing.: removed `'unsafe-inline'` from `scriptSrc` and `styleSrc`; added `baseUri 'none'` and `formAction 'none'`. Gateway serves JSON+SSE only, so no inline assets are needed.
-- **gateway** Pre-verify JWT format with `/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/` before `jwt.verify()` on both Authorization header and SSE `?token=`. Cheap rejection of malformed probes.
-- **gateway** New per-user rate limiter (`expensiveLimiter`, 20/min) applied to `/api/v1/discover` and `/api/v1/search` to throttle heavy DB/ML queries.
-- **social** Self-report/self-block/self-unmatch guards on `/api/v1/matches/by-user/:userId/{report,block,DELETE}`.
-- **users** `PUT /api/v1/profiles/me/prompts` now rejects non-array and arrays >10 items.
-- **docker-compose / .env.example** Replaced hardcoded `JWT_SECRET`, `INTERNAL_SERVICE_KEY`, and `POSTGRES_PASSWORD` with `${VAR:?required}` interpolation. Compose now fails fast if `.env` is missing required secrets.
+- **shared** 26 unit tests covering `schemas.ts` (11), `validate.ts` (4), `errorHandler.ts` (4 incl. Prisma P2003 mapping + production message masking), and `requestId.ts` (4 incl. malicious-header rejection). All passing.
 
 ## [3.0.0]
 Initial backend-hardening + responsive frontend release. See git history for details.

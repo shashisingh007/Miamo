@@ -83,7 +83,7 @@ export function ProfileEditor({
 
  {/* Step 0: Personal */}
  {bioDataStep === 0 && (
- <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
+ <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-soft">
  <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2"><Users className="w-4 h-4 text-rose-main" /> Personal Details</h3>
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <Field label="Full Name" icon={Users} required><Input value={myProfile.fullName} onChange={(v: string) => updateField('fullName', v)} placeholder="Enter full name" /></Field>
@@ -102,7 +102,7 @@ export function ProfileEditor({
 
  {/* Step 1: Religion */}
  {bioDataStep === 1 && (
- <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
+ <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-soft">
  <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2"><Moon className="w-4 h-4 text-rose-main" /> Religion & Caste</h3>
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <Field label="Religion" icon={Moon} required><Select value={myProfile.religion} onChange={(v: string) => updateField('religion', v)} options={RELIGIONS} /></Field>
@@ -126,7 +126,7 @@ export function ProfileEditor({
 
  {/* Step 2: Education */}
  {bioDataStep === 2 && (
- <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
+ <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-soft">
  <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2"><GraduationCap className="w-4 h-4 text-rose-main" /> Education & Career</h3>
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <Field label="Highest Education" required><Select value={myProfile.education} onChange={(v: string) => updateField('education', v)} options={EDUCATION_LEVELS} /></Field>
@@ -143,7 +143,7 @@ export function ProfileEditor({
 
  {/* Step 3: Family */}
  {bioDataStep === 3 && (
- <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
+ <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-soft">
  <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2"><Home className="w-4 h-4 text-rose-main" /> Family Details</h3>
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <Field label="Father's Name"><Input value={myProfile.fatherName} onChange={(v: string) => updateField('fatherName', v)} placeholder="Father's name" /></Field>
@@ -165,7 +165,7 @@ export function ProfileEditor({
 
  {/* Step 4: Lifestyle */}
  {bioDataStep === 4 && (
- <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
+ <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-soft">
  <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2"><Sun className="w-4 h-4 text-rose-main" /> Lifestyle & About</h3>
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
  <Field label="Marital Status"><Select value={myProfile.maritalStatus} onChange={(v: string) => updateField('maritalStatus', v)} options={MARITAL_STATUSES} /></Field>
@@ -183,7 +183,7 @@ export function ProfileEditor({
  {/* Step 5: Contact & Privacy */}
  {bioDataStep === 5 && (
  <div className="space-y-5">
- <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-sm">
+ <div className="bg-miamo-card rounded-2xl border border-zinc-200 p-5 space-y-4 shadow-soft">
  <h3 className="text-sm font-bold text-zinc-900 flex items-center gap-2"><Lock className="w-4 h-4 text-rose-main" /> Contact & Privacy</h3>
  <div className="bg-rose-soft border border-rose-light rounded-xl p-3">
  <p className="text-xs text-rose-dark flex items-start gap-2"><Shield className="w-4 h-4 shrink-0 mt-0.5" /> Your contact info is never shown publicly. Others must request access.</p>
