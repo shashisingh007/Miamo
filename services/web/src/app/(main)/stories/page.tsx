@@ -44,7 +44,7 @@ function MyStoryInsights({ stories, onView, onDelete, onPostToFeed }: {
  <motion.button whileHover={{ scale: 1.05 }} onClick={() => onView(i)}
  className={cn('w-14 h-20 rounded-xl overflow-hidden flex-shrink-0 relative',
  s.mediaUrl ? '' : `bg-gradient-to-br ${bgGradient}`)}>
- {s.mediaUrl ? <img loading="lazy" src={s.mediaUrl} alt="" className="w-full h-full object-cover" /> :
+ {s.mediaUrl ? <img loading="lazy" src={s.mediaUrl} alt={text ? text.substring(0, 60) : 'Story preview'} className="w-full h-full object-cover" /> :
  <p className="absolute inset-0 flex items-center justify-center p-1 text-text-primary text-[8px] font-bold text-center leading-tight">{text?.substring(0, 40)}</p>}
  {isPopular && (
  <div className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-rose-alt flex items-center justify-center">
@@ -265,7 +265,7 @@ export default function StoriesPage() {
  onClick={() => handleViewGroup(group)}
  className="relative aspect-[9/16] max-h-[260px] rounded-2xl overflow-hidden group shadow-lg hover:shadow-xl transition-all">
  {firstStory.mediaUrl ? (
- <img loading="lazy" src={firstStory.mediaUrl} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+ <img loading="lazy" src={firstStory.mediaUrl} alt={`${author.displayName || 'Story'} preview`} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
  ) : (
  <div className={cn('w-full h-full bg-gradient-to-br', bgGrad)}>
  <div className="absolute inset-0 flex items-center justify-center p-3">

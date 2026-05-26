@@ -59,7 +59,7 @@ function PhotoLightbox({ photos, initialIndex, onClose }: { photos: any[]; initi
  <motion.img
  key={idx}
  src={photos[idx]?.url}
- alt=""
+ alt={photos[idx]?.description || `Photo ${idx + 1} of ${photos.length}`}
  className="w-full rounded-2xl object-contain max-h-[80vh]"
  initial={{ opacity: 0, scale: 0.95 }}
  animate={{ opacity: 1, scale: 1 }}
@@ -272,7 +272,7 @@ export default function ProfilePage() {
  onClick={() => setLightboxIndex(i)}
  >
  <div className="tilt-3d-inner aspect-square rounded-2xl overflow-hidden bg-miamo-surface">
- <img loading="lazy" src={photo.url} alt="" className="w-full h-full object-cover group-hover:brightness-90 transition-all" />
+ <img loading="lazy" src={photo.url} alt={photo.description || `Profile photo ${i + 1}`} className="w-full h-full object-cover group-hover:brightness-90 transition-all" />
  </div>
  <div className="absolute inset-0 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity bg-black/20 flex items-center justify-center">
  <ZoomIn className="w-5 h-5 text-text-primary" />

@@ -250,7 +250,7 @@ export default function DiscoverPage() {
  i === 0 ? 'ring-2 ring-white/20' : '',
  )} style={{ zIndex: 4 - i }}>
  {p.photos?.[0] ? (
- <img loading="lazy" src={p.photos[0].url || p.photos[0]} alt="" className="w-full h-full object-cover" />
+ <img loading="lazy" src={p.photos[0].url || p.photos[0]} alt={`${p.displayName || 'Profile'} photo`} className="w-full h-full object-cover" />
  ) : (
  <div className="w-full h-full bg-miamo-card/10 flex items-center justify-center text-[8px] text-text-muted font-bold">{p.displayName?.[0]}</div>
  )}

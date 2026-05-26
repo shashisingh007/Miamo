@@ -15,10 +15,17 @@ import { useRouter } from 'next/navigation';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 
-interface ToggleProps { enabled: boolean; onToggle: () => void; }
-function Toggle({ enabled, onToggle }: ToggleProps) {
+interface ToggleProps { enabled: boolean; onToggle: () => void; label?: string; }
+function Toggle({ enabled, onToggle, label }: ToggleProps) {
  return (
- <button onClick={onToggle} className={cn('w-10 h-6 rounded-full transition-colors relative', enabled ? 'bg-rose-main' : 'bg-miamo-elevated border border-border')}>
+ <button
+ type="button"
+ role="switch"
+ aria-checked={enabled}
+ aria-label={label}
+ onClick={onToggle}
+ className={cn('w-10 h-6 rounded-full transition-colors relative', enabled ? 'bg-rose-main' : 'bg-miamo-elevated border border-border')}
+ >
  <motion.div animate={{ x: enabled ? 18 : 2 }} className="absolute top-1 w-4 h-4 rounded-full bg-miamo-card shadow" />
  </button>
  );

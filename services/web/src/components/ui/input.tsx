@@ -13,11 +13,17 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
  * Focus ring uses rose-soft accent. Error state changes border to red.
  */
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
- ({ className, label, error, icon, type, variant = 'default', ...props }, ref) => {
+ ({ className, label, error, icon, type, variant = 'default', id, ...props }, ref) => {
+ const reactId = React.useId();
+ const inputId = id || `input-${reactId}`;
+ const errorId = error ? `${inputId}-error` : undefined;
  return (
  <div className="space-y-1.5">
  {label && (
- <label className="text-sm font-medium text-text-secondary tracking-wide">
+ <label
+ htmlFor={inputId}
+ className="text-sm font-medium text-text-secondary tracking-wide"
+ >
  {label}
  </label>
  )}
@@ -28,7 +34,10 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
  </div>
  )}
  <input
+ id={inputId}
  type={type}
+ aria-invalid={error ? true : undefined}
+ aria-describedby={errorId}
  className={cn(
  'w-full rounded-xl px-4 py-3 text-text-primary text-sm',
  'placeholder:text-text-muted',
@@ -46,7 +55,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
  />
  </div>
  {error && (
- <p className="text-xs text-red-500 font-medium flex items-center gap-1">
+ <p id={errorId} className="text-xs text-red-500 font-medium flex items-center gap-1">
  <span className="inline-block w-1 h-1 rounded-full bg-red-400" />
  {error}
  </p>
