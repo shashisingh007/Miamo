@@ -1,11 +1,17 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeAll } from 'vitest';
 import type { Request, Response } from 'express';
 
 // Ensure REDIS_URL is unset so the middleware no-ops without a real Redis.
 delete process.env.REDIS_URL;
 
 // Dynamic import after env tweak so the module sees the unset URL on first call.
-const { idempotency } = await import('./idempotency');
+// Wrapped in `beforeAll` (not top-level await) so this file remains parseable by
+// the older `module: commonjs` tsc configs used by some services that include
+// `services/shared/**` in their compile graph.
+let idempotency: typeof import('./idempotency').idempotency;
+beforeAll(async () => {
+  ({ idempotency } = await import('./idempotency'));
+});
 
 function mockRes() {
   const headers: Record<string, string> = {};

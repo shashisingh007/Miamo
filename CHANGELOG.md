@@ -16,6 +16,8 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 - **shared** New `services/shared/src/errorHandler.ts`. Replaced 6 near-duplicate Express error handlers across auth, users, social, messaging, content, notifications with a single import. The Prisma P2003-on-userId → 401 special case (previously only in content) is now applied uniformly.
 - **repo** Added Husky 9 + lint-staged 15 scaffolding. Pre-commit hook is a no-op until matchers are populated.
 - **repo** Added `.github/dependabot.yml`: weekly npm/docker/github-actions updates, patch+minor grouped, majors require manual review.
+- **repo** Added `.github/workflows/ci.yml`: runs the vitest suite on every push/PR plus a per-service `tsc --noEmit` matrix (auth, users, social, messaging, content, notifications, gateway).
+- **services/*** tsconfigs now exclude `**/*.test.ts`, `**/*.spec.ts`, and `**/*.integration.test.ts` from the compile graph so test fixtures never leak into production builds. All 7 services pass `tsc --noEmit` clean.
 
 ### UI / UX
 - **web** `Button` base class gains `focus-visible:ring-2 focus-visible:ring-rose-main focus-visible:ring-offset-2 focus-visible:ring-offset-white`. Keyboard users now see a visible focus state matching the brand.
@@ -43,10 +45,14 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ### Polish
 - **web** Shadow-ladder consistency sweep: 17 card-tier surfaces in `serious-mode/page.tsx` and `serious-mode/components/ProfileEditor.tsx` migrated from default `shadow-sm` to brand token `shadow-soft` (the lowest tier in `tailwind.config.ts` boxShadow ladder). Micro shadows (status dots, swatches) kept on `shadow-sm`.
+- **web** Added `@media (prefers-reduced-motion: reduce)` safety net in `globals.css` that collapses every custom keyframe and transition to ~0ms for users with the OS-level Reduce Motion preference.
+- **web** New `services/web/src/app/error.tsx` and `not-found.tsx` segment routes — brand-styled fallbacks (rose-gold chrome, focus-visible rings on action buttons, requestId/digest displayed when available) replace Next.js' default unstyled 404 / error pages.
+- **web** SEO + PWA metadata: new `robots.ts`, `sitemap.ts`, and `manifest.ts` files under `src/app/` (Next.js App Router auto-routes them at `/robots.txt`, `/sitemap.xml`, `/manifest.webmanifest`). Robots disallows all authenticated app surfaces; manifest enables "Add to Home Screen".
 
 ### Testing
 - **repo** Added Vitest 2 + supertest 7. Root `vitest.config.ts` excludes `services/web/**` (Next.js has its own test setup). Scripts: `npm test`, `npm run test:watch`, `npm run test:coverage` (python suite moved to `npm run test:python`).
 - **shared** 30 unit tests covering `schemas.ts` (11), `validate.ts` (4), `errorHandler.ts` (4), `requestId.ts` (4), and `idempotency.ts` (4 incl. malformed-key 400, no-Redis fail-open). All passing.
+- **shared** Plus 5 supertest integration tests in `stack.integration.test.ts` that boot a minimal Express app with the full shared middleware chain (requestId → validate → handler → errorHandler) and assert request-id propagation, validation 400 shape, custom AppError mapping, and 5xx requestId surfacing. Total: 35 tests across 6 files.
 
 ## [3.0.0]
 Initial backend-hardening + responsive frontend release. See git history for details.
