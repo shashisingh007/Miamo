@@ -88,6 +88,11 @@ model User {
   activities           UserActivity[]
   userData             UserData[]
 
+  // v3.2
+  showcaseItems        ShowcaseItem[]  @relation("ShowcaseAuthor")
+  accessRequestsSent   AccessRequest[] @relation("AccessRequestFrom")
+  accessRequestsRcvd   AccessRequest[] @relation("AccessRequestTo")
+
   @@index([email])
   @@index([username])
   @@index([miamoId])
@@ -125,6 +130,23 @@ model Profile {
 
   politicalViews String @default("")
   diet           String @default("")
+
+  // v3.2 — onboarding completion
+  completionScore   Int      @default(0)
+  completionMissing String[] @default([])
+
+  // v3.2 — Date-to-Marry extended fields (optional; required for DTM 80% gate)
+  familyBackground   String?  @db.VarChar(280)
+  educationLevel     String?
+  educationInstitution String?
+  employer           String?
+  incomeBand         String?
+  subCommunity       String?
+  maritalStatus      String?
+  willingToRelocate  Boolean?
+  familyInvolved     Boolean?
+  expectedTimeline   String?
+  kundliUrl          String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -989,4 +1011,49 @@ model DtmMessage {
 
   @@index([senderId, recipientId, createdAt])
   @@index([recipientId, read])
+}
+
+// ─── v3.2 — Showcase (replaces Creativity) ──────────────
+model ShowcaseItem {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation("ShowcaseAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  category        String
+  type            String   // link | image | text | voice
+  title           String   @db.VarChar(120)
+  body            String?  @db.VarChar(300)
+  url             String?
+  imageUrl        String?
+  ogImageCached   String?
+  voiceUrl        String?
+  voiceDurationMs Int?
+  bytes           Int      @default(0)
+  pinned          Boolean  @default(false)
+  moveCount       Int      @default(0)
+  matchCount      Int      @default(0)
+  visibility      String   @default("everyone") // everyone | matches | private
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, pinned])
+  @@index([category, createdAt])
+}
+
+// ─── v3.2 — Access Control ──────────────────────────────
+model AccessRequest {
+  id           String    @id @default(uuid())
+  fromUserId   String
+  fromUser     User      @relation("AccessRequestFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId     String
+  toUser       User      @relation("AccessRequestTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  field        String    // photos|phone|family|income|kundli|lastName|exactCity|socials|email
+  status       String    @default("pending") // pending|approved|denied|revoked|expired
+  message      String?   @db.VarChar(500)
+  createdAt    DateTime  @default(now())
+  decidedAt    DateTime?
+  expiresAt    DateTime?
+
+  @@unique([fromUserId, toUserId, field])
+  @@index([toUserId, status])
+  @@index([fromUserId, status])
 }
