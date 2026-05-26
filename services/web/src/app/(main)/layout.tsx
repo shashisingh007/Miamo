@@ -146,7 +146,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  {/* Brand header */}
  <div className="flex items-center h-[72px] relative" style={{ paddingLeft: 28, paddingRight: 16 }}>
  <div className="relative flex items-center miamo-sidebar-logo" style={{ width: 100, height: 50, overflow: 'visible' }}>
- <MiamoWordmark height={18} animated={true} className="!min-h-0 !h-[50px] !w-[100px]" />
+ <MiamoWordmark height={18} animated={false} className="!min-h-0 !h-[50px] !w-[100px]" />
  </div>
  <div className="ml-auto flex flex-col items-center gap-0.5">
  <Link href="/premium" className="relative group" aria-label="Premium">

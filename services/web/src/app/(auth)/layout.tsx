@@ -20,7 +20,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <header className="relative z-20">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href="/" aria-label="Miamo home" className="flex items-center">
-            <MiamoWordmark height={24} animated={true} />
+            <MiamoWordmark height={24} animated={false} />
           </Link>
           <Link
             href="/"

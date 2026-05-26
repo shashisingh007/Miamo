@@ -42,7 +42,7 @@ export default function LandingPage() {
       {/* ─── NAV ─── */}
       <nav className="relative z-10 flex items-center justify-between px-6 lg:px-12 h-16 backdrop-blur-md bg-white/60 border-b border-border-light">
         <Link href="/" aria-label="Miamo home">
-          <MiamoWordmark height={22} animated={true} />
+          <MiamoWordmark height={22} animated={false} />
         </Link>
         <div className="flex items-center gap-2">
           <Link href="/login">
