@@ -24,6 +24,10 @@ import { auditLog, trackActivity } from '../../shared/src/audit';
 import { env } from '../../shared/src/env';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware, createPushToUser } from '../../shared/src/service';
 import { cursorOpt } from '../../shared/src/coerce';
+import { PrismaSignalReader } from '../../shared/src/algo/signals';
+import { suggestMessages } from '../../shared/src/algo/messageSuggest';
+import { suggestMoves } from '../../shared/src/algo/moves';
+import { v4RankEnabled } from '../../shared/src/algo/flags';
 
 // ─── Chat Suggestion Cache ──────────────────────────
 const suggestionCache = new LRUCache(200);
@@ -548,6 +552,58 @@ app.post('/api/v1/messages/chats/:chatId/suggestions', authMiddleware, async (re
     suggestionCache.set(cacheKey, result, TTL.CHAT_SUGGESTIONS);
 
     res.json({ data: result });
+  } catch (e) { next(e); }
+});
+
+// ── v4 suggestion endpoint (flag-gated) ──
+// Returns deterministic suggestion + moves picks via services/shared/src/algo.
+// Independent from the legacy /suggestions endpoint so we can A/B safely.
+app.post('/api/v1/messages/chats/:chatId/suggestions-v4', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (!v4RankEnabled('messaging')) {
+      return res.status(404).json({ error: { message: 'v4 messaging suggestions disabled' } });
+    }
+    const userId = req.userId!;
+    const chat = await prisma.chat.findUnique({ where: { id: req.params.chatId } });
+    if (!chat) return res.status(404).json({ error: { message: 'Not found' } });
+    const otherId = chat.user1Id === userId ? chat.user2Id : chat.user1Id;
+
+    const reader = new PrismaSignalReader(prisma);
+    const candHash = reader.hashOf(otherId);
+    const candFeat = await reader.features(candHash);
+
+    const lastMsg = await prisma.message.findFirst({
+      where: { chatId: req.params.chatId, deletedForAll: false },
+      orderBy: { createdAt: 'desc' },
+    });
+    const lastInboundKind = lastMsg && lastMsg.senderId !== userId
+      ? (lastMsg.type === 'voice' ? 'voice'
+        : lastMsg.type === 'image' ? 'photo'
+        : lastMsg.type === 'gif' ? 'gif'
+        : 'text')
+      : null;
+
+    const suggestions = suggestMessages({
+      candFeatures: candFeat,
+      lastInboundKind,
+      ageSec: {},
+      myIntent: null,
+      candIntent: null,
+      nowHour: new Date().getHours(),
+    }, 3);
+
+    const moves = suggestMoves({
+      candFeatures: candFeat,
+      lastUsedAgoSec: {},
+      candLastAction: lastMsg && lastMsg.senderId !== userId
+        ? { kind: lastInboundKind === 'voice' ? 'sent_voice' : lastInboundKind === 'photo' ? 'sent_photo' : 'sent_text', sec: Math.max(0, (Date.now() - new Date(lastMsg.createdAt).getTime()) / 1000) }
+        : null,
+      nowHour: new Date().getHours(),
+      deepCompatAffinity: {},
+      consent: 'full',
+    }, 3);
+
+    res.json({ data: { suggestions, moves, algo: 'v4' } });
   } catch (e) { next(e); }
 });
 

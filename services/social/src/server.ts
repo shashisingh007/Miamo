@@ -24,6 +24,14 @@ import { idempotency } from '../../shared/src/idempotency';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
 import { hashUid } from '../../shared/src/track/hash';
+import { PrismaSignalReader } from '../../shared/src/algo/signals';
+import { rankForYou } from '../../shared/src/algo/forYou';
+import { scoreAiPicksV4 } from '../../shared/src/algo/aiPicks';
+import { scoreNew as scoreNewV4 } from '../../shared/src/algo/new';
+import { scoreActive as scoreActiveV4 } from '../../shared/src/algo/active';
+import { scoreVerified as scoreVerifiedV4 } from '../../shared/src/algo/verified';
+import { scoreSerious as scoreSeriousV4 } from '../../shared/src/algo/serious';
+import { v4RankEnabled } from '../../shared/src/algo/flags';
 import { env } from '../../shared/src/env';
 import { createPrisma, applyBaseMiddleware, createInternalAuthMiddleware, installHealthRoutes } from '../../shared/src/service';
 
@@ -548,6 +556,79 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
       }
     } catch { /* cache miss / table not present → silent fallback */ }
 
+    // ── v4 ranker (flag-gated; replaces legacy discoverScore when on) ──
+    // When ALGO_V4_RANK_ENABLED_DISCOVER=1, route the per-filter scoring
+    // through services/shared/src/algo/* using the SignalReader. The score
+    // returned is 0..100 and is used in place of discoverScore. compatBoost
+    // is bypassed when v4 is on (already folded into PairCompatCache reads).
+    let v4Scores: Map<string, number> | null = null;
+    if (v4RankEnabled('discover')) {
+      try {
+        const reader = new PrismaSignalReader(prisma);
+        const myHash = reader.hashOf(userId);
+        const candEntries = users.map((u) => ({
+          id: u.id,
+          intent: (u.profile as { datingIntent?: string } | null)?.datingIntent ?? null,
+          age: (u.profile as { age?: number } | null)?.age ?? null,
+          interests: u.interests.map((i) => i.name),
+          cityKm: null as number | null,
+        }));
+        const me = await reader.features(myHash);
+        const candHashes = candEntries.map((c) => reader.hashOf(c.id));
+        const pairMap = await reader.pairCompat(myHash, candHashes);
+        const priorMap = await reader.priorTargets(myHash, candHashes, 14);
+        v4Scores = new Map();
+        const myIntent = (myProfile as { datingIntent?: string } | null)?.datingIntent ?? null;
+        const myAge = (myProfile as { age?: number } | null)?.age ?? null;
+        const myInts = myInterestNames;
+        for (let i = 0; i < candEntries.length; i++) {
+          const c = candEntries[i];
+          const candFeat = await reader.features(candHashes[i]);
+          const baseInputs = {
+            me, cand: candFeat,
+            myIntent, candIntent: c.intent,
+            myAge, candAge: c.age, cityKm: c.cityKm,
+            myInterests: myInts, candInterests: c.interests,
+            pair: pairMap.get(candHashes[i]),
+            priorCount: priorMap.get(candHashes[i]) || 0,
+            impressionsLast48h: 0,
+            consent: 'full' as const,
+          };
+          let s = 0;
+          const u = users[i];
+          const verified = u.verified === true;
+          switch (activeAlgo) {
+            case 'new':
+              s = scoreNewV4({ ...baseInputs, candCreatedAtMs: new Date(u.createdAt).getTime(), verified, completeness: 0.5 }).score;
+              break;
+            case 'active':
+              s = scoreActiveV4({ ...baseInputs, candLastHeartbeatMs: null }).score;
+              break;
+            case 'verified':
+              s = scoreVerifiedV4({ ...baseInputs, photoVerified: verified, phoneVerified: verified, idVerified: false }).score;
+              break;
+            case 'serious':
+              s = scoreSeriousV4({ ...baseInputs, dtmCompletes90d: 0, lovelangCompat: null, completeness: 0.5 }).score;
+              break;
+            case 'aiPicks':
+              s = scoreAiPicksV4({ ...baseInputs, subs: { cf: 50, active: 50, serious: 50, matchHistoryAffinity: 50, vibeMomentum: 50 } }).score;
+              break;
+            case 'forYou':
+            default: {
+              const r = await rankForYou(reader, userId, [c], 'full');
+              s = r[0]?.score ?? 0;
+              break;
+            }
+          }
+          v4Scores.set(c.id, s);
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[discover] v4 ranker failed, falling back to legacy:', (e as Error).message);
+        v4Scores = null;
+      }
+    }
+
     // ── ALGORITHM DISPATCH ──
     // Each discover filter tab uses a completely different scoring algorithm.
     // The algorithm selection is driven by the "filter" query param from the client.
@@ -618,7 +699,9 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
       const candidateFeatures = toFeatureVector(u);
       const { mlScore, breakdown: mlBreakdown } = computeMLScore(candidateFeatures, mlState.prefs, sessionCtx, drift, mlState.bandit);
 
-      const finalScore = Math.min(100, discoverScore + filterBonus + mlScore + (compatBoost.get(u.id) || 0));
+      const finalScore = v4Scores
+        ? Math.min(100, (v4Scores.get(u.id) ?? discoverScore))
+        : Math.min(100, discoverScore + filterBonus + mlScore + (compatBoost.get(u.id) || 0));
 
       // Track profile view activity
       trackActivity(prisma, userId, 'view', 'profile', u.id, { city: u.profile?.city, age: u.profile?.age, intent: u.profile?.datingIntent });

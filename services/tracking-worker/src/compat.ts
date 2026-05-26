@@ -18,6 +18,15 @@
 import type { PrismaClient } from '@prisma/client';
 import { cosine, fromBuffer } from './embeddings';
 
+/** EnrichmentWorker stores cadenceVec as a base64-encoded Float32 buffer. */
+function decodeCadence(b64: string | undefined): Float32Array | null {
+  if (!b64) return null;
+  try {
+    const buf = Buffer.from(b64, 'base64');
+    return new Float32Array(buf.buffer, buf.byteOffset, buf.byteLength / 4);
+  } catch { return null; }
+}
+
 const INTERVAL_MS = Number(process.env.COMPAT_INTERVAL_MS || 15 * 60 * 1000);
 const ACTIVE_LIMIT = Number(process.env.COMPAT_ACTIVE_LIMIT || 200);
 const CANDIDATES_PER_USER = Number(process.env.COMPAT_CANDIDATES || 50);
@@ -33,6 +42,9 @@ type Snap = {
   rageClickRate: number | null;
   deadClickRate: number | null;
   behaviorEmb: Buffer | null;
+  interestVec: Buffer | null;
+  vibeEmb: Buffer | null;
+  raw: { cadenceVec?: string } | null;
 };
 
 /** 1.0 same chronotype, 0.6 either mixed, 0.2 disjoint. */
@@ -94,7 +106,8 @@ export class CompatWriter {
 
     // Load snapshots for the active pool in one shot.
     const snaps = (await this.prisma.$queryRawUnsafe(
-      `SELECT "uidHash","chronotype","attentionProfile","rageClickRate","deadClickRate","behaviorEmb"
+      `SELECT "uidHash","chronotype","attentionProfile","rageClickRate","deadClickRate",
+              "behaviorEmb","interestVec","vibeEmb","raw"
        FROM "FeatureSnapshot"
        WHERE "uidHash" = ANY($1::text[])`,
       actives.map((a) => a.uidHash),
@@ -129,26 +142,41 @@ export class CompatWriter {
       if (!a) continue;
       // candidate pool: other active users, capped
       const pool = actives.filter((c) => c.uidHash !== aHash).slice(0, CANDIDATES_PER_USER);
-      const scored: Array<{ bHash: string; chrono: number; behavior: number; prior: number; final: number }> = [];
+      const scored: Array<{ bHash: string; chrono: number; behavior: number; behaviorCos: number; interestCos: number; vibeCos: number; cadence: number; prior: number; final: number }> = [];
       const myPrior = priorByHash.get(aHash);
       const aEmb = a.behaviorEmb ? fromBuffer(a.behaviorEmb, 64) : null;
+      const aInterest = a.interestVec ? fromBuffer(a.interestVec, 32) : null;
+      const aVibe = a.vibeEmb ? fromBuffer(a.vibeEmb, 64) : null;
+      const aCadence = decodeCadence(a.raw?.cadenceVec);
       for (const { uidHash: bHash } of pool) {
         const b = byHash.get(bHash);
         if (!b) continue;
         const chrono = chronoOverlap(a.chronotype, b.chronotype);
         // Prefer embedding cosine when both vectors exist; fall back to scalar sim.
         let behavior = behaviorSim(a, b);
+        let behaviorCos = 0;
         if (aEmb && b.behaviorEmb) {
           const bEmb = fromBuffer(b.behaviorEmb, 64);
-          const cos = cosine(aEmb, bEmb);
+          behaviorCos = cosine(aEmb, bEmb);
           // Map cosine [-1,1] → [0,1] and blend 50/50 with scalar sim so a
           // cold-start snapshot without scalars doesn't lose all signal.
-          behavior = 0.5 * behavior + 0.5 * ((cos + 1) / 2);
+          behavior = 0.5 * behavior + 0.5 * ((behaviorCos + 1) / 2);
         }
+        let interestCos = 0;
+        if (aInterest && b.interestVec) {
+          interestCos = cosine(aInterest, fromBuffer(b.interestVec, 32));
+        }
+        let vibeCos = 0;
+        if (aVibe && b.vibeEmb) {
+          vibeCos = cosine(aVibe, fromBuffer(b.vibeEmb, 64));
+        }
+        let cadence = 0;
+        const bCadence = decodeCadence(b.raw?.cadenceVec);
+        if (aCadence && bCadence) cadence = (cosine(aCadence, bCadence) + 1) / 2;
         const priorCount = myPrior?.get(bHash) || 0;
         const prior = priorCount > 0 ? Math.min(1, Math.log1p(priorCount) / Math.log(1000)) : 0;
         const final = compose(chrono, behavior, prior);
-        scored.push({ bHash, chrono, behavior, prior, final });
+        scored.push({ bHash, chrono, behavior, behaviorCos, interestCos, vibeCos, cadence, prior, final });
       }
       scored.sort((x, y) => y.final - x.final);
       const top = scored.slice(0, TOP_K);
@@ -156,15 +184,18 @@ export class CompatWriter {
         try {
           await this.prisma.$executeRawUnsafe(
             `INSERT INTO "PairCompatCache"
-               ("aHash","bHash","computedAt","chronoOverlap","behaviorCos","priorInteractionScore","finalScore")
-             VALUES ($1, $2, NOW(), $3, $4, $5, $6)
+               ("aHash","bHash","computedAt","chronoOverlap","behaviorCos","interestCos","vibeCos","cadenceOverlap","priorInteractionScore","finalScore")
+             VALUES ($1, $2, NOW(), $3, $4, $5, $6, $7, $8, $9)
              ON CONFLICT ("aHash","bHash") DO UPDATE SET
                "computedAt"            = NOW(),
                "chronoOverlap"         = EXCLUDED."chronoOverlap",
                "behaviorCos"           = EXCLUDED."behaviorCos",
+               "interestCos"           = EXCLUDED."interestCos",
+               "vibeCos"               = EXCLUDED."vibeCos",
+               "cadenceOverlap"        = EXCLUDED."cadenceOverlap",
                "priorInteractionScore" = EXCLUDED."priorInteractionScore",
                "finalScore"            = EXCLUDED."finalScore"`,
-            aHash, row.bHash, row.chrono, row.behavior, row.prior, row.final,
+            aHash, row.bHash, row.chrono, row.behaviorCos, row.interestCos, row.vibeCos, row.cadence, row.prior, row.final,
           );
           written += 1;
         } catch (e) {
