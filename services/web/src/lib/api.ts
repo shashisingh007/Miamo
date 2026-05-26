@@ -201,6 +201,7 @@ class ApiClient {
  async clearChat(chatId: string) { return this.request<any>(`/api/v1/messages/chats/${chatId}/clear`, { method: 'DELETE' }); }
  async searchMessages(chatId: string, q: string) { return this.request<any>(`/api/v1/messages/chats/${chatId}/search?q=${encodeURIComponent(q)}`); }
  async getChatSuggestions(chatId: string, context?: string) { return this.request<any>(`/api/v1/messages/chats/${chatId}/suggestions`, { method: 'POST', body: JSON.stringify({ context }) }); }
+ async getChatSuggestionsV4(chatId: string) { return this.request<any>(`/api/v1/messages/chats/${chatId}/suggestions-v4`, { method: 'POST', body: JSON.stringify({}) }); }
  async checkContent(content: string) { return this.request<any>('/api/v1/messages/check-content', { method: 'POST', body: JSON.stringify({ content }) }); }
  async getChatBackgrounds() { return this.request<any>('/api/v1/messages/backgrounds'); }
  async setChatBackground(chatId: string, background: string) { return this.request<any>(`/api/v1/messages/chats/${chatId}/theme`, { method: 'POST', body: JSON.stringify({ background }) }); }
