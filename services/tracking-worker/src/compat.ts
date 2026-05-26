@@ -16,6 +16,7 @@
  * the product.
  */
 import type { PrismaClient } from '@prisma/client';
+import { cosine, fromBuffer } from './embeddings';
 
 const INTERVAL_MS = Number(process.env.COMPAT_INTERVAL_MS || 15 * 60 * 1000);
 const ACTIVE_LIMIT = Number(process.env.COMPAT_ACTIVE_LIMIT || 200);
@@ -31,6 +32,7 @@ type Snap = {
   attentionProfile: string | null;
   rageClickRate: number | null;
   deadClickRate: number | null;
+  behaviorEmb: Buffer | null;
 };
 
 /** 1.0 same chronotype, 0.6 either mixed, 0.2 disjoint. */
@@ -92,7 +94,7 @@ export class CompatWriter {
 
     // Load snapshots for the active pool in one shot.
     const snaps = (await this.prisma.$queryRawUnsafe(
-      `SELECT "uidHash","chronotype","attentionProfile","rageClickRate","deadClickRate"
+      `SELECT "uidHash","chronotype","attentionProfile","rageClickRate","deadClickRate","behaviorEmb"
        FROM "FeatureSnapshot"
        WHERE "uidHash" = ANY($1::text[])`,
       actives.map((a) => a.uidHash),
@@ -129,13 +131,21 @@ export class CompatWriter {
       const pool = actives.filter((c) => c.uidHash !== aHash).slice(0, CANDIDATES_PER_USER);
       const scored: Array<{ bHash: string; chrono: number; behavior: number; prior: number; final: number }> = [];
       const myPrior = priorByHash.get(aHash);
+      const aEmb = a.behaviorEmb ? fromBuffer(a.behaviorEmb, 64) : null;
       for (const { uidHash: bHash } of pool) {
         const b = byHash.get(bHash);
         if (!b) continue;
         const chrono = chronoOverlap(a.chronotype, b.chronotype);
-        const behavior = behaviorSim(a, b);
+        // Prefer embedding cosine when both vectors exist; fall back to scalar sim.
+        let behavior = behaviorSim(a, b);
+        if (aEmb && b.behaviorEmb) {
+          const bEmb = fromBuffer(b.behaviorEmb, 64);
+          const cos = cosine(aEmb, bEmb);
+          // Map cosine [-1,1] → [0,1] and blend 50/50 with scalar sim so a
+          // cold-start snapshot without scalars doesn't lose all signal.
+          behavior = 0.5 * behavior + 0.5 * ((cos + 1) / 2);
+        }
         const priorCount = myPrior?.get(bHash) || 0;
-        // log1p scaled: 0 interactions → 0, 10 → ~0.4, 100 → ~0.7, 1k → ~1.0
         const prior = priorCount > 0 ? Math.min(1, Math.log1p(priorCount) / Math.log(1000)) : 0;
         const final = compose(chrono, behavior, prior);
         scored.push({ bHash, chrono, behavior, prior, final });
