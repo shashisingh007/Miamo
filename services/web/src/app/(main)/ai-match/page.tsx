@@ -52,7 +52,20 @@ export default function AIMatchPage() {
  const user = item.user || item;
  const score = item.score || item.aiScore || 0;
  const photo = user.photos?.[0]?.url || user.photos?.[0];
- const breakdown = item.breakdown || {};
+ const explain = item.explain || null;
+ const breakdown = (explain && explain.breakdown) || item.breakdown || {};
+ const algoTag = (explain && explain.algo) || item.algorithm || null;
+ const v4Rows = explain && explain.breakdown
+   ? [
+       { label: 'For-You ensemble', key: 'forYou' },
+       { label: 'Collaborative filter', key: 'cf' },
+       { label: 'Active now', key: 'active' },
+       { label: 'Serious intent', key: 'serious' },
+       { label: 'Match history affinity', key: 'matchHistoryAffinity' },
+       { label: 'Vibe momentum', key: 'vibeMomentum' },
+       { label: 'Exploration', key: 'explore' },
+     ]
+   : null;
  return (
  <motion.div key={user.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
  <Card hover className="p-4">
@@ -62,23 +75,30 @@ export default function AIMatchPage() {
  <div className="flex items-center gap-2 mb-1">
  <h4 className="text-sm font-semibold">{user.displayName || 'User'}</h4>
  <Badge>{score}% match</Badge>
+ {algoTag ? <span className="text-[9px] uppercase tracking-wider text-text-muted/70 ml-1">{algoTag}</span> : null}
  </div>
  <div className="space-y-1.5 mt-2">
- {[
+ {(v4Rows || [
  { icon: Heart, label: 'Interest overlap', key: 'interestOverlap' },
  { icon: MessageCircle, label: 'Intent alignment', key: 'intentMatch' },
  { icon: Palette, label: 'Location proximity', key: 'cityBonus' },
  { icon: Zap, label: 'Activity & profile', key: 'profileScoreBonus' },
- ].map(item => (
- <div key={item.label} className="flex items-center gap-2">
- <item.icon className="w-3 h-3 text-text-muted" />
- <span className="text-[11px] text-text-muted w-32">{item.label}</span>
+ ]).map((row: any) => {
+ const Icon = row.icon || Sparkles;
+ const raw = breakdown[row.key];
+ const valueNum = typeof raw === 'number' ? raw : null;
+ const pct = valueNum == null ? 0 : (valueNum <= 1 ? valueNum * 100 : Math.min(100, valueNum));
+ return (
+ <div key={row.label} className="flex items-center gap-2">
+ <Icon className="w-3 h-3 text-text-muted" />
+ <span className="text-[11px] text-text-muted w-32">{row.label}</span>
  <div className="flex-1 h-1 bg-miamo-elevated rounded-full overflow-hidden">
- <div className="h-full bg-rose-main/60 rounded-full" style={{ width: `${Math.min(100, (breakdown[item.key] || 0) * 5)}%` }} />
+ <div className="h-full bg-rose-main/60 rounded-full" style={{ width: `${pct}%` }} />
  </div>
- <span className="text-[10px] text-text-muted w-6 text-right">{breakdown[item.key] || '-'}</span>
+ <span className="text-[10px] text-text-muted w-10 text-right">{valueNum == null ? '-' : (valueNum <= 1 ? valueNum.toFixed(2) : Math.round(valueNum))}</span>
  </div>
- ))}
+ );
+ })}
  </div>
  <div className="flex gap-2 mt-3">
  <Button size="sm" variant="default" onClick={() => { api.sendLike(user.id).catch(() => {}); }}><Heart className="w-3 h-3 mr-1" /> Like</Button>
