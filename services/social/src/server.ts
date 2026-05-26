@@ -1354,6 +1354,74 @@ app.get('/api/v1/ai-match/suggestions', authMiddleware, async (req: AuthRequest,
     const cached = aiMatchCache.get(cacheKey);
     if (cached) return res.json({ data: cached });
 
+    // ── v4 AI Match short-circuit (flag-gated) ──
+    // When ALGO_V4_RANK_ENABLED_AIMATCH=1, rank a smaller candidate pool with
+    // scoreAiPicksV4 (no explore noise) and return up to 20 with breakdown.
+    // Falls through to legacy on any error.
+    if (v4RankEnabled('aiMatch')) {
+      try {
+        const myProfileV4 = await prisma.profile.findUnique({ where: { userId } });
+        const myInterestsV4 = await prisma.profileInterest.findMany({ where: { userId } });
+        const myInterestNamesV4 = myInterestsV4.map((i) => i.name);
+        const blocksV4 = await prisma.block.findMany({ where: { OR: [{ blockerId: userId }, { blockedId: userId }] } });
+        const blockedIdsV4 = blocksV4.map((b) => (b.blockerId === userId ? b.blockedId : b.blockerId));
+        blockedIdsV4.push(userId);
+        const sentLikesV4 = await prisma.like.findMany({ where: { fromUserId: userId }, select: { toUserId: true } });
+        sentLikesV4.forEach((l) => { if (!blockedIdsV4.includes(l.toUserId)) blockedIdsV4.push(l.toUserId); });
+
+        const candUsersV4 = await prisma.user.findMany({
+          where: { id: { notIn: blockedIdsV4 }, active: true, deactivated: false, privacySettings: { profileVisible: true } },
+          include: { profile: true, interests: true, photos: { take: 3, orderBy: { position: 'asc' }, select: { url: true } } },
+          take: 100,
+        });
+
+        const reader = new PrismaSignalReader(prisma);
+        const myHash = reader.hashOf(userId);
+        const me = await reader.features(myHash);
+        const candHashes = candUsersV4.map((u) => reader.hashOf(u.id));
+        const pairMap = await reader.pairCompat(myHash, candHashes);
+        const priorMap = await reader.priorTargets(myHash, candHashes, 14);
+        const myIntentV4 = (myProfileV4 as { datingIntent?: string } | null)?.datingIntent ?? null;
+        const myAgeV4 = (myProfileV4 as { age?: number } | null)?.age ?? null;
+
+        const scored: Array<{ user: any; aiScore: number; explain: any }> = [];
+        for (let i = 0; i < candUsersV4.length; i++) {
+          const u = candUsersV4[i];
+          const candFeat = await reader.features(candHashes[i]);
+          const { score, explain } = scoreAiPicksV4({
+            me, cand: candFeat,
+            myIntent: myIntentV4, candIntent: (u.profile as { datingIntent?: string } | null)?.datingIntent ?? null,
+            myAge: myAgeV4, candAge: (u.profile as { age?: number } | null)?.age ?? null, cityKm: null,
+            myInterests: myInterestNamesV4, candInterests: u.interests.map((i) => i.name),
+            pair: pairMap.get(candHashes[i]),
+            priorCount: priorMap.get(candHashes[i]) || 0,
+            impressionsLast48h: 0,
+            consent: 'full',
+            subs: { cf: 50, active: 50, serious: 50, matchHistoryAffinity: 50, vibeMomentum: 50 },
+            rand: () => 1,
+          });
+          const { passwordHash, ...userData } = u;
+          scored.push({ user: userData, aiScore: score, explain });
+        }
+        scored.sort((a, b) => b.aiScore - a.aiScore);
+        const v4Results = scored.slice(0, 20).map((s) => ({
+          user: s.user,
+          aiScore: s.aiScore,
+          algorithm: 'ai-picks-v4',
+          reasons: [],
+          concerns: [],
+          commonInterests: myInterestNamesV4.filter((n) => (s.user.interests || []).some((i: { name: string }) => i.name === n)),
+          explain: s.explain,
+        }));
+        trackActivity(prisma, userId, 'view', 'ai-match', undefined, { resultCount: v4Results.length, algo: 'v4' });
+        aiMatchCache.set(cacheKey, v4Results, TTL.AI_MATCH);
+        return res.json({ data: v4Results });
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[ai-match] v4 short-circuit failed, falling back to legacy:', (e as Error).message);
+      }
+    }
+
     const myProfile = await prisma.profile.findUnique({ where: { userId } });
     const myInterests = await prisma.profileInterest.findMany({ where: { userId } });
     const myInterestNames = myInterests.map(i => i.name);

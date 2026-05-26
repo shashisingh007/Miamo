@@ -16,6 +16,9 @@ import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog } from '../../shared/src/audit';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware } from '../../shared/src/service';
 import { computeCompletionScore, recomputeAndPersistCompletion } from '../../shared/src/completion';
+import { PrismaSignalReader } from '../../shared/src/algo/signals';
+import { rerankSearch } from '../../shared/src/algo/searchAugment';
+import { v4RankEnabled } from '../../shared/src/algo/flags';
 
 const prisma = createPrisma(10);
 export const app = express();
@@ -355,6 +358,48 @@ app.get('/api/v1/search', authMiddleware, async (req: AuthRequest, res: Response
       // Sort by algorithm score descending, filter out zero-score results
       scored.sort((a, b) => b.searchScore - a.searchScore);
       results = scored.filter(r => r.searchScore > 0).slice(0, 20);
+
+      // v4 search augment: blend lexical score with forYou (personalisation).
+      // Flag-gated; falls back silently to the lexical-only ranking above.
+      if (v4RankEnabled('search') && results.length > 0) {
+        try {
+          const reader = new PrismaSignalReader(prisma);
+          const myHash = reader.hashOf(userId);
+          const me = await reader.features(myHash);
+          const myInterests = await prisma.profileInterest.findMany({ where: { userId } });
+          const myInterestNames = myInterests.map((i) => i.name);
+          const myProfile = await prisma.profile.findUnique({ where: { userId } });
+          const myIntent = (myProfile as { datingIntent?: string } | null)?.datingIntent ?? null;
+          const myAge = (myProfile as { age?: number } | null)?.age ?? null;
+          const maxLex = Math.max(...results.map((r: any) => r.searchScore), 1);
+          const candHashes = results.map((r: any) => reader.hashOf(r.id));
+          const pairMap = await reader.pairCompat(myHash, candHashes);
+          const priorMap = await reader.priorTargets(myHash, candHashes, 14);
+          const augmented: any[] = [];
+          for (let i = 0; i < results.length; i++) {
+            const r = results[i];
+            const candFeat = await reader.features(candHashes[i]);
+            const { score } = rerankSearch({
+              me, cand: candFeat,
+              myIntent, candIntent: (r.profile as { datingIntent?: string } | null)?.datingIntent ?? null,
+              myAge, candAge: (r.profile as { age?: number } | null)?.age ?? null, cityKm: null,
+              myInterests: myInterestNames, candInterests: (r.interests || []).map((i: { name: string }) => i.name),
+              pair: pairMap.get(candHashes[i]),
+              priorCount: priorMap.get(candHashes[i]) || 0,
+              impressionsLast48h: 0,
+              consent: 'full',
+              textScore: r.searchScore / maxLex,
+              candUpdatedAtMs: new Date(r.profile?.updatedAt ?? r.createdAt ?? Date.now()).getTime(),
+            });
+            augmented.push({ ...r, searchScore: score, algo: 'v4' });
+          }
+          augmented.sort((a, b) => b.searchScore - a.searchScore);
+          results = augmented;
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.warn('[search] v4 rerank failed, keeping lexical order:', (e as Error).message);
+        }
+      }
     }
 
     await prisma.searchLog.create({ data: { userId, query, type: searchType, results: results.length } });

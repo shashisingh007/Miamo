@@ -8,6 +8,9 @@ import { sanitize } from '../../shared/src/sanitize';
 import { env } from '../../shared/src/env';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware, createPushToUser } from '../../shared/src/service';
 import { cursorOpt } from '../../shared/src/coerce';
+import { PrismaSignalReader } from '../../shared/src/algo/signals';
+import { nextNotifyAt } from '../../shared/src/algo/notifyTiming';
+import { v4RankEnabled } from '../../shared/src/algo/flags';
 
 const prisma = createPrisma(5);
 export const app = express();
@@ -80,11 +83,64 @@ app.post('/internal/notifications', async (req: Request, res: Response, next: Ne
     const { userId, type, title: rawTitle, body: rawBody, data } = req.body;
     const title = sanitize(rawTitle || '');
     const body = sanitize(rawBody || '');
-    const notification = await prisma.notification.create({ data: { userId, type, title, body, data: data || '{}' } });
+
+    // v4: stamp a recommended delivery time onto data.scheduledFor so cron / push
+    // workers can hold non-urgent notifications until the recipient's peak hour.
+    // Non-breaking: the row is still created immediately; consumers may ignore.
+    let finalData = data || '{}';
+    if (v4RankEnabled('notifications')) {
+      try {
+        const reader = new PrismaSignalReader(prisma);
+        const feat = await reader.features(reader.hashOf(userId));
+        const lastSent = await prisma.notification.findFirst({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+          select: { createdAt: true },
+        });
+        const scheduledFor = nextNotifyAt({
+          now: new Date(),
+          peakHours: feat?.peakHours ?? null,
+          quietHours: null,
+          lastSent: lastSent?.createdAt ?? null,
+          minSpacingSec: 1800,
+          tzOffsetMin: 0,
+        });
+        const parsed = typeof finalData === 'string' ? (() => { try { return JSON.parse(finalData); } catch { return {}; } })() : finalData;
+        finalData = JSON.stringify({ ...parsed, scheduledFor: scheduledFor.toISOString(), algo: 'v4' });
+      } catch { /* silent fallback to legacy */ }
+    }
+
+    const notification = await prisma.notification.create({ data: { userId, type, title, body, data: finalData } });
     // Push real-time notification to user via SSE
     const unreadCount = await prisma.notification.count({ where: { userId, read: false } });
     pushToUser(userId, 'new-notification', { notification, unreadCount });
     res.json({ data: notification });
+  } catch (e) { next(e); }
+});
+
+// v4: schedule-only helper. Returns the recommended next delivery timestamp
+// for a user without creating a notification row. Useful for batchers / cron.
+app.post('/internal/notifications/schedule', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const key = req.headers['x-internal-key'];
+    if (key !== env.internalServiceKey) return res.status(403).json({ error: { message: 'Forbidden' } });
+    if (!v4RankEnabled('notifications')) return res.status(404).json({ error: { message: 'v4 notifications disabled' } });
+    const { userId, minSpacingSec = 1800, tzOffsetMin = 0, quietHours = null } = req.body || {};
+    if (!userId) return res.status(400).json({ error: { message: 'userId required' } });
+    const reader = new PrismaSignalReader(prisma);
+    const feat = await reader.features(reader.hashOf(userId));
+    const lastSent = await prisma.notification.findFirst({
+      where: { userId }, orderBy: { createdAt: 'desc' }, select: { createdAt: true },
+    });
+    const at = nextNotifyAt({
+      now: new Date(),
+      peakHours: feat?.peakHours ?? null,
+      quietHours,
+      lastSent: lastSent?.createdAt ?? null,
+      minSpacingSec,
+      tzOffsetMin,
+    });
+    res.json({ data: { scheduledFor: at.toISOString(), algo: 'v4' } });
   } catch (e) { next(e); }
 });
 
