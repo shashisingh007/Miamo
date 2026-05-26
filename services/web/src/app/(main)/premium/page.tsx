@@ -48,7 +48,7 @@ export default function PremiumPage() {
  <p className="text-sm text-text-muted mt-2 max-w-lg mx-auto">Get more from Miamo with advanced features, unlimited interactions, and priority visibility.</p>
  </div>
 
- <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+ <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
  {plans.map((plan) => (
  <Card key={plan.name} className={`p-6 relative ${plan.popular ? 'border-rose-main/50 shadow-glow-sm' : ''}`}>
  {plan.popular && (

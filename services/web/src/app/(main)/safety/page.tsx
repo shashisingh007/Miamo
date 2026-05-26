@@ -63,7 +63,7 @@ export default function SafetyPage() {
  <p className="text-sm text-text-muted mt-1">Your safety is our top priority. Learn how to stay safe on Miamo.</p>
  </div>
 
- <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+ <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
  {safetyCards.map((item) => (
  <Card key={item.title} hover className="p-5 cursor-pointer" onClick={item.action}>
  <item.icon className={`w-6 h-6 ${item.color} mb-3`} />

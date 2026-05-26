@@ -176,7 +176,7 @@ export default function VibeCheckPage() {
  <div className="relative z-10">
  <h2 className="text-xl font-black text-text-primary mb-2">{VIBE_QUESTIONS[0].q}</h2>
  <p className="text-sm text-text-muted mb-6">Pick your current mood</p>
- <div className="grid grid-cols-4 gap-3 mb-6">
+ <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
  {MOODS.map(m => (
  <motion.button key={m.id}
  whileHover={{ y: -8, scale: 1.1 }}
@@ -348,7 +348,7 @@ export default function VibeCheckPage() {
  <motion.div key={i} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: i * 0.1 }}>
  <Card hover className="p-3 flex items-center gap-3">
  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-rose-alt to-rose-main flex items-center justify-center text-lg overflow-hidden">
- {photo ? <img loading="lazy" src={photo} alt="" className="w-full h-full object-cover" /> : vmMood?.emoji || '✨'}
+ {photo ? <img loading="lazy" src={photo} alt={`${vmMood?.label || 'Mood'} reference photo`} className="w-full h-full object-cover" /> : vmMood?.emoji || '✨'}
  </div>
  <div className="flex-1">
  <p className="font-semibold text-sm text-text-primary">{vm.user?.displayName || 'User'}</p>

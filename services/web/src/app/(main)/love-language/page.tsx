@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui';
+import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
@@ -148,7 +149,7 @@ function ResultCard({ primary, secondary, scores }: { primary: typeof LANGUAGES[
  <h3 className="font-bold text-text-primary text-sm mb-3 flex items-center gap-2">
  <Sparkles className="w-4 h-4 text-rose" /> How to Show Love
  </h3>
- <div className="grid grid-cols-2 gap-2">
+ <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
  {primary.tips.map((tip, i) => (
  <motion.div key={i} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
  transition={{ delay: 1 + i * 0.15 }}
@@ -184,6 +185,7 @@ export default function LoveLanguagePage() {
  const [qIdx, setQIdx] = useState(0);
  const [scores, setScores] = useState<Record<string, number>>({ words: 0, acts: 0, time: 0, touch: 0, gifts: 0 });
  const [done, setDone] = useState(false);
+ const toast = useToast();
 
  useTrackPageView('love-language');
  useTrackScrollDepth('love-language');
@@ -292,7 +294,26 @@ export default function LoveLanguagePage() {
  <ResultCard primary={primary} secondary={secondary} scores={scores} />
  <div className="mt-4 flex gap-3">
  <Button variant="secondary" onClick={reset} className="flex-1 gap-2"><RotateCcw className="w-4 h-4" /> Retake</Button>
- <Button onClick={() => { /* share */ }} className="flex-1 gap-2"><Zap className="w-4 h-4" /> Share with Match</Button>
+ <Button
+ onClick={async () => {
+ const summary = `My love language is ${primary.name} ${primary.emoji} (secondary: ${secondary.name} ${secondary.emoji}). Discover yours on Miamo.`;
+ try {
+ if (typeof navigator !== 'undefined' && (navigator as any).share) {
+ await (navigator as any).share({ title: 'My love language', text: summary });
+ } else if (typeof navigator !== 'undefined' && navigator.clipboard) {
+ await navigator.clipboard.writeText(summary);
+ toast.success('Copied', 'Paste it into your next chat with a match.');
+ } else {
+ toast.info('Share', summary);
+ }
+ } catch {
+ /* user cancelled */
+ }
+ }}
+ className="flex-1 gap-2"
+ >
+ <Zap className="w-4 h-4" /> Share with Match
+ </Button>
  </div>
  </motion.div>
  )}
