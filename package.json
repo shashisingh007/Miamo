@@ -8,7 +8,10 @@
     "stop": "bash scripts/start-services.sh local stop",
     "restart": "bash scripts/start-services.sh local restart",
     "status": "bash scripts/start-services.sh local status",
-    "test": "python3 scripts/test-all.py",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:python": "python3 scripts/test-all.py",
     "logs": "bash scripts/start-services.sh local logs",
     "docker:up": "bash scripts/start-services.sh docker up",
     "docker:down": "bash scripts/start-services.sh docker down",
@@ -34,11 +37,15 @@
   "author": "Miamo Team",
   "license": "UNLICENSED",
   "devDependencies": {
+    "@types/supertest": "6.0.3",
+    "@vitest/coverage-v8": "2.1.9",
     "husky": "9.1.7",
     "lint-staged": "15.5.2",
+    "supertest": "7.2.2",
     "ts-node": "^10.9.2",
     "tsx": "^4.22.3",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "2.1.9"
   },
   "lint-staged": {
     "*.{ts,tsx,js,jsx,json,md,yml,yaml}": []
