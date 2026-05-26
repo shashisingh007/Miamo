@@ -5,6 +5,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import crypto from 'crypto';
 import { LRUCache, TTL } from '../../shared/cache';
 import { logger } from '../../shared/src/logger';
+import { errorHandler } from '../../shared/src/errorHandler';
 import { sanitize } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
 import { env } from '../../shared/src/env';
@@ -839,15 +840,7 @@ app.get('/api/v1/messages/sent-texts/:userId', authMiddleware, async (req: AuthR
 });
 
 // Error Handler
-app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  const error = err as { statusCode?: number; message?: string; code?: string };
-  const statusCode = error.statusCode || 500;
-  const message = statusCode === 500 && process.env.NODE_ENV === 'production'
-    ? 'Internal server error'
-    : (error.message || 'Internal server error');
-  if (statusCode >= 500) logger.error('Unhandled error:', error.message);
-  res.status(statusCode).json({ error: { message, code: error.code || 'INTERNAL_ERROR', statusCode } });
-});
+app.use(errorHandler);
 
 if (process.env.NODE_ENV !== 'test') {
   const server = app.listen(PORT, '0.0.0.0', () => { logger.info(`Miamo Messaging Service on port ${PORT}`); });

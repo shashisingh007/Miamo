@@ -3,6 +3,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { scoreSearch } from '../../shared/algorithms';
 import { logger } from '../../shared/src/logger';
+import { errorHandler } from '../../shared/src/errorHandler';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog } from '../../shared/src/audit';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware } from '../../shared/src/service';
@@ -451,15 +452,7 @@ app.put('/api/v1/user-data/upsert/:type', authMiddleware, async (req: AuthReques
 });
 
 // ─── Error Handler ───────────────────────────────────
-app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  const error = err as { statusCode?: number; message?: string; code?: string };
-  const statusCode = error.statusCode || 500;
-  const message = statusCode === 500 && process.env.NODE_ENV === 'production'
-    ? 'Internal server error'
-    : (error.message || 'Internal server error');
-  if (statusCode >= 500) logger.error('Unhandled error:', error.message);
-  res.status(statusCode).json({ error: { message, code: error.code || 'INTERNAL_ERROR', statusCode } });
-});
+app.use(errorHandler);
 
 // ─── Start ───────────────────────────────────────────
 if (process.env.NODE_ENV !== 'test') {

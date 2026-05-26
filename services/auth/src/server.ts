@@ -3,6 +3,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { logger } from '../../shared/src/logger';
+import { errorHandler } from '../../shared/src/errorHandler';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog } from '../../shared/src/audit';
 import { env } from '../../shared/src/env';
@@ -268,15 +269,7 @@ app.post('/api/v1/auth/sessions/:id/revoke', authMiddleware, async (req: AuthReq
 });
 
 // ─── Error Handler ───────────────────────────────────
-app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  const error = err as { statusCode?: number; message?: string; code?: string };
-  const statusCode = error.statusCode || 500;
-  const message = statusCode === 500 && process.env.NODE_ENV === 'production'
-    ? 'Internal server error'
-    : (error.message || 'Internal server error');
-  if (statusCode >= 500) logger.error('Unhandled error:', error.message);
-  res.status(statusCode).json({ error: { message, code: error.code || 'INTERNAL_ERROR', statusCode } });
-});
+app.use(errorHandler);
 
 // ─── Start ───────────────────────────────────────────
 if (process.env.NODE_ENV !== 'test') {

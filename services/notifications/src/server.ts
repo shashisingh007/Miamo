@@ -1,6 +1,7 @@
 // ─── Miamo Notification Service ──────────────────────
 import express, { Request, Response, NextFunction } from 'express';
 import { logger } from '../../shared/src/logger';
+import { errorHandler } from '../../shared/src/errorHandler';
 import { sanitize } from '../../shared/src/sanitize';
 import { env } from '../../shared/src/env';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware, createPushToUser } from '../../shared/src/service';
@@ -86,15 +87,7 @@ app.post('/internal/notifications', async (req: Request, res: Response, next: Ne
 });
 
 // Error Handler
-app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  const error = err as { statusCode?: number; message?: string; code?: string };
-  const statusCode = error.statusCode || 500;
-  const message = statusCode === 500 && process.env.NODE_ENV === 'production'
-    ? 'Internal server error'
-    : (error.message || 'Internal server error');
-  if (statusCode >= 500) logger.error('Unhandled error:', error.message);
-  res.status(statusCode).json({ error: { message, code: error.code || 'INTERNAL_ERROR', statusCode } });
-});
+app.use(errorHandler);
 
 if (process.env.NODE_ENV !== 'test') {
   const server = app.listen(PORT, '0.0.0.0', () => { logger.info(`Miamo Notification Service on port ${PORT}`); });

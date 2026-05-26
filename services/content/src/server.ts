@@ -4,6 +4,7 @@ import express, { Request, Response, NextFunction } from 'express';
 import { LRUCache, MinHeap, TTL, feedCache, activityCache } from '../../shared/cache';
 import { scoreFeedItem, scoreDtm, scoreDtmEnhanced, type FeedItem, type FeedUserProfile, type DtmUser, type DtmCandidate } from '../../shared/algorithms';
 import { logger } from '../../shared/src/logger';
+import { errorHandler } from '../../shared/src/errorHandler';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware } from '../../shared/src/service';
@@ -1560,19 +1561,7 @@ app.get('/api/v1/matrimonial/chat', authMiddleware, async (req: AuthRequest, res
 });
 
 // Error Handler
-app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  const error = err as { statusCode?: number; message?: string; code?: string };
-  // Prisma FK violation on userId means the user's session is stale (deleted after reseed)
-  if (error?.code === 'P2003' && error?.message?.includes('userId')) {
-    return res.status(401).json({ error: { message: 'Session expired — please log in again', code: 'UNAUTHORIZED', statusCode: 401 } });
-  }
-  const statusCode = error.statusCode || 500;
-  const message = statusCode === 500 && process.env.NODE_ENV === 'production'
-    ? 'Internal server error'
-    : (error.message || 'Internal server error');
-  if (statusCode >= 500) logger.error('Unhandled error:', error.message);
-  res.status(statusCode).json({ error: { message, code: error.code || 'INTERNAL_ERROR', statusCode } });
-});
+app.use(errorHandler);
 
 if (process.env.NODE_ENV !== 'test') {
   const server = app.listen(PORT, '0.0.0.0', () => { logger.info(`Miamo Content Service on port ${PORT}`); });
