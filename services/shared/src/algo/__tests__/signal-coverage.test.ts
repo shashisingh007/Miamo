@@ -1,0 +1,118 @@
+/**
+ * Signal-coverage guard — fails CI if a tracked event becomes dead data.
+ *
+ * Every TrackEventName must be EITHER:
+ *   (a) consumed by at least one v4 algorithm (registered via registry.ts), OR
+ *   (b) explicitly listed in OPERATIONAL_EVENTS below with a one-line reason.
+ *
+ * Adding a new event without doing one of the two will fail this test. That
+ * is intentional: per docs/ALGORITHMS_V4_PROMPT.md §5 — "no dead data".
+ */
+import { describe, it, expect } from 'vitest';
+import { usedEvents, getRegistry } from '../../algo/registry';
+// Importing each algo registers its event set as a side effect.
+import '../../algo/forYou';
+import '../../algo/aiPicks';
+import '../../algo/moves';
+import '../../algo/new';
+import '../../algo/active';
+import '../../algo/verified';
+import '../../algo/serious';
+import '../../algo/dtm';
+import '../../algo/cf';
+import '../../algo/messageSuggest';
+import '../../algo/beats';
+import '../../algo/notifyTiming';
+import '../../algo/searchAugment';
+import '../../algo/feedAugment';
+import '../../algo/postImpressionRerank';
+import '../../algo/aiMatch';
+
+import * as fs from 'fs';
+import * as path from 'path';
+
+/** Events that are intentionally not consumed by any ranker. */
+const OPERATIONAL_EVENTS = new Set<string>([
+  'consent.update',         // routed to ConsentEvent table, not a ranking signal
+  'page.view',              // navigation only
+  'page.leave',             // navigation only
+  'route.change',           // navigation only
+  'impression',             // generic; aggregated as discover.card_view downstream
+  'dwell',                  // aggregated into FeatureSnapshot.attentionProfile
+  'scroll.idle',            // attention signal already captured via scroll.depth
+  'visibility.change',      // session-state only
+  'cursor.sample',          // attention; folded into attentionProfile via worker
+  'form.focus',             // funnel analytics
+  'form.change',            // funnel analytics
+  'form.submit',            // funnel analytics
+  'form.error',             // funnel analytics
+  'perf.web_vitals',        // operational
+  'error.js',               // operational
+  'error.network',          // operational
+  'discover.boost_view',    // boost telemetry
+  'profile.edit',           // attribute change; feeds FeatureSnapshot completeness only
+  'album.upload',           // creator funnel
+  'album.view',             // attention; folded via dwell
+  'album.unlock_request',   // revenue funnel
+  'vibe.check_start',       // funnel
+  'vibe.check_complete',    // feeds vibeEmb via feature loop (no direct ranker)
+  'date.plan_open',         // funnel
+  'date.plan_save',         // funnel
+  'custom',                 // by definition unrestricted
+]);
+
+function readTrackedEventNames(): string[] {
+  // Parse the TrackEventName union directly so we don't need a separate enum.
+  const file = path.resolve(__dirname, '..', '..', 'track', 'events.ts');
+  const src = fs.readFileSync(file, 'utf8');
+  const start = src.indexOf('export type TrackEventName');
+  const semi = src.indexOf(';', start);
+  const block = src.slice(start, semi);
+  const out = new Set<string>();
+  for (const m of block.matchAll(/'([a-z][a-z0-9._]+)'/g)) out.add(m[1]);
+  return [...out];
+}
+
+describe('signal coverage', () => {
+  const all = readTrackedEventNames();
+
+  it('event catalog is non-empty (parser sanity)', () => {
+    expect(all.length).toBeGreaterThan(20);
+  });
+
+  it('every tracked event is consumed by an algo OR explicitly operational', () => {
+    const consumed = usedEvents();
+    const dead: string[] = [];
+    for (const e of all) {
+      if (consumed.has(e)) continue;
+      if (OPERATIONAL_EVENTS.has(e)) continue;
+      dead.push(e);
+    }
+    expect(dead).toEqual([]);
+  });
+
+  it('OPERATIONAL_EVENTS does not silently shadow events also claimed by an algo', () => {
+    const consumed = usedEvents();
+    const overlap = [...OPERATIONAL_EVENTS].filter((e) => consumed.has(e));
+    expect(overlap).toEqual([]);
+  });
+
+  it('every registered algo declares at least one event', () => {
+    for (const a of getRegistry()) {
+      expect(a.usesEvents.length, `${a.name} declares no events`).toBeGreaterThan(0);
+    }
+  });
+
+  it('every registered algo lists only events that actually exist', () => {
+    const known = new Set(all);
+    const unknown: Array<{ algo: string; evt: string }> = [];
+    for (const a of getRegistry()) {
+      for (const e of a.usesEvents) {
+        // skip pseudo-signals (worker-derived buckets) prefixed elsewhere
+        if (known.has(e)) continue;
+        unknown.push({ algo: a.name, evt: e });
+      }
+    }
+    expect(unknown).toEqual([]);
+  });
+});

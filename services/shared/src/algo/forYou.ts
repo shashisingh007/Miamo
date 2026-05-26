@@ -170,7 +170,7 @@ registerAlgo({
   name: 'forYou',
   surface: 'discover',
   usesEvents: [
-    'discover.card_view', 'discover.swipe', 'dwell', 'scroll.depth',
+    'discover.card_view', 'discover.swipe', 'scroll.depth',
     'click', 'click.rage', 'click.dead', 'session.heartbeat',
     'profile.view', 'msg.send',
   ],
