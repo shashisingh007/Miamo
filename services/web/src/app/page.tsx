@@ -10,6 +10,7 @@ import {
   ArrowRight, Heart, Sparkles, Shield, MessageCircle, Star,
   Quote, Users, MapPin, Check, Flame, Music, Coffee, Camera, Plane,
   Compass, Brain, Lock, Zap, Globe2, Calendar, Gift, Mic2, Wand2,
+  EyeOff, ChevronDown, BellRing, BadgeCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { MiamoWordmark } from '@/components/ui/miamo-logo';
@@ -80,6 +81,19 @@ const FEATURES = [
   { icon: Wand2,         title: 'Vibe Check',   desc: 'A 60-second quiz that turns into your living personality card.' },
   { icon: Lock,          title: 'Private Album', desc: 'Photos you only unlock for someone you actually trust.' },
   { icon: Globe2,        title: 'Date Planner', desc: 'AI suggests a first date you both will say yes to.' },
+];
+
+const CITIES = [
+  'Mumbai','Bengaluru','Delhi','Pune','Hyderabad','Chennai','Kolkata','Ahmedabad',
+  'Jaipur','Goa','Chandigarh','Lucknow','Indore','Kochi','Bhopal','Gurgaon',
+];
+
+const FAQS = [
+  { q: 'Is Miamo free to join?', a: 'Yes. Build your profile, get matched, send Miamo Moves and start Beats — all free. Premium unlocks AI Match boosts and the private album.' },
+  { q: 'How is Date to Marry different from Discover?', a: 'DTM is a separate, more serious lane with verified intent, kundli matching, bio-data, and a slower review flow. Discover stays casual.' },
+  { q: 'Are profiles real and verified?', a: 'We verify every photo with a selfie check, block disposable emails, and use ML to flag bot patterns within minutes.' },
+  { q: 'Who sees my photos?', a: 'You choose. Public photos are visible after a match. Your Private Album is only unlocked when you tap unlock for a specific person.' },
+  { q: 'Can I pause my profile?', a: 'Anytime. One toggle in Settings hides you from Discover without deleting any matches or chats.' },
 ];
 
 /* ── helpers ─────────────────────────────────────────────── */
@@ -576,6 +590,294 @@ function RevealWords({ text, className = '' }: { text: string; className?: strin
   );
 }
 
+/* ── infinite city marquee ─────────────────────────────── */
+function CityMarquee() {
+  const row = [...CITIES, ...CITIES];
+  return (
+    <div className="relative overflow-hidden py-6 border-y border-rose-soft/60 bg-white/50 backdrop-blur">
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-miamo-bg to-transparent z-10" />
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-24 bg-gradient-to-l from-miamo-bg to-transparent z-10" />
+      <motion.div
+        className="flex gap-10 whitespace-nowrap"
+        animate={{ x: ['0%', '-50%'] }}
+        transition={{ duration: 40, repeat: Infinity, ease: 'linear' }}
+      >
+        {row.map((c, i) => (
+          <span key={i} className="inline-flex items-center gap-2 font-brand text-2xl text-text-secondary">
+            <span className="w-1.5 h-1.5 rounded-full bg-rose-main" /> {c}
+          </span>
+        ))}
+      </motion.div>
+    </div>
+  );
+}
+
+/* ── floating emoji burst (decorative) ─────────────────── */
+function EmojiBurst() {
+  const reduce = useReducedMotion();
+  const emojis = ['💖', '✨', '💌', '🌹', '💫'];
+  if (reduce) return null;
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+      {emojis.map((e, i) => (
+        <motion.div
+          key={i}
+          className="absolute text-2xl"
+          style={{ left: `${10 + i * 18}%`, bottom: '-2rem' }}
+          initial={{ opacity: 0, y: 0 }}
+          animate={{ opacity: [0, 1, 0], y: -380, x: i % 2 ? 30 : -30, rotate: i * 25 }}
+          transition={{ duration: 6 + i, repeat: Infinity, delay: i * 1.3, ease: 'easeOut' }}
+        >
+          {e}
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+/* ── phone mockup with rotating profile screen ─────────── */
+function PhoneMockup() {
+  const [i, setI] = useState(0);
+  const reduce = useReducedMotion();
+  useEffect(() => {
+    if (reduce) return;
+    const t = setInterval(() => setI(x => (x + 1) % DECK.length), 3000);
+    return () => clearInterval(t);
+  }, [reduce]);
+  const p = DECK[i];
+  const gradient = `linear-gradient(135deg, hsl(${p.hue}, 78%, 70%) 0%, hsl(${(p.hue + 30) % 360}, 80%, 58%) 100%)`;
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 30, rotateY: -10 }}
+      whileInView={{ opacity: 1, y: 0, rotateY: -6 }}
+      viewport={{ once: true, amount: 0.3 }}
+      transition={{ duration: 0.7 }}
+      style={{ transformStyle: 'preserve-3d', perspective: 1400 }}
+      className="relative mx-auto w-[280px]"
+    >
+      {/* phone frame */}
+      <div className="relative rounded-[42px] bg-zinc-900 p-3 shadow-[0_50px_100px_-30px_rgba(0,0,0,0.55),0_0_0_1px_rgba(255,255,255,0.05)_inset]">
+        <div className="absolute top-5 left-1/2 -translate-x-1/2 w-24 h-5 rounded-full bg-black z-20" />
+        <div className="relative rounded-[32px] overflow-hidden bg-white h-[540px]">
+          <AnimatePresence mode="popLayout">
+            <motion.div
+              key={p.name}
+              initial={{ opacity: 0, scale: 1.05 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.5 }}
+              className="absolute inset-0"
+              style={{ background: gradient }}
+            >
+              <div className="absolute inset-0 mix-blend-overlay opacity-30"
+                style={{ backgroundImage: 'radial-gradient(circle at 30% 25%, rgba(255,255,255,0.55), transparent 55%)' }} />
+              <div className="absolute inset-x-0 top-12 flex items-center justify-center">
+                <span className="font-brand text-[180px] text-white/90 drop-shadow">{p.initial}</span>
+              </div>
+              <div className="absolute inset-x-0 bottom-0 h-[55%] bg-gradient-to-t from-black/90 via-black/55 to-transparent" />
+              <div className="absolute inset-x-0 bottom-0 p-5 text-white">
+                <div className="flex items-baseline gap-2">
+                  <h3 className="font-semibold text-2xl">{p.name}</h3><span className="text-white/80">{p.age}</span>
+                  <BadgeCheck className="ml-1 w-5 h-5 text-sky-300" />
+                </div>
+                <div className="text-[12px] text-white/85 flex items-center gap-1 mt-1"><MapPin className="w-3 h-3" /> {p.city}</div>
+                <p className="text-[13px] mt-2 text-white">{p.blurb}</p>
+              </div>
+              {/* like / pass icons */}
+              <div className="absolute bottom-5 right-5 flex gap-2 z-10">
+                <motion.button aria-label="pass" className="w-10 h-10 rounded-full bg-white/90 flex items-center justify-center shadow-lg"
+                  whileTap={{ scale: 0.9 }}><span className="text-zinc-400 font-bold">×</span></motion.button>
+                <motion.button aria-label="move" className="w-10 h-10 rounded-full bg-rose-main flex items-center justify-center shadow-lg"
+                  whileTap={{ scale: 0.9 }}
+                  animate={{ scale: [1, 1.08, 1] }}
+                  transition={{ duration: 1.8, repeat: Infinity }}>
+                  <Heart className="w-4 h-4 text-white fill-white" />
+                </motion.button>
+              </div>
+            </motion.div>
+          </AnimatePresence>
+        </div>
+      </div>
+      {/* match pop-out */}
+      <motion.div
+        initial={{ opacity: 0, x: 30, rotate: 4 }}
+        whileInView={{ opacity: 1, x: 0, rotate: 4 }}
+        viewport={{ once: true, amount: 0.5 }}
+        transition={{ delay: 0.4, type: 'spring' }}
+        className="absolute -right-10 top-24 bg-white rounded-2xl px-3 py-2.5 shadow-[0_18px_40px_-12px_rgba(0,0,0,0.3)] border border-rose-soft hidden md:flex items-center gap-2"
+      >
+        <Sparkles className="w-4 h-4 text-rose-main" />
+        <div className="text-[11.5px]">
+          <div className="font-bold text-text-primary leading-none">It&rsquo;s a match!</div>
+          <div className="text-[10px] text-text-secondary mt-0.5">Tap to say hello</div>
+        </div>
+      </motion.div>
+      {/* notification */}
+      <motion.div
+        initial={{ opacity: 0, x: -30, rotate: -4 }}
+        whileInView={{ opacity: 1, x: 0, rotate: -4 }}
+        viewport={{ once: true, amount: 0.5 }}
+        transition={{ delay: 0.6, type: 'spring' }}
+        className="absolute -left-12 bottom-28 bg-gradient-to-br from-violet-500 to-rose-main text-white rounded-2xl px-3 py-2.5 shadow-[0_18px_40px_-12px_rgba(190,90,70,0.55)] hidden md:flex items-center gap-2"
+      >
+        <BellRing className="w-4 h-4" />
+        <div className="text-[11.5px]">
+          <div className="font-bold leading-none">Beat ready</div>
+          <div className="text-[10px] opacity-90 mt-0.5">Aanya is waiting</div>
+        </div>
+      </motion.div>
+    </motion.div>
+  );
+}
+
+/* ── lane comparison (Discover vs DTM) ─────────────────── */
+function LaneCompare() {
+  const lanes = [
+    {
+      name: 'Discover', tag: 'Casual to serious', accent: 'from-rose-alt to-rose-main',
+      icon: Heart,
+      items: ['Daily curated matches', 'Beats and Voice Prompts', 'AI Match score', 'Move on at any time'],
+    },
+    {
+      name: 'Date to Marry', tag: 'Marriage-ready', accent: 'from-violet-500 to-rose-dark',
+      icon: Shield,
+      items: ['Verified intent and background', 'Kundli + family preferences', 'Bio-data and longer prompts', 'Slow, deliberate matching'],
+    },
+  ];
+  return (
+    <div className="grid md:grid-cols-2 gap-5">
+      {lanes.map((l, i) => (
+        <motion.div
+          key={l.name}
+          initial={{ opacity: 0, y: 24 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.55, delay: i * 0.1 }}
+          whileHover={{ y: -6, rotateX: 3, rotateY: i ? 4 : -4 }}
+          style={{ transformStyle: 'preserve-3d', perspective: 1000 }}
+          className="relative rounded-3xl bg-white border border-border-light p-7 shadow-[0_30px_70px_-30px_rgba(0,0,0,0.22)] overflow-hidden"
+        >
+          <div className={`absolute -top-16 -right-16 w-44 h-44 rounded-full bg-gradient-to-br ${l.accent} opacity-25 blur-2xl`} />
+          <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${l.accent} flex items-center justify-center text-white shadow-lg`}>
+            <l.icon className="w-5 h-5" />
+          </div>
+          <div className="text-[11px] uppercase tracking-wider font-bold text-rose-main mt-4">{l.tag}</div>
+          <h3 className="font-brand text-2xl font-semibold text-text-primary mt-1">{l.name}</h3>
+          <ul className="mt-4 space-y-2">
+            {l.items.map(it => (
+              <li key={it} className="flex items-start gap-2 text-[13.5px] text-text-primary">
+                <span className="w-5 h-5 rounded-full bg-rose-soft text-rose-main flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Check className="w-3 h-3" />
+                </span>
+                {it}
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+/* ── safety promise (3 cards w/ animated shield) ───────── */
+function SafetyPromise() {
+  const items = [
+    { icon: BadgeCheck, title: 'Verified humans only', desc: 'Selfie-check on every profile. Bots flagged in minutes.' },
+    { icon: EyeOff,     title: 'You control visibility', desc: 'Private album, pause anytime, hide from anyone.' },
+    { icon: Lock,       title: 'End-to-end private',     desc: 'Messages encrypted in transit. Never sold, ever.' },
+  ];
+  return (
+    <div className="grid sm:grid-cols-3 gap-4">
+      {items.map((it, i) => (
+        <motion.div
+          key={it.title}
+          initial={{ opacity: 0, y: 18 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.5, delay: i * 0.08 }}
+          whileHover={{ y: -4 }}
+          className="relative rounded-3xl bg-white/90 border border-border-light p-6 shadow-[0_20px_50px_-25px_rgba(0,0,0,0.2)]"
+        >
+          <motion.div
+            className="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-white shadow-lg mb-3"
+            animate={{ scale: [1, 1.05, 1] }}
+            transition={{ duration: 2.4, repeat: Infinity, delay: i * 0.4 }}
+          >
+            <it.icon className="w-5 h-5" />
+          </motion.div>
+          <h4 className="font-semibold text-text-primary">{it.title}</h4>
+          <p className="mt-1 text-[13px] text-text-secondary leading-relaxed">{it.desc}</p>
+        </motion.div>
+      ))}
+    </div>
+  );
+}
+
+/* ── FAQ accordion ─────────────────────────────────────── */
+function FAQ() {
+  const [open, setOpen] = useState<number | null>(0);
+  return (
+    <div className="max-w-3xl mx-auto space-y-3">
+      {FAQS.map((f, i) => {
+        const isOpen = open === i;
+        return (
+          <motion.div
+            key={f.q}
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, amount: 0.3 }}
+            transition={{ duration: 0.4, delay: i * 0.05 }}
+            className="rounded-2xl bg-white border border-border-light shadow-[0_15px_40px_-25px_rgba(0,0,0,0.2)] overflow-hidden"
+          >
+            <button
+              onClick={() => setOpen(isOpen ? null : i)}
+              className="w-full flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-rose-soft/30 transition-colors"
+              aria-expanded={isOpen}
+            >
+              <span className="font-semibold text-[15px] text-text-primary">{f.q}</span>
+              <motion.span animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.25 }}>
+                <ChevronDown className="w-4 h-4 text-rose-main" />
+              </motion.span>
+            </button>
+            <AnimatePresence initial={false}>
+              {isOpen && (
+                <motion.div
+                  key="content"
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3, ease: 'easeOut' }}
+                  className="overflow-hidden"
+                >
+                  <p className="px-5 pb-5 text-[14px] text-text-secondary leading-relaxed">{f.a}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── heartbeat SVG divider ─────────────────────────────── */
+function HeartbeatDivider() {
+  return (
+    <div aria-hidden className="max-w-3xl mx-auto px-6 py-2 opacity-70">
+      <svg viewBox="0 0 600 60" className="w-full h-10">
+        <motion.path
+          d="M0 30 L 120 30 L 140 10 L 160 50 L 180 18 L 200 42 L 220 30 L 380 30 L 400 8 L 420 52 L 440 22 L 460 38 L 480 30 L 600 30"
+          stroke="rgb(190,90,70)" strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"
+          initial={{ pathLength: 0, opacity: 0 }}
+          whileInView={{ pathLength: 1, opacity: 1 }}
+          viewport={{ once: true, amount: 0.5 }}
+          transition={{ duration: 2.2, ease: 'easeInOut' }}
+        />
+      </svg>
+    </div>
+  );
+}
+
 /* ═══════════════════════ PAGE ═══════════════════════════ */
 export default function LandingPage() {
   const { scrollYProgress } = useScroll();
@@ -593,6 +895,7 @@ export default function LandingPage() {
         }}
       />
       <FloatingBackgroundCards />
+      <EmojiBurst />
 
       {/* NAV */}
       <nav className="sticky top-0 z-30 flex items-center justify-between px-6 lg:px-12 h-16 backdrop-blur-md bg-white/75 border-b border-border-light">
@@ -687,6 +990,11 @@ export default function LandingPage() {
 
       {/* STATS MARQUEE */}
       <StatsMarquee />
+
+      {/* CITY MARQUEE */}
+      <div className="relative z-10 mt-16">
+        <CityMarquee />
+      </div>
 
       {/* HOW IT WORKS */}
       <section className="relative z-10 max-w-6xl mx-auto px-6 py-20">
@@ -813,6 +1121,22 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* PHONE MOCKUP + LANE COMPARISON */}
+      <section className="relative z-10 max-w-6xl mx-auto px-6 py-24">
+        <div className="grid lg:grid-cols-[1fr_1.2fr] gap-12 items-center">
+          <div className="order-2 lg:order-1">
+            <span className="text-[11px] uppercase tracking-[0.18em] font-bold text-rose-main">Two lanes, your choice</span>
+            <h2 className="font-brand font-semibold text-[34px] lg:text-[42px] tracking-tight mt-2">One Miamo. Two journeys.</h2>
+            <p className="mt-3 text-text-secondary text-[14.5px] max-w-lg">Whether you&rsquo;re here to meet someone interesting or to find the person you&rsquo;ll marry &mdash; Miamo has a dedicated space for both, with the right pace and the right people.</p>
+            <div className="mt-8"><LaneCompare /></div>
+          </div>
+          <div className="order-1 lg:order-2 relative">
+            <div aria-hidden className="absolute -inset-10 bg-gradient-to-br from-rose-soft via-amber-100 to-violet-200 rounded-[60px] blur-3xl opacity-50" />
+            <PhoneMockup />
+          </div>
+        </div>
+      </section>
+
       {/* TESTIMONIALS */}
       <section className="relative z-10 max-w-6xl mx-auto px-6 py-24">
         <motion.div
@@ -857,6 +1181,39 @@ export default function LandingPage() {
         </div>
       </section>
 
+      <HeartbeatDivider />
+
+      {/* SAFETY PROMISE */}
+      <section className="relative z-10 max-w-6xl mx-auto px-6 py-20">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-12"
+        >
+          <span className="text-[11px] uppercase tracking-[0.18em] font-bold text-rose-main">Built on trust</span>
+          <h2 className="font-brand font-semibold text-[34px] lg:text-[42px] tracking-tight mt-2">Your safety is the product.</h2>
+          <p className="mt-3 text-text-secondary text-[14.5px] max-w-xl mx-auto">Verified humans, private by default, and you stay in control of who sees what.</p>
+        </motion.div>
+        <SafetyPromise />
+      </section>
+
+      {/* FAQ */}
+      <section className="relative z-10 max-w-6xl mx-auto px-6 py-20">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.5 }}
+          className="text-center mb-10"
+        >
+          <span className="text-[11px] uppercase tracking-[0.18em] font-bold text-rose-main">Questions, answered</span>
+          <h2 className="font-brand font-semibold text-[34px] lg:text-[42px] tracking-tight mt-2">Good to know.</h2>
+        </motion.div>
+        <FAQ />
+      </section>
+
       {/* FINAL CTA */}
       <section className="relative z-10 px-6 pb-24">
         <motion.div
@@ -886,8 +1243,16 @@ export default function LandingPage() {
             </h2>
             <p className="mt-4 text-white/95 max-w-xl mx-auto text-[14.5px] leading-relaxed">Free to join. No bots. No tricks. Just thoughtful people meeting other thoughtful people.</p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3 justify-center">
-              <Link href="/register"><Button size="lg" className="bg-white text-rose-main hover:bg-white/90 min-w-[210px] shadow-xl">Join Miamo <ArrowRight className="ml-1 w-4 h-4" /></Button></Link>
-              <Link href="/login"><Button size="lg" variant="outline" className="bg-transparent text-white border-white/50 hover:bg-white/10 min-w-[180px]">I&rsquo;m already in</Button></Link>
+              <Link href="/register">
+                <button className="inline-flex items-center justify-center gap-1 h-12 px-8 rounded-2xl bg-white text-rose-main font-bold text-sm min-w-[210px] shadow-[0_18px_40px_-10px_rgba(0,0,0,0.45)] hover:bg-rose-soft hover:scale-[1.03] transition-all duration-300 active:scale-[0.97]">
+                  Join Miamo <ArrowRight className="w-4 h-4" />
+                </button>
+              </Link>
+              <Link href="/login">
+                <button className="inline-flex items-center justify-center gap-1 h-12 px-8 rounded-2xl bg-transparent text-white border-2 border-white/70 font-semibold text-sm min-w-[180px] hover:bg-white/15 hover:border-white transition-all duration-300">
+                  I&rsquo;m already in
+                </button>
+              </Link>
             </div>
           </div>
         </motion.div>
