@@ -91,9 +91,20 @@ class ApiClient {
  async getMe() {
  return this.request<any>('/api/v1/auth/me');
  }
- // v3.2 — Onboarding completion score
+ // v3.2 — Onboarding completion score (with per-bucket breakdown)
  async getCompletion() {
- return this.request<{ data: { score: number; threshold: number; missing: string[]; dtm: boolean } }>('/api/v1/profiles/me/completion');
+ return this.request<{ data: {
+   score: number;
+   threshold: number;
+   missing: string[];
+   dtm: boolean;
+   buckets: Array<{
+     key: string; label: string; hint: string;
+     pts: number; earned: number; done: boolean;
+     fields: string[];
+     visibility: 'PUBLIC' | 'MATCHES_ONLY' | 'REQUEST_ACCESS';
+   }>;
+ } }>('/api/v1/profiles/me/completion');
  }
  async updatePassword(data: { currentPassword: string; newPassword: string }) {
  return this.request<any>('/api/v1/auth/password', { method: 'PUT', body: JSON.stringify(data) });
