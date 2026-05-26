@@ -16,9 +16,11 @@ import { FeatureAggregator } from './feature';
 import { CompatWriter } from './compat';
 import { EmbeddingWorker } from './embeddings';
 import { ColdStore } from './cold-store';
+import { EnrichmentWorker } from './enrich';
 
 const PORT = Number(process.env.PORT || 3261);
 const KILL = process.env.TRACKING_KILL === '1';
+const V4_WORKERS = process.env.ALGO_V4_WORKERS_ENABLED === '1';
 
 const prisma = new PrismaClient();
 const rollup = new RollupConsumer(prisma);
@@ -26,9 +28,10 @@ const feature = new FeatureAggregator(prisma);
 const compat = new CompatWriter(prisma);
 const embed = new EmbeddingWorker(prisma);
 const coldStore = new ColdStore(prisma);
+const enrich = new EnrichmentWorker(prisma);
 
 const app = express();
-app.get('/healthz', (_req, res) => res.json({ ok: true, kill: KILL, ts: Date.now() }));
+app.get('/healthz', (_req, res) => res.json({ ok: true, kill: KILL, v4Workers: V4_WORKERS, ts: Date.now() }));
 
 async function main(): Promise<void> {
   if (!KILL) {
@@ -37,6 +40,7 @@ async function main(): Promise<void> {
     compat.start();
     embed.start();
     coldStore.start();
+    if (V4_WORKERS) enrich.start();
   } else {
     // eslint-disable-next-line no-console
     console.warn('[worker] TRACKING_KILL=1 — loops disabled, only /healthz live');
@@ -47,6 +51,7 @@ async function main(): Promise<void> {
   });
   const shutdown = async (): Promise<void> => {
     server.close();
+    enrich.stop();
     coldStore.stop();
     embed.stop();
     compat.stop();
