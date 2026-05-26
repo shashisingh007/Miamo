@@ -992,6 +992,98 @@ model UserActivity {
   @@index([userId, targetType, createdAt])
 }
 
+// ─── v3.1 Tracking pipeline (Phase 1) ───────────────
+// Hot raw events live in Redis Streams; only aggregates land in Postgres.
+// All tracking tables key on uidHash (HMAC-SHA256 of userId) so an account
+// delete can break the join without a full table-rewrite.
+
+model ConsentEvent {
+  id        String   @id @default(uuid())
+  userId    String?
+  did       String   // device id (cookie)
+  scope     String   // 'analytics' | 'personalization' | 'marketing'
+  granted   Boolean
+  region    String?  // 'IN' | 'EU' | 'US' | ...
+  source    String   @default("banner") // banner | settings | api
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([did])
+  @@index([userId, scope, createdAt])
+}
+
+model EventAggHourly {
+  uidHash String
+  evt     String
+  bucket  DateTime // truncated to hour, UTC
+  count   Int      @default(0)
+  durSum  Int      @default(0)
+  durP50  Int      @default(0)
+  durP95  Int      @default(0)
+  meta    Json     @default("{}")
+
+  @@id([uidHash, evt, bucket])
+  @@index([bucket])
+  @@index([uidHash, bucket])
+}
+
+model EventAggDaily {
+  uidHash     String
+  evt         String
+  day         DateTime // truncated to day, UTC
+  count       Int      @default(0)
+  durSum      Int      @default(0)
+  uniqTargets Int      @default(0) // HLL cardinality snapshot
+  meta        Json     @default("{}")
+
+  @@id([uidHash, evt, day])
+  @@index([day])
+  @@index([uidHash, day])
+}
+
+model FeatureSnapshot {
+  uidHash             String   @id
+  computedAt          DateTime @default(now())
+  chronotype          String?  // morning | day | evening | night | mixed
+  replyPersonaP50Ms   Int?
+  replyPersonaP90Ms   Int?
+  responseRate        Float?
+  rageClickRate       Float?
+  deadClickRate       Float?
+  dwellToDecisionP50  Float?
+  swipeRightRatio     Float?
+  attentionProfile    String?  // reader | scanner | voice-first | visual
+  interestVec         Bytes? // 32 × f16
+  vibeEmb             Bytes? // 64 × f16
+  behaviorEmb         Bytes? // 64 × f16
+  cityCenterLat       Float?
+  cityCenterLng       Float?
+  raw                 Json     @default("{}")
+
+  @@index([computedAt])
+}
+
+model PairCompatCache {
+  aHash                 String
+  bHash                 String
+  computedAt            DateTime @default(now())
+  interestCos           Float    @default(0)
+  vibeCos               Float    @default(0)
+  behaviorCos           Float    @default(0)
+  magnetCos             Float    @default(0)
+  cityKm                Float    @default(0)
+  ageDelta              Int      @default(0)
+  intentMatch           Float    @default(0)
+  chronoOverlap         Float    @default(0)
+  cadenceOverlap        Float    @default(0)
+  priorInteractionScore Float    @default(0)
+  finalScore            Float    @default(0)
+
+  @@id([aHash, bHash])
+  @@index([aHash, finalScore])
+  @@index([computedAt])
+}
+
 // ─── User Data (generic feature persistence) ────────
 model UserData {
   id        String   @id @default(uuid())

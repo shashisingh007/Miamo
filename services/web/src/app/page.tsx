@@ -928,7 +928,7 @@ export default function LandingPage() {
       </nav>
 
       {/* HERO */}
-      <section className="relative z-10 max-w-6xl mx-auto px-6 pt-10 lg:pt-16 pb-24 grid lg:grid-cols-[1.05fr_1fr] gap-10 lg:gap-14 items-center">
+      <section data-track-section="hero" className="relative z-10 max-w-6xl mx-auto px-6 pt-10 lg:pt-16 pb-24 grid lg:grid-cols-[1.05fr_1fr] gap-10 lg:gap-14 items-center">
         <motion.div style={{ y: heroParallax }} className="text-center lg:text-left">
           {/* BIG animated wordmark */}
           <motion.div
@@ -1234,7 +1234,7 @@ export default function LandingPage() {
       </section>
 
       {/* FINAL CTA */}
-      <section className="relative z-10 px-6 pb-24">
+      <section data-track-section="final_cta" className="relative z-10 px-6 pb-24">
         <motion.div
           initial={{ opacity: 0, scale: 0.97 }}
           whileInView={{ opacity: 1, scale: 1 }}

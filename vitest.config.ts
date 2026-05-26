@@ -4,6 +4,7 @@ export default defineConfig({
   test: {
     include: [
       'services/shared/**/*.{test,spec}.ts',
+      'services/ingest/**/*.{test,spec}.ts',
       'tests/**/*.{test,spec}.ts',
     ],
     exclude: [

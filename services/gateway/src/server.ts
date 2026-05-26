@@ -75,6 +75,7 @@ const SERVICES = {
   messaging: process.env.MESSAGING_SERVICE_URL || 'http://localhost:3204',
   content: process.env.CONTENT_SERVICE_URL || 'http://localhost:3205',
   notifications: process.env.NOTIFICATION_SERVICE_URL || 'http://localhost:3206',
+  ingest: process.env.INGEST_SERVICE_URL || 'http://localhost:3260',
 };
 
 // ─── Security: Enhanced Helmet CSP ───────────────────
@@ -444,14 +445,15 @@ app.post('/api/v1/activity/track', express.json({ limit: '50kb' }), (req: expres
 });
 
 // ─── Proxy Options Builder ───────────────────────────
-function proxyTo(target: string): Options {
+function proxyTo(target: string, extra?: Partial<Options> & { pathRewrite?: Record<string, string> }): Options {
   return {
     target,
     changeOrigin: true,
+    ...(extra?.pathRewrite ? { pathRewrite: extra.pathRewrite } : {}),
     on: {
       proxyReq: (proxyReq, req: any) => {
-        // Express strips the mount path from req.url — restore it
-        proxyReq.path = req.originalUrl;
+        // Express strips the mount path from req.url — restore it (unless rewriting)
+        if (!extra?.pathRewrite) proxyReq.path = req.originalUrl;
         // Forward auth headers
         if (req.headers['x-user-id']) {
           proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
@@ -476,6 +478,15 @@ function proxyTo(target: string): Options {
 
 // ─── Route Definitions ───────────────────────────────
 // Auth routes (public)
+// ─── v3.1 Tracking: unauthenticated edge ingest ─────
+// Proxied BEFORE auth-gated routes; tracking is consent-gated client-side,
+// not auth-gated. Kill switch via TRACKING_KILL short-circuits to 204.
+if (process.env.TRACKING_KILL === '1') {
+  app.use('/api/v1/track', (_req, res) => res.status(204).end());
+} else {
+  app.use('/api/v1/track', createProxyMiddleware(proxyTo(SERVICES.ingest, { pathRewrite: { '^/api/v1/track': '/v1/track' } })));
+}
+
 app.use('/api/v1/auth/forgot-password', forgotPasswordLimiter);
 app.use('/api/v1/auth/refresh', refreshLimiter);
 app.use('/api/v1/auth', authLimiter, createProxyMiddleware(proxyTo(SERVICES.auth)));
