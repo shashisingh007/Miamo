@@ -354,3 +354,84 @@ export const videoBodySchema = z.object({
 export const markReadBodySchema = z.object({
   ids: z.array(z.string().min(1).max(64)).max(500).optional(),
 });
+
+// ─── v3.2 Showcase ─────────────────────────────────────
+export const SHOWCASE_CATEGORIES = [
+  'music', 'visual-art', 'writing', 'photography', 'cooking', 'dance',
+  'fitness', 'comedy', 'tech-code', 'crafts', 'performance', 'other',
+] as const;
+
+export const SHOWCASE_LINK_ALLOWLIST = [
+  'youtube.com', 'youtu.be',
+  'soundcloud.com',
+  'open.spotify.com',
+  'github.com',
+  'behance.net',
+  'substack.com',
+  'bandcamp.com',
+  'vimeo.com',
+  'are.na',
+  'instagram.com', // public reels only — enforced server-side via /reel/ check
+] as const;
+
+export const showcaseCreateBodySchema = z.object({
+  category: z.enum(SHOWCASE_CATEGORIES),
+  type: z.enum(['link', 'image', 'text', 'voice']),
+  title: z.string().trim().min(1).max(120),
+  body: z.string().trim().max(300).optional(),
+  url: z.string().trim().min(1).max(2048).optional(),
+  imageUrl: z.string().trim().min(1).max(2048).optional(),
+  voiceUrl: z.string().trim().min(1).max(2048).optional(),
+  voiceDurationMs: z.number().int().min(0).max(120_000).optional(),
+  pinned: z.boolean().optional(),
+  visibility: z.enum(['everyone', 'matches', 'private']).optional(),
+}).refine(
+  (v) => (v.type === 'link' && !!v.url) || (v.type === 'image' && !!v.imageUrl) ||
+         (v.type === 'voice' && !!v.voiceUrl) || (v.type === 'text' && !!v.body),
+  { message: 'payload must match type (link→url, image→imageUrl, voice→voiceUrl, text→body)' },
+);
+
+export const showcaseUpdateBodySchema = z.object({
+  title: z.string().trim().min(1).max(120).optional(),
+  body: z.string().trim().max(300).optional(),
+  url: z.string().trim().min(1).max(2048).optional(),
+  imageUrl: z.string().trim().min(1).max(2048).optional(),
+  pinned: z.boolean().optional(),
+  visibility: z.enum(['everyone', 'matches', 'private']).optional(),
+}).passthrough();
+
+export const showcaseMoveBodySchema = z.object({
+  fromUserId: z.string().min(1).max(64),
+  message: z.string().trim().max(500).optional(),
+});
+
+// ─── v3.2 Access Control ───────────────────────────────
+export const ACCESS_FIELDS = [
+  'photos', 'phone', 'family', 'income', 'kundli',
+  'lastName', 'exactCity', 'socials', 'email',
+] as const;
+
+export const accessRequestCreateBodySchema = z.object({
+  toUserId: z.string().min(1).max(64),
+  field: z.enum(ACCESS_FIELDS),
+  message: z.string().trim().max(500).optional(),
+});
+
+export const accessRequestDecisionBodySchema = z.object({
+  reason: z.string().trim().max(500).optional(),
+});
+
+// ─── v3.2 DTM Profile Fields ───────────────────────────
+export const dtmProfileUpdateBodySchema = z.object({
+  familyBackground:   z.string().trim().max(280).optional().nullable(),
+  educationLevel:     z.string().trim().max(80).optional().nullable(),
+  educationInstitution: z.string().trim().max(160).optional().nullable(),
+  employer:           z.string().trim().max(160).optional().nullable(),
+  incomeBand:         z.string().trim().max(40).optional().nullable(),
+  subCommunity:       z.string().trim().max(80).optional().nullable(),
+  maritalStatus:      z.enum(['never-married', 'divorced', 'widowed', 'separated']).optional().nullable(),
+  willingToRelocate:  z.boolean().optional().nullable(),
+  familyInvolved:     z.boolean().optional().nullable(),
+  expectedTimeline:   z.enum(['6mo', '1yr', '2yr+']).optional().nullable(),
+  kundliUrl:          z.string().trim().max(2048).optional().nullable(),
+}).passthrough();

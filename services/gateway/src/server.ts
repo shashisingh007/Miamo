@@ -258,6 +258,54 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
   next();
 }
 
+// ─── v3.2 — Onboarding Gate ───────────────────────────
+// Calls users service /api/v1/profiles/me/completion (60s in-memory cache per user)
+// and returns 403 ONBOARDING_INCOMPLETE if score < required threshold (60 casual / 80 DTM).
+// Designed to be cheap: only invoked on a small allowlist of gated routes.
+interface CompletionCacheEntry { result: { score: number; missing: string[]; threshold: number; dtm: boolean }; expiresAt: number }
+const completionCache = new Map<string, CompletionCacheEntry>();
+const COMPLETION_TTL_MS = 60_000;
+
+async function requireOnboarded(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const userId = req.headers['x-user-id'] as string | undefined;
+  if (!userId) return res.status(401).json({ error: { message: 'Authentication required', code: 'UNAUTHORIZED' } });
+
+  try {
+    const cached = completionCache.get(userId);
+    let result = cached && cached.expiresAt > Date.now() ? cached.result : null;
+    if (!result) {
+      const ctrl = new AbortController();
+      const t = setTimeout(() => ctrl.abort(), 2500);
+      const r = await fetch(`${SERVICES.users}/api/v1/profiles/me/completion`, {
+        headers: { 'x-user-id': userId, 'x-internal-key': INTERNAL_KEY },
+        signal: ctrl.signal,
+      });
+      clearTimeout(t);
+      if (!r.ok) return next(); // fail-open: don't block traffic on completion lookup hiccups
+      const body = await r.json() as { data: typeof result };
+      result = body.data!;
+      completionCache.set(userId, { result, expiresAt: Date.now() + COMPLETION_TTL_MS });
+    }
+    if (result && result.score < result.threshold) {
+      return res.status(403).json({
+        error: {
+          message: 'Complete your profile to unlock this feature.',
+          code: 'ONBOARDING_INCOMPLETE',
+          statusCode: 403,
+          requiredScore: result.threshold,
+          currentScore: result.score,
+          missingFields: result.missing,
+          dtm: result.dtm,
+        },
+      });
+    }
+    next();
+  } catch {
+    // Fail-open on any unexpected error to avoid wedging the gateway.
+    next();
+  }
+}
+
 app.use(extractUserId);
 
 // ─── Health Check ────────────────────────────────────
@@ -441,22 +489,24 @@ app.use('/api/v1/bookmarks', requireAuth, createProxyMiddleware(proxyTo(SERVICES
 app.use('/api/v1/user-data', requireAuth, createProxyMiddleware(proxyTo(SERVICES.users)));
 
 // Social routes (protected)
-app.use('/api/v1/discover', requireAuth, expensiveLimiter, createProxyMiddleware(proxyTo(SERVICES.social)));
-app.use('/api/v1/matches', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
-app.use('/api/v1/ai-match', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
+app.use('/api/v1/discover', requireAuth, requireOnboarded, expensiveLimiter, createProxyMiddleware(proxyTo(SERVICES.social)));
+app.use('/api/v1/matches', requireAuth, requireOnboarded, createProxyMiddleware(proxyTo(SERVICES.social)));
+app.use('/api/v1/ai-match', requireAuth, requireOnboarded, createProxyMiddleware(proxyTo(SERVICES.social)));
 app.use('/api/v1/safety', requireAuth, reportLimiter, createProxyMiddleware(proxyTo(SERVICES.social)));
 app.use('/api/v1/vibe-check', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
 app.use('/api/v1/activity', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
+app.use('/api/v1/access', requireAuth, requireOnboarded, createProxyMiddleware(proxyTo(SERVICES.social)));
 
 // Messaging routes (protected)
-app.use('/api/v1/messages', requireAuth, createProxyMiddleware(proxyTo(SERVICES.messaging)));
-app.use('/api/v1/beats', requireAuth, createProxyMiddleware(proxyTo(SERVICES.messaging)));
+app.use('/api/v1/messages', requireAuth, requireOnboarded, createProxyMiddleware(proxyTo(SERVICES.messaging)));
+app.use('/api/v1/beats', requireAuth, requireOnboarded, createProxyMiddleware(proxyTo(SERVICES.messaging)));
 
 // Content routes (protected)
 app.use('/api/v1/feed', requireAuth, feedLimiter, createProxyMiddleware(proxyTo(SERVICES.content)));
 app.use('/api/v1/stories', requireAuth, feedLimiter, createProxyMiddleware(proxyTo(SERVICES.content)));
 app.use('/api/v1/videos', requireAuth, feedLimiter, createProxyMiddleware(proxyTo(SERVICES.content)));
 app.use('/api/v1/creativity', requireAuth, feedLimiter, createProxyMiddleware(proxyTo(SERVICES.content)));
+app.use('/api/v1/showcase', requireAuth, feedLimiter, createProxyMiddleware(proxyTo(SERVICES.content)));
 app.use('/api/v1/matrimonial', requireAuth, createProxyMiddleware(proxyTo(SERVICES.content)));
 
 // Notification routes (protected)

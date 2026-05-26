@@ -15,6 +15,7 @@ import {
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog } from '../../shared/src/audit';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware } from '../../shared/src/service';
+import { computeCompletionScore, recomputeAndPersistCompletion } from '../../shared/src/completion';
 
 const prisma = createPrisma(10);
 export const app = express();
@@ -109,8 +110,18 @@ app.put('/api/v1/profiles/me', authMiddleware, validate({ body: updateProfileBod
     score = Math.min(score, 100);
 
     const updated = await prisma.profile.update({ where: { userId: req.userId }, data: { profileScore: score } });
+    // v3.2 — recompute onboarding completion (separate from legacy profileScore)
+    await recomputeAndPersistCompletion(prisma, req.userId!).catch(() => {});
     auditLog(prisma, req.userId!, 'profile_update', { fields: Object.keys(data) });
     res.json({ data: updated });
+  } catch (e) { next(e); }
+});
+
+// v3.2 — onboarding completion endpoint used by gateway requireOnboarded
+app.get('/api/v1/profiles/me/completion', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const result = await computeCompletionScore(prisma, req.userId!);
+    res.json({ data: result });
   } catch (e) { next(e); }
 });
 
