@@ -209,7 +209,7 @@ export default function OnboardingPage() {
     <main className="mx-auto max-w-2xl px-6 pb-24 pt-10" data-mode={completion.dtm ? 'dtm' : 'casual'}>
       <header className="mb-6">
         <p className="text-xs uppercase tracking-wider text-text-muted">
-          {completion.dtm ? 'Profile Setup · Date to Marry' : 'Profile Setup · Discover'}
+          {completion.dtm ? 'Your DTM Profile · Date to Marry' : 'Your Dating Profile · Discover'}
         </p>
         <h1 className="mt-1 text-3xl font-medium tracking-tight">
           {completion.score >= 100

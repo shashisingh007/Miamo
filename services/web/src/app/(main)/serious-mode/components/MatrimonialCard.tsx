@@ -1,24 +1,34 @@
 'use client';
 
+import { useState } from 'react';
 import { motion } from 'framer-motion';
 import {
  CheckCircle, Hash, GraduationCap, Briefcase, Building,
- Phone, Linkedin, Mail, ChevronRight,
+ Phone, Linkedin, Mail, ChevronRight, Heart, Send,
 } from 'lucide-react';
 
 /* ═══════════════════════════════════════════════════════════
  PROFILE CARD — Discover-style for Browse
  ═══════════════════════════════════════════════════════════ */
-export function MatrimonialCard({ profile: p, onView }: { profile: any; onView: () => void }) {
+export function MatrimonialCard({ profile: p, onView, onMove, onMatchRequest }: {
+ profile: any;
+ onView: () => void;
+ onMove?: (toUserId: string) => void | Promise<void>;
+ onMatchRequest?: (toUserId: string) => void | Promise<void>;
+}) {
  const photo = p.user?.photos?.[0]?.url;
  const up = p.user?.profile;
  const gradient = up?.avatarGradient || 'from-rose-alt to-rose-main';
+ const targetUserId = p.user?.id || p.userId;
+ const [movePending, setMovePending] = useState(false);
+ const [matchPending, setMatchPending] = useState(false);
+ const [moveSent, setMoveSent] = useState(false);
+ const [matchSent, setMatchSent] = useState(false);
 
  return (
  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
- className="group relative bg-miamo-card rounded-2xl border border-zinc-200 overflow-hidden hover:shadow-xl hover:shadow-rose-soft transition-all duration-300 cursor-pointer"
- onClick={onView}>
- <div className="relative h-56 overflow-hidden">
+ className="group relative bg-miamo-card rounded-2xl border border-zinc-200 overflow-hidden hover:shadow-xl hover:shadow-rose-soft transition-all duration-300">
+ <div className="relative h-56 overflow-hidden cursor-pointer" onClick={onView}>
  {photo ? (
  <img loading="lazy" src={photo} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
  ) : (
@@ -57,8 +67,28 @@ export function MatrimonialCard({ profile: p, onView }: { profile: any; onView: 
  <Linkedin className={`w-3.5 h-3.5 ${p.hasLinkedIn ? 'text-rose-main' : 'text-zinc-300'}`} />
  <Mail className={`w-3.5 h-3.5 ${p.hasEmail ? 'text-rose-main' : 'text-zinc-300'}`} />
  <div className="flex-1" />
- <span className="text-[10px] font-semibold text-rose-main group-hover:text-rose-main flex items-center gap-1">View <ChevronRight className="w-3 h-3" /></span>
+ <button onClick={onView} className="text-[10px] font-semibold text-rose-main hover:text-rose-dark flex items-center gap-1">View <ChevronRight className="w-3 h-3" /></button>
  </div>
+ {(onMove || onMatchRequest) && (
+ <div className="grid grid-cols-2 gap-2 pt-1">
+ {onMove && (
+ <button
+ disabled={movePending || moveSent || !targetUserId}
+ onClick={async (e) => { e.stopPropagation(); if (!targetUserId) return; setMovePending(true); try { await onMove(targetUserId); setMoveSent(true); } finally { setMovePending(false); } }}
+ className="flex items-center justify-center gap-1.5 rounded-xl border border-rose-light bg-rose-soft px-3 py-2 text-xs font-semibold text-rose-dark hover:bg-rose-light disabled:opacity-50 transition">
+ <Heart className="w-3.5 h-3.5" /> {moveSent ? 'Move sent' : movePending ? 'Sending…' : 'Miamo Move'}
+ </button>
+ )}
+ {onMatchRequest && (
+ <button
+ disabled={matchPending || matchSent || !targetUserId}
+ onClick={async (e) => { e.stopPropagation(); if (!targetUserId) return; setMatchPending(true); try { await onMatchRequest(targetUserId); setMatchSent(true); } finally { setMatchPending(false); } }}
+ className="flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-rose-main to-rose-dark px-3 py-2 text-xs font-semibold text-white shadow-button hover:shadow-lg disabled:opacity-50 transition">
+ <Send className="w-3.5 h-3.5" /> {matchSent ? 'Request sent' : matchPending ? 'Sending…' : 'Send Match'}
+ </button>
+ )}
+ </div>
+ )}
  </div>
  </motion.div>
  );

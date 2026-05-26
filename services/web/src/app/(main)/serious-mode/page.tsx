@@ -357,7 +357,23 @@ export default function DateToMarryPage() {
  </AnimatePresence>
 
  {/* Profile Grid */}
- {browseProfiles.length === 0 ? (
+ {profileCompletion < DTM_GATE ? (
+ <div className="text-center py-16 bg-gradient-to-br from-rose-soft/60 via-white to-rose-soft/40 rounded-2xl border border-rose-light shadow-soft">
+ <Lock className="w-10 h-10 text-rose-main mx-auto mb-3" />
+ <h3 className="text-base font-bold text-zinc-900">Reach {DTM_GATE}% to start browsing</h3>
+ <p className="text-xs text-zinc-500 mt-1 max-w-sm mx-auto">DTM is a serious flow. Complete your matrimonial profile to unlock browsing, Miamo Moves and Match requests.</p>
+ <div className="max-w-xs mx-auto mt-4">
+ <div className="w-full bg-zinc-100 rounded-full h-2.5">
+ <div className="h-full bg-gradient-to-r from-rose-main to-rose-dark rounded-full transition-all" style={{ width: `${profileCompletion}%` }} />
+ </div>
+ <p className="text-[10px] text-zinc-400 mt-1.5 tabular-nums">{profileCompletion}% complete • {Math.max(0, DTM_GATE - profileCompletion)}% to go</p>
+ </div>
+ <button onClick={() => setSection('profile')}
+ className="mt-5 inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-rose-main to-rose-dark text-white shadow-button hover:shadow-lg transition">
+ <FileText className="w-3.5 h-3.5" /> Complete my profile
+ </button>
+ </div>
+ ) : browseProfiles.length === 0 ? (
  <div className="text-center py-20 bg-miamo-card rounded-2xl border border-zinc-200">
  <Search className="w-12 h-12 text-zinc-300 mx-auto mb-4" />
  <p className="text-sm text-zinc-500 font-medium">No profiles found</p>
@@ -366,7 +382,13 @@ export default function DateToMarryPage() {
  ) : (
  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
  {browseProfiles.map(p => (
- <MatrimonialCard key={p.id} profile={p} onView={() => viewProfile(p.user?.id || p.userId)} />
+ <MatrimonialCard
+ key={p.id}
+ profile={p}
+ onView={() => viewProfile(p.user?.id || p.userId)}
+ onMove={async (uid) => { try { await api.sendMiamoMove(uid, undefined, 'matrimonial', p.id); setSaveMsg('Miamo Move sent'); setTimeout(() => setSaveMsg(''), 2500); } catch (e: any) { setSaveMsg(e?.message || 'Failed to send move'); setTimeout(() => setSaveMsg(''), 3000); } }}
+ onMatchRequest={async (uid) => { try { await api.requestAccess(uid, 'full', 'I\u2019d like to connect for matrimony.'); setSaveMsg('Match request sent'); setTimeout(() => setSaveMsg(''), 2500); } catch (e: any) { setSaveMsg(e?.message || 'Failed to send request'); setTimeout(() => setSaveMsg(''), 3000); } }}
+ />
  ))}
  </div>
  )}
