@@ -1069,6 +1069,7 @@ app.delete('/api/v1/matches/by-user/:userId', authMiddleware, async (req: AuthRe
   try {
     const userId = req.userId!;
     const targetUserId = req.params.userId;
+    if (userId === targetUserId) return res.status(400).json({ error: { message: 'Cannot unmatch yourself', code: 'INVALID_TARGET' } });
     const { reason: rawReason, details: rawDetails } = req.body || {};
     const reason = rawReason ? sanitize(rawReason) : undefined;
     const details = rawDetails ? sanitize(rawDetails) : '';
@@ -1091,6 +1092,7 @@ app.post('/api/v1/matches/by-user/:userId/report', authMiddleware, async (req: A
   try {
     const userId = req.userId!;
     const targetUserId = req.params.userId;
+    if (userId === targetUserId) return res.status(400).json({ error: { message: 'Cannot report yourself', code: 'INVALID_TARGET' } });
     const { reason: rawRptReason, details: rawRptDetails } = req.body || {};
     const reason = rawRptReason ? sanitize(rawRptReason) : undefined;
     const details = rawRptDetails ? sanitize(rawRptDetails) : '';
@@ -1111,6 +1113,7 @@ app.post('/api/v1/matches/by-user/:userId/block', authMiddleware, async (req: Au
   try {
     const userId = req.userId!;
     const targetUserId = req.params.userId;
+    if (userId === targetUserId) return res.status(400).json({ error: { message: 'Cannot block yourself', code: 'INVALID_TARGET' } });
     const { reason: rawBlkReason, details: rawBlkDetails } = req.body || {};
     const reason = rawBlkReason ? sanitize(rawBlkReason) : undefined;
     const details = rawBlkDetails ? sanitize(rawBlkDetails) : '';

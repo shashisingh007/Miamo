@@ -108,6 +108,8 @@ app.put('/api/v1/profiles/me', authMiddleware, async (req: AuthRequest, res: Res
 app.put('/api/v1/profiles/me/prompts', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { prompts } = req.body;
+    if (!Array.isArray(prompts)) return res.status(400).json({ error: { message: 'prompts must be an array', code: 'INVALID_BODY' } });
+    if (prompts.length > 10) return res.status(400).json({ error: { message: 'Max 10 prompts allowed', code: 'TOO_MANY' } });
     await prisma.profilePrompt.deleteMany({ where: { userId: req.userId } });
     for (let i = 0; i < prompts.length; i++) {
       await prisma.profilePrompt.create({ data: { userId: req.userId!, question: sanitize(prompts[i].question || ''), answer: sanitize(prompts[i].answer || ''), position: i } });

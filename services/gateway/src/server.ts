@@ -76,18 +76,22 @@ const SERVICES = {
 };
 
 // ─── Security: Enhanced Helmet CSP ───────────────────
+// Gateway serves JSON + SSE only — no HTML. Strict CSP is safe and blocks any
+// accidental script/style injection via reflected error pages.
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "'unsafe-inline'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'"],
       imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
       connectSrc: ["'self'", 'http://localhost:*', 'ws://localhost:*'],
       fontSrc: ["'self'", 'data:'],
       objectSrc: ["'none'"],
       frameAncestors: ["'none'"],
+      baseUri: ["'none'"],
+      formAction: ["'none'"],
     },
   },
   hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
@@ -180,6 +184,16 @@ const reportLimiter = rateLimit({
   keyGenerator: (req) => (req.headers['x-user-id'] as string) || req.ip || 'unknown',
 });
 
+// Expensive-query limiter: discover feed + user search both run heavy DB joins
+// and an ML scoring pass. Cap at 20/min/user to prevent scraping & DoS.
+const expensiveLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  message: { error: { message: 'Slow down. Too many requests.', code: 'RATE_LIMITED' } },
+  store: sensitiveRedisStore,
+  keyGenerator: (req) => (req.headers['x-user-id'] as string) || req.ip || 'unknown',
+});
+
 // ─── Security: Input Sanitization Middleware ─────────
 function sanitizeHeaders(req: express.Request, _res: express.Response, next: express.NextFunction) {
   // Strip potentially dangerous headers from client requests
@@ -202,11 +216,15 @@ function sanitizeHeaders(req: express.Request, _res: express.Response, next: exp
 app.use(sanitizeHeaders);
 
 // ─── Auth Validation Middleware ───────────────────────
+// Compact 3-segment JWT pre-check. Rejects junk like `Bearer xxx` or single-segment
+// strings before jwt.verify(), eliminating one class of CPU-cheap probing.
+const JWT_FORMAT = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+
 function extractUserId(req: express.Request, res: express.Response, next: express.NextFunction) {
   const authHeader = req.headers.authorization;
   const token = authHeader?.startsWith('Bearer ') ? authHeader.slice(7) : null;
 
-  if (token) {
+  if (token && JWT_FORMAT.test(token)) {
     try {
       const payload = jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string };
       // Pass user ID to downstream services
@@ -281,7 +299,7 @@ app.get('/api/v1/events/stream', (req: express.Request, res: express.Response) =
   if (!userId && req.query.token) {
     // Validate token length before attempting verification (prevent DoS via long tokens)
     const tokenStr = req.query.token as string;
-    if (tokenStr.length > 2048) return res.status(400).json({ error: { message: 'Invalid token' } });
+    if (tokenStr.length > 2048 || !JWT_FORMAT.test(tokenStr)) return res.status(400).json({ error: { message: 'Invalid token' } });
     try {
       const payload = jwt.verify(tokenStr, JWT_SECRET, { algorithms: ['HS256'] }) as { userId: string; exp?: number };
       userId = payload.userId;
@@ -401,13 +419,13 @@ app.use('/api/v1/auth', authLimiter, createProxyMiddleware(proxyTo(SERVICES.auth
 // User routes (protected)
 app.use('/api/v1/users', requireAuth, createProxyMiddleware(proxyTo(SERVICES.users)));
 app.use('/api/v1/profiles', requireAuth, createProxyMiddleware(proxyTo(SERVICES.users)));
-app.use('/api/v1/search', requireAuth, createProxyMiddleware(proxyTo(SERVICES.users)));
+app.use('/api/v1/search', requireAuth, expensiveLimiter, createProxyMiddleware(proxyTo(SERVICES.users)));
 app.use('/api/v1/settings', requireAuth, createProxyMiddleware(proxyTo(SERVICES.users)));
 app.use('/api/v1/bookmarks', requireAuth, createProxyMiddleware(proxyTo(SERVICES.users)));
 app.use('/api/v1/user-data', requireAuth, createProxyMiddleware(proxyTo(SERVICES.users)));
 
 // Social routes (protected)
-app.use('/api/v1/discover', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
+app.use('/api/v1/discover', requireAuth, expensiveLimiter, createProxyMiddleware(proxyTo(SERVICES.social)));
 app.use('/api/v1/matches', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
 app.use('/api/v1/ai-match', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
 app.use('/api/v1/safety', requireAuth, reportLimiter, createProxyMiddleware(proxyTo(SERVICES.social)));

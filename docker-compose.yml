@@ -11,9 +11,9 @@ services:
     image: postgres:16-alpine
     container_name: miamo-postgres
     environment:
-      POSTGRES_USER: miamo
-      POSTGRES_PASSWORD: miamo
-      POSTGRES_DB: miamo
+      POSTGRES_USER: ${POSTGRES_USER:-miamo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — copy .env.example to .env}
+      POSTGRES_DB: ${POSTGRES_DB:-miamo}
     ports:
       - "5432:5432"
     volumes:
@@ -48,7 +48,7 @@ services:
       dockerfile: docker/migrate.Dockerfile
     container_name: miamo-migrate
     environment:
-      DATABASE_URL: postgresql://miamo:miamo@postgres:5432/miamo?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-miamo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-miamo}?schema=public
     depends_on:
       postgres:
         condition: service_healthy
@@ -62,11 +62,11 @@ services:
     ports:
       - "3200:3200"
     environment: &common-env
-      DATABASE_URL: postgresql://miamo:miamo@postgres:5432/miamo?schema=public
-      JWT_SECRET: miamo-dev-jwt-secret-change-in-production-2026
-      INTERNAL_SERVICE_KEY: miamo-internal-dev-key
-      NODE_ENV: production
-      FRONTEND_URL: http://localhost:3100
+      DATABASE_URL: postgresql://${POSTGRES_USER:-miamo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-miamo}?schema=public
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required — generate with: openssl rand -hex 64}
+      INTERNAL_SERVICE_KEY: ${INTERNAL_SERVICE_KEY:?INTERNAL_SERVICE_KEY is required — generate with: openssl rand -hex 32}
+      NODE_ENV: ${NODE_ENV:-production}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3100}
       REDIS_URL: redis://redis:6379
       AUTH_SERVICE_URL: http://auth:3201
       USER_SERVICE_URL: http://users:3202
