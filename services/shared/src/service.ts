@@ -58,7 +58,12 @@ export function applyBaseMiddleware(app: Express, opts: BaseMiddlewareOptions = 
   }));
   app.use(express.json({ limit: opts.jsonLimit || '1mb' }));
   app.use(cookieParser());
-  if (process.env.NODE_ENV !== 'test') app.use(morgan('short'));
+  if (process.env.NODE_ENV !== 'test') {
+    // Custom morgan token surfaces the X-Request-Id (set by requestId middleware
+    // above) so every access-log line can be correlated with downstream traces.
+    morgan.token('reqid', (req: any) => req.id || '-');
+    app.use(morgan(':method :url :status :res[content-length] - :response-time ms reqid=:reqid'));
+  }
   app.use(rateLimit({
     windowMs: opts.rateLimitWindowMs ?? 15 * 60 * 1000,
     max: opts.rateLimitMax ?? 2000,
