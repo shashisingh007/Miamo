@@ -12,6 +12,7 @@ import { Avatar, Badge, Card, EmptyState } from '@/components/ui';
 import { BeatsSkeleton } from '@/components/ui/skeleton';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { api } from '@/lib/api';
+import { track } from '@/lib/track';
 import { BEAT_STATES } from '@/lib/constants';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
@@ -169,6 +170,7 @@ function BeatsPageInner() {
  setCompleting(beatId);
  try {
  const res = await api.completeBeat(beatId, type, content || `Quick ${type} beat!`);
+ try { track('beats.send', { bid: beatId, kind: type, hasContent: !!content }); } catch {}
  const serverData = res.data || {};
  // Update local state using server response
  setBeats(prev => prev.map(b => {

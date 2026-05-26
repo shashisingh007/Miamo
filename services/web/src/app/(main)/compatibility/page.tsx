@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, Avatar } from '@/components/ui';
 import { cn } from '@/lib/utils';
+import { track } from '@/lib/track';
 import { api } from '@/lib/api';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
@@ -97,6 +98,7 @@ export default function CompatibilityPage() {
 
  const handleAnswer = (optionIdx: number) => {
  setMyAnswers(prev => [...prev, optionIdx]);
+ try { track('compat.answer', { si: sectionIdx, qi: questionIdx, opt: optionIdx }); } catch {}
  // Simulate partner's random answer
  setPartnerAnswers(prev => [...prev, Math.floor(Math.random() * 4)]);
 

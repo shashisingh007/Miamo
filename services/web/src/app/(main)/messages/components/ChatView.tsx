@@ -11,6 +11,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui';
 import { api } from '@/lib/api';
+import { track } from '@/lib/track';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores';
@@ -273,6 +274,7 @@ export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, on
  } else {
  const res = await api.sendMessage(chat.id, content, 'text', replyTo?.id);
  if (res.data) setMessages(prev => [...prev, res.data]);
+ try { track('message.send', { cid: chat.id, kind: 'text', len: content.length, reply: !!replyTo }); } catch {}
  setReplyTo(null);
  }
  setMessage('');
@@ -326,6 +328,7 @@ export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, on
  try {
  const res = await api.sendMessage(chat.id, content, attachedFile.type === 'photo' ? 'image' : attachedFile.type, replyTo?.id);
  if (res.data) setMessages(prev => [...prev, { ...res.data, attachmentPreview: attachedFile.preview, attachmentName: attachedFile.file.name }]);
+ try { track('message.send', { cid: chat.id, kind: attachedFile.type, len: content.length, reply: !!replyTo, attach: true }); } catch {}
  setMessage('');
  setAttachedFile(null);
  setReplyTo(null);

@@ -11,6 +11,7 @@ import { Card } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
+import { track } from '@/lib/track';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 
 /* ═══ Love Languages ═══ */
@@ -193,10 +194,12 @@ export default function LoveLanguagePage() {
  const handleAnswer = (lang: string) => {
  const newScores = { ...scores, [lang]: (scores[lang] || 0) + 1 };
  setScores(newScores);
+ try { track('lovelang.answer', { qi: qIdx, lang }); } catch {}
  if (qIdx < QUESTIONS.length - 1) {
  setQIdx(q => q + 1);
  } else {
  setDone(true);
+ try { track('lovelang.complete', { total: QUESTIONS.length, scores: newScores }); } catch {}
  }
  };
 
