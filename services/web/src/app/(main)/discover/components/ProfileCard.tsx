@@ -1,13 +1,13 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
  Heart, X, MapPin, Briefcase, Shield, Star, ChevronDown, Sparkles,
- Send, Cigarette, Wine, Dumbbell, GraduationCap, Baby, Dog, Moon,
- Globe, Check,
+ Send, Check,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { ProfileAttributeStrip } from '@/components/ProfileAttributeStrip';
 import { type DiscoverProfile, type AiData } from './constants';
 
 export function ProfileCard({
@@ -45,18 +45,6 @@ export function ProfileCard({
  };
 
  if (!isActive) return null;
-
- // Lifestyle items
- const lifestyleItems = useMemo(() => [
- profile.smoking && { icon: Cigarette, label: profile.smoking, color: 'text-rose-alt' },
- profile.drinking && { icon: Wine, label: profile.drinking, color: 'text-rose-alt' },
- profile.exercise && { icon: Dumbbell, label: profile.exercise, color: 'text-rose-alt' },
- profile.education && { icon: GraduationCap, label: profile.education, color: 'text-rose-alt' },
- profile.zodiac && { icon: Moon, label: profile.zodiac, color: 'text-rose-alt' },
- profile.languages && { icon: Globe, label: profile.languages, color: 'text-rose-alt' },
- profile.pets && profile.pets !== 'none' && { icon: Dog, label: profile.pets, color: 'text-rose-alt' },
- profile.children && { icon: Baby, label: profile.children, color: 'text-rose-light' },
- ].filter(Boolean) as { icon: any; label: string; color: string }[], [profile]);
 
  return (
  <div className="w-full">
@@ -225,23 +213,17 @@ export function ProfileCard({
  </div>
  )}
 
- {/* ─── Lifestyle Grid ─── */}
- {lifestyleItems.length > 0 && (
+ {/* ─── Lifestyle Grid (v3.2 — iconified, registry-driven) ─── */}
  <div className="px-6 pb-5">
- <h4 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.15em] mb-3">Lifestyle</h4>
- <div className="grid grid-cols-2 gap-2">
- {lifestyleItems.map((item, idx) => {
- const Icon = item.icon;
- return (
- <div key={idx} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-miamo-surface border border-border">
- <Icon className={cn('w-3.5 h-3.5', item.color)} />
- <span className="text-[12px] text-text-secondary font-medium capitalize">{item.label}</span>
+ <h4 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.15em] mb-3">Lifestyle &amp; details</h4>
+ <ProfileAttributeStrip
+ kind="casual"
+ profile={profile}
+ max={16}
+ chipClassName="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-miamo-surface border border-border text-[12px] text-text-secondary font-medium"
+ className="flex flex-wrap gap-2"
+ />
  </div>
- );
- })}
- </div>
- </div>
- )}
 
  {/* ─── Pass & Super Like Buttons ─── */}
  <div className="px-6 py-5 border-t border-border">

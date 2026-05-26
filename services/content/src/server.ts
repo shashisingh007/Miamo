@@ -11,6 +11,7 @@ import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware } from '../../shared/src/service';
 import { cursorOpt } from '../../shared/src/coerce';
+import { computeDtmCompatibility } from '../../shared/src/dtmCompatibility';
 
 const prisma = createPrisma(15);
 export const app = express();
@@ -1442,8 +1443,22 @@ app.get('/api/v1/matrimonial/compatibility/:userId', authMiddleware, async (req:
       const myN = calculateNumerology(myProfile.dateOfBirth.toISOString()), oN = calculateNumerology(otherProfile.dateOfBirth.toISOString());
       if (myN && oN) { const ob = oN.lifePath>9?((oN.lifePath-1)%9+1):oN.lifePath; let s=50; if(myN.compatibleNumbers.includes(ob))s+=25; if(myN.destiny===oN.destiny)s+=15; if(myN.soul===oN.soul)s+=10; numResult={score:Math.min(99,s),myNumber:myN.lifePath,partnerNumber:oN.lifePath}; }
     }
-    const composite = Math.min(99, Math.round(kundli.percentage*0.6 + (numResult?.score||50)*0.2 + (myProfile.religion===otherProfile.religion?10:0) + (myProfile.gotra&&otherProfile.gotra&&myProfile.gotra.toLowerCase()!==otherProfile.gotra.toLowerCase()?5:0) + (!kundli.manglikWarning?5:0)));
-    res.json({ data: { compositeScore: composite, kundli, numerology: numResult, partnerName: otherProfile.fullName, partnerUserId: otherProfile.userId, insights: kundli.insights || [] } });
+    // v3.2 — lifestyle / preference compatibility (symmetric, 16-axis)
+    const [myUser, otherUser] = await Promise.all([
+      prisma.user.findUnique({ where: { id: req.userId! }, select: { profile: { select: { age: true } } } }),
+      prisma.user.findUnique({ where: { id: req.params.userId }, select: { profile: { select: { age: true } } } }),
+    ]);
+    const lifestyle = computeDtmCompatibility({
+      mine: myProfile as any, myAge: myUser?.profile?.age ?? 0,
+      theirs: otherProfile as any, theirAge: otherUser?.profile?.age ?? 0,
+    });
+    const composite = Math.min(99, Math.round(
+      kundli.percentage * 0.35 +
+      (numResult?.score || 50) * 0.15 +
+      lifestyle.overall * 0.45 +
+      (myProfile.religion === otherProfile.religion ? 5 : 0)
+    ));
+    res.json({ data: { compositeScore: composite, kundli, numerology: numResult, lifestyle, partnerName: otherProfile.fullName, partnerUserId: otherProfile.userId, insights: kundli.insights || [] } });
   } catch (e) { next(e); }
 });
 

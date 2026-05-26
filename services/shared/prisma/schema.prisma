@@ -895,6 +895,15 @@ model MatrimonialProfile {
   partnerDiet          String @default("")
   partnerExpectation   String @default("")
 
+  // v3.2 — extended partner preferences (new compatibility axes)
+  partnerSmoking       String  @default("")
+  partnerDrinking      String  @default("")
+  partnerFamilyType    String  @default("")
+  partnerFamilyValues  String  @default("")
+  partnerLocations     String  @default("") // CSV of preferred cities
+  partnerRelocate      String  @default("") // "yes" | "no" | "open"
+  partnerChildren      String  @default("") // "have" | "dontwant" | "wantsome" | "open"
+
   bioDataTemplate  String  @default("royal-rajasthani")
   bioDataGenerated Boolean @default(false)
 

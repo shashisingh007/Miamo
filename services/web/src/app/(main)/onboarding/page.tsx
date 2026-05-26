@@ -8,6 +8,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
+import { FieldIcon } from '@/components/FieldIcon';
+import type { IconName } from '../../../../../shared/src/fieldMeta';
+
+// Icon per bucket card header (v3.2)
+const BUCKET_ICONS: Record<string, IconName> = {
+  identity: 'User', city: 'MapPin', photos: 'Camera', bio: 'FileText',
+  prompts: 'MessageCircle', interests: 'Tag', lifestyle: 'Sparkles',
+  lookingFor: 'HeartHandshake', profession: 'Briefcase', verification: 'Shield',
+  inherited: 'User', 'dtm-photos': 'Camera', maritalStatus: 'HeartHandshake',
+  'dtm-basics': 'CalendarDays', community: 'Flower2', education: 'GraduationCap',
+  career: 'Briefcase', family: 'Home', aboutMe: 'FileText', aboutFamily: 'Home',
+  partnerPrefs: 'Heart', kundli: 'Star',
+};
 
 // ─── Selector catalogs (kept inline so this page is one-stop) ─────
 const INTEREST_OPTIONS = [
@@ -235,8 +248,8 @@ export default function OnboardingPage() {
               className={`rounded-2xl border ${b.done ? 'border-emerald-200 bg-emerald-50/30' : 'border-token bg-miamo-card'} transition`}>
               <button onClick={() => setOpenKey(open ? null : b.key)}
                 className="flex w-full items-start gap-3 p-4 text-left">
-                <div className={`mt-0.5 grid h-7 w-7 place-items-center rounded-full text-xs font-semibold ${b.done ? 'bg-emerald-500 text-white' : 'bg-black/5 text-text-muted'}`}>
-                  {b.done ? '✓' : '·'}
+                <div className={`mt-0.5 grid h-7 w-7 place-items-center rounded-full text-xs font-semibold ${b.done ? 'bg-emerald-500 text-white' : 'bg-rose-main/10 text-rose-main'}`}>
+                  {b.done ? '✓' : <FieldIcon name={BUCKET_ICONS[b.key] ?? 'Tag'} className="h-3.5 w-3.5" />}
                 </div>
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-2">
@@ -578,29 +591,72 @@ function BucketEditor(props: {
         <label className="block text-xs font-medium">Max age
           <TextInput type="number" min={18} max={99} value={draft.partnerAgeMax ?? 35} onChange={e => setDraft({ ...draft, partnerAgeMax: parseInt(e.target.value) || 35 })} />
         </label>
+        <label className="block text-xs font-medium">Min height
+          <Select options={HEIGHTS} value={draft.partnerHeightMin ?? ''} onChange={v => setDraft({ ...draft, partnerHeightMin: v })} />
+        </label>
+        <label className="block text-xs font-medium">Max height
+          <Select options={HEIGHTS} value={draft.partnerHeightMax ?? ''} onChange={v => setDraft({ ...draft, partnerHeightMax: v })} />
+        </label>
         <label className="block text-xs font-medium">Partner religion
           <Select options={['Any', ...RELIGIONS]} value={draft.partnerReligion ?? ''} onChange={v => setDraft({ ...draft, partnerReligion: v })} />
         </label>
         <label className="block text-xs font-medium">Partner caste
           <TextInput value={draft.partnerCaste ?? ''} placeholder="Any / specific" onChange={e => setDraft({ ...draft, partnerCaste: e.target.value })} />
         </label>
+        <label className="block text-xs font-medium">Partner mother tongue
+          <Select options={['Any', ...MOTHER_TONGUES]} value={draft.partnerMotherTongue ?? ''} onChange={v => setDraft({ ...draft, partnerMotherTongue: v })} />
+        </label>
+        <label className="block text-xs font-medium">Manglik preference
+          <Select options={['Any', ...MANGLIK]} value={draft.partnerManglik ?? ''} onChange={v => setDraft({ ...draft, partnerManglik: v })} />
+        </label>
+        <label className="block text-xs font-medium">Marital status
+          <Select options={['Any', ...MARITAL]} value={draft.partnerMaritalStatus ?? ''} onChange={v => setDraft({ ...draft, partnerMaritalStatus: v })} />
+        </label>
         <label className="block text-xs font-medium">Partner education
           <Select options={['Any', ...EDUCATION_LEVELS]} value={draft.partnerEducation ?? ''} onChange={v => setDraft({ ...draft, partnerEducation: v })} />
         </label>
-        <label className="block text-xs font-medium">Partner income
+        <label className="block text-xs font-medium">Partner occupation
+          <TextInput value={draft.partnerOccupation ?? ''} placeholder="Any / specific" onChange={e => setDraft({ ...draft, partnerOccupation: e.target.value })} />
+        </label>
+        <label className="block text-xs font-medium">Partner income (annual)
           <Select options={['Any', ...INCOME_BANDS]} value={draft.partnerIncome ?? ''} onChange={v => setDraft({ ...draft, partnerIncome: v })} />
         </label>
         <label className="block text-xs font-medium">Partner diet
           <Select options={['Any','Vegetarian','Vegan','Non-vegetarian','Eggetarian','Jain']} value={draft.partnerDiet ?? ''} onChange={v => setDraft({ ...draft, partnerDiet: v })} />
         </label>
-        <label className="block text-xs font-medium">Partner occupation
-          <TextInput value={draft.partnerOccupation ?? ''} placeholder="Any / specific" onChange={e => setDraft({ ...draft, partnerOccupation: e.target.value })} />
+        <label className="block text-xs font-medium">Partner smoking
+          <Select options={['Any','never','rarely','socially','often']} value={draft.partnerSmoking ?? ''} onChange={v => setDraft({ ...draft, partnerSmoking: v })} />
+        </label>
+        <label className="block text-xs font-medium">Partner drinking
+          <Select options={['Any','never','rarely','socially','often']} value={draft.partnerDrinking ?? ''} onChange={v => setDraft({ ...draft, partnerDrinking: v })} />
+        </label>
+        <label className="block text-xs font-medium">Family type preference
+          <Select options={['Any', ...FAMILY_TYPES]} value={draft.partnerFamilyType ?? ''} onChange={v => setDraft({ ...draft, partnerFamilyType: v })} />
+        </label>
+        <label className="block text-xs font-medium">Family values preference
+          <Select options={['Any', ...FAMILY_VALUES]} value={draft.partnerFamilyValues ?? ''} onChange={v => setDraft({ ...draft, partnerFamilyValues: v })} />
+        </label>
+        <label className="block text-xs font-medium sm:col-span-2">Preferred cities (comma separated)
+          <TextInput value={draft.partnerLocations ?? ''} placeholder="Bengaluru, Mumbai, Pune" onChange={e => setDraft({ ...draft, partnerLocations: e.target.value })} />
+        </label>
+        <label className="block text-xs font-medium">Open to relocate?
+          <Select options={['yes','no','open']} value={draft.partnerRelocate ?? ''} onChange={v => setDraft({ ...draft, partnerRelocate: v })} />
+        </label>
+        <label className="block text-xs font-medium">Kids stance
+          <Select options={['Any','want some','don\u2019t want','have & want more','have & don\u2019t want more','open']} value={draft.partnerChildren ?? ''} onChange={v => setDraft({ ...draft, partnerChildren: v })} />
         </label>
         <div className="sm:col-span-2"><SaveRow onSave={() => onPatchMp({
           partnerAgeMin: draft.partnerAgeMin, partnerAgeMax: draft.partnerAgeMax,
+          partnerHeightMin: draft.partnerHeightMin, partnerHeightMax: draft.partnerHeightMax,
           partnerReligion: draft.partnerReligion, partnerCaste: draft.partnerCaste,
-          partnerEducation: draft.partnerEducation, partnerIncome: draft.partnerIncome,
-          partnerDiet: draft.partnerDiet, partnerOccupation: draft.partnerOccupation,
+          partnerMotherTongue: draft.partnerMotherTongue, partnerManglik: draft.partnerManglik,
+          partnerMaritalStatus: draft.partnerMaritalStatus,
+          partnerEducation: draft.partnerEducation, partnerOccupation: draft.partnerOccupation,
+          partnerIncome: draft.partnerIncome, partnerDiet: draft.partnerDiet,
+          partnerSmoking: draft.partnerSmoking, partnerDrinking: draft.partnerDrinking,
+          partnerFamilyType: draft.partnerFamilyType, partnerFamilyValues: draft.partnerFamilyValues,
+          partnerLocations: draft.partnerLocations, partnerRelocate: draft.partnerRelocate,
+          partnerChildren: draft.partnerChildren,
         })} /></div>
       </div>
     );
