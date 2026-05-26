@@ -209,7 +209,7 @@ export default function OnboardingPage() {
     <main className="mx-auto max-w-2xl px-6 pb-24 pt-10" data-mode={completion.dtm ? 'dtm' : 'casual'}>
       <header className="mb-6">
         <p className="text-xs uppercase tracking-wider text-text-muted">
-          {completion.dtm ? 'DTM Onboarding · Matrimony' : 'Discover Onboarding · Casual'}
+          {completion.dtm ? 'Profile Setup · Date to Marry' : 'Profile Setup · Discover'}
         </p>
         <h1 className="mt-1 text-3xl font-medium tracking-tight">
           {completion.score >= 100
@@ -307,9 +307,9 @@ export default function OnboardingPage() {
         <section className="mt-8 rounded-2xl border border-violet-200 bg-violet-50/40 p-5">
           <h3 className="text-sm font-medium">Looking for marriage?</h3>
           <p className="mt-1 text-xs text-text-muted">
-            Switch on DTM to unlock the matrimony profile (family, education, horoscope). It\u2019s a fully separate flow — your casual profile stays as is.
+            Switch on DTM to unlock the matrimony profile (family, education, horoscope). It’s a fully separate flow — your casual profile stays as is.
           </p>
-          <button onClick={() => patchProfile({ seriousMode: true })}
+          <button onClick={async () => { await patchProfile({ seriousMode: true }); router.push('/serious-mode'); }}
             className="mt-3 rounded-xl border border-violet-300 bg-white px-3 py-1.5 text-xs font-medium text-violet-700 hover:bg-violet-100">
             Enable DTM mode →
           </button>
@@ -317,12 +317,18 @@ export default function OnboardingPage() {
       )}
       {completion.dtm && (
         <section className="mt-8 rounded-2xl border border-token bg-miamo-card p-5">
-          <h3 className="text-sm font-medium">Switch back to casual</h3>
-          <p className="mt-1 text-xs text-text-muted">Your DTM details stay saved, but DTM features stop showing.</p>
-          <button onClick={() => patchProfile({ seriousMode: false })}
-            className="mt-3 rounded-xl border border-token bg-white px-3 py-1.5 text-xs font-medium text-text-muted hover:border-rose-main/50">
-            Turn DTM off
-          </button>
+          <h3 className="text-sm font-medium">Date to Marry workspace</h3>
+          <p className="mt-1 text-xs text-text-muted">Browse matrimonial profiles, manage requests, view your matches.</p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button onClick={() => router.push('/serious-mode')}
+              className="rounded-xl bg-violet-500 px-3 py-1.5 text-xs font-medium text-white shadow-button hover:bg-violet-600">
+              Open DTM dashboard →
+            </button>
+            <button onClick={() => patchProfile({ seriousMode: false })}
+              className="rounded-xl border border-token bg-white px-3 py-1.5 text-xs font-medium text-text-muted hover:border-rose-main/50">
+              Turn DTM off
+            </button>
+          </div>
         </section>
       )}
     </main>

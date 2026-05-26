@@ -117,7 +117,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  // notifications (so users can clear pings), and access (so users can act on inbox).
  useEffect(() => {
    if (!hydrated || !isAuthenticated) return;
-   const exempt = ['/onboarding', '/profile', '/settings', '/notifications', '/access'];
+   const exempt = ['/onboarding', '/profile', '/settings', '/notifications', '/access', '/serious-mode'];
    if (exempt.some(p => pathname.startsWith(p))) return;
    let cancelled = false;
    (async () => {
