@@ -16,7 +16,21 @@
     --bg: #FAF8F5;
     --spring: cubic-bezier(0.16, 1, 0.3, 1);
     --bounce: cubic-bezier(0.68, -0.55, 0.27, 1.55);
+
+    /* v3.2 — Date-to-Marry palette (muted marigold gold) */
+    --miamo-dtm-accent: #B58A4E;
+    --miamo-dtm-hairline: #E3CFA8;
+    --miamo-dtm-bg: #FBF7EE;
   }
+
+  /* v3.2 — DTM mode overrides (applied via [data-mode="dtm"] on body) */
+  [data-mode="dtm"] {
+    --rose-main: var(--miamo-dtm-accent);
+    --rose-copper: var(--miamo-dtm-accent);
+    --rose-gold: var(--miamo-dtm-accent);
+  }
+  [data-mode="dtm"] body { background: var(--miamo-dtm-bg); }
+  [data-mode="dtm"] .dtm-hairline { border-color: var(--miamo-dtm-hairline); }
 
   * {
     border-color: #E8E4DF;

@@ -2,6 +2,29 @@
 
 All notable changes are documented here. Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](https://semver.org/).
 
+## [3.2.0] — Unreleased
+
+### Added
+- **db** `Profile.completionScore`, `Profile.completionMissing` + 11 optional DTM fields (`familyBackground`, `educationLevel`, `educationInstitution`, `employer`, `incomeBand`, `subCommunity`, `maritalStatus`, `willingToRelocate`, `familyInvolved`, `expectedTimeline`, `kundliUrl`).
+- **db** New `ShowcaseItem` model — per-user portfolio items (category, type, pinned, moveCount, matchCount, visibility, bytes).
+- **db** New `AccessRequest` model — field-level access lifecycle (`pending|approved|denied|revoked|expired`) with `@@unique([fromUserId,toUserId,field])`.
+- **shared** `completion.ts` — pure `computeCompletionScore()` and `recomputeAndPersistCompletion()`; casual threshold 60, DTM threshold 80; 5-bucket weighted scoring.
+- **users** `GET /api/v1/profiles/me/completion`; recomputation on `PUT /api/v1/profiles/me`.
+- **gateway** `requireOnboarded` middleware (60s in-memory cache, fail-open) applied to discover, matches, ai-match, messages, beats, showcase, access. 403 envelope: `{ code:'ONBOARDING_INCOMPLETE', requiredScore, currentScore, missingFields[], dtm }`.
+- **content** `POST/GET/PUT/DELETE /api/v1/showcase` — 11-platform link allowlist, 6-pin/user cap, ~10 MB bytes/user cap, cursor pagination 24/page.
+- **social** `/api/v1/access/requests` full lifecycle (create/inbox/outbox/approve/deny/revoke) with spam controls (5 outbound, 3 per field, 7-day deny cooldown) and +30-day default expiry on approve.
+- **shared/schemas** New zod: `showcaseCreate`, `showcaseUpdate`, `showcaseMove`, `accessRequestCreate`, `accessRequestDecision`, `dtmProfileUpdate` + constants `SHOWCASE_CATEGORIES`, `SHOWCASE_LINK_ALLOWLIST`, `ACCESS_FIELDS`.
+- **web** `/onboarding` page (server-driven 6-step progress), `/showcase` board, `/access` inbox/outbox UI.
+- **web** DTM mode CSS tokens (`--miamo-dtm-accent`, `--miamo-dtm-hairline`, `--miamo-dtm-bg`) gated by `[data-mode="dtm"]`.
+- **docs** `docs/SHOWCASE.md`, `docs/ACCESS_CONTROL.md`.
+
+### Tests
+- 60 → 84 (+24 new): 18 v3.2 schema unit tests, 5 completion scoring tests, 1 constants test.
+
+### Notes
+- `/creativity` route remains live; the 301 to `/showcase` will be enabled once feature parity (composer + comments + reactions) lands.
+- AI Move suggestions and persisted access SSE notifications are deferred.
+
 ## [3.1.0] — Unreleased
 
 ### Security
