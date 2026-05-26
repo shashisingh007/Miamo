@@ -5,6 +5,8 @@ import { LRUCache, MinHeap, BloomFilter, TTL, discoverCache, aiMatchCache, activ
 import { scoreForYou, scoreNew, scoreActive, scoreVerified, scoreSerious, scoreAiPicks, computeDeepCompatibility, computePersonalityArchetype, generateSmartMoves, computeFilterRelevanceBonus, type BehaviorVector, type VibeData, type MatchHistoryInsights, type CandidateUser, type UserProfile, type DeepCompatibilityInput, type SmartMoveInput, type CommStyleVector } from '../../shared/algorithms';
 import { logger } from '../../shared/src/logger';
 import { errorHandler } from '../../shared/src/errorHandler';
+import { validate } from '../../shared/src/validate';
+import { discoverLikeBodySchema, discoverPassBodySchema, discoverCommentBodySchema, reportBodySchema, vibeCheckBodySchema } from '../../shared/src/schemas';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
 import { env } from '../../shared/src/env';
@@ -594,12 +596,10 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/discover/like', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/discover/like', authMiddleware, validate({ body: discoverLikeBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { toUserId, targetType, targetId } = req.body;
     const fromUserId = req.userId!;
-    // Input validation: toUserId must be a non-empty string and cannot be self
-    if (!toUserId || typeof toUserId !== 'string') return res.status(400).json({ error: { message: 'toUserId is required', code: 'VALIDATION_ERROR' } });
     if (toUserId === fromUserId) return res.status(400).json({ error: { message: 'Cannot like yourself', code: 'VALIDATION_ERROR' } });
     const tType = targetType || 'profile';
     const tId = targetId || null;
@@ -643,7 +643,7 @@ app.post('/api/v1/discover/like', authMiddleware, async (req: AuthRequest, res: 
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/discover/comment', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/discover/comment', authMiddleware, validate({ body: discoverCommentBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { toUserId, message: rawMessage, type, targetType, targetId } = req.body;
     const message = rawMessage ? sanitize(rawMessage) : '';
@@ -666,7 +666,7 @@ app.post('/api/v1/discover/comment', authMiddleware, async (req: AuthRequest, re
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/discover/pass', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/discover/pass', authMiddleware, validate({ body: discoverPassBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
     const { userId: passedUserId } = req.body;
@@ -1141,7 +1141,7 @@ app.post('/api/v1/matches/by-user/:userId/block', authMiddleware, async (req: Au
 
 // ═══ VIBE CHECK ══════════════════════════════════════
 // Save a new vibe check
-app.post('/api/v1/vibe-check', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/vibe-check', authMiddleware, validate({ body: vibeCheckBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
     const { mood: rawMood, energy, topics: rawTopics, intent: rawIntent } = req.body;
@@ -1669,7 +1669,7 @@ app.get('/api/v1/ai-match/why/:targetId', authMiddleware, async (req: AuthReques
 });
 
 // ═══ SAFETY ══════════════════════════════════════════
-app.post('/api/v1/safety/report', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/safety/report', authMiddleware, validate({ body: reportBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { reportedId, reason: rawReason, details: rawDetails, targetType, targetId } = req.body;
     const reason = sanitize(rawReason || '');

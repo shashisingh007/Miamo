@@ -4,6 +4,8 @@ import express, { Request, Response, NextFunction } from 'express';
 import { scoreSearch } from '../../shared/algorithms';
 import { logger } from '../../shared/src/logger';
 import { errorHandler } from '../../shared/src/errorHandler';
+import { validate } from '../../shared/src/validate';
+import { updateProfileBodySchema, profilePromptsBodySchema, profileInterestsBodySchema } from '../../shared/src/schemas';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog } from '../../shared/src/audit';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware } from '../../shared/src/service';
@@ -53,7 +55,7 @@ app.get('/api/v1/profiles/me', authMiddleware, async (req: AuthRequest, res: Res
   } catch (e) { next(e); }
 });
 
-app.put('/api/v1/profiles/me', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.put('/api/v1/profiles/me', authMiddleware, validate({ body: updateProfileBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const sanitizedBody = sanitizeObject(req.body);
     const { age, gender, city, profession, bio, datingIntent, seriousMode, avatarGradient,
@@ -106,11 +108,9 @@ app.put('/api/v1/profiles/me', authMiddleware, async (req: AuthRequest, res: Res
   } catch (e) { next(e); }
 });
 
-app.put('/api/v1/profiles/me/prompts', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.put('/api/v1/profiles/me/prompts', authMiddleware, validate({ body: profilePromptsBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { prompts } = req.body;
-    if (!Array.isArray(prompts)) return res.status(400).json({ error: { message: 'prompts must be an array', code: 'INVALID_BODY' } });
-    if (prompts.length > 10) return res.status(400).json({ error: { message: 'Max 10 prompts allowed', code: 'TOO_MANY' } });
     await prisma.profilePrompt.deleteMany({ where: { userId: req.userId } });
     for (let i = 0; i < prompts.length; i++) {
       await prisma.profilePrompt.create({ data: { userId: req.userId!, question: sanitize(prompts[i].question || ''), answer: sanitize(prompts[i].answer || ''), position: i } });
@@ -119,7 +119,7 @@ app.put('/api/v1/profiles/me/prompts', authMiddleware, async (req: AuthRequest, 
   } catch (e) { next(e); }
 });
 
-app.put('/api/v1/profiles/me/interests', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.put('/api/v1/profiles/me/interests', authMiddleware, validate({ body: profileInterestsBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { interests } = req.body;
     await prisma.profileInterest.deleteMany({ where: { userId: req.userId } });

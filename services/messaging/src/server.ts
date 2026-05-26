@@ -6,6 +6,8 @@ import crypto from 'crypto';
 import { LRUCache, TTL } from '../../shared/cache';
 import { logger } from '../../shared/src/logger';
 import { errorHandler } from '../../shared/src/errorHandler';
+import { validate } from '../../shared/src/validate';
+import { sendMessageBodySchema, messageReactBodySchema, chatThemeBodySchema } from '../../shared/src/schemas';
 import { sanitize } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
 import { env } from '../../shared/src/env';
@@ -172,7 +174,7 @@ app.get('/api/v1/messages/chats/:chatId/messages', authMiddleware, async (req: A
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/messages/chats/:chatId/messages', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/messages/chats/:chatId/messages', authMiddleware, validate({ body: sendMessageBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { chatId } = req.params;
     const { content: rawContent, type, replyToId } = req.body;
@@ -234,7 +236,7 @@ app.post('/api/v1/messages/messages/:id/delete-for-me', authMiddleware, async (r
 
 // delete-for-all with 2-hour window is defined below (after chat search)
 
-app.post('/api/v1/messages/messages/:id/react', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/messages/messages/:id/react', authMiddleware, validate({ body: messageReactBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const msg = await prisma.message.findUnique({ where: { id: req.params.id } });
     if (!msg) return res.status(404).json({ error: { message: 'Not found' } });
@@ -297,7 +299,7 @@ app.post('/api/v1/messages/chats/:chatId/unarchive', authMiddleware, async (req:
 });
 
 // Set chat theme/background
-app.post('/api/v1/messages/chats/:chatId/theme', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/messages/chats/:chatId/theme', authMiddleware, validate({ body: chatThemeBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { isMember } = await verifyChatMembership(req.params.chatId, req.userId!);
     if (!isMember) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
