@@ -1,457 +1,234 @@
 'use client';
+// v3.2 — Talent Showcase (replaces TikTok-style reels). Goal: low-storage
+// platform where users display creativity in 1+ categories. Each piece has
+// a "Send Move" CTA → matches sparked from creativity. Composer is text-
+// first (no video uploads); images are linked, not hosted.
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
- Plus, X, ChevronDown, Sparkles, Check,
- ExternalLink, EyeOff, Flag, Ban,
-} from 'lucide-react';
+import { Plus, Sparkles, Search, X, TrendingUp, Flame, Award } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { GridSkeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
-import { useRouter } from 'next/navigation';
-import { useTrackPageView, useTrackDwell, useTrackScrollDepth } from '@/hooks/useTrackActivity';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { useTrackPageView, useTrackDwell } from '@/hooks/useTrackActivity';
 import { CATEGORIES, fmt } from './components/constants';
-import { CommentSheet } from './components/CommentSheet';
+import { TalentCard } from './components/TalentCard';
+import { ShowcaseComposer } from './components/ShowcaseComposer';
 import { MoveModal } from './components/MoveModal';
-import { ReelCard } from './components/ReelCard';
-import { UploadModal } from './components/UploadModal';
+import { CommentSheet } from './components/CommentSheet';
 
-/* ═══════════════════════════════════════════════════════
- MORE OPTIONS MENU (3-dot)
- ═══════════════════════════════════════════════════════ */
-function MoreMenu({
- isOpen, onClose, item, onHide,
-}: {
- isOpen: boolean; onClose: () => void; item: any; onHide: () => void;
-}) {
- const router = useRouter();
- if (!isOpen) return null;
-
- const menuItems = [
- { label: 'View Profile', icon: ExternalLink, color: 'text-text-secondary', onClick: () => { router.push(`/profile?id=${item.authorId}`); onClose(); } },
- { label: "Don't show this", icon: EyeOff, color: 'text-text-secondary', onClick: () => { onHide(); onClose(); } },
- { divider: true },
- { label: 'Report Content', icon: Flag, color: 'text-rose-alt', onClick: () => { api.reportUser({ reportedId: item.authorId, reason: 'inappropriate', targetType: 'creativity', targetId: item.id }); onClose(); } },
- { label: 'Block Creator', icon: Ban, color: 'text-red-400', onClick: () => { api.blockUser(item.authorId); onClose(); } },
- ];
-
- return (
- <>
- <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
- className="fixed inset-0 bg-black/50 z-50" onClick={onClose} />
- <motion.div
- initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
- transition={{ type: 'spring', damping: 30, stiffness: 300 }}
- className="fixed bottom-0 inset-x-0 bg-miamo-card border-t border-border rounded-t-[20px] z-50 px-4 py-3 pb-[max(2rem,env(safe-area-inset-bottom))]"
- >
- <div className="w-10 h-1 rounded-full bg-miamo-card/10 mx-auto mb-4" />
- <div className="space-y-0.5">
- {menuItems.map((item, i) => {
- if ('divider' in item) return <div key={i} className="my-2 h-px bg-miamo-surface" />;
- const Icon = item.icon;
- return (
- <button key={i} onClick={item.onClick}
- className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-miamo-surface transition-colors">
- <Icon className={cn('w-5 h-5', item.color)} />
- <span className={cn('text-[14px] font-medium', item.color)}>{item.label}</span>
- </button>
- );
- })}
- </div>
- </motion.div>
- </>
- );
-}
-
-/* ═══════════════════════════════════════════════════════
- MAIN CREATIVITY PAGE — TikTok/Reels vertical scroll
- ═══════════════════════════════════════════════════════ */
 export default function CreativityPage() {
- const router = useRouter();
- const [activeCategory, setActiveCategory] = useState('general');
- const [items, setItems] = useState<any[]>([]);
- const [loading, setLoading] = useState(true);
- const [currentIndex, setCurrentIndex] = useState(0);
- const [dbCategories, setDbCategories] = useState<any[]>([]);
- const scrollRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
+  const [activeCat, setActiveCat] = useState<string>('general');
+  const [sort, setSort] = useState<'trending' | 'recent' | 'top'>('trending');
+  const [search, setSearch] = useState('');
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [moveItem, setMoveItem] = useState<any>(null);
+  const [commentItem, setCommentItem] = useState<any>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const [myStats, setMyStats] = useState<{ views: number; moves: number; matches: number }>({ views: 0, moves: 0, matches: 0 });
 
- // Modals
- const [commentOpen, setCommentOpen] = useState(false);
- const [moveItem, setMoveItem] = useState<any>(null);
- const [moreItem, setMoreItem] = useState<any>(null);
- const [uploadOpen, setUploadOpen] = useState(false);
- const [showCatPicker, setShowCatPicker] = useState(false);
- const [toast, setToast] = useState<{ msg: string; type: 'success' | 'error' } | null>(null);
+  useTrackPageView('creativity');
+  useTrackDwell('creativity');
 
- useTrackPageView('creativity');
- useTrackDwell('creativity');
- useTrackScrollDepth('creativity');
+  const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(null), 2200); };
 
- const showToast = (msg: string, type: 'success' | 'error' = 'success') => {
- setToast({ msg, type });
- setTimeout(() => setToast(null), 2500);
- };
+  const loadFeed = useCallback(async () => {
+    setLoading(true);
+    try {
+      const params: Record<string, string> = { sort };
+      if (activeCat !== 'general') params.category = activeCat;
+      if (search.trim()) params.q = search.trim();
+      const res = activeCat === 'general' && sort === 'trending'
+        ? await api.getCreativityFeed(params)
+        : await api.getCreativityItems(params);
+      setItems(res.data || []);
+    } catch {
+      setItems([]);
+    } finally { setLoading(false); }
+  }, [activeCat, sort, search]);
 
- // Load categories from DB
- useEffect(() => {
- api.getCreativityCategories().then(res => setDbCategories(res.data || [])).catch(() => {});
- }, []);
+  useEffect(() => { loadFeed(); }, [loadFeed]);
 
- // Load feed
- const loadFeed = useCallback(async () => {
- setLoading(true);
- try {
- const params: Record<string, string> = {};
- if (activeCategory !== 'general') params.category = activeCategory;
- const res = await api.getCreativityFeed(params);
- setItems(res.data || []);
- setCurrentIndex(0);
- } catch { setItems([]); }
- finally { setLoading(false); }
- }, [activeCategory]);
+  // Lightweight self-stats (best-effort)
+  useEffect(() => {
+    api.getCreativityItems({ author: 'me' } as any).then((res: any) => {
+      const mine = res?.data || [];
+      const views = mine.reduce((s: number, i: any) => s + (i.views || 0), 0);
+      const moves = mine.reduce((s: number, i: any) => s + (i.moveCount || 0), 0);
+      setMyStats({ views, moves, matches: moves });
+    }).catch(() => {});
+  }, []);
 
- useEffect(() => { loadFeed(); }, [loadFeed]);
+  const onLike = async (item: any) => {
+    setItems(prev => prev.map(p => p.id === item.id ? { ...p, liked: !p.liked, reactionCount: (p.reactionCount || 0) + (p.liked ? -1 : 1) } : p));
+    try { await api.reactToCreativity(item.id, 'like'); } catch { loadFeed(); }
+  };
 
- // Record view when item becomes active
- useEffect(() => {
- const item = items[currentIndex];
- if (item) {
- api.viewCreativityItem(item.id).catch(() => {});
- }
- }, [currentIndex, items]);
+  const filteredCats = useMemo(() => CATEGORIES, []);
 
- // Snap scroll handler
- const handleScroll = useCallback(() => {
- if (!scrollRef.current) return;
- const container = scrollRef.current;
- const cardHeight = container.clientHeight;
- const newIndex = Math.round(container.scrollTop / cardHeight);
- if (newIndex !== currentIndex && newIndex >= 0 && newIndex < items.length) {
- setCurrentIndex(newIndex);
- }
- }, [currentIndex, items.length]);
+  return (
+    <ErrorBoundary>
+      <main className="mx-auto max-w-6xl px-4 pb-24 pt-6">
+        {/* Hero */}
+        <section className="rounded-3xl bg-gradient-to-br from-rose-main/15 via-rose-light/10 to-amber-200/20 p-6 sm:p-8">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-rose-main">
+                <Sparkles className="h-3 w-3" /> Talent Showcase
+              </div>
+              <h1 className="mt-2 text-3xl font-bold tracking-tight sm:text-4xl">
+                Show what you create.<br />
+                <span className="text-rose-main">Get matched for it.</span>
+              </h1>
+              <p className="mt-2 max-w-md text-sm text-text-secondary">
+                Post in up to 3 categories. Text, images, links — no video uploads, no friction. People can send you a Miamo Move straight from your work.
+              </p>
+            </div>
+            <button
+              onClick={() => setComposerOpen(true)}
+              className="inline-flex items-center gap-2 rounded-full bg-rose-main px-5 py-3 text-sm font-semibold text-white shadow-button hover:shadow-lg"
+            >
+              <Plus className="h-4 w-4" /> Share your work
+            </button>
+          </div>
 
- // Like handler — optimistic update
- const handleLike = async (idx: number) => {
- const item = items[idx];
- if (!item) return;
- // Optimistic: immediately toggle UI
- const wasLiked = item.liked;
- setItems(prev => prev.map((it, i) => i === idx ? {
- ...it,
- liked: !wasLiked,
- likeCount: wasLiked ? Math.max(0, (it.likeCount || 0) - 1) : (it.likeCount || 0) + 1,
- } : it));
- try {
- const res = await api.reactToCreativity(item.id);
- // Sync with server response — correct if server disagreed with our optimistic update
- setItems(prev => prev.map((it, i) => i === idx ? {
- ...it,
- liked: res.data.liked,
- likeCount: res.data.likeCount != null ? res.data.likeCount : (
- res.data.liked
- ? (wasLiked ? it.likeCount : (it.likeCount || 0) + 1) // server says liked but we thought already liked
- : (!wasLiked ? it.likeCount : Math.max(0, (it.likeCount || 0) - 1)) // server says unliked but we thought already unliked
- ),
- } : it));
- } catch (e: any) {
- // Revert on error
- setItems(prev => prev.map((it, i) => i === idx ? {
- ...it,
- liked: wasLiked,
- likeCount: wasLiked ? (it.likeCount || 0) + 1 : Math.max(0, (it.likeCount || 0) - 1),
- } : it));
- showToast(e?.message || 'Failed to like — please re-login', 'error');
- }
- };
+          {/* Self stats */}
+          <div className="mt-5 grid grid-cols-3 gap-2 sm:max-w-md">
+            <StatCard icon={<TrendingUp className="h-3.5 w-3.5" />} label="Views" value={fmt(myStats.views)} />
+            <StatCard icon={<Sparkles className="h-3.5 w-3.5" />} label="Moves" value={fmt(myStats.moves)} />
+            <StatCard icon={<Award className="h-3.5 w-3.5" />} label="Matches" value={fmt(myStats.matches)} />
+          </div>
+        </section>
 
- // Share handler
- const handleShare = async (idx: number) => {
- const item = items[idx];
- if (!item) return;
- try {
- await api.shareCreativityItem(item.id);
- showToast('Shared!', 'success');
- if (navigator.share) {
- await navigator.share({ title: item.title, text: item.content, url: window.location.href });
- }
- } catch (e: any) {
- showToast(e?.message || 'Share failed', 'error');
- }
- };
+        {/* Category rail */}
+        <section className="mt-6">
+          <div className="-mx-1 flex gap-2 overflow-x-auto pb-2">
+            {filteredCats.map(c => {
+              const Icon = c.icon;
+              const active = activeCat === c.id;
+              return (
+                <button
+                  key={c.id}
+                  onClick={() => setActiveCat(c.id)}
+                  className={`shrink-0 inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition ${
+                    active ? 'border-transparent text-white shadow-soft' : 'border-token bg-miamo-card text-text-muted hover:border-rose-main/40'
+                  }`}
+                  style={active ? { background: c.color } : undefined}
+                >
+                  <Icon className="h-3.5 w-3.5" /> {c.label}
+                </button>
+              );
+            })}
+          </div>
 
- // Hide handler
- const handleHide = async (itemId: string) => {
- try {
- await api.hideCreativityItem(itemId);
- setItems(prev => prev.filter(it => it.id !== itemId));
- showToast('Hidden', 'success');
- } catch (e: any) {
- showToast(e?.message || 'Failed to hide', 'error');
- }
- };
+          {/* Sort + search */}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {[
+              { key: 'trending' as const, label: 'Trending', icon: <Flame className="h-3 w-3" /> },
+              { key: 'recent' as const,   label: 'Recent',   icon: <Sparkles className="h-3 w-3" /> },
+              { key: 'top' as const,      label: 'Top',      icon: <Award className="h-3 w-3" /> },
+            ].map(s => (
+              <button key={s.key} onClick={() => setSort(s.key)}
+                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-medium transition ${
+                  sort === s.key ? 'border-rose-main bg-rose-main/10 text-rose-main' : 'border-token text-text-muted hover:border-rose-main/40'
+                }`}>
+                {s.icon} {s.label}
+              </button>
+            ))}
+            <div className="ml-auto relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-text-muted" />
+              <input value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="Search showcases"
+                className="rounded-full border border-token bg-miamo-card pl-8 pr-3 py-1.5 text-[12px] w-48 focus:w-64 transition-all" />
+              {search && <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted"><X className="h-3 w-3" /></button>}
+            </div>
+          </div>
+        </section>
 
- // Merge DB categories with static list for display
- const displayCategories = CATEGORIES.map(c => {
- const dbCat = dbCategories.find(dc => dc.name === c.name);
- return { ...c, count: dbCat?._count?.items || 0 };
- });
+        {/* Grid */}
+        <section className="mt-5">
+          {loading ? (
+            <GridSkeleton count={6} />
+          ) : items.length === 0 ? (
+            <EmptyState onCreate={() => setComposerOpen(true)} category={activeCat} />
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {items.map(it => (
+                <TalentCard
+                  key={it.id}
+                  item={it}
+                  onLike={() => onLike(it)}
+                  onComment={() => setCommentItem(it)}
+                  onMove={() => setMoveItem(it)}
+                  onMore={() => router.push(`/profile?id=${it.authorId}`)}
+                  onOpenAuthor={() => router.push(`/profile?id=${it.authorId}`)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
 
- /* ─── Loading ─── */
- if (loading) {
- return <GridSkeleton count={9} />;
- }
+        {/* Composer */}
+        <ShowcaseComposer
+          open={composerOpen}
+          onClose={() => setComposerOpen(false)}
+          onCreated={(created) => { showToast(`Published to ${created.length} categor${created.length > 1 ? 'ies' : 'y'}`); loadFeed(); }}
+        />
 
- /* ─── Empty ─── */
- if (items.length === 0) {
- return (
- <div className="h-full flex flex-col bg-miamo-bg">
- {/* Category bar even when empty */}
- <CategoryBar
- categories={displayCategories}
- active={activeCategory}
- onSelect={setActiveCategory}
- onShowAll={() => setShowCatPicker(true)}
- />
- <div className="flex-1 flex items-center justify-center">
- <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="text-center px-8">
- <div className="w-20 h-20 rounded-full bg-miamo-surface border border-border flex items-center justify-center mx-auto mb-5">
- <Sparkles className="w-8 h-8 text-text-secondary" />
- </div>
- <h3 className="text-lg font-bold text-text-primary mb-2">No content yet</h3>
- <p className="text-[13px] text-text-muted mb-6 leading-relaxed">
- {activeCategory === 'general'
- ? 'Be the first to share something creative!'
- : `No ${activeCategory} content yet — be the pioneer!`}
- </p>
- <button onClick={() => setUploadOpen(true)}
- className="h-11 px-6 rounded-xl bg-miamo-card text-text-primary text-sm font-bold hover:bg-miamo-card/90 transition-all inline-flex items-center gap-2">
- <Plus className="w-4 h-4" /> Create
- </button>
- </motion.div>
- </div>
- <UploadModal isOpen={uploadOpen} onClose={() => setUploadOpen(false)} categories={dbCategories} onCreated={loadFeed} />
- <CategoryPickerSheet isOpen={showCatPicker} onClose={() => setShowCatPicker(false)} categories={displayCategories} active={activeCategory} onSelect={(c) => { setActiveCategory(c); setShowCatPicker(false); }} />
- </div>
- );
- }
+        {/* Move modal */}
+        <AnimatePresence>
+          {moveItem && <MoveModal isOpen onClose={() => setMoveItem(null)} item={moveItem} />}
+        </AnimatePresence>
 
- return (
- <ErrorBoundary>
- <div className="h-full flex flex-col bg-miamo-bg relative">
- {/* Toast notification */}
- <AnimatePresence>
- {toast && (
- <motion.div
- initial={{ opacity: 0, y: -20 }}
- animate={{ opacity: 1, y: 0 }}
- exit={{ opacity: 0, y: -20 }}
- className={cn(
- 'absolute top-14 left-1/2 -translate-x-1/2 z-[60] px-4 py-2 rounded-xl text-[12px] font-semibold shadow-lg backdrop-blur-xl border',
- toast.type === 'error'
- ? 'bg-red-500/20 border-red-500/30 text-red-300'
- : 'bg-rose-main/20 border-rose-main/30 text-rose-light',
- )}
- >
- {toast.msg}
- </motion.div>
- )}
- </AnimatePresence>
+        {/* Comments */}
+        <AnimatePresence>
+          {commentItem && (
+            <CommentSheet
+              isOpen
+              itemId={commentItem.id}
+              commentCount={commentItem.commentCount ?? 0}
+              onClose={() => { setCommentItem(null); loadFeed(); }}
+            />
+          )}
+        </AnimatePresence>
 
- {/* ── Top: Category bar ── */}
- <CategoryBar
- categories={displayCategories}
- active={activeCategory}
- onSelect={setActiveCategory}
- onShowAll={() => setShowCatPicker(true)}
- />
-
- {/* ── Vertical scroll feed ── */}
- <div
- ref={scrollRef}
- onScroll={handleScroll}
- className="flex-1 overflow-y-auto snap-y snap-mandatory"
- style={{ scrollSnapType: 'y mandatory' }}
- >
- {items.map((item, idx) => (
- <div key={item.id} className="h-full snap-start" style={{ minHeight: '100%' }}>
- <ReelCard
- item={item}
- isActive={idx === currentIndex}
- onLike={() => handleLike(idx)}
- onComment={() => setCommentOpen(true)}
- onShare={() => handleShare(idx)}
- onMove={() => setMoveItem(item)}
- onMore={() => setMoreItem(item)}
- onProfileClick={() => router.push(`/profile?id=${item.authorId}`)}
- />
- </div>
- ))}
- </div>
-
- {/* ── FAB: Upload ── */}
- <motion.button
- whileHover={{ scale: 1.05 }}
- whileTap={{ scale: 0.95 }}
- onClick={() => setUploadOpen(true)}
- className="absolute bottom-6 right-4 z-30 w-12 h-12 rounded-full bg-miamo-card text-text-primary flex items-center justify-center shadow-[0_4px_24px_rgba(201,120,86,0.2)]"
- >
- <Plus className="w-6 h-6" />
- </motion.button>
-
- {/* ── Scroll indicators ── */}
- <div className="absolute right-1.5 top-1/2 -translate-y-1/2 z-20 flex flex-col gap-1">
- {items.slice(0, Math.min(items.length, 10)).map((_, i) => (
- <div key={i} className={cn(
- 'w-1 rounded-full transition-all duration-300',
- i === currentIndex ? 'h-4 bg-miamo-card' : 'h-1.5 bg-miamo-card/20',
- )} />
- ))}
- </div>
-
- {/* ── Modals ── */}
- <CommentSheet
- isOpen={commentOpen}
- onClose={() => setCommentOpen(false)}
- itemId={items[currentIndex]?.id || ''}
- commentCount={items[currentIndex]?.commentCount || 0}
- />
- <MoveModal
- isOpen={!!moveItem}
- onClose={() => setMoveItem(null)}
- item={moveItem}
- />
- <MoreMenu
- isOpen={!!moreItem}
- onClose={() => setMoreItem(null)}
- item={moreItem}
- onHide={() => moreItem && handleHide(moreItem.id)}
- />
- <UploadModal
- isOpen={uploadOpen}
- onClose={() => setUploadOpen(false)}
- categories={dbCategories}
- onCreated={loadFeed}
- />
- <CategoryPickerSheet
- isOpen={showCatPicker}
- onClose={() => setShowCatPicker(false)}
- categories={displayCategories}
- active={activeCategory}
- onSelect={(c) => { setActiveCategory(c); setShowCatPicker(false); }}
- />
- </div>
- </ErrorBoundary>
- );
+        {/* Toast */}
+        <AnimatePresence>
+          {toast && (
+            <motion.div initial={{ y: 40, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 40, opacity: 0 }}
+              className="fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-full bg-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-lg">
+              {toast}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
+    </ErrorBoundary>
+  );
 }
 
-/* ═══════════════════════════════════════════════════════
- CATEGORY BAR — Horizontal scrollable
- ═══════════════════════════════════════════════════════ */
-function CategoryBar({
- categories, active, onSelect, onShowAll,
-}: {
- categories: { id: string; name: string; label: string; icon: any; color: string; count?: number }[];
- active: string;
- onSelect: (name: string) => void;
- onShowAll: () => void;
-}) {
- return (
- <div className="flex items-center gap-2 px-4 py-3 overflow-x-auto no-scrollbar z-30 bg-miamo-bg/80 backdrop-blur-xl border-b border-border">
- {categories.slice(0, 8).map(cat => {
- const Icon = cat.icon;
- const isActive = active === cat.name || (active === 'general' && cat.name === 'general');
- return (
- <button
- key={cat.id}
- onClick={() => onSelect(cat.name)}
- className={cn(
- 'flex items-center gap-1.5 h-8 px-3.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all border flex-shrink-0',
- isActive
- ? 'bg-miamo-card text-text-primary border-white shadow-[0_0_12px_rgba(201,120,86,0.15)]'
- : 'bg-miamo-surface border-border text-text-muted hover:text-text-secondary hover:bg-miamo-surface',
- )}
- >
- <Icon className="w-3 h-3" />
- {cat.label}
- </button>
- );
- })}
- <button onClick={onShowAll}
- className="flex items-center gap-1 h-8 px-3 rounded-full card-premium text-text-muted text-[11px] font-semibold whitespace-nowrap hover:text-text-muted flex-shrink-0">
- All <ChevronDown className="w-3 h-3" />
- </button>
- </div>
- );
+function StatCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-xl bg-white/70 px-3 py-2 backdrop-blur-sm">
+      <div className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-text-muted">{icon} {label}</div>
+      <div className="mt-0.5 text-lg font-bold tabular-nums text-text-primary">{value}</div>
+    </div>
+  );
 }
 
-/* ═══════════════════════════════════════════════════════
- FULL CATEGORY PICKER (sheet)
- ═══════════════════════════════════════════════════════ */
-function CategoryPickerSheet({
- isOpen, onClose, categories, active, onSelect,
-}: {
- isOpen: boolean; onClose: () => void;
- categories: { id: string; name: string; label: string; icon: any; color: string; count?: number }[];
- active: string;
- onSelect: (name: string) => void;
-}) {
- return (
- <AnimatePresence>
- {isOpen && (
- <>
- <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
- className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" onClick={onClose} />
- <motion.div
- initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
- transition={{ type: 'spring', damping: 30, stiffness: 300 }}
- className="fixed bottom-0 inset-x-0 max-h-[75vh] bg-miamo-card border-t border-border rounded-t-[20px] z-50 flex flex-col pb-[env(safe-area-inset-bottom)]"
- >
- <div className="flex items-center justify-between px-5 py-4 border-b border-border">
- <h3 className="text-[14px] font-bold text-text-primary">Browse Categories</h3>
- <button onClick={onClose} className="w-8 h-8 rounded-full bg-miamo-surface flex items-center justify-center">
- <X className="w-4 h-4 text-text-muted" />
- </button>
- </div>
- <div className="flex-1 overflow-y-auto px-4 py-4">
- <div className="grid grid-cols-2 gap-2">
- {categories.map(cat => {
- const Icon = cat.icon;
- const isActive = active === cat.name;
- return (
- <button key={cat.id} onClick={() => onSelect(cat.name)}
- className={cn(
- 'flex items-center gap-3 px-4 py-3.5 rounded-xl border transition-all text-left',
- isActive
- ? 'bg-miamo-surface border-border shadow-[0_0_12px_rgba(255,255,255,0.03)]'
- : 'bg-miamo-surface/50 border-border hover:bg-miamo-surface',
- )}
- >
- <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
- style={{ backgroundColor: cat.color + '15' }}>
- <Icon className="w-4 h-4" style={{ color: cat.color }} />
- </div>
- <div className="min-w-0">
- <p className={cn('text-[12px] font-semibold truncate', isActive ? 'text-text-primary' : 'text-text-muted')}>{cat.label}</p>
- {cat.count !== undefined && cat.count > 0 && (
- <p className="text-[10px] text-text-secondary">{cat.count} items</p>
- )}
- </div>
- {isActive && (
- <div className="ml-auto w-5 h-5 rounded-full bg-miamo-card flex items-center justify-center flex-shrink-0">
- <Check className="w-3 h-3 text-text-primary" />
- </div>
- )}
- </button>
- );
- })}
- </div>
- </div>
- </motion.div>
- </>
- )}
- </AnimatePresence>
- );
+function EmptyState({ onCreate, category }: { onCreate: () => void; category: string }) {
+  return (
+    <div className="mx-auto max-w-md rounded-3xl border border-dashed border-token bg-miamo-card p-8 text-center">
+      <Sparkles className="mx-auto h-8 w-8 text-rose-main" />
+      <h3 className="mt-3 text-base font-semibold">Be the first in {category === 'general' ? 'this feed' : category}</h3>
+      <p className="mt-1 text-xs text-text-muted">Post a poem, a sketch, a photo, a project — anything that shows what makes you you.</p>
+      <button onClick={onCreate}
+        className="mt-4 inline-flex items-center gap-2 rounded-full bg-rose-main px-4 py-2 text-xs font-semibold text-white shadow-button">
+        <Plus className="h-4 w-4" /> Share your work
+      </button>
+    </div>
+  );
 }

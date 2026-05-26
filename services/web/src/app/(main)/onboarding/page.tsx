@@ -9,7 +9,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { FieldIcon } from '@/components/FieldIcon';
+import { IconOptionGrid } from '@/components/IconOptionGrid';
+import { IconChipMulti } from '@/components/IconChipMulti';
+import { NumberStepper, HeightPickerCm } from '@/components/NumberStepper';
 import type { IconName } from '../../../../../shared/src/fieldMeta';
+import { INTEREST_ICONS, iconForOption } from '../../../../../shared/src/optionIcons';
 
 // Icon per bucket card header (v3.2)
 const BUCKET_ICONS: Record<string, IconName> = {
@@ -208,12 +212,16 @@ export default function OnboardingPage() {
           {completion.dtm ? 'DTM Onboarding · Matrimony' : 'Discover Onboarding · Casual'}
         </p>
         <h1 className="mt-1 text-3xl font-medium tracking-tight">
-          Complete {completion.threshold}% to {completion.dtm ? 'unlock DTM features' : 'get started'}
+          {completion.score >= 100
+            ? 'Your profile shines ✨'
+            : completion.score >= completion.threshold
+              ? `${completion.score}% complete — push to 100% for the best matches`
+              : 'Make every detail count'}
         </h1>
         <p className="mt-2 text-sm text-text-muted">
           {completion.dtm
-            ? 'DTM is fully separate from your casual profile. Everything here is gated for serious matches — pick from lists wherever possible.'
-            : 'Fill in your basics first. We use dropdowns and chips so it stays quick — no essays needed.'}
+            ? 'DTM is a serious flow — the more you share, the better the compatibility we can compute. Every field below adds signal.'
+            : 'A complete profile gets up to 8× more matches. Pick from chips wherever you can — no essays needed.'}
         </p>
       </header>
 
@@ -221,20 +229,26 @@ export default function OnboardingPage() {
       <section className="rounded-2xl border border-token bg-miamo-card p-5 shadow-soft">
         <div className="flex items-center justify-between text-sm">
           <span className="font-medium">Profile completion</span>
-          <span className="tabular-nums text-text-muted">{completion.score} / {completion.threshold} pts</span>
+          <span className="tabular-nums text-text-muted">{completion.score}%</span>
         </div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-black/5">
-          <div className={`h-full rounded-full transition-all ${isDone ? 'bg-emerald-500' : 'bg-rose-main'}`}
-               style={{ width: `${Math.min(100, Math.round((completion.score / completion.threshold) * 100))}%` }} />
+        <div className="relative mt-3 h-2 overflow-hidden rounded-full bg-black/5">
+          <div className={`h-full rounded-full transition-all ${completion.score >= 100 ? 'bg-emerald-500' : completion.score >= completion.threshold ? 'bg-amber-500' : 'bg-rose-main'}`}
+               style={{ width: `${Math.min(100, completion.score)}%` }} />
+          <div className="absolute top-0 h-full w-px bg-emerald-500/70" style={{ left: `${completion.threshold}%` }} title={`Minimum to start: ${completion.threshold}%`} />
+        </div>
+        <div className="mt-1.5 flex justify-between text-[10px] text-text-muted tabular-nums">
+          <span>0</span>
+          <span className="text-emerald-600">{completion.threshold}% — unlocked</span>
+          <span className="text-rose-main">100% — best matches</span>
         </div>
         {isDone ? (
           <button onClick={() => router.push(completion.dtm ? '/dtm' : '/discover')}
             className="mt-4 w-full rounded-xl bg-rose-main py-2.5 text-sm font-medium text-white shadow-button">
-            You\u2019re set — continue to {completion.dtm ? 'DTM' : 'Discover'}
+            {completion.score >= 100 ? `Continue to ${completion.dtm ? 'DTM' : 'Discover'}` : `Continue to ${completion.dtm ? 'DTM' : 'Discover'} — keep adding for stronger matches`}
           </button>
         ) : (
           <p className="mt-3 text-xs text-text-muted">
-            You need <strong>{Math.max(0, completion.threshold - completion.score)} more pts</strong> to unlock {completion.dtm ? 'DTM matches' : 'matches & discover'}.
+            <strong className="text-rose-main">{Math.max(0, completion.threshold - completion.score)}% to go</strong> before {completion.dtm ? 'DTM' : 'Discover'} opens. Every section below adds points.
           </p>
         )}
       </section>
@@ -402,38 +416,62 @@ function BucketEditor(props: {
   if (bucketKey === 'interests') {
     return (
       <div className="space-y-3">
-        <ChipMulti options={INTEREST_OPTIONS} value={draft.interests ?? []} max={12}
-          onChange={v => setDraft({ ...draft, interests: v })} />
+        <IconChipMulti
+          options={INTEREST_ICONS}
+          value={draft.interests ?? []}
+          max={12}
+          onChange={v => setDraft({ ...draft, interests: v })}
+        />
         <SaveRow onSave={() => onSaveInterests(draft.interests ?? [])} />
       </div>
     );
   }
   if (bucketKey === 'lifestyle') {
+    const lifestyleGroups: Array<{ key: keyof typeof LIFESTYLE_DROPDOWNS; label: string }> = [
+      { key: 'drinking', label: 'Drinking' }, { key: 'smoking', label: 'Smoking' },
+      { key: 'exercise', label: 'Exercise' }, { key: 'diet', label: 'Diet' },
+      { key: 'religion', label: 'Religion' }, { key: 'pets', label: 'Pets' },
+      { key: 'children', label: 'Kids' }, { key: 'education', label: 'Education' },
+    ];
     return (
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block text-xs font-medium">Height (cm)
-          <TextInput type="number" min={120} max={230} value={draft.height ?? ''} onChange={e => setDraft({ ...draft, height: parseInt(e.target.value) || '' })} />
-        </label>
-        {Object.entries(LIFESTYLE_DROPDOWNS).map(([key, opts]) => (
-          <label key={key} className="block text-xs font-medium capitalize">{key}
-            <Select options={opts} value={draft[key] ?? ''} onChange={v => setDraft({ ...draft, [key]: v })} />
-          </label>
+      <div className="space-y-5">
+        <HeightPickerCm value={typeof draft.height === 'number' ? draft.height : undefined}
+          onChange={cm => setDraft({ ...draft, height: cm })} />
+        {lifestyleGroups.map(({ key, label }) => (
+          <div key={key}>
+            <div className="mb-1.5 text-xs font-medium text-text-secondary">{label}</div>
+            <IconOptionGrid
+              columns={3}
+              ariaLabel={label}
+              value={draft[key] ?? ''}
+              onChange={v => setDraft({ ...draft, [key]: v })}
+              options={LIFESTYLE_DROPDOWNS[key].filter(o => o).map(o => ({
+                value: o, label: o, icon: iconForOption(key, o),
+              }))}
+            />
+          </div>
         ))}
-        <label className="block text-xs font-medium sm:col-span-2">Languages (comma separated)
+        <label className="block text-xs font-medium">Languages (comma separated)
           <TextInput value={draft.languages ?? ''} placeholder="English, Hindi…" onChange={e => setDraft({ ...draft, languages: e.target.value })} />
         </label>
-        <div className="sm:col-span-2"><SaveRow onSave={() => onPatchProfile({
+        <SaveRow onSave={() => onPatchProfile({
           height: draft.height, education: draft.education, languages: draft.languages, diet: draft.diet,
           drinking: draft.drinking, smoking: draft.smoking, exercise: draft.exercise, religion: draft.religion,
           pets: draft.pets, children: draft.children,
-        })} /></div>
+        })} />
       </div>
     );
   }
   if (bucketKey === 'lookingFor') {
     return (
       <div className="space-y-3">
-        <Select options={LOOKING_FOR_OPTIONS} value={draft.lookingFor ?? ''} onChange={v => setDraft({ ...draft, lookingFor: v })} />
+        <IconOptionGrid
+          columns={3}
+          ariaLabel="Looking for"
+          value={draft.lookingFor ?? ''}
+          onChange={v => setDraft({ ...draft, lookingFor: v })}
+          options={LOOKING_FOR_OPTIONS.map(o => ({ value: o, label: o, icon: iconForOption('lookingFor', o) }))}
+        />
         <SaveRow onSave={() => onPatchProfile({ lookingFor: draft.lookingFor })} />
       </div>
     );

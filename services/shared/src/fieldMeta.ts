@@ -17,15 +17,22 @@ export type IconName =
   | 'User' | 'Users' | 'MapPin' | 'Briefcase' | 'Building2' | 'GraduationCap'
   | 'Heart' | 'HeartHandshake' | 'Sparkles' | 'Star' | 'Moon' | 'Sun'
   | 'Cake' | 'Ruler' | 'Languages' | 'BookOpen' | 'Globe'
-  | 'Cigarette' | 'Wine' | 'Dumbbell' | 'Salad' | 'Baby' | 'Dog'
+  | 'Cigarette' | 'Wine' | 'Dumbbell' | 'Salad' | 'Baby' | 'Dog' | 'Cat' | 'PawPrint'
   | 'Camera' | 'MessageCircle' | 'Tag' | 'CheckCircle2' | 'Shield'
   | 'Coins' | 'Wallet' | 'Banknote' | 'TrendingUp'
   | 'Flame' | 'Home' | 'Hand' | 'Handshake'
   | 'Crown' | 'Gem' | 'Flower2' | 'Music' | 'Mic'
-  | 'CalendarDays' | 'Clock' | 'Map' | 'Plane'
+  | 'CalendarDays' | 'Clock' | 'Map' | 'Plane' | 'Mountain' | 'Trees'
   | 'Hash' | 'FileText' | 'Link2' | 'Phone' | 'Mail'
-  | 'Compass' | 'Target' | 'Filter' | 'Settings' | 'Eye'
-  | 'Scroll';
+  | 'Compass' | 'Target' | 'Filter' | 'Settings' | 'Eye' | 'EyeOff'
+  | 'Scroll' | 'Trophy' | 'Footprints' | 'Bike' | 'Waves' | 'Snowflake'
+  | 'Film' | 'Drama' | 'Palette' | 'PenTool' | 'Landmark'
+  | 'Cpu' | 'Rocket' | 'Gamepad2' | 'Dice5'
+  | 'Megaphone' | 'Leaf' | 'CircleSlash' | 'Droplet'
+  | 'Fish' | 'Cross' | 'HelpCircle' | 'School' | 'Wrench'
+  | 'Coffee' | 'Utensils' | 'ChefHat' | 'Activity' | 'BatteryLow'
+  | 'Image' | 'Video' | 'Paintbrush' | 'Award' | 'Zap'
+  | 'Flag' | 'Bookmark' | 'Send';
 
 export interface FieldMeta {
   key: string;
