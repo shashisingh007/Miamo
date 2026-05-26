@@ -152,6 +152,56 @@ export const vibeCheckBodySchema = z.object({
   intent: z.string().trim().max(120).optional(),
 });
 
+// Discover pass-feedback (structured reason capture)
+export const passFeedbackBodySchema = z.object({
+  userId: z.string().min(1).max(64),
+  reason: z.string().trim().min(1).max(200),
+  details: z.string().trim().max(2000).optional(),
+});
+
+// Miamo Move (an in-app prompt sent to another user)
+export const discoverMoveBodySchema = z.object({
+  toUserId: z.string().min(1).max(64),
+  message: z.string().trim().max(1000).optional(),
+  targetType: z.string().max(40).optional(),
+  targetId: z.string().max(64).nullable().optional(),
+});
+
+// Match-report / match-block (by-user variants reuse the report fields)
+export const matchActionBodySchema = z.object({
+  reason: z.string().trim().min(1).max(200).optional(),
+  details: z.string().trim().max(2000).optional(),
+});
+
+// Discover filters — keep permissive (server still whitelists fields).
+// Just bound the shape so we can reject obviously hostile payloads early.
+export const discoverFiltersBodySchema = z
+  .object({
+    minAge: z.number().int().min(18).max(120).optional(),
+    maxAge: z.number().int().min(18).max(120).optional(),
+    minHeight: z.number().int().min(50).max(250).optional(),
+    maxHeight: z.number().int().min(50).max(250).optional(),
+    distance: z.number().int().min(0).max(20000).optional(),
+    city: z.string().trim().max(120).optional(),
+    gender: z.string().trim().max(40).optional(),
+    sexuality: z.string().trim().max(40).optional(),
+    lookingFor: z.string().trim().max(80).optional(),
+    smoking: z.string().trim().max(40).optional(),
+    drinking: z.string().trim().max(40).optional(),
+    exercise: z.string().trim().max(40).optional(),
+    education: z.string().trim().max(120).optional(),
+    religion: z.string().trim().max(80).optional(),
+    zodiac: z.string().trim().max(40).optional(),
+    pets: z.string().trim().max(120).optional(),
+    children: z.string().trim().max(40).optional(),
+    seriousOnly: z.boolean().optional(),
+    verifiedOnly: z.boolean().optional(),
+    activeToday: z.boolean().optional(),
+    newHere: z.boolean().optional(),
+    hasPhotos: z.boolean().optional(),
+  })
+  .passthrough();
+
 // Messaging -------------------------------------------
 export const sendMessageBodySchema = z.object({
   content: z.string().trim().min(1).max(5000),

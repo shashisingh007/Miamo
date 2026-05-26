@@ -6,7 +6,17 @@ import { scoreForYou, scoreNew, scoreActive, scoreVerified, scoreSerious, scoreA
 import { logger } from '../../shared/src/logger';
 import { errorHandler } from '../../shared/src/errorHandler';
 import { validate } from '../../shared/src/validate';
-import { discoverLikeBodySchema, discoverPassBodySchema, discoverCommentBodySchema, reportBodySchema, vibeCheckBodySchema } from '../../shared/src/schemas';
+import {
+  discoverLikeBodySchema,
+  discoverPassBodySchema,
+  discoverCommentBodySchema,
+  reportBodySchema,
+  vibeCheckBodySchema,
+  passFeedbackBodySchema,
+  discoverMoveBodySchema,
+  matchActionBodySchema,
+  discoverFiltersBodySchema,
+} from '../../shared/src/schemas';
 import { idempotency } from '../../shared/src/idempotency';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
@@ -687,7 +697,7 @@ app.post('/api/v1/discover/pass', authMiddleware, validate({ body: discoverPassB
 });
 
 // ─── Pass Feedback (with reason) ──────────────────────
-app.post('/api/v1/discover/pass-feedback', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/discover/pass-feedback', authMiddleware, validate({ body: passFeedbackBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
     const { userId: passedUserId, reason, details } = req.body;
@@ -722,7 +732,7 @@ app.post('/api/v1/discover/:userId/superlike', authMiddleware, async (req: AuthR
 });
 
 // ─── Send Miamo Move (stored in DB for algorithm analysis) ───
-app.post('/api/v1/discover/move', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/discover/move', authMiddleware, validate({ body: discoverMoveBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { toUserId, message: rawMoveMsg, targetType, targetId } = req.body;
     const message = rawMoveMsg ? sanitize(rawMoveMsg) : '';
@@ -850,7 +860,7 @@ app.get('/api/v1/discover/filters', authMiddleware, async (req: AuthRequest, res
     res.json({ data: filter || {} });
   } catch (e) { next(e); }
 });
-app.put('/api/v1/discover/filters', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.put('/api/v1/discover/filters', authMiddleware, validate({ body: discoverFiltersBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
     // Whitelist allowed filter fields to prevent arbitrary data injection
@@ -1090,7 +1100,7 @@ app.delete('/api/v1/matches/by-user/:userId', authMiddleware, async (req: AuthRe
 });
 
 // Report by other userId (for messages page)
-app.post('/api/v1/matches/by-user/:userId/report', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/matches/by-user/:userId/report', authMiddleware, validate({ body: matchActionBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
     const targetUserId = req.params.userId;
@@ -1111,7 +1121,7 @@ app.post('/api/v1/matches/by-user/:userId/report', authMiddleware, async (req: A
 });
 
 // Block with feedback (for messages/matches pages)
-app.post('/api/v1/matches/by-user/:userId/block', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/matches/by-user/:userId/block', authMiddleware, validate({ body: matchActionBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
     const targetUserId = req.params.userId;
