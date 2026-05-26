@@ -194,8 +194,8 @@ export default function RegisterPage() {
 
         <p className="text-[11px] text-text-muted text-center mt-5 leading-relaxed">
           By creating an account you agree to our{' '}
-          <a href="#" className="text-text-secondary hover:text-rose">Terms</a> and{' '}
-          <a href="#" className="text-text-secondary hover:text-rose">Privacy Policy</a>.
+          <Link href="/terms" className="text-text-secondary hover:text-rose">Terms</Link> and{' '}
+          <Link href="/privacy" className="text-text-secondary hover:text-rose">Privacy Policy</Link>.
         </p>
 
         <p className="text-center text-sm text-text-secondary mt-6">

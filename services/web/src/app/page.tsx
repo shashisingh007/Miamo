@@ -319,25 +319,45 @@ export default function LandingPage() {
       {/* ─── FOOTER ─── */}
       <footer className="relative z-10 border-t border-border-light bg-white/60 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-6 py-14">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-10 mb-10">
-            <div className="col-span-2 md:col-span-1">
-              <MiamoWordmark height={20} animated={true} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-10 mb-10">
+            <div className="sm:col-span-2 md:col-span-1">
+              <MiamoWordmark height={20} animated={false} />
               <p className="text-sm text-text-muted mt-4 leading-relaxed max-w-[220px]">
                 Where hearts connect. A premium dating platform for meaningful relationships.
               </p>
               <div className="flex gap-2 mt-5">
-                <a href="#" aria-label="Website" className="w-9 h-9 rounded-full bg-white border border-border-light flex items-center justify-center hover:border-rose-main/40 hover:text-rose transition-colors text-text-muted">
+                <a href="https://miamo.app" target="_blank" rel="noreferrer noopener" aria-label="Website" className="w-9 h-9 rounded-full bg-white border border-border-light flex items-center justify-center hover:border-rose-main/40 hover:text-rose transition-colors text-text-muted">
                   <Globe className="w-4 h-4" />
                 </a>
-                <a href="#" aria-label="Email" className="w-9 h-9 rounded-full bg-white border border-border-light flex items-center justify-center hover:border-rose-main/40 hover:text-rose transition-colors text-text-muted">
+                <a href="mailto:hello@miamo.app" aria-label="Email" className="w-9 h-9 rounded-full bg-white border border-border-light flex items-center justify-center hover:border-rose-main/40 hover:text-rose transition-colors text-text-muted">
                   <Mail className="w-4 h-4" />
                 </a>
               </div>
             </div>
 
-            <FooterCol heading="Product" items={['Features', 'AI matching', 'Daily Beats', 'Creativity', 'Serious Mode', 'Pricing']} />
-            <FooterCol heading="Company" items={['About', 'Careers', 'Press', 'Blog', 'Contact']} />
-            <FooterCol heading="Support" items={['Help', 'Safety', 'Community guidelines', 'Privacy', 'Terms', 'Cookies']} />
+            <FooterCol heading="Product" items={[
+              { label: 'Features', href: '/coming-soon' },
+              { label: 'AI matching', href: '/coming-soon' },
+              { label: 'Daily Beats', href: '/coming-soon' },
+              { label: 'Creativity', href: '/coming-soon' },
+              { label: 'Serious Mode', href: '/coming-soon' },
+              { label: 'Pricing', href: '/coming-soon' },
+            ]} />
+            <FooterCol heading="Company" items={[
+              { label: 'About', href: '/coming-soon' },
+              { label: 'Careers', href: '/coming-soon' },
+              { label: 'Press', href: '/coming-soon' },
+              { label: 'Blog', href: '/coming-soon' },
+              { label: 'Contact', href: 'mailto:hello@miamo.app' },
+            ]} />
+            <FooterCol heading="Support" items={[
+              { label: 'Help', href: '/coming-soon' },
+              { label: 'Safety', href: '/coming-soon' },
+              { label: 'Community guidelines', href: '/community-guidelines' },
+              { label: 'Privacy', href: '/privacy' },
+              { label: 'Terms', href: '/terms' },
+              { label: 'Cookies', href: '/cookies' },
+            ]} />
           </div>
 
           <div className="border-t border-border-light pt-6 flex flex-col md:flex-row items-center justify-between gap-3">
@@ -435,20 +455,27 @@ function FaqItem({ q, a }: { q: string; a: string }) {
   );
 }
 
-function FooterCol({ heading, items }: { heading: string; items: string[] }) {
+function FooterCol({ heading, items }: { heading: string; items: { label: string; href: string }[] }) {
   return (
     <div>
       <h4 className="text-[11px] font-semibold text-text-primary uppercase tracking-[0.18em] mb-4">
         {heading}
       </h4>
       <ul className="space-y-2.5">
-        {items.map((item) => (
-          <li key={item}>
-            <a href="#" className="text-sm text-text-muted hover:text-rose transition-colors">
-              {item}
-            </a>
-          </li>
-        ))}
+        {items.map((item) => {
+          const isExternal = item.href.startsWith('mailto:') || item.href.startsWith('http');
+          return (
+            <li key={item.label}>
+              <a
+                href={item.href}
+                {...(isExternal ? { target: '_blank', rel: 'noreferrer noopener' } : {})}
+                className="text-sm text-text-muted hover:text-rose transition-colors"
+              >
+                {item.label}
+              </a>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
