@@ -6,7 +6,7 @@ import { scoreFeedItem, scoreDtm, scoreDtmEnhanced, type FeedItem, type FeedUser
 import { logger } from '../../shared/src/logger';
 import { errorHandler } from '../../shared/src/errorHandler';
 import { validate } from '../../shared/src/validate';
-import { feedPostBodySchema, feedPostUpdateBodySchema, reactionBodySchema, commentBodySchema, storyBodySchema, storyReactBodySchema, videoBodySchema } from '../../shared/src/schemas';
+import { feedPostBodySchema, feedPostUpdateBodySchema, reactionBodySchema, commentBodySchema, storyBodySchema, storyReactBodySchema, videoBodySchema, showcaseCreateBodySchema, showcaseUpdateBodySchema, SHOWCASE_LINK_ALLOWLIST } from '../../shared/src/schemas';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware } from '../../shared/src/service';
@@ -1559,6 +1559,130 @@ app.get('/api/v1/matrimonial/chat', authMiddleware, async (req: AuthRequest, res
       return bTime - aTime;
     });
     res.json({ data: chats });
+  } catch (e) { next(e); }
+});
+
+// ─── v3.2 SHOWCASE ──────────────────────────────────────────
+// Per-user portfolio replacing legacy CreativityItem surfaces.
+// Server-enforced caps: 6 pinned/user, ~10MB total bytes/user.
+const SHOWCASE_MAX_PINNED = 6;
+const SHOWCASE_MAX_BYTES_PER_USER = 10 * 1024 * 1024;
+
+function validateShowcaseLink(url?: string): boolean {
+  if (!url) return true;
+  try {
+    const u = new URL(url);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+    const host = u.hostname.toLowerCase().replace(/^www\./, '');
+    if (host === 'instagram.com') return u.pathname.includes('/reel/') || u.pathname.includes('/p/');
+    return (SHOWCASE_LINK_ALLOWLIST as readonly string[]).some(d => host === d || host.endsWith('.' + d));
+  } catch { return false; }
+}
+
+// GET /api/v1/showcase — public board, cursor-based, 24/page
+app.get('/api/v1/showcase', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { category, cursor } = req.query as { category?: string; cursor?: string };
+    const where: any = { visibility: 'everyone' };
+    if (category) where.category = category;
+    if (cursor) where.createdAt = { lt: new Date(cursor) };
+    const items = await prisma.showcaseItem.findMany({
+      where, orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }], take: 25,
+    });
+    const nextCursor = items.length > 24 ? items[23].createdAt.toISOString() : null;
+    res.json({ data: items.slice(0, 24), meta: { nextCursor } });
+  } catch (e) { next(e); }
+});
+
+// GET /api/v1/showcase/users/:userId — items for one user
+app.get('/api/v1/showcase/users/:userId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const items = await prisma.showcaseItem.findMany({
+      where: { userId: req.params.userId },
+      orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }], take: 50,
+    });
+    res.json({ data: items });
+  } catch (e) { next(e); }
+});
+
+// POST /api/v1/showcase — create item
+app.post('/api/v1/showcase', authMiddleware, validate({ body: showcaseCreateBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const body = sanitizeObject(req.body);
+    if (body.type === 'link' && !validateShowcaseLink(body.url)) {
+      return res.status(400).json({ error: { message: 'Link domain not allowed', code: 'SHOWCASE_LINK_DENIED', statusCode: 400 } });
+    }
+    const bytes = (body.body?.length || 0) + (body.title?.length || 0);
+    const totalBytes = await prisma.showcaseItem.aggregate({ where: { userId: req.userId! }, _sum: { bytes: true } });
+    if ((totalBytes._sum.bytes || 0) + bytes > SHOWCASE_MAX_BYTES_PER_USER) {
+      return res.status(413).json({ error: { message: 'Storage quota exceeded', code: 'SHOWCASE_QUOTA_EXCEEDED', statusCode: 413 } });
+    }
+    if (body.pinned) {
+      const pinnedCount = await prisma.showcaseItem.count({ where: { userId: req.userId!, pinned: true } });
+      if (pinnedCount >= SHOWCASE_MAX_PINNED) {
+        return res.status(409).json({ error: { message: `Max ${SHOWCASE_MAX_PINNED} pinned items`, code: 'SHOWCASE_PIN_LIMIT', statusCode: 409 } });
+      }
+    }
+    const item = await prisma.showcaseItem.create({
+      data: {
+        userId: req.userId!,
+        category: body.category,
+        type: body.type,
+        title: sanitize(body.title),
+        body: body.body ? sanitize(body.body) : null,
+        url: body.url || null,
+        imageUrl: body.imageUrl || null,
+        voiceUrl: body.voiceUrl || null,
+        voiceDurationMs: body.voiceDurationMs ?? null,
+        pinned: !!body.pinned,
+        visibility: body.visibility || 'everyone',
+        bytes,
+        updatedAt: new Date(),
+      },
+    });
+    auditLog(prisma, req.userId!, 'showcase_create', { id: item.id, category: item.category });
+    res.status(201).json({ data: item });
+  } catch (e) { next(e); }
+});
+
+// PUT /api/v1/showcase/:id — update
+app.put('/api/v1/showcase/:id', authMiddleware, validate({ body: showcaseUpdateBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const existing = await prisma.showcaseItem.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.userId !== req.userId) return res.status(404).json({ error: { message: 'Not found', code: 'NOT_FOUND' } });
+    const body = sanitizeObject(req.body);
+    if (body.url && !validateShowcaseLink(body.url)) {
+      return res.status(400).json({ error: { message: 'Link domain not allowed', code: 'SHOWCASE_LINK_DENIED', statusCode: 400 } });
+    }
+    if (body.pinned === true && !existing.pinned) {
+      const pinnedCount = await prisma.showcaseItem.count({ where: { userId: req.userId!, pinned: true } });
+      if (pinnedCount >= SHOWCASE_MAX_PINNED) {
+        return res.status(409).json({ error: { message: `Max ${SHOWCASE_MAX_PINNED} pinned items`, code: 'SHOWCASE_PIN_LIMIT', statusCode: 409 } });
+      }
+    }
+    const updated = await prisma.showcaseItem.update({
+      where: { id: req.params.id },
+      data: {
+        title: body.title !== undefined ? sanitize(body.title) : undefined,
+        body: body.body !== undefined ? sanitize(body.body) : undefined,
+        url: body.url,
+        imageUrl: body.imageUrl,
+        pinned: body.pinned,
+        visibility: body.visibility,
+      },
+    });
+    res.json({ data: updated });
+  } catch (e) { next(e); }
+});
+
+// DELETE /api/v1/showcase/:id
+app.delete('/api/v1/showcase/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const existing = await prisma.showcaseItem.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.userId !== req.userId) return res.status(404).json({ error: { message: 'Not found', code: 'NOT_FOUND' } });
+    await prisma.showcaseItem.delete({ where: { id: req.params.id } });
+    auditLog(prisma, req.userId!, 'showcase_delete', { id: req.params.id });
+    res.json({ data: { success: true } });
   } catch (e) { next(e); }
 });
 

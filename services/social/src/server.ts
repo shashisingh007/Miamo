@@ -16,6 +16,9 @@ import {
   discoverMoveBodySchema,
   matchActionBodySchema,
   discoverFiltersBodySchema,
+  accessRequestCreateBodySchema,
+  accessRequestDecisionBodySchema,
+  ACCESS_FIELDS,
 } from '../../shared/src/schemas';
 import { idempotency } from '../../shared/src/idempotency';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
@@ -2017,6 +2020,111 @@ app.get('/api/v1/matches/incoming/:userId/suggestions', authMiddleware, async (r
     suggestions.push("I have a feeling we'd get along — let's find out! What are you passionate about right now?");
 
     res.json({ data: suggestions.slice(0, 5) });
+  } catch (e) { next(e); }
+});
+
+// ─── v3.2 ACCESS CONTROL ────────────────────────────────────
+// Field-level access requests with full lifecycle.
+// Spam controls: 5 max pending outbound/user, 3 max pending per (field,target),
+// 7-day cooldown after denial for same (from,to,field).
+const ACCESS_MAX_OUTBOUND_PENDING = 5;
+const ACCESS_MAX_PER_FIELD_TARGET = 3;
+const ACCESS_DENY_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+const ACCESS_DEFAULT_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
+
+app.post('/api/v1/access/requests', authMiddleware, validate({ body: accessRequestCreateBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { toUserId, field, message } = req.body as { toUserId: string; field: string; message?: string };
+    if (toUserId === req.userId) return res.status(400).json({ error: { message: 'Cannot request access from yourself', code: 'INVALID_TARGET' } });
+
+    // Cooldown check for previous denial
+    const lastDenied = await prisma.accessRequest.findFirst({
+      where: { fromUserId: req.userId!, toUserId, field, status: 'denied' },
+      orderBy: { decidedAt: 'desc' },
+    });
+    if (lastDenied?.decidedAt && Date.now() - lastDenied.decidedAt.getTime() < ACCESS_DENY_COOLDOWN_MS) {
+      return res.status(429).json({ error: { message: 'Please wait 7 days before re-requesting', code: 'ACCESS_COOLDOWN', statusCode: 429 } });
+    }
+
+    const [outboundPending, perFieldPending] = await Promise.all([
+      prisma.accessRequest.count({ where: { fromUserId: req.userId!, status: 'pending' } }),
+      prisma.accessRequest.count({ where: { toUserId, field, status: 'pending' } }),
+    ]);
+    if (outboundPending >= ACCESS_MAX_OUTBOUND_PENDING) return res.status(429).json({ error: { message: 'Too many pending requests', code: 'ACCESS_QUOTA_OUTBOUND', statusCode: 429 } });
+    if (perFieldPending >= ACCESS_MAX_PER_FIELD_TARGET) return res.status(429).json({ error: { message: 'Too many requests for this field', code: 'ACCESS_QUOTA_FIELD', statusCode: 429 } });
+
+    const request = await prisma.accessRequest.upsert({
+      where: { fromUserId_toUserId_field: { fromUserId: req.userId!, toUserId, field } },
+      update: { status: 'pending', message: message ? sanitize(message) : null, createdAt: new Date(), decidedAt: null, expiresAt: null },
+      create: { fromUserId: req.userId!, toUserId, field, message: message ? sanitize(message) : null, status: 'pending' },
+    });
+    auditLog(prisma, req.userId!, 'access_request_create', { id: request.id, toUserId, field });
+    res.status(201).json({ data: request });
+  } catch (e) { next(e); }
+});
+
+app.get('/api/v1/access/requests/inbox', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const requests = await prisma.accessRequest.findMany({
+      where: { toUserId: req.userId!, status: 'pending' },
+      orderBy: { createdAt: 'desc' }, take: 100,
+    });
+    res.json({ data: requests });
+  } catch (e) { next(e); }
+});
+
+app.get('/api/v1/access/requests/outbox', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const requests = await prisma.accessRequest.findMany({
+      where: { fromUserId: req.userId! },
+      orderBy: { createdAt: 'desc' }, take: 100,
+    });
+    res.json({ data: requests });
+  } catch (e) { next(e); }
+});
+
+app.post('/api/v1/access/requests/:id/approve', authMiddleware, validate({ body: accessRequestDecisionBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const existing = await prisma.accessRequest.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.toUserId !== req.userId) return res.status(404).json({ error: { message: 'Not found', code: 'NOT_FOUND' } });
+    if (existing.status !== 'pending') return res.status(409).json({ error: { message: 'Already decided', code: 'ACCESS_ALREADY_DECIDED' } });
+    const updated = await prisma.accessRequest.update({
+      where: { id: req.params.id },
+      data: { status: 'approved', decidedAt: new Date(), expiresAt: new Date(Date.now() + ACCESS_DEFAULT_EXPIRY_MS) },
+    });
+    auditLog(prisma, req.userId!, 'access_request_approve', { id: req.params.id, field: existing.field });
+    res.json({ data: updated });
+  } catch (e) { next(e); }
+});
+
+app.post('/api/v1/access/requests/:id/deny', authMiddleware, validate({ body: accessRequestDecisionBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const existing = await prisma.accessRequest.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.toUserId !== req.userId) return res.status(404).json({ error: { message: 'Not found', code: 'NOT_FOUND' } });
+    if (existing.status !== 'pending') return res.status(409).json({ error: { message: 'Already decided', code: 'ACCESS_ALREADY_DECIDED' } });
+    const updated = await prisma.accessRequest.update({
+      where: { id: req.params.id },
+      data: { status: 'denied', decidedAt: new Date() },
+    });
+    auditLog(prisma, req.userId!, 'access_request_deny', { id: req.params.id, field: existing.field });
+    res.json({ data: updated });
+  } catch (e) { next(e); }
+});
+
+app.delete('/api/v1/access/requests/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const existing = await prisma.accessRequest.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: { message: 'Not found', code: 'NOT_FOUND' } });
+    // Owner can revoke their grant; sender can withdraw their request.
+    const isGrantOwner = existing.toUserId === req.userId && existing.status === 'approved';
+    const isSender = existing.fromUserId === req.userId;
+    if (!isGrantOwner && !isSender) return res.status(403).json({ error: { message: 'Forbidden', code: 'FORBIDDEN' } });
+    const updated = await prisma.accessRequest.update({
+      where: { id: req.params.id },
+      data: { status: 'revoked', decidedAt: new Date() },
+    });
+    auditLog(prisma, req.userId!, 'access_request_revoke', { id: req.params.id, field: existing.field });
+    res.json({ data: updated });
   } catch (e) { next(e); }
 });
 
