@@ -5,7 +5,13 @@ import { scoreSearch } from '../../shared/algorithms';
 import { logger } from '../../shared/src/logger';
 import { errorHandler } from '../../shared/src/errorHandler';
 import { validate } from '../../shared/src/validate';
-import { updateProfileBodySchema, profilePromptsBodySchema, profileInterestsBodySchema } from '../../shared/src/schemas';
+import {
+  updateProfileBodySchema,
+  profilePromptsBodySchema,
+  profileInterestsBodySchema,
+  settingsUpdateBodySchema,
+  privacyUpdateBodySchema,
+} from '../../shared/src/schemas';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog } from '../../shared/src/audit';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware } from '../../shared/src/service';
@@ -168,7 +174,7 @@ app.get('/api/v1/settings', authMiddleware, async (req: AuthRequest, res: Respon
   } catch (e) { next(e); }
 });
 
-app.put('/api/v1/settings', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.put('/api/v1/settings', authMiddleware, validate({ body: settingsUpdateBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     // Map nested notifications object to flat fields
     const body = { ...req.body };
@@ -189,7 +195,7 @@ app.put('/api/v1/settings', authMiddleware, async (req: AuthRequest, res: Respon
   } catch (e) { next(e); }
 });
 
-app.put('/api/v1/settings/privacy', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.put('/api/v1/settings/privacy', authMiddleware, validate({ body: privacyUpdateBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const body = req.body;
     // Map frontend keys to correct model fields

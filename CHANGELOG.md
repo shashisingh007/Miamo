@@ -7,7 +7,7 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 ### Security
 - **gateway** Strict CSP: removed `'unsafe-inline'` from `scriptSrc` and `styleSrc`; added `baseUri 'none'` and `formAction 'none'`. Gateway serves JSON+SSE only, so no inline assets are needed.
 - **gateway** Pre-verify JWT format with `/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/` before `jwt.verify()` on both Authorization header and SSE `?token=`. Cheap rejection of malformed probes.
-- **gateway** New per-user rate limiter (`expensiveLimiter`, 20/min) applied to `/api/v1/discover` and `/api/v1/search` to throttle heavy DB/ML queries.
+- **gateway** New per-user rate limiter (`expensiveLimiter`, 20/min) applied to `/api/v1/discover` and `/api/v1/search` to throttle heavy DB/ML queries. New `feedLimiter` (60/min/user) wraps `/api/v1/{feed,stories,videos,creativity}` to bound infinite-scroll scraping.
 - **social** Self-report/self-block/self-unmatch guards on `/api/v1/matches/by-user/:userId/{report,block,DELETE}`.
 - **users** `PUT /api/v1/profiles/me/prompts` now rejects non-array and arrays >10 items.
 - **docker-compose / .env.example** Replaced hardcoded `JWT_SECRET`, `INTERNAL_SERVICE_KEY`, and `POSTGRES_PASSWORD` with `${VAR:?required}` interpolation. Compose now fails fast if `.env` is missing required secrets.
@@ -33,7 +33,8 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 - **auth** `/api/v1/auth/{register,login,refresh}` now use zod schemas instead of hand-rolled `if (!field)` chains. Email is auto-lowercased+trimmed by zod; sanitize() still runs for HTML/control-char stripping.
 - **users** `PUT /api/v1/profiles/me`, `/profiles/me/prompts`, `/profiles/me/interests` validated with zod (`updateProfileBodySchema`, `profilePromptsBodySchema`, `profileInterestsBodySchema`). All field-level length and range checks (age 18-120, height 50-250, bio ≤2000, etc.) now run in middleware.
 - **social** `POST /api/v1/discover/{like,pass,comment}`, `/safety/report`, `/vibe-check` validated with zod.
-- **messaging** `POST /api/v1/messages/chats/:chatId/messages`, `/messages/:id/react`, `/chats/:chatId/theme` validated with zod (`sendMessageBodySchema` caps content at 5000 chars and restricts `type` to a known enum).
+- **messaging** `POST /api/v1/messages/chats/:chatId/messages`, `/messages/:id/react`, `/chats/:chatId/{theme,pin,mute,archive}`, `PUT /api/v1/messages/messages/:id` (edit), `POST /api/v1/beats/start`, `/beats/:id/complete` validated with zod (`sendMessageBodySchema` caps content at 5000 chars and restricts `type` to a known enum; `chatThemeBodySchema` now accepts either `theme` or `background`; pin/mute/archive require boolean toggles).
+- **users** `PUT /api/v1/settings`, `/settings/privacy` validated with zod (`settingsUpdateBodySchema`, `privacyUpdateBodySchema`) — typed boolean toggles and bounded string fields. Server-side whitelist still runs after middleware.
 - **content** `POST /api/v1/feed`, `PUT /api/v1/feed/:id`, `/feed/:id/{react,comments}`, `POST /api/v1/stories`, `/stories/:id/{react,comments}`, `POST /api/v1/videos`, `/videos/:id/{react,comments}` validated with zod. Visibility restricted to enum `everyone|matches|private`.
 - **notifications** `POST /api/v1/notifications/mark-read` validated with zod (`ids` array capped at 500).
 

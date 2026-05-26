@@ -198,6 +198,16 @@ const expensiveLimiter = rateLimit({
   keyGenerator: (req) => (req.headers['x-user-id'] as string) || req.ip || 'unknown',
 });
 
+// Feed/stories/videos/creativity limiter: lighter than discover but still bounded
+// to prevent infinite-scroll abuse and content scraping. 60/min/user.
+const feedLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  message: { error: { message: 'Slow down. Too many feed requests.', code: 'RATE_LIMITED' } },
+  store: sensitiveRedisStore,
+  keyGenerator: (req) => (req.headers['x-user-id'] as string) || req.ip || 'unknown',
+});
+
 // ─── Security: Input Sanitization Middleware ─────────
 function sanitizeHeaders(req: express.Request, _res: express.Response, next: express.NextFunction) {
   // Strip potentially dangerous headers from client requests
@@ -443,10 +453,10 @@ app.use('/api/v1/messages', requireAuth, createProxyMiddleware(proxyTo(SERVICES.
 app.use('/api/v1/beats', requireAuth, createProxyMiddleware(proxyTo(SERVICES.messaging)));
 
 // Content routes (protected)
-app.use('/api/v1/feed', requireAuth, createProxyMiddleware(proxyTo(SERVICES.content)));
-app.use('/api/v1/stories', requireAuth, createProxyMiddleware(proxyTo(SERVICES.content)));
-app.use('/api/v1/videos', requireAuth, createProxyMiddleware(proxyTo(SERVICES.content)));
-app.use('/api/v1/creativity', requireAuth, createProxyMiddleware(proxyTo(SERVICES.content)));
+app.use('/api/v1/feed', requireAuth, feedLimiter, createProxyMiddleware(proxyTo(SERVICES.content)));
+app.use('/api/v1/stories', requireAuth, feedLimiter, createProxyMiddleware(proxyTo(SERVICES.content)));
+app.use('/api/v1/videos', requireAuth, feedLimiter, createProxyMiddleware(proxyTo(SERVICES.content)));
+app.use('/api/v1/creativity', requireAuth, feedLimiter, createProxyMiddleware(proxyTo(SERVICES.content)));
 app.use('/api/v1/matrimonial', requireAuth, createProxyMiddleware(proxyTo(SERVICES.content)));
 
 // Notification routes (protected)

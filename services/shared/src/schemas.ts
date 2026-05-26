@@ -163,9 +163,97 @@ export const messageReactBodySchema = z.object({
   emoji: z.string().min(1).max(8),
 });
 
-export const chatThemeBodySchema = z.object({
-  theme: z.string().min(1).max(40),
+export const chatThemeBodySchema = z
+  .object({
+    theme: z.string().trim().min(1).max(40).optional(),
+    background: z.string().trim().max(200).optional(),
+  })
+  .refine((v) => v.theme !== undefined || v.background !== undefined, {
+    message: 'theme or background is required',
+  });
+
+// Chat boolean toggles (pin/mute/archive)
+export const chatPinBodySchema = z.object({ pinned: z.boolean().optional() });
+export const chatMuteBodySchema = z.object({ muted: z.boolean().optional() });
+export const chatArchiveBodySchema = z.object({ archived: z.boolean().optional() });
+
+// Edit a message (sender only; route enforces ownership)
+export const messageEditBodySchema = z.object({
+  content: z.string().trim().min(1).max(5000),
 });
+
+// Beats
+export const beatStartBodySchema = z.object({
+  matchedUserId: z.string().min(1).max(64),
+});
+export const beatCompleteBodySchema = z.object({
+  type: z.enum(['snap', 'text', 'photo', 'voice', 'video']).optional(),
+  content: z.string().trim().max(1000).optional(),
+});
+
+// Settings (lenient — server still hand-filters fields, but we cap obvious abuse)
+export const settingsUpdateBodySchema = z
+  .object({
+    theme: z.string().max(40).optional(),
+    accentColor: z.string().max(40).optional(),
+    reduceMotion: z.boolean().optional(),
+    highContrast: z.boolean().optional(),
+    readReceipts: z.boolean().optional(),
+    typingIndicator: z.boolean().optional(),
+    onlineStatus: z.boolean().optional(),
+    lastActiveVisible: z.boolean().optional(),
+    whoCanMessage: z.string().max(40).optional(),
+    whoCanSendMedia: z.string().max(40).optional(),
+    whoCanStartBeat: z.string().max(40).optional(),
+    whoCanBroadcast: z.string().max(40).optional(),
+    whoCanVoiceCall: z.string().max(40).optional(),
+    whoCanVideoCall: z.string().max(40).optional(),
+    storyVisibility: z.string().max(40).optional(),
+    feedVisibility: z.string().max(40).optional(),
+    videoVisibility: z.string().max(40).optional(),
+    creativityVisibility: z.string().max(40).optional(),
+    notificationsEnabled: z.boolean().optional(),
+    beatReminders: z.boolean().optional(),
+    messageNotifications: z.boolean().optional(),
+    storyNotifications: z.boolean().optional(),
+    privacyMode: z.boolean().optional(),
+    invisibleMode: z.boolean().optional(),
+    seriousModeEnabled: z.boolean().optional(),
+    aiPersonalization: z.boolean().optional(),
+    notifications: z
+      .object({
+        matches: z.boolean().optional(),
+        messages: z.boolean().optional(),
+        beats: z.boolean().optional(),
+        stories: z.boolean().optional(),
+      })
+      .partial()
+      .optional(),
+  })
+  .passthrough();
+
+export const privacyUpdateBodySchema = z
+  .object({
+    profileVisible: z.boolean().optional(),
+    searchable: z.boolean().optional(),
+    miamoIdSearchable: z.boolean().optional(),
+    nameSearchable: z.boolean().optional(),
+    citySearchable: z.boolean().optional(),
+    hideExactCity: z.boolean().optional(),
+    showApproxCity: z.boolean().optional(),
+    disableSearch: z.boolean().optional(),
+    // frontend aliases (server maps to real fields)
+    searchByName: z.boolean().optional(),
+    searchByMiamoId: z.boolean().optional(),
+    searchByCity: z.boolean().optional(),
+    onlineStatus: z.boolean().optional(),
+    lastActive: z.boolean().optional(),
+    readReceipts: z.boolean().optional(),
+    typingIndicator: z.boolean().optional(),
+    seriousMode: z.boolean().optional(),
+    aiPersonalization: z.boolean().optional(),
+  })
+  .passthrough();
 
 // Content ---------------------------------------------
 export const feedPostBodySchema = z.object({

@@ -7,7 +7,17 @@ import { LRUCache, TTL } from '../../shared/cache';
 import { logger } from '../../shared/src/logger';
 import { errorHandler } from '../../shared/src/errorHandler';
 import { validate } from '../../shared/src/validate';
-import { sendMessageBodySchema, messageReactBodySchema, chatThemeBodySchema } from '../../shared/src/schemas';
+import {
+  sendMessageBodySchema,
+  messageReactBodySchema,
+  chatThemeBodySchema,
+  chatPinBodySchema,
+  chatMuteBodySchema,
+  chatArchiveBodySchema,
+  messageEditBodySchema,
+  beatStartBodySchema,
+  beatCompleteBodySchema,
+} from '../../shared/src/schemas';
 import { idempotency } from '../../shared/src/idempotency';
 import { sanitize } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
@@ -210,7 +220,7 @@ app.post('/api/v1/messages/chats/:chatId/messages', authMiddleware, idempotency(
   } catch (e) { next(e); }
 });
 
-app.put('/api/v1/messages/messages/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.put('/api/v1/messages/messages/:id', authMiddleware, validate({ body: messageEditBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const sanitizedContent = sanitize(req.body.content || '');
     const encContent = encryptMessage(sanitizedContent);
@@ -254,7 +264,7 @@ app.post('/api/v1/messages/messages/:id/react', authMiddleware, validate({ body:
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/messages/chats/:chatId/pin', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/messages/chats/:chatId/pin', authMiddleware, validate({ body: chatPinBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { isMember, chat } = await verifyChatMembership(req.params.chatId, req.userId!);
     if (!chat) return res.status(404).json({ error: { message: 'Not found' } });
@@ -265,7 +275,7 @@ app.post('/api/v1/messages/chats/:chatId/pin', authMiddleware, async (req: AuthR
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/messages/chats/:chatId/mute', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/messages/chats/:chatId/mute', authMiddleware, validate({ body: chatMuteBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { isMember, chat } = await verifyChatMembership(req.params.chatId, req.userId!);
     if (!chat) return res.status(404).json({ error: { message: 'Not found' } });
@@ -276,7 +286,7 @@ app.post('/api/v1/messages/chats/:chatId/mute', authMiddleware, async (req: Auth
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/messages/chats/:chatId/archive', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/messages/chats/:chatId/archive', authMiddleware, validate({ body: chatArchiveBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { isMember, chat } = await verifyChatMembership(req.params.chatId, req.userId!);
     if (!chat) return res.status(404).json({ error: { message: 'Not found' } });
@@ -621,7 +631,7 @@ app.get('/api/v1/beats', authMiddleware, async (req: AuthRequest, res: Response,
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/beats/start', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/beats/start', authMiddleware, validate({ body: beatStartBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { matchedUserId } = req.body;
     const userId = req.userId!;
@@ -636,7 +646,7 @@ app.post('/api/v1/beats/start', authMiddleware, async (req: AuthRequest, res: Re
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/beats/:id/complete', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/beats/:id/complete', authMiddleware, validate({ body: beatCompleteBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
     const beat = await prisma.beat.findUnique({ where: { id: req.params.id } });
