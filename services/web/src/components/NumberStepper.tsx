@@ -4,7 +4,7 @@
 import { Minus, Plus } from 'lucide-react';
 
 export function NumberStepper({
-  value, onChange, min, max, step = 1, suffix, label,
+  value, onChange, min, max, step = 1, suffix, label, ariaLabel,
 }: {
   value: number | undefined;
   onChange: (v: number) => void;
@@ -13,12 +13,13 @@ export function NumberStepper({
   step?: number;
   suffix?: string;
   label?: string;
+  ariaLabel?: string;
 }) {
   const v = typeof value === 'number' && !isNaN(value) ? value : min;
   const clamp = (n: number) => Math.min(max, Math.max(min, n));
   const pct = ((v - min) / (max - min)) * 100;
   return (
-    <div className="w-full">
+    <div className="w-full" role="group" aria-label={ariaLabel ?? label}>
       {label ? <div className="mb-1 text-xs font-medium text-text-secondary">{label}</div> : null}
       <div className="flex items-center gap-2 rounded-2xl border border-token bg-miamo-card px-2 py-2">
         <button type="button" aria-label="decrease" onClick={() => onChange(clamp(v - step))}

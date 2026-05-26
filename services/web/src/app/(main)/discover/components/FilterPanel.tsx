@@ -1,12 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
  ChevronLeft, Check, Zap, MapPin, Heart, Cigarette, Wine,
- Dumbbell, GraduationCap, Dog, Baby, Moon,
+ Dumbbell, GraduationCap, Dog, Baby, Moon, HeartHandshake, ArrowRight,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { api } from '@/lib/api';
 import { type Filters, DEFAULT_FILTERS } from './constants';
 
 export function FilterPanel({
@@ -16,6 +18,8 @@ export function FilterPanel({
  onApply: (f: Filters) => void;
 }) {
  const [local, setLocal] = useState<Filters>(filters);
+ const router = useRouter();
+ const [switchingMode, setSwitchingMode] = useState(false);
  useEffect(() => { if (isOpen) setLocal(filters); }, [isOpen, filters]);
  const set = (key: keyof Filters, val: any) => setLocal(p => ({ ...p, [key]: val }));
  const toggleChip = (key: keyof Filters, val: string) => {
@@ -95,7 +99,7 @@ export function FilterPanel({
  </Section>
  <Section title="Show Me" icon={<span className="text-[10px]">👤</span>}>
  <div className="flex flex-wrap gap-2">
- {['male', 'female', 'nonbinary'].map(g => (
+ {['woman','man','non-binary','transgender woman','transgender man','genderfluid','genderqueer','agender','two-spirit','intersex','other'].map(g => (
  <Chip key={g} label={g.charAt(0).toUpperCase() + g.slice(1)} active={isChipActive('genders', g)} onClick={() => toggleChip('genders', g)} />
  ))}
  </div>
@@ -113,6 +117,25 @@ export function FilterPanel({
  <Chip key={l} label={l.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')} active={isChipActive('lookingFor', l)} onClick={() => toggleChip('lookingFor', l)} />
  ))}
  </div>
+ {isChipActive('lookingFor', 'marriage') && (
+ <motion.div initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }}
+ className="mt-3 rounded-xl border border-violet-300/50 bg-gradient-to-br from-violet-500/10 to-rose-main/10 p-3">
+ <div className="flex items-start gap-2">
+ <HeartHandshake className="mt-0.5 h-4 w-4 shrink-0 text-violet-500" />
+ <div className="flex-1">
+ <div className="text-[12px] font-semibold text-text-primary">Looking for marriage? Switch to DTM.</div>
+ <p className="mt-0.5 text-[11px] text-text-muted">DTM (Date-to-Marry) is the matrimonial-grade flow — family, education, horoscope, partner prefs and access control.</p>
+ <button disabled={switchingMode} onClick={async () => {
+ setSwitchingMode(true);
+ try { await api.updateProfile({ seriousMode: true }); } catch {}
+ router.push('/serious-mode');
+ }} className="mt-2 inline-flex items-center gap-1 rounded-full bg-violet-500 px-3 py-1 text-[11px] font-semibold text-white shadow-button disabled:opacity-50">
+ {switchingMode ? 'Switching…' : <>Take me to DTM <ArrowRight className="h-3 w-3" /></>}
+ </button>
+ </div>
+ </div>
+ </motion.div>
+ )}
  </Section>
  <Section title="Smoking" icon={<Cigarette className="w-3 h-3 text-rose-alt" />}>
  <div className="flex flex-wrap gap-2">

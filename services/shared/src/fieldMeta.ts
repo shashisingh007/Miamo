@@ -32,7 +32,15 @@ export type IconName =
   | 'Fish' | 'Cross' | 'HelpCircle' | 'School' | 'Wrench'
   | 'Coffee' | 'Utensils' | 'ChefHat' | 'Activity' | 'BatteryLow'
   | 'Image' | 'Video' | 'Paintbrush' | 'Award' | 'Zap'
-  | 'Flag' | 'Bookmark' | 'Send';
+  | 'Flag' | 'Bookmark' | 'Send'
+  // v3.2.1 — gender + showcase icons
+  | 'Venus' | 'Mars' | 'NonBinary' | 'CircleDot'
+  | 'Hourglass' | 'Smile' | 'Brain' | 'Headphones'
+  | 'Lightbulb' | 'Sprout' | 'Tv' | 'Tent' | 'Bird'
+  | 'Glasses' | 'Code' | 'Atom' | 'Sailboat' | 'Anchor'
+  | 'Microscope' | 'Stethoscope' | 'Scale' | 'Library'
+  | 'Drum' | 'Guitar' | 'Piano' | 'Disc3'
+  | 'CircleHelp' | 'Asterisk';
 
 export interface FieldMeta {
   key: string;

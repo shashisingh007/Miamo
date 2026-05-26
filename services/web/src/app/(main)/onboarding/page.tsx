@@ -13,7 +13,7 @@ import { IconOptionGrid } from '@/components/IconOptionGrid';
 import { IconChipMulti } from '@/components/IconChipMulti';
 import { NumberStepper, HeightPickerCm } from '@/components/NumberStepper';
 import type { IconName } from '../../../../../shared/src/fieldMeta';
-import { INTEREST_ICONS, iconForOption } from '../../../../../shared/src/optionIcons';
+import { INTEREST_ICONS, iconForOption, GENDER_OPTIONS } from '../../../../../shared/src/optionIcons';
 
 // Icon per bucket card header (v3.2)
 const BUCKET_ICONS: Record<string, IconName> = {
@@ -39,7 +39,7 @@ const LIFESTYLE_DROPDOWNS = {
   drinking: ['never','rarely','socially','often','prefer not to say'],
   smoking:  ['never','rarely','socially','often','prefer not to say'],
   exercise: ['rarely','sometimes','often','daily'],
-  diet:     ['everything','vegetarian','vegan','pescatarian','halal','kosher','jain'],
+  diet:     ['everything','vegetarian','vegan','pescatarian','halal','kosher','jain','eggetarian','gluten-free','keto'],
   religion: ['','agnostic','atheist','spiritual','hindu','muslim','christian','sikh','jain','buddhist','jewish','other'],
   pets:     ['','dogs','cats','both','none','want some day'],
   children: ['','want some day','don\'t want','have & want more','have & don\'t want more','open'],
@@ -242,7 +242,7 @@ export default function OnboardingPage() {
           <span className="text-rose-main">100% — best matches</span>
         </div>
         {isDone ? (
-          <button onClick={() => router.push(completion.dtm ? '/dtm' : '/discover')}
+          <button onClick={() => router.push(completion.dtm ? '/serious-mode' : '/discover')}
             className="mt-4 w-full rounded-xl bg-rose-main py-2.5 text-sm font-medium text-white shadow-button">
             {completion.score >= 100 ? `Continue to ${completion.dtm ? 'DTM' : 'Discover'}` : `Continue to ${completion.dtm ? 'DTM' : 'Discover'} — keep adding for stronger matches`}
           </button>
@@ -353,13 +353,23 @@ function BucketEditor(props: {
   // ─── Casual buckets ─────────────────────────────────────────
   if (bucketKey === 'identity') {
     return (
-      <div className="space-y-3">
-        <label className="block text-xs font-medium">Age
-          <TextInput type="number" min={18} max={99} value={draft.age ?? ''} onChange={e => setDraft({ ...draft, age: parseInt(e.target.value) || '' })} />
-        </label>
-        <label className="block text-xs font-medium">Gender
-          <Select options={['woman','man','non-binary','prefer not to say']} value={draft.gender ?? ''} onChange={v => setDraft({ ...draft, gender: v })} />
-        </label>
+      <div className="space-y-4">
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-text-secondary">Age</div>
+          <NumberStepper value={typeof draft.age === 'number' ? draft.age : 25} min={18} max={99}
+            onChange={n => setDraft({ ...draft, age: n })} ariaLabel="Age" suffix=" yrs" />
+        </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-text-secondary">Gender</div>
+          <IconOptionGrid
+            columns={3}
+            ariaLabel="Gender"
+            value={draft.gender ?? ''}
+            onChange={v => setDraft({ ...draft, gender: v })}
+            options={GENDER_OPTIONS.map(o => ({ value: o, label: o, icon: iconForOption('gender', o) }))}
+          />
+          <p className="mt-2 text-[11px] text-text-muted">More options? <button type="button" onClick={() => setDraft({ ...draft, gender: 'other' })} className="text-rose-main underline">Use “Other”</button> — you can describe yourself in your bio.</p>
+        </div>
         <SaveRow onSave={() => onPatchProfile({ age: draft.age, gender: draft.gender })} />
       </div>
     );
@@ -499,7 +509,13 @@ function BucketEditor(props: {
   if (bucketKey === 'maritalStatus') {
     return (
       <div className="space-y-3">
-        <Select options={MARITAL} value={draft.maritalStatus ?? ''} onChange={v => setDraft({ ...draft, maritalStatus: v })} />
+        <IconOptionGrid
+          columns={2}
+          ariaLabel="Marital status"
+          value={draft.maritalStatus ?? ''}
+          onChange={v => setDraft({ ...draft, maritalStatus: v })}
+          options={MARITAL.map(o => ({ value: o, label: o, icon: iconForOption('maritalStatus', o) }))}
+        />
         <SaveRow onSave={() => onPatchMp({ maritalStatus: draft.maritalStatus })} />
       </div>
     );
@@ -524,36 +540,52 @@ function BucketEditor(props: {
   if (bucketKey === 'community') {
     const castes = CASTES_BY_RELIGION[draft.religion as string] ?? ['Open','Other'];
     return (
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block text-xs font-medium">Religion
-          <Select options={RELIGIONS} value={draft.religion ?? ''} onChange={v => setDraft({ ...draft, religion: v, caste: '' })} />
-        </label>
-        <label className="block text-xs font-medium">Caste / community
-          <Select options={castes} value={draft.caste ?? ''} onChange={v => setDraft({ ...draft, caste: v })} />
-        </label>
-        <label className="block text-xs font-medium">Sub-caste
-          <TextInput value={draft.subCaste ?? ''} onChange={e => setDraft({ ...draft, subCaste: e.target.value })} />
-        </label>
-        <label className="block text-xs font-medium">Manglik
-          <Select options={MANGLIK} value={draft.manglik ?? ''} onChange={v => setDraft({ ...draft, manglik: v })} />
-        </label>
-        <div className="sm:col-span-2"><SaveRow onSave={() => onPatchMp({ religion: draft.religion, caste: draft.caste, subCaste: draft.subCaste, manglik: draft.manglik })} /></div>
+      <div className="space-y-4">
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-text-secondary">Religion</div>
+          <IconOptionGrid columns={3} ariaLabel="Religion"
+            value={draft.religion ?? ''}
+            onChange={v => setDraft({ ...draft, religion: v, caste: '' })}
+            options={RELIGIONS.map(o => ({ value: o, label: o, icon: iconForOption('religionDtm', o) }))} />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-xs font-medium">Caste / community
+            <Select options={castes} value={draft.caste ?? ''} onChange={v => setDraft({ ...draft, caste: v })} />
+          </label>
+          <label className="block text-xs font-medium">Sub-caste
+            <TextInput value={draft.subCaste ?? ''} onChange={e => setDraft({ ...draft, subCaste: e.target.value })} />
+          </label>
+        </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-text-secondary">Manglik</div>
+          <IconOptionGrid columns={2} ariaLabel="Manglik"
+            value={draft.manglik ?? ''}
+            onChange={v => setDraft({ ...draft, manglik: v })}
+            options={MANGLIK.map(o => ({ value: o, label: o, icon: iconForOption('manglik', o) }))} />
+        </div>
+        <SaveRow onSave={() => onPatchMp({ religion: draft.religion, caste: draft.caste, subCaste: draft.subCaste, manglik: draft.manglik })} />
       </div>
     );
   }
   if (bucketKey === 'education') {
     return (
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block text-xs font-medium">Education level
-          <Select options={EDUCATION_LEVELS} value={draft.education ?? ''} onChange={v => setDraft({ ...draft, education: v })} />
-        </label>
-        <label className="block text-xs font-medium">Field / specialisation
-          <TextInput value={draft.educationDetail ?? ''} placeholder="CS, Economics, MBA…" onChange={e => setDraft({ ...draft, educationDetail: e.target.value })} />
-        </label>
-        <label className="block text-xs font-medium sm:col-span-2">College <span className="text-text-muted">(matches only)</span>
-          <TextInput value={draft.college ?? ''} onChange={e => setDraft({ ...draft, college: e.target.value })} />
-        </label>
-        <div className="sm:col-span-2"><SaveRow onSave={() => onPatchMp({ education: draft.education, educationDetail: draft.educationDetail, college: draft.college })} /></div>
+      <div className="space-y-4">
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-text-secondary">Education level</div>
+          <IconOptionGrid columns={3} ariaLabel="Education level"
+            value={draft.education ?? ''}
+            onChange={v => setDraft({ ...draft, education: v })}
+            options={EDUCATION_LEVELS.map(o => ({ value: o, label: o, icon: iconForOption('educationLevel', o) }))} />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-xs font-medium">Field / specialisation
+            <TextInput value={draft.educationDetail ?? ''} placeholder="CS, Economics, MBA…" onChange={e => setDraft({ ...draft, educationDetail: e.target.value })} />
+          </label>
+          <label className="block text-xs font-medium">College <span className="text-text-muted">(matches only)</span>
+            <TextInput value={draft.college ?? ''} onChange={e => setDraft({ ...draft, college: e.target.value })} />
+          </label>
+        </div>
+        <SaveRow onSave={() => onPatchMp({ education: draft.education, educationDetail: draft.educationDetail, college: draft.college })} />
       </div>
     );
   }
@@ -578,23 +610,33 @@ function BucketEditor(props: {
   }
   if (bucketKey === 'family') {
     return (
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block text-xs font-medium">Father\u2019s occupation
-          <TextInput value={draft.fatherOccupation ?? ''} onChange={e => setDraft({ ...draft, fatherOccupation: e.target.value })} />
-        </label>
-        <label className="block text-xs font-medium">Family type
-          <Select options={FAMILY_TYPES} value={draft.familyType ?? ''} onChange={v => setDraft({ ...draft, familyType: v })} />
-        </label>
-        <label className="block text-xs font-medium">Family values
-          <Select options={FAMILY_VALUES} value={draft.familyValues ?? ''} onChange={v => setDraft({ ...draft, familyValues: v })} />
-        </label>
-        <label className="block text-xs font-medium">Brothers
-          <TextInput type="number" min={0} max={10} value={draft.brothers ?? 0} onChange={e => setDraft({ ...draft, brothers: parseInt(e.target.value) || 0 })} />
-        </label>
-        <label className="block text-xs font-medium">Sisters
-          <TextInput type="number" min={0} max={10} value={draft.sisters ?? 0} onChange={e => setDraft({ ...draft, sisters: parseInt(e.target.value) || 0 })} />
-        </label>
-        <div className="sm:col-span-2"><SaveRow onSave={() => onPatchMp({ fatherOccupation: draft.fatherOccupation, familyType: draft.familyType, familyValues: draft.familyValues, brothers: draft.brothers, sisters: draft.sisters })} /></div>
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-xs font-medium">Father’s occupation
+            <TextInput value={draft.fatherOccupation ?? ''} onChange={e => setDraft({ ...draft, fatherOccupation: e.target.value })} />
+          </label>
+          <label className="block text-xs font-medium">Brothers
+            <NumberStepper value={draft.brothers ?? 0} min={0} max={10} ariaLabel="Brothers" onChange={n => setDraft({ ...draft, brothers: n })} />
+          </label>
+          <label className="block text-xs font-medium">Sisters
+            <NumberStepper value={draft.sisters ?? 0} min={0} max={10} ariaLabel="Sisters" onChange={n => setDraft({ ...draft, sisters: n })} />
+          </label>
+        </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-text-secondary">Family type</div>
+          <IconOptionGrid columns={3} ariaLabel="Family type"
+            value={draft.familyType ?? ''}
+            onChange={v => setDraft({ ...draft, familyType: v })}
+            options={FAMILY_TYPES.map(o => ({ value: o, label: o, icon: iconForOption('familyType', o) }))} />
+        </div>
+        <div>
+          <div className="mb-1.5 text-xs font-medium text-text-secondary">Family values</div>
+          <IconOptionGrid columns={3} ariaLabel="Family values"
+            value={draft.familyValues ?? ''}
+            onChange={v => setDraft({ ...draft, familyValues: v })}
+            options={FAMILY_VALUES.map(o => ({ value: o, label: o, icon: iconForOption('familyValues', o) }))} />
+        </div>
+        <SaveRow onSave={() => onPatchMp({ fatherOccupation: draft.fatherOccupation, familyType: draft.familyType, familyValues: draft.familyValues, brothers: draft.brothers, sisters: draft.sisters })} />
       </div>
     );
   }
@@ -621,69 +663,142 @@ function BucketEditor(props: {
     );
   }
   if (bucketKey === 'partnerPrefs') {
+    const partnerReligions = ['Any', ...RELIGIONS];
+    const partnerEdu       = ['Any', ...EDUCATION_LEVELS];
+    const partnerManglikO  = ['Any', ...MANGLIK];
+    const partnerMaritalO  = ['Any', ...MARITAL];
+    const partnerDietO     = ['Any','Vegetarian','Vegan','Non-vegetarian','Eggetarian','Jain'];
+    const partnerSmokO     = ['Any','never','rarely','socially','often'];
+    const partnerDrinkO    = ['Any','never','rarely','socially','often'];
+    const partnerFamTypeO  = ['Any', ...FAMILY_TYPES];
+    const partnerFamValO   = ['Any', ...FAMILY_VALUES];
+    const relocateO        = ['yes','no','open'];
+    const childrenO        = ['Any','want some',"don\u2019t want",'have & want more',"have & don\u2019t want more",'open'];
+    const Group = ({ label, children }: { label: string; children: React.ReactNode }) => (
+      <div>
+        <div className="mb-1.5 text-xs font-medium text-text-secondary">{label}</div>
+        {children}
+      </div>
+    );
     return (
-      <div className="grid gap-3 sm:grid-cols-2">
-        <label className="block text-xs font-medium">Min age
-          <TextInput type="number" min={18} max={99} value={draft.partnerAgeMin ?? 21} onChange={e => setDraft({ ...draft, partnerAgeMin: parseInt(e.target.value) || 21 })} />
-        </label>
-        <label className="block text-xs font-medium">Max age
-          <TextInput type="number" min={18} max={99} value={draft.partnerAgeMax ?? 35} onChange={e => setDraft({ ...draft, partnerAgeMax: parseInt(e.target.value) || 35 })} />
-        </label>
-        <label className="block text-xs font-medium">Min height
-          <Select options={HEIGHTS} value={draft.partnerHeightMin ?? ''} onChange={v => setDraft({ ...draft, partnerHeightMin: v })} />
-        </label>
-        <label className="block text-xs font-medium">Max height
-          <Select options={HEIGHTS} value={draft.partnerHeightMax ?? ''} onChange={v => setDraft({ ...draft, partnerHeightMax: v })} />
-        </label>
-        <label className="block text-xs font-medium">Partner religion
-          <Select options={['Any', ...RELIGIONS]} value={draft.partnerReligion ?? ''} onChange={v => setDraft({ ...draft, partnerReligion: v })} />
-        </label>
-        <label className="block text-xs font-medium">Partner caste
-          <TextInput value={draft.partnerCaste ?? ''} placeholder="Any / specific" onChange={e => setDraft({ ...draft, partnerCaste: e.target.value })} />
-        </label>
-        <label className="block text-xs font-medium">Partner mother tongue
-          <Select options={['Any', ...MOTHER_TONGUES]} value={draft.partnerMotherTongue ?? ''} onChange={v => setDraft({ ...draft, partnerMotherTongue: v })} />
-        </label>
-        <label className="block text-xs font-medium">Manglik preference
-          <Select options={['Any', ...MANGLIK]} value={draft.partnerManglik ?? ''} onChange={v => setDraft({ ...draft, partnerManglik: v })} />
-        </label>
-        <label className="block text-xs font-medium">Marital status
-          <Select options={['Any', ...MARITAL]} value={draft.partnerMaritalStatus ?? ''} onChange={v => setDraft({ ...draft, partnerMaritalStatus: v })} />
-        </label>
-        <label className="block text-xs font-medium">Partner education
-          <Select options={['Any', ...EDUCATION_LEVELS]} value={draft.partnerEducation ?? ''} onChange={v => setDraft({ ...draft, partnerEducation: v })} />
-        </label>
-        <label className="block text-xs font-medium">Partner occupation
-          <TextInput value={draft.partnerOccupation ?? ''} placeholder="Any / specific" onChange={e => setDraft({ ...draft, partnerOccupation: e.target.value })} />
-        </label>
-        <label className="block text-xs font-medium">Partner income (annual)
-          <Select options={['Any', ...INCOME_BANDS]} value={draft.partnerIncome ?? ''} onChange={v => setDraft({ ...draft, partnerIncome: v })} />
-        </label>
-        <label className="block text-xs font-medium">Partner diet
-          <Select options={['Any','Vegetarian','Vegan','Non-vegetarian','Eggetarian','Jain']} value={draft.partnerDiet ?? ''} onChange={v => setDraft({ ...draft, partnerDiet: v })} />
-        </label>
-        <label className="block text-xs font-medium">Partner smoking
-          <Select options={['Any','never','rarely','socially','often']} value={draft.partnerSmoking ?? ''} onChange={v => setDraft({ ...draft, partnerSmoking: v })} />
-        </label>
-        <label className="block text-xs font-medium">Partner drinking
-          <Select options={['Any','never','rarely','socially','often']} value={draft.partnerDrinking ?? ''} onChange={v => setDraft({ ...draft, partnerDrinking: v })} />
-        </label>
-        <label className="block text-xs font-medium">Family type preference
-          <Select options={['Any', ...FAMILY_TYPES]} value={draft.partnerFamilyType ?? ''} onChange={v => setDraft({ ...draft, partnerFamilyType: v })} />
-        </label>
-        <label className="block text-xs font-medium">Family values preference
-          <Select options={['Any', ...FAMILY_VALUES]} value={draft.partnerFamilyValues ?? ''} onChange={v => setDraft({ ...draft, partnerFamilyValues: v })} />
-        </label>
-        <label className="block text-xs font-medium sm:col-span-2">Preferred cities (comma separated)
-          <TextInput value={draft.partnerLocations ?? ''} placeholder="Bengaluru, Mumbai, Pune" onChange={e => setDraft({ ...draft, partnerLocations: e.target.value })} />
-        </label>
-        <label className="block text-xs font-medium">Open to relocate?
-          <Select options={['yes','no','open']} value={draft.partnerRelocate ?? ''} onChange={v => setDraft({ ...draft, partnerRelocate: v })} />
-        </label>
-        <label className="block text-xs font-medium">Kids stance
-          <Select options={['Any','want some','don\u2019t want','have & want more','have & don\u2019t want more','open']} value={draft.partnerChildren ?? ''} onChange={v => setDraft({ ...draft, partnerChildren: v })} />
-        </label>
-        <div className="sm:col-span-2"><SaveRow onSave={() => onPatchMp({
+      <div className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Group label="Min age">
+            <NumberStepper value={typeof draft.partnerAgeMin === 'number' ? draft.partnerAgeMin : 21}
+              min={18} max={70} ariaLabel="Min age" suffix=" yrs"
+              onChange={n => setDraft({ ...draft, partnerAgeMin: n })} />
+          </Group>
+          <Group label="Max age">
+            <NumberStepper value={typeof draft.partnerAgeMax === 'number' ? draft.partnerAgeMax : 35}
+              min={18} max={70} ariaLabel="Max age" suffix=" yrs"
+              onChange={n => setDraft({ ...draft, partnerAgeMax: n })} />
+          </Group>
+          <label className="block text-xs font-medium">Min height
+            <Select options={HEIGHTS} value={draft.partnerHeightMin ?? ''} onChange={v => setDraft({ ...draft, partnerHeightMin: v })} />
+          </label>
+          <label className="block text-xs font-medium">Max height
+            <Select options={HEIGHTS} value={draft.partnerHeightMax ?? ''} onChange={v => setDraft({ ...draft, partnerHeightMax: v })} />
+          </label>
+        </div>
+
+        <Group label="Religion">
+          <IconOptionGrid columns={3} ariaLabel="Partner religion"
+            value={draft.partnerReligion ?? ''}
+            onChange={v => setDraft({ ...draft, partnerReligion: v })}
+            options={partnerReligions.map(o => ({ value: o, label: o, icon: iconForOption('religionDtm', o) }))} />
+        </Group>
+
+        <Group label="Manglik preference">
+          <IconOptionGrid columns={3} ariaLabel="Manglik"
+            value={draft.partnerManglik ?? ''}
+            onChange={v => setDraft({ ...draft, partnerManglik: v })}
+            options={partnerManglikO.map(o => ({ value: o, label: o, icon: iconForOption('manglik', o) }))} />
+        </Group>
+
+        <Group label="Marital status">
+          <IconOptionGrid columns={3} ariaLabel="Marital status"
+            value={draft.partnerMaritalStatus ?? ''}
+            onChange={v => setDraft({ ...draft, partnerMaritalStatus: v })}
+            options={partnerMaritalO.map(o => ({ value: o, label: o, icon: iconForOption('maritalStatus', o) }))} />
+        </Group>
+
+        <Group label="Education">
+          <IconOptionGrid columns={3} ariaLabel="Partner education"
+            value={draft.partnerEducation ?? ''}
+            onChange={v => setDraft({ ...draft, partnerEducation: v })}
+            options={partnerEdu.map(o => ({ value: o, label: o, icon: iconForOption('educationLevel', o) }))} />
+        </Group>
+
+        <Group label="Diet">
+          <IconOptionGrid columns={3} ariaLabel="Partner diet"
+            value={draft.partnerDiet ?? ''}
+            onChange={v => setDraft({ ...draft, partnerDiet: v })}
+            options={partnerDietO.map(o => ({ value: o, label: o, icon: iconForOption('diet', o) }))} />
+        </Group>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Group label="Smoking">
+            <IconOptionGrid columns={2} ariaLabel="Partner smoking"
+              value={draft.partnerSmoking ?? ''}
+              onChange={v => setDraft({ ...draft, partnerSmoking: v })}
+              options={partnerSmokO.map(o => ({ value: o, label: o, icon: iconForOption('partnerSmoking', o) }))} />
+          </Group>
+          <Group label="Drinking">
+            <IconOptionGrid columns={2} ariaLabel="Partner drinking"
+              value={draft.partnerDrinking ?? ''}
+              onChange={v => setDraft({ ...draft, partnerDrinking: v })}
+              options={partnerDrinkO.map(o => ({ value: o, label: o, icon: iconForOption('partnerDrinking', o) }))} />
+          </Group>
+        </div>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Group label="Family type">
+            <IconOptionGrid columns={2} ariaLabel="Family type"
+              value={draft.partnerFamilyType ?? ''}
+              onChange={v => setDraft({ ...draft, partnerFamilyType: v })}
+              options={partnerFamTypeO.map(o => ({ value: o, label: o, icon: iconForOption('familyType', o) }))} />
+          </Group>
+          <Group label="Family values">
+            <IconOptionGrid columns={2} ariaLabel="Family values"
+              value={draft.partnerFamilyValues ?? ''}
+              onChange={v => setDraft({ ...draft, partnerFamilyValues: v })}
+              options={partnerFamValO.map(o => ({ value: o, label: o, icon: iconForOption('familyValues', o) }))} />
+          </Group>
+        </div>
+
+        <Group label="Kids stance">
+          <IconOptionGrid columns={3} ariaLabel="Children"
+            value={draft.partnerChildren ?? ''}
+            onChange={v => setDraft({ ...draft, partnerChildren: v })}
+            options={childrenO.map(o => ({ value: o, label: o, icon: iconForOption('partnerChildren', o) }))} />
+        </Group>
+
+        <Group label="Open to relocate?">
+          <IconOptionGrid columns={3} ariaLabel="Relocate"
+            value={draft.partnerRelocate ?? ''}
+            onChange={v => setDraft({ ...draft, partnerRelocate: v })}
+            options={relocateO.map(o => ({ value: o, label: o, icon: iconForOption('relocate', o) }))} />
+        </Group>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block text-xs font-medium">Partner caste
+            <TextInput value={draft.partnerCaste ?? ''} placeholder="Any / specific" onChange={e => setDraft({ ...draft, partnerCaste: e.target.value })} />
+          </label>
+          <label className="block text-xs font-medium">Partner mother tongue
+            <Select options={['Any', ...MOTHER_TONGUES]} value={draft.partnerMotherTongue ?? ''} onChange={v => setDraft({ ...draft, partnerMotherTongue: v })} />
+          </label>
+          <label className="block text-xs font-medium">Partner occupation
+            <TextInput value={draft.partnerOccupation ?? ''} placeholder="Any / specific" onChange={e => setDraft({ ...draft, partnerOccupation: e.target.value })} />
+          </label>
+          <label className="block text-xs font-medium">Partner income (annual)
+            <Select options={['Any', ...INCOME_BANDS]} value={draft.partnerIncome ?? ''} onChange={v => setDraft({ ...draft, partnerIncome: v })} />
+          </label>
+          <label className="block text-xs font-medium sm:col-span-2">Preferred cities (comma separated)
+            <TextInput value={draft.partnerLocations ?? ''} placeholder="Bengaluru, Mumbai, Pune" onChange={e => setDraft({ ...draft, partnerLocations: e.target.value })} />
+          </label>
+        </div>
+
+        <SaveRow onSave={() => onPatchMp({
           partnerAgeMin: draft.partnerAgeMin, partnerAgeMax: draft.partnerAgeMax,
           partnerHeightMin: draft.partnerHeightMin, partnerHeightMax: draft.partnerHeightMax,
           partnerReligion: draft.partnerReligion, partnerCaste: draft.partnerCaste,
@@ -695,7 +810,7 @@ function BucketEditor(props: {
           partnerFamilyType: draft.partnerFamilyType, partnerFamilyValues: draft.partnerFamilyValues,
           partnerLocations: draft.partnerLocations, partnerRelocate: draft.partnerRelocate,
           partnerChildren: draft.partnerChildren,
-        })} /></div>
+        })} />
       </div>
     );
   }
