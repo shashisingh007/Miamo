@@ -44,8 +44,8 @@ function ComposeBox({ onPost }: { onPost: () => void }) {
  className="input-premium w-full resize-none text-sm min-h-[60px]" rows={2} />
  <div className="flex items-center justify-between mt-3">
  <div className="flex gap-1">
- <Button variant="ghost" size="icon-sm" title="Attach image" onClick={() => alert('Image upload coming in next update!')}><Image className="w-4 h-4" /></Button>
- <Button variant="ghost" size="icon-sm" title="Attach video" onClick={() => alert('Video attachment coming soon!')}><Video className="w-4 h-4" /></Button>
+ <Button variant="ghost" size="icon-sm" title="Attach image" onClick={() => toast.info('Coming soon', 'Image uploads land in the next update.')}><Image className="w-4 h-4" /></Button>
+ <Button variant="ghost" size="icon-sm" title="Attach video" onClick={() => toast.info('Coming soon', 'Video attachments land in the next update.')}><Video className="w-4 h-4" /></Button>
  <Button variant="ghost" size="icon-sm" title="Date idea" onClick={() => setContent(c => c + (c ? '\n' : '') + '💡 Date idea: ')}><Lightbulb className="w-4 h-4" /></Button>
  <Button variant="ghost" size="icon-sm" title="Add emoji" onClick={() => setContent(c => c + '❤️')}><Smile className="w-4 h-4" /></Button>
  </div>
