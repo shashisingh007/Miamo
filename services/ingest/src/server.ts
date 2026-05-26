@@ -23,6 +23,17 @@ import { EnvelopeSchema } from './validate';
 import { hashUid } from './hash';
 import { pushEvents, closeStream, type StreamRecord } from './stream';
 
+// In-process counters exposed at /metrics in Prometheus text format.
+// Lightweight and dependency-free — we don't need full prom-client here.
+const counters = {
+  requests_total: 0,
+  events_accepted_total: 0,
+  events_dropped_total: 0,
+  kill_total: 0,
+  dnt_total: 0,
+  invalid_total: 0,
+};
+
 const PORT = Number(process.env.PORT || 3260);
 const KILL = process.env.TRACKING_KILL === '1';
 
@@ -63,12 +74,14 @@ app.get('/v1/track/healthz', (_req, res) => {
 
 // ── ingest ────────────────────────────────────────────────────────────────
 app.post('/v1/track', perDeviceLimiter, async (req, res) => {
+  counters.requests_total += 1;
   // Kill switch & DNT — short-circuit before parsing.
-  if (KILL) return res.status(204).end();
-  if (req.headers['dnt'] === '1') return res.status(204).end();
+  if (KILL) { counters.kill_total += 1; return res.status(204).end(); }
+  if (req.headers['dnt'] === '1') { counters.dnt_total += 1; return res.status(204).end(); }
 
   const parsed = EnvelopeSchema.safeParse(req.body);
   if (!parsed.success) {
+    counters.invalid_total += 1;
     // Don't reflect parser errors — just 204. This keeps the surface boring.
     return res.status(204).end();
   }
@@ -100,8 +113,21 @@ app.post('/v1/track', perDeviceLimiter, async (req, res) => {
   }));
 
   // Fire-and-forget; never block the response on Redis.
-  pushEvents(records).catch(() => undefined);
+  counters.events_accepted_total += records.length;
+  pushEvents(records).then((n) => {
+    if (n < records.length) counters.events_dropped_total += (records.length - n);
+  }).catch(() => { counters.events_dropped_total += records.length; });
   return res.status(204).end();
+});
+
+// ── metrics ───────────────────────────────────────────────────────────────
+app.get('/metrics', (_req, res) => {
+  const lines: string[] = [];
+  for (const [k, v] of Object.entries(counters)) {
+    lines.push(`# TYPE miamo_ingest_${k} counter`);
+    lines.push(`miamo_ingest_${k} ${v}`);
+  }
+  res.type('text/plain; version=0.0.4').send(lines.join('\n') + '\n');
 });
 
 // ── right to erasure ──────────────────────────────────────────────────────

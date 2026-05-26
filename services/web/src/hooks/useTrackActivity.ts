@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
+import { track as mioTrack } from '@/lib/track';
 
 // ─── Session ID (persisted per browser tab) ──────────
 let _sessionId: string | null = null;
@@ -42,6 +43,11 @@ function flushQueue() {
 
 function enqueue(action: string, targetType: string, targetId?: string, metadata?: Record<string, any>, durationMs?: number) {
  _eventQueue.push({ action, targetType, targetId, metadata, durationMs });
+ // Bridge to v3.1 tracking pipeline (silent no-op until user grants consent
+ // and NEXT_PUBLIC_TRACKING_ENABLED=1). This means every legacy-instrumented
+ // action — discover swipe, message open, page view, dwell — flows into the
+ // new aggregator without per-call-site changes.
+ try { mioTrack(`legacy.${action}`, { tt: targetType, tid: targetId, d: durationMs, ...(metadata || {}) }); } catch { /* never break user flow */ }
  if (_eventQueue.length >= BATCH_SIZE) {
  flushQueue();
  } else if (!_flushTimer) {

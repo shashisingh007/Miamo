@@ -13,6 +13,8 @@ import { installRoute } from './collectors/route';
 import { installVisibility } from './collectors/visibility';
 import { installErrors } from './collectors/errors';
 import { installAutotrack } from './collectors/autotrack';
+import { installForms } from './collectors/forms';
+import { installPerf } from './collectors/perf';
 import { hasConsent, readConsent, writeConsent, type ConsentScope, type ConsentState } from './consent';
 import { setUid } from './envelope';
 import type { TrackEvent } from './types';
@@ -106,6 +108,8 @@ export function mount(): void {
   state.uninstallers.push(installScroll(emit));
   state.uninstallers.push(installCursor(emit));
   state.uninstallers.push(installAutotrack(emit));
+  state.uninstallers.push(installForms(emit));
+  state.uninstallers.push(installPerf(emit));
   state.uninstallers.push(installErrors(emit));
 
   state.mounted = true;

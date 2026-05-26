@@ -12,6 +12,7 @@ import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useTrackPageView, useTrackActivity, useTrackScrollDepth, useTrackPhotoViews } from '@/hooks/useTrackActivity';
+import { track } from '@/lib/track';
 import { type DiscoverProfile, type AiData, type Filters, DEFAULT_FILTERS } from './components/constants';
 import { FilterPanel } from './components/FilterPanel';
 import { ProfileCard } from './components/ProfileCard';
@@ -99,6 +100,7 @@ export default function DiscoverPage() {
  const passedUser = profiles[currentIndex];
  if (passedUser) {
  trackActivity('pass', 'profile', passedUser.id);
+ track('discover.swipe', { dir: 'left', tt: 'profile', tid: passedUser.id });
  api.passUser(passedUser.id).catch(() => {});
  const newCount = passCount + 1;
  setPassCount(newCount);
@@ -114,6 +116,7 @@ export default function DiscoverPage() {
  const handleMove = async (message: string, targetType: string, targetId?: string) => {
  if (!currentUser) return;
  trackActivity('like', 'profile', currentUser.id);
+ track('discover.swipe', { dir: 'right', tt: 'profile', tid: currentUser.id, hasMessage: !!message });
  try {
  await api.sendMiamoMove(currentUser.id, message, targetType, targetId);
  toast.love('Move sent!', `Your move to ${currentUser.displayName} was delivered`);
@@ -127,6 +130,7 @@ export default function DiscoverPage() {
  const handleSuperLike = async () => {
  if (!currentUser) return;
  trackActivity('super_like', 'profile', currentUser.id);
+ track('discover.swipe', { dir: 'super', tt: 'profile', tid: currentUser.id });
  try { await api.superLikeUser(currentUser.id); toast.love('Super Like!', `${currentUser.displayName} will see your Super Like`); } catch { toast.error('Super Like failed'); }
  if (currentIndex < profiles.length - 1) setCurrentIndex(i => i + 1);
  else setProfiles([]);
