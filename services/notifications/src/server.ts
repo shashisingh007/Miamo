@@ -2,6 +2,8 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { logger } from '../../shared/src/logger';
 import { errorHandler } from '../../shared/src/errorHandler';
+import { validate } from '../../shared/src/validate';
+import { markReadBodySchema } from '../../shared/src/schemas';
 import { sanitize } from '../../shared/src/sanitize';
 import { env } from '../../shared/src/env';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware, createPushToUser } from '../../shared/src/service';
@@ -56,7 +58,7 @@ app.post('/api/v1/notifications/read-all', authMiddleware, async (req: AuthReque
 });
 
 // Bulk mark-read by IDs
-app.post('/api/v1/notifications/mark-read', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/notifications/mark-read', authMiddleware, validate({ body: markReadBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { ids } = req.body;
     if (ids && Array.isArray(ids) && ids.length > 0) {

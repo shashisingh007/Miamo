@@ -5,6 +5,8 @@ import { LRUCache, MinHeap, TTL, feedCache, activityCache } from '../../shared/c
 import { scoreFeedItem, scoreDtm, scoreDtmEnhanced, type FeedItem, type FeedUserProfile, type DtmUser, type DtmCandidate } from '../../shared/algorithms';
 import { logger } from '../../shared/src/logger';
 import { errorHandler } from '../../shared/src/errorHandler';
+import { validate } from '../../shared/src/validate';
+import { feedPostBodySchema, feedPostUpdateBodySchema, reactionBodySchema, commentBodySchema, storyBodySchema, storyReactBodySchema, videoBodySchema } from '../../shared/src/schemas';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware } from '../../shared/src/service';
@@ -46,7 +48,7 @@ app.get('/api/v1/feed', authMiddleware, async (req: AuthRequest, res: Response, 
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/feed', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/feed', authMiddleware, validate({ body: feedPostBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { type, content: rawContent, mediaUrl, visibility } = req.body;
     const content = sanitize(rawContent || '');
@@ -59,7 +61,7 @@ app.post('/api/v1/feed', authMiddleware, async (req: AuthRequest, res: Response,
   } catch (e) { next(e); }
 });
 
-app.put('/api/v1/feed/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.put('/api/v1/feed/:id', authMiddleware, validate({ body: feedPostUpdateBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const post = await prisma.feedPost.update({ where: { id: req.params.id, authorId: req.userId }, data: { content: sanitize(req.body.content || ''), type: req.body.type, visibility: req.body.visibility } });
     res.json({ data: post });
@@ -70,7 +72,7 @@ app.delete('/api/v1/feed/:id', authMiddleware, async (req: AuthRequest, res: Res
   try { await prisma.feedPost.delete({ where: { id: req.params.id, authorId: req.userId } }); auditLog(prisma, req.userId!, 'feed_post_delete', { postId: req.params.id }); res.json({ data: { success: true } }); } catch (e) { next(e); }
 });
 
-app.post('/api/v1/feed/:id/react', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/feed/:id/react', authMiddleware, validate({ body: reactionBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const existing = await prisma.feedReaction.findUnique({ where: { postId_userId: { postId: req.params.id, userId: req.userId! } } });
     if (existing) { await prisma.feedReaction.delete({ where: { id: existing.id } }); res.json({ data: { liked: false } }); }
@@ -82,7 +84,7 @@ app.post('/api/v1/feed/:id/react', authMiddleware, async (req: AuthRequest, res:
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/feed/:id/comments', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/feed/:id/comments', authMiddleware, validate({ body: commentBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const comment = await prisma.feedComment.create({ data: { postId: req.params.id, authorId: req.userId!, content: sanitize(req.body.content || '') }, include: { author: { select: { id: true, displayName: true, username: true } } } });
     res.json({ data: comment });
@@ -179,7 +181,7 @@ app.get('/api/v1/stories/mine', authMiddleware, async (req: AuthRequest, res: Re
 });
 
 // POST /api/v1/stories — Create story (with background color support)
-app.post('/api/v1/stories', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/stories', authMiddleware, validate({ body: storyBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { type, content: rawStoryContent, mediaUrl, visibility, expiresInHours, background } = req.body;
     const content = sanitize(rawStoryContent || '');
@@ -222,7 +224,7 @@ app.post('/api/v1/stories/:id/like', authMiddleware, async (req: AuthRequest, re
 });
 
 // POST /api/v1/stories/:id/react — Legacy reaction (still supported)
-app.post('/api/v1/stories/:id/react', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/stories/:id/react', authMiddleware, validate({ body: storyReactBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     await prisma.storyView.upsert({ where: { storyId_viewerId: { storyId: req.params.id, viewerId: req.userId! } }, create: { storyId: req.params.id, viewerId: req.userId!, reaction: req.body.reaction }, update: { reaction: req.body.reaction } });
     res.json({ data: { success: true } });
@@ -248,7 +250,7 @@ app.get('/api/v1/stories/:id/comments', authMiddleware, async (req: AuthRequest,
 });
 
 // POST /api/v1/stories/:id/comments — Add comment (only matched users)
-app.post('/api/v1/stories/:id/comments', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/stories/:id/comments', authMiddleware, validate({ body: commentBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
     const story = await prisma.story.findUnique({ where: { id: req.params.id }, select: { authorId: true } });
@@ -346,7 +348,7 @@ app.get('/api/v1/videos', authMiddleware, async (req: AuthRequest, res: Response
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/videos', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/videos', authMiddleware, validate({ body: videoBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { title: rawTitle, description: rawDescription, url, thumbnailUrl, category, visibility } = req.body;
     const title = sanitize(rawTitle || '');
@@ -356,7 +358,7 @@ app.post('/api/v1/videos', authMiddleware, async (req: AuthRequest, res: Respons
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/videos/:id/react', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/videos/:id/react', authMiddleware, validate({ body: reactionBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const existing = await prisma.videoReaction.findUnique({ where: { videoId_userId: { videoId: req.params.id, userId: req.userId! } } });
     if (existing) { await prisma.videoReaction.delete({ where: { id: existing.id } }); res.json({ data: { liked: false } }); }
@@ -364,7 +366,7 @@ app.post('/api/v1/videos/:id/react', authMiddleware, async (req: AuthRequest, re
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/videos/:id/comments', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/videos/:id/comments', authMiddleware, validate({ body: commentBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const comment = await prisma.videoComment.create({ data: { videoId: req.params.id, authorId: req.userId!, content: sanitize(req.body.content || '') }, include: { author: { select: { id: true, displayName: true } } } });
     trackActivity(prisma, req.userId!, 'comment', 'video', req.params.id);

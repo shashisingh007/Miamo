@@ -32,6 +32,11 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 - **users** `PUT /api/v1/profiles/me`, `/profiles/me/prompts`, `/profiles/me/interests` validated with zod (`updateProfileBodySchema`, `profilePromptsBodySchema`, `profileInterestsBodySchema`). All field-level length and range checks (age 18-120, height 50-250, bio ≤2000, etc.) now run in middleware.
 - **social** `POST /api/v1/discover/{like,pass,comment}`, `/safety/report`, `/vibe-check` validated with zod.
 - **messaging** `POST /api/v1/messages/chats/:chatId/messages`, `/messages/:id/react`, `/chats/:chatId/theme` validated with zod (`sendMessageBodySchema` caps content at 5000 chars and restricts `type` to a known enum).
+- **content** `POST /api/v1/feed`, `PUT /api/v1/feed/:id`, `/feed/:id/{react,comments}`, `POST /api/v1/stories`, `/stories/:id/{react,comments}`, `POST /api/v1/videos`, `/videos/:id/{react,comments}` validated with zod. Visibility restricted to enum `everyone|matches|private`.
+- **notifications** `POST /api/v1/notifications/mark-read` validated with zod (`ids` array capped at 500).
+
+### Idempotency
+- **shared** New `services/shared/src/idempotency.ts` middleware. When the caller sends an `Idempotency-Key` header (8-128 chars of `[A-Za-z0-9_-]`), atomically reserves the key per-user in Redis with `SET key 1 NX EX 86400`. Collisions return 409 `IDEMPOTENCY_REPLAY`. Fails open if `REDIS_URL` is not set or Redis is unreachable, so the middleware never hard-blocks writes. Currently mounted on `POST /api/v1/messages/chats/:chatId/messages` and `POST /api/v1/discover/like` as the two highest-value duplicate-prone endpoints.
 
 ### Tracing
 - **shared** New `services/shared/src/requestId.ts` middleware auto-mounted via `applyBaseMiddleware` and the gateway. Mints a UUID for each request (or echoes a safe incoming `X-Request-Id`), attaches to `req.id`, sets `X-Request-Id` response header, and the gateway forwards it to downstream services. Now surfaced in `errorHandler` response envelopes and 5xx log lines.
@@ -41,7 +46,7 @@ All notable changes are documented here. Follows [Keep a Changelog](https://keep
 
 ### Testing
 - **repo** Added Vitest 2 + supertest 7. Root `vitest.config.ts` excludes `services/web/**` (Next.js has its own test setup). Scripts: `npm test`, `npm run test:watch`, `npm run test:coverage` (python suite moved to `npm run test:python`).
-- **shared** 26 unit tests covering `schemas.ts` (11), `validate.ts` (4), `errorHandler.ts` (4 incl. Prisma P2003 mapping + production message masking), and `requestId.ts` (4 incl. malicious-header rejection). All passing.
+- **shared** 30 unit tests covering `schemas.ts` (11), `validate.ts` (4), `errorHandler.ts` (4), `requestId.ts` (4), and `idempotency.ts` (4 incl. malformed-key 400, no-Redis fail-open). All passing.
 
 ## [3.0.0]
 Initial backend-hardening + responsive frontend release. See git history for details.

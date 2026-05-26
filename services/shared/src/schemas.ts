@@ -166,3 +166,53 @@ export const messageReactBodySchema = z.object({
 export const chatThemeBodySchema = z.object({
   theme: z.string().min(1).max(40),
 });
+
+// Content ---------------------------------------------
+export const feedPostBodySchema = z.object({
+  type: z.string().max(40).optional(),
+  content: z.string().trim().max(5000).optional(),
+  mediaUrl: z.string().trim().max(2048).optional().nullable(),
+  visibility: z.enum(['everyone', 'matches', 'private']).optional(),
+});
+
+export const feedPostUpdateBodySchema = z.object({
+  type: z.string().max(40).optional(),
+  content: z.string().trim().max(5000).optional(),
+  visibility: z.enum(['everyone', 'matches', 'private']).optional(),
+});
+
+export const reactionBodySchema = z.object({
+  type: z.string().trim().max(40).optional(),
+});
+
+export const commentBodySchema = z.object({
+  content: z.string().trim().min(1).max(2000),
+  parentId: z.string().max(64).optional().nullable(),
+});
+
+export const storyBodySchema = z.object({
+  type: z.string().max(40).optional(),
+  content: z.string().trim().max(5000).optional(),
+  mediaUrl: z.string().trim().max(2048).optional().nullable(),
+  visibility: z.enum(['everyone', 'matches', 'private']).optional(),
+  expiresInHours: z.number().int().min(1).max(168).optional(),
+  background: z.union([z.string().max(120), z.record(z.string(), z.unknown())]).optional(),
+});
+
+export const storyReactBodySchema = z.object({
+  reaction: z.string().trim().min(1).max(40),
+});
+
+export const videoBodySchema = z.object({
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(5000).optional(),
+  url: z.string().trim().min(1).max(2048),
+  thumbnailUrl: z.string().trim().max(2048).optional().nullable(),
+  category: z.string().max(80).optional(),
+  visibility: z.enum(['everyone', 'matches', 'private']).optional(),
+});
+
+// Notifications ---------------------------------------
+export const markReadBodySchema = z.object({
+  ids: z.array(z.string().min(1).max(64)).max(500).optional(),
+});

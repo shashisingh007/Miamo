@@ -7,6 +7,7 @@ import { logger } from '../../shared/src/logger';
 import { errorHandler } from '../../shared/src/errorHandler';
 import { validate } from '../../shared/src/validate';
 import { discoverLikeBodySchema, discoverPassBodySchema, discoverCommentBodySchema, reportBodySchema, vibeCheckBodySchema } from '../../shared/src/schemas';
+import { idempotency } from '../../shared/src/idempotency';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
 import { env } from '../../shared/src/env';
@@ -596,7 +597,7 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/discover/like', authMiddleware, validate({ body: discoverLikeBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/discover/like', authMiddleware, idempotency(), validate({ body: discoverLikeBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { toUserId, targetType, targetId } = req.body;
     const fromUserId = req.userId!;

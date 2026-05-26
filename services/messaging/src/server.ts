@@ -8,6 +8,7 @@ import { logger } from '../../shared/src/logger';
 import { errorHandler } from '../../shared/src/errorHandler';
 import { validate } from '../../shared/src/validate';
 import { sendMessageBodySchema, messageReactBodySchema, chatThemeBodySchema } from '../../shared/src/schemas';
+import { idempotency } from '../../shared/src/idempotency';
 import { sanitize } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
 import { env } from '../../shared/src/env';
@@ -174,7 +175,7 @@ app.get('/api/v1/messages/chats/:chatId/messages', authMiddleware, async (req: A
   } catch (e) { next(e); }
 });
 
-app.post('/api/v1/messages/chats/:chatId/messages', authMiddleware, validate({ body: sendMessageBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+app.post('/api/v1/messages/chats/:chatId/messages', authMiddleware, idempotency(), validate({ body: sendMessageBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { chatId } = req.params;
     const { content: rawContent, type, replyToId } = req.body;
