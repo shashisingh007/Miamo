@@ -495,7 +495,7 @@ app.use('/api/v1/ai-match', requireAuth, requireOnboarded, createProxyMiddleware
 app.use('/api/v1/safety', requireAuth, reportLimiter, createProxyMiddleware(proxyTo(SERVICES.social)));
 app.use('/api/v1/vibe-check', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
 app.use('/api/v1/activity', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
-app.use('/api/v1/access', requireAuth, requireOnboarded, createProxyMiddleware(proxyTo(SERVICES.social)));
+app.use('/api/v1/access', requireAuth, createProxyMiddleware(proxyTo(SERVICES.social)));
 
 // Messaging routes (protected)
 app.use('/api/v1/messages', requireAuth, requireOnboarded, createProxyMiddleware(proxyTo(SERVICES.messaging)));
