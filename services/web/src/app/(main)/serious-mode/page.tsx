@@ -86,8 +86,19 @@ export default function DateToMarryPage() {
  const [bioDataStep, setBioDataStep] = useState(0);
  const [matchTab, setMatchTab] = useState<'matches' | 'incoming' | 'hold'>('matches');
 
- // Profile completion check
- const profileCompletion = useMemo(() => myProfile ? Math.min(100, [myProfile.fullName, myProfile.religion, myProfile.caste, myProfile.education, myProfile.occupation, myProfile.fatherName, myProfile.dateOfBirth, myProfile.height, myProfile.motherTongue, myProfile.maritalStatus].filter(Boolean).length * 10) : 0, [myProfile]);
+ // Profile completion — uses the canonical /api/v1/profiles/me/completion
+ // score (DTM scoring kicks in when Profile.seriousMode = true; gate = 75).
+ const [profileCompletion, setProfileCompletion] = useState(0);
+ const DTM_GATE = 75;
+ useEffect(() => {
+   let mounted = true;
+   const refresh = () => api.getCompletion().then((c: any) => {
+     if (mounted && typeof c?.data?.score === 'number') setProfileCompletion(c.data.score);
+   }).catch(() => {});
+   refresh();
+   const t = setInterval(refresh, 8000);
+   return () => { mounted = false; clearInterval(t); };
+ }, [myProfile]);
 
  const pendingRequestCount = useMemo(() => incomingRequests.filter(r => r.status === 'pending').length, [incomingRequests]);
 
@@ -190,14 +201,14 @@ export default function DateToMarryPage() {
  className="bg-miamo-card rounded-3xl border border-zinc-200 shadow-xl max-w-md w-full p-8 text-center space-y-5">
  <div className="text-5xl">🕉</div>
  <h2 className="text-xl font-bold text-zinc-900">Welcome to Date to Marry</h2>
- <p className="text-sm text-zinc-500">Build your matrimonial profile to access all features. Complete at least 60% to enable browsing & matching.</p>
+ <p className="text-sm text-zinc-500">Build your matrimonial profile to access all features. Complete at least {DTM_GATE}% to enable browsing & matching.</p>
  <div className="w-full bg-zinc-100 rounded-full h-3">
  <div className="h-full bg-gradient-to-r from-rose-alt to-rose-alt rounded-full transition-all" style={{ width: `${profileCompletion}%` }} />
  </div>
- <p className="text-xs text-zinc-400">{profileCompletion}% complete • Need 60% minimum</p>
+ <p className="text-xs text-zinc-400">{profileCompletion}% complete • Need {DTM_GATE}% minimum</p>
  <button onClick={() => { setProfileEnabled(true); setSection('profile'); }}
  className="w-full py-3 rounded-xl bg-gradient-to-r from-rose-main to-rose-main text-text-primary font-bold text-sm hover:shadow-lg transition">
- {profileCompletion >= 60 ? 'Enter Date to Marry' : 'Build Your Profile First'} →
+ {profileCompletion >= DTM_GATE ? 'Enter Date to Marry' : 'Build Your Profile First'} →
  </button>
  <button onClick={() => { setProfileEnabled(true); setSection('browse'); }}
  className="text-xs text-zinc-400 hover:text-zinc-600 transition">or browse profiles first →</button>
@@ -224,7 +235,7 @@ export default function DateToMarryPage() {
  <p className="text-[10px] text-zinc-400">Find your life partner</p>
  </div>
  </div>
- {profileCompletion < 60 && (
+ {profileCompletion < DTM_GATE && (
  <button onClick={() => setSection('profile')} className="text-[10px] bg-rose-soft text-rose-dark px-3 py-1.5 rounded-lg font-semibold border border-rose-light hover:bg-rose-soft transition">
  Complete Profile ({profileCompletion}%)
  </button>
