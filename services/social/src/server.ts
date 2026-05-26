@@ -23,6 +23,7 @@ import {
 import { idempotency } from '../../shared/src/idempotency';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
+import { hashUid } from '../../shared/src/track/hash';
 import { env } from '../../shared/src/env';
 import { createPrisma, applyBaseMiddleware, createInternalAuthMiddleware, installHealthRoutes } from '../../shared/src/service';
 
@@ -526,6 +527,27 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
       }
     }
 
+    // ── Tracking compat cache lookup (v3.1) ──
+    // One query: pull precomputed pair scores for (me, candidates). The cache
+    // is written by services/tracking-worker/src/compat.ts every 15 min.
+    // Missing rows simply contribute 0 — the cache is a hint, not authority.
+    const compatBoost = new Map<string, number>(); // candidateId → 0..10
+    try {
+      const myHash = hashUid(userId);
+      const candHashes = users.map(u => hashUid(u.id));
+      const idByHash = new Map<string, string>();
+      users.forEach((u, i) => idByHash.set(candHashes[i], u.id));
+      const rows = (await prisma.$queryRawUnsafe(
+        `SELECT "bHash","finalScore" FROM "PairCompatCache"
+         WHERE "aHash" = $1 AND "bHash" = ANY($2::text[])`,
+        myHash, candHashes,
+      )) as Array<{ bHash: string; finalScore: number }>;
+      for (const r of rows) {
+        const candId = idByHash.get(r.bHash);
+        if (candId) compatBoost.set(candId, Math.max(0, Math.min(10, r.finalScore * 10)));
+      }
+    } catch { /* cache miss / table not present → silent fallback */ }
+
     // ── ALGORITHM DISPATCH ──
     // Each discover filter tab uses a completely different scoring algorithm.
     // The algorithm selection is driven by the "filter" query param from the client.
@@ -596,7 +618,7 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
       const candidateFeatures = toFeatureVector(u);
       const { mlScore, breakdown: mlBreakdown } = computeMLScore(candidateFeatures, mlState.prefs, sessionCtx, drift, mlState.bandit);
 
-      const finalScore = Math.min(100, discoverScore + filterBonus + mlScore);
+      const finalScore = Math.min(100, discoverScore + filterBonus + mlScore + (compatBoost.get(u.id) || 0));
 
       // Track profile view activity
       trackActivity(prisma, userId, 'view', 'profile', u.id, { city: u.profile?.city, age: u.profile?.age, intent: u.profile?.datingIntent });
