@@ -32,6 +32,7 @@ import { scoreActive as scoreActiveV4 } from '../../shared/src/algo/active';
 import { scoreVerified as scoreVerifiedV4 } from '../../shared/src/algo/verified';
 import { scoreSerious as scoreSeriousV4 } from '../../shared/src/algo/serious';
 import { v4RankEnabled } from '../../shared/src/algo/flags';
+import { postImpressionPenalty } from '../../shared/src/algo/postImpressionRerank';
 import { env } from '../../shared/src/env';
 import { createPrisma, applyBaseMiddleware, createInternalAuthMiddleware, installHealthRoutes } from '../../shared/src/service';
 
@@ -577,6 +578,7 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
         const candHashes = candEntries.map((c) => reader.hashOf(c.id));
         const pairMap = await reader.pairCompat(myHash, candHashes);
         const priorMap = await reader.priorTargets(myHash, candHashes, 14);
+        const imprMap = await reader.targetImpressions(myHash, candHashes, 7);
         v4Scores = new Map();
         const myIntent = (myProfile as { datingIntent?: string } | null)?.datingIntent ?? null;
         const myAge = (myProfile as { age?: number } | null)?.age ?? null;
@@ -621,6 +623,16 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
             }
           }
           v4Scores.set(c.id, s);
+        }
+        // Apply per-candidate impression-fatigue penalty (bandit-style).
+        if (v4Scores && imprMap.size > 0) {
+          for (let i = 0; i < candEntries.length; i++) {
+            const c = candEntries[i];
+            const skipped = imprMap.get(candHashes[i]) || 0;
+            if (skipped <= 0) continue;
+            const penalty = postImpressionPenalty(skipped, 6 * 3600, 12);
+            v4Scores.set(c.id, Math.max(0, (v4Scores.get(c.id) ?? 0) - penalty));
+          }
         }
       } catch (e) {
         // eslint-disable-next-line no-console

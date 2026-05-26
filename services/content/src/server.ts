@@ -12,6 +12,10 @@ import { auditLog, trackActivity } from '../../shared/src/audit';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware } from '../../shared/src/service';
 import { cursorOpt } from '../../shared/src/coerce';
 import { computeDtmCompatibility } from '../../shared/src/dtmCompatibility';
+import { PrismaSignalReader } from '../../shared/src/algo/signals';
+import { rankForYou } from '../../shared/src/algo/forYou';
+import { rerankFeed } from '../../shared/src/algo/feedAugment';
+import { v4RankEnabled } from '../../shared/src/algo/flags';
 
 const prisma = createPrisma(15);
 export const app = express();
@@ -40,11 +44,41 @@ app.get('/api/v1/feed', authMiddleware, async (req: AuthRequest, res: Response, 
       ...cursorOpt(cursor),
     });
     const userId = req.userId!;
-    const result = posts.map(p => {
+    let result = posts.map(p => {
       const { passwordHash, ...author } = p.author;
       const { reactions, ...rest } = p;
       return { ...rest, author, liked: reactions.some(r => r.userId === userId), likeCount: p._count.reactions, commentCount: p._count.comments };
     });
+
+    // v4 feed augment: blend source ordering with personalised author fit + recency.
+    // Flag-gated; falls back to chronological ordering on any error.
+    if (v4RankEnabled('feed') && result.length > 1) {
+      try {
+        const reader = new PrismaSignalReader(prisma);
+        const candIds = result.map((p: any) => p.author.id);
+        const candEntries = candIds.map((id: string, i: number) => ({
+          id,
+          intent: (result[i].author.profile as { datingIntent?: string } | null)?.datingIntent ?? null,
+          age: (result[i].author.profile as { age?: number } | null)?.age ?? null,
+          interests: [] as string[],
+          cityKm: null as number | null,
+        }));
+        const fyScores = await rankForYou(reader, userId, candEntries, 'full');
+        const fyById = new Map(fyScores.map((r) => [r.id, r.score]));
+        const augmented = result.map((p: any, idx: number) => {
+          const sourceScore = 1 - idx / result.length;
+          const fy = fyById.get(p.author.id) ?? 0;
+          const ageSec = Math.max(0, (Date.now() - new Date(p.createdAt).getTime()) / 1000);
+          const v4Score = rerankFeed({ sourceScore, forYouScore: fy, itemAgeSec: ageSec });
+          return { ...p, v4Score, algo: 'v4' };
+        });
+        augmented.sort((a: any, b: any) => b.v4Score - a.v4Score);
+        result = augmented;
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[feed] v4 augment failed, keeping chronological order:', (e as Error).message);
+      }
+    }
     res.json({ data: result, cursor: posts[posts.length - 1]?.id });
   } catch (e) { next(e); }
 });

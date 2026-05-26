@@ -72,6 +72,9 @@ class FakeSignalReader implements SignalReader {
     }
     return m;
   }
+  async targetImpressions(_a: string, _b: string[], _d: number): Promise<Map<string, number>> {
+    return new Map();
+  }
 }
 
 function feature(uidHash: string, seed: number): FeatureRow {

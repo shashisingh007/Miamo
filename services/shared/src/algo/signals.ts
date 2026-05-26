@@ -52,6 +52,8 @@ export interface SignalReader {
   recentEvents(uidHash: string, evts: string[], days: number): Promise<EvtCount[]>;
   /** Prior-interaction counts: how many times aHash targeted each bHash. */
   priorTargets(aHash: string, bHashes: string[], days: number): Promise<Map<string, number>>;
+  /** Per-candidate impression counts (discover.card_view → targets) over the last N days. */
+  targetImpressions(aHash: string, bHashes: string[], days: number): Promise<Map<string, number>>;
 }
 
 const FEATURES_TTL_MS = 60_000;
@@ -142,6 +144,28 @@ export class PrismaSignalReader implements SignalReader {
       `SELECT meta->'targets' AS targets
        FROM "EventAggDaily"
        WHERE "uidHash" = $1 AND "day" >= NOW() - ($2 || ' days')::interval
+         AND meta ? 'targets'`,
+      aHash, String(days),
+    )) as Array<{ targets: Record<string, number> | null }>;
+    const bSet = new Set(bHashes);
+    for (const r of rows) {
+      if (!r.targets) continue;
+      for (const [b, c] of Object.entries(r.targets)) {
+        if (bSet.has(b)) out.set(b, (out.get(b) || 0) + Number(c));
+      }
+    }
+    return out;
+  }
+
+  async targetImpressions(aHash: string, bHashes: string[], days: number): Promise<Map<string, number>> {
+    const out = new Map<string, number>();
+    if (bHashes.length === 0) return out;
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `SELECT meta->'targets' AS targets
+       FROM "EventAggDaily"
+       WHERE "uidHash" = $1
+         AND "evt" = 'discover.card_view'
+         AND "day" >= NOW() - ($2 || ' days')::interval
          AND meta ? 'targets'`,
       aHash, String(days),
     )) as Array<{ targets: Record<string, number> | null }>;
