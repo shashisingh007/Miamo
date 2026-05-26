@@ -29,6 +29,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
+  viewportFit: 'cover', // iOS notch / home-indicator: allow content under safe areas, padded via env(safe-area-inset-*)
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

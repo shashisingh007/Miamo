@@ -310,13 +310,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  </div>
 
  {/* Mobile Nav — Glass Premium */}
- <nav className="lg:hidden shrink-0 border-t border-[#C97856]/8 px-2 py-2 flex items-center justify-around frosted">
+ <nav className="lg:hidden shrink-0 border-t border-[#C97856]/8 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] flex items-center justify-around frosted">
  {NAV_MAIN.slice(0, 4).map((item) => {
  const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
  const Icon = item.icon;
  const isMessages = item.href === '/messages';
  return (
- <Link key={item.href} href={item.href} className={cn('flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all duration-300', isActive ? 'text-[#C97856]' : 'text-text-muted hover:text-[#C97856]')}>
+ <Link key={item.href} href={item.href} className={cn('flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-all duration-300 min-h-[44px] min-w-[44px]', isActive ? 'text-[#C97856]' : 'text-text-muted hover:text-[#C97856]')}>
  <div className="relative">
  <Icon className="w-5 h-5" />
  {isMessages && unreadMsgCount > 0 && (
@@ -331,7 +331,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  );
  })}
  {/* More menu item for remaining nav items */}
- <Link href="/profile" className={cn('flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-xl transition-all duration-300', ['/profile', '/creativity', '/stories', '/serious-mode', '/settings', '/notifications'].some(p => pathname.startsWith(p)) ? 'text-[#C97856]' : 'text-text-muted hover:text-[#C97856]')}>
+ <Link href="/profile" className={cn('flex flex-col items-center gap-0.5 px-3 py-2 rounded-xl transition-all duration-300 min-h-[44px] min-w-[44px]', ['/profile', '/creativity', '/stories', '/serious-mode', '/settings', '/notifications'].some(p => pathname.startsWith(p)) ? 'text-[#C97856]' : 'text-text-muted hover:text-[#C97856]')}>
  <div className="w-5 h-5 flex items-center justify-center">
  <div className="grid grid-cols-2 gap-[2px]">
  <div className="w-[5px] h-[5px] rounded-sm bg-current" />

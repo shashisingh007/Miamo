@@ -44,7 +44,7 @@ function MoreMenu({
  <motion.div
  initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
  transition={{ type: 'spring', damping: 30, stiffness: 300 }}
- className="fixed bottom-0 inset-x-0 bg-miamo-card border-t border-border rounded-t-[20px] z-50 px-4 py-3 pb-8"
+ className="fixed bottom-0 inset-x-0 bg-miamo-card border-t border-border rounded-t-[20px] z-50 px-4 py-3 pb-[max(2rem,env(safe-area-inset-bottom))]"
  >
  <div className="w-10 h-1 rounded-full bg-miamo-card/10 mx-auto mb-4" />
  <div className="space-y-0.5">
@@ -407,7 +407,7 @@ function CategoryPickerSheet({
  <motion.div
  initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
  transition={{ type: 'spring', damping: 30, stiffness: 300 }}
- className="fixed bottom-0 inset-x-0 max-h-[75vh] bg-miamo-card border-t border-border rounded-t-[20px] z-50 flex flex-col"
+ className="fixed bottom-0 inset-x-0 max-h-[75vh] bg-miamo-card border-t border-border rounded-t-[20px] z-50 flex flex-col pb-[env(safe-area-inset-bottom)]"
  >
  <div className="flex items-center justify-between px-5 py-4 border-b border-border">
  <h3 className="text-[14px] font-bold text-text-primary">Browse Categories</h3>

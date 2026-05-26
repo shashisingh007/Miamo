@@ -123,7 +123,7 @@ export function UploadModal({
  <motion.div
  initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
  transition={{ type: 'spring', damping: 30, stiffness: 300 }}
- className="fixed bottom-0 inset-x-0 max-h-[90vh] bg-miamo-card border-t border-border rounded-t-[20px] z-50 flex flex-col"
+ className="fixed bottom-0 inset-x-0 max-h-[90vh] bg-miamo-card border-t border-border rounded-t-[20px] z-50 flex flex-col pb-[env(safe-area-inset-bottom)]"
  >
  {/* Hidden file input */}
  <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} />
