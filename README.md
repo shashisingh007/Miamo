@@ -2,6 +2,8 @@
 
 A premium romantic dating platform with glass-morphism UI, AI-powered matching algorithms, and real-time messaging. Built with microservice architecture on Kubernetes.
 
+> **New here?** Start with [`docs/SERVICES.md`](docs/SERVICES.md) for the service map + algorithm index, then dive into [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
 ---
 
 ## Table of Contents
@@ -121,9 +123,11 @@ Miamo/
 │   ├── migrate.Dockerfile
 │   └── ...
 ├── docs/                        # Documentation
-│   ├── ARCHITECTURE.md          # System design & algorithms
-│   ├── FRONTEND_AUDIT.md        # Frontend audit report
-│   └── PHASE7_AUDIT.md          # Code quality audit
+│   ├── ARCHITECTURE.md          # Full system design, schemas, algorithms
+│   ├── SERVICES.md              # Service map + algorithm index (start here)
+│   ├── ACCESS_CONTROL.md        # DTM access-control deep dive
+│   ├── SHOWCASE.md              # Showcase feature spec
+│   └── DESIGN_PROMPT.md         # UI / brand guide
 ├── k8s/                         # Kubernetes manifests
 │   └── templates/
 ├── scripts/

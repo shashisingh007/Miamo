@@ -283,7 +283,20 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  </div>
  <div className="flex items-center gap-3">
  <h1 className="font-brand font-semibold text-2xl text-text-primary capitalize tracking-tight">
- {pathname === '/' ? 'Home' : pathname.split('/').filter(Boolean)[0]?.replace(/-/g, ' ')}
+ {(() => {
+   if (pathname === '/') return 'Home';
+   const seg = pathname.split('/').filter(Boolean)[0] || '';
+   const titles: Record<string, string> = {
+     'onboarding': 'My Profile',
+     'serious-mode': 'Date to Marry',
+     'ai-match': 'AI Match',
+     'date-planner': 'Date Planner',
+     'love-language': 'Love Language',
+     'vibe-check': 'Vibe Check',
+     'date-ideas': 'Date Ideas',
+   };
+   return titles[seg] ?? seg.replace(/-/g, ' ');
+ })()}
  </h1>
  </div>
  <div className="ml-auto flex items-center gap-3">

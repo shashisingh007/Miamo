@@ -12,7 +12,7 @@ const nextConfig = {
   // v3.2 — Creativity remains the legacy route. /showcase is the new v3.2
   // surface backed by ShowcaseItem; both ship side-by-side during transition.
   // The 301 from /creativity → /showcase will be activated once feature parity
-  // (composer + comments + reactions) lands. Tracked in PHASE7_AUDIT.md.
+  // (composer + comments + reactions) lands.
   // Security headers for all routes
   async headers() {
     return [
