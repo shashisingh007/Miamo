@@ -1,139 +1,114 @@
 # shared
 
-## 1. Purpose
+> Not a service. A library. The Prisma schema for the whole product, the 17 ranking algorithms, the middleware everyone reuses.
 
-The library every service imports. Owns the Prisma schema (one schema, many writers), all shared middleware (logger, audit, sanitiser, rate-limit boilerplate, idempotency, request-id, metrics, error handler), the validation schemas (Zod), the field-meta tables (icons, labels, options), the deep-compatibility math, the completion scorer, and — most importantly — the **17 v4 algorithms** with their `SignalReader` interface, registry, and per-surface flags.
+## 1. The story (60 seconds)
 
-## 2. Mental model
+When `social` needs to know how to rank Arjun for Priya, it imports
+`forYou` from here. When `messaging` needs to encrypt a chat, it
+imports the crypto helper from here. When *any* service needs to query
+the database, it uses the same Prisma client generated from the
+schema that lives here. One source of truth, used by everyone.
 
-```
-services/shared/
-├── prisma/
-│   ├── schema.prisma          # 80+ models, all services
-│   ├── seed.ts                # 20 deterministic users
-│   └── migrations/
-└── src/
-    ├── algo/                  # the 17 algos (see docs/ALGORITHMS.md)
-    ├── service.ts             # createPrisma, applyBaseMiddleware, health routes
-    ├── logger.ts              # JSON logs with PII redaction
-    ├── audit.ts               # auditLog + trackActivity helpers
-    ├── sanitize.ts            # XSS strip + recursive object sanitisation
-    ├── idempotency.ts         # Idempotency-Key middleware
-    ├── requestId.ts           # X-Request-ID propagation
-    ├── metrics.ts             # prom-client middleware
-    ├── errorHandler.ts        # Express error handler
-    ├── schemas.ts             # Zod schemas (80+)
-    ├── validate.ts            # body/req validation wrapper
-    ├── env.ts                 # requireSecret + typed env accessors
-    ├── coerce.ts              # safeUuid/safeLimit/safeEnum/cursorOpt
-    ├── completion.ts          # onboarding score (60/75 thresholds)
-    ├── dtmCompatibility.ts    # 16-dim deep compat
-    ├── fieldMeta.ts           # CASUAL_FIELDS, DTM_FIELDS
-    ├── optionIcons.ts         # icon mapping tables
-    ├── visibility.ts          # profile redaction rules
-    └── track/                 # tracking-side helpers (hash, events)
+## 2. What this library is (in one picture)
+
+```mermaid
+flowchart TB
+    subgraph shared/
+        Schema[prisma/schema.prisma<br/>80+ models]
+        Algos[src/algo/<br/>17 algorithms + 225 tests]
+        MW[src/middleware/<br/>auth, internal-key, logger]
+        Crypto[src/crypto.ts]
+    end
+    Schema --> Auth & Users & Social & Msg & Content & Notif & TW & Ingest
+    Algos --> Social & Msg & Content & Notif & TW
+    MW --> Auth & Users & Social & Msg & Content & Notif & GW
+    Crypto --> Msg
 ```
 
-## 3. Public exports (highlights)
+## 3. What's inside (the menu)
 
-| Symbol | Purpose | Source |
-|---|---|---|
-| `createPrisma()` | Singleton Prisma client with logging | `src/service.ts` |
-| `applyBaseMiddleware(app)` | Helmet, morgan, JSON body, error handler | `src/service.ts` |
-| `installHealthRoutes(app)` | `/healthz` + `/readyz` | `src/service.ts` |
-| `createInternalAuthMiddleware()` | `x-internal-key` gate | `src/service.ts` |
-| `createPushToUser(deps)` | POST `/internal/push-event` helper | `src/service.ts` |
-| `logger.info/warn/error` | JSON logs | `src/logger.ts` |
-| `auditLog(action, userId, details)` | Best-effort insert into AuditLog | `src/audit.ts` |
-| `sanitize(string)` / `sanitizeObject(obj, depth=5)` | XSS strip | `src/sanitize.ts` |
-| `idempotency()` middleware | Redis `SET NX EX 86400` | `src/idempotency.ts` |
-| `env.jwtSecret`, `env.encryptionKey`, … | Typed env accessors | `src/env.ts` |
-| `computeCompletionScore(profile)` | 0..100 + missing buckets | `src/completion.ts` |
-| `computeDtmCompatibility({mine,…,theirs})` | 16-d cosine | `src/dtmCompatibility.ts` |
-| `PrismaSignalReader` | feature/pair lookups | `src/algo/signals.ts` |
-| `registerAlgo(spec)` + `listAlgos()` | algo registry | `src/algo/registry.ts` |
-| `scoreForYou`, `scoreAiPicksV4`, … | the 17 rankers | `src/algo/*.ts` |
-| `v4RankEnabled(surface)` | flag check | `src/algo/flags.ts` |
+| Path                                     | What it is                                                |
+|------------------------------------------|-----------------------------------------------------------|
+| `prisma/schema.prisma`                    | The whole DB schema — 80+ models                          |
+| `prisma/seed.ts`                          | Demo users, posts, matches for local dev                  |
+| `src/algo/`                               | 17 algorithms (see [docs/ALGORITHMS.md](docs/ALGORITHMS.md)) |
+| `src/algo/__tests__/`                     | 225 unit tests, run in ~1.2s                              |
+| `src/middleware/internalAuth.ts`          | Verifies `X-Internal-Key`                                  |
+| `src/middleware/jwt.ts`                   | Verifies JWT for backend services                          |
+| `src/logger.ts`                           | Central logger with secret redaction                      |
+| `src/audit.ts`                            | Append-only audit log helper                              |
+| `src/cache.ts`                            | Redis cache helpers                                       |
+| `src/ml-engine.ts`                        | Optional ML enrichment                                    |
+| `src/activity-analyzer.ts`                | Aggregation helpers for `tracking-worker`                 |
+| `src/algorithms.ts`                       | Legacy algos wrapper (kept for compatibility)             |
 
-## 4. Prisma schema highlights
+## 4. The data it owns (the whole schema)
 
-80+ models grouped by domain (full listing in [docs/ARCHITECTURE.md](../../docs/ARCHITECTURE.md#2-data-ownership-matrix)):
+All 80+ models live in `prisma/schema.prisma`. Highlights:
 
-- **Users & Auth** — User, Profile, ProfilePhoto/Prompt/Interest, Settings, PrivacySettings, Session
-- **Matching** — Like, MatchRequest, Match, MatchFeedback, MiamoMove, DiscoverFilter, VibeCheck, UserActivity
-- **Messaging** — Chat, Message, Beat, BeatEvent
-- **Content** — FeedPost/Comment/Reaction, Story+View/Comment/Like, Video+Comment/Reaction, CreativityCategory/Item/View/Reaction/Comment, Trend
-- **DTM** — MatrimonialProfile (88 fields), ShowcaseItem, AccessRequest, BioDataAccessRequest
-- **Safety** — Report, Block
-- **System** — Notification, AuditLog, Bookmark, SearchLog, UserData
-- **Tracking (v3.1)** — ConsentEvent, EventAggHourly, EventAggDaily, FeatureSnapshot, PairCompatCache, CfNeighbourCache, Embeddings
+- **`User`, `Profile`, `Session`, `Setting`** — auth + users
+- **`Like`, `Pass`, `Match`, `Chat`, `Message`, `DailyMatch`** — social + messaging
+- **`Post`, `Story`, `Video`, `CreativityPrompt`, `PromptAnswer`** — content
+- **`Notification`, `NotificationPref`** — notifications
+- **`UserActivity15m`, `CandidateInteraction15m`, `CompatScore`, `ProfileEmbedding`** — tracking-worker feature tables
 
-## 5. Seed
+## 5. Who uses it
 
-[prisma/seed.ts](prisma/seed.ts) inserts 20 deterministic users (`miamo1`..`miamo20`, password = username), a mix of intents and cities, plus creativity categories, feed posts, stories, matches, messages, beats. `SEED_DATE = 2026-05-01T12:00:00Z`. Re-runnable.
+**Every other service.** That's the point.
 
-## 6. Configuration
+## 6. The knobs (configuration)
 
-| Env | Used by | Required |
-|---|---|---|
-| `DATABASE_URL` | `createPrisma()` | yes |
-| `JWT_SECRET`, `JWT_REFRESH_SECRET`, `INTERNAL_SERVICE_KEY` | `env.ts` | yes (in services that need them) |
-| `ENCRYPTION_KEY`, `ENCRYPTION_SALT` | `env.ts` (messaging) | yes for messaging |
-| `TRACKING_HASH_SECRET` | `algo/signals.ts`, ingest, tracking-worker | yes for tracking |
-| `ALGO_V4_RANK_ENABLED_*`, `ALGO_V4_WORKERS_ENABLED` | `algo/flags.ts` | no (default `'0'`) |
+This library reads no env vars directly; the services that consume it
+provide their own. The library defines the **shape** that services
+configure.
 
-## 7. Worked example — using shared in a new service
+## 7. A real example
+
+A service consumes `forYou`:
 
 ```ts
-// services/myservice/src/server.ts
-import express from "express";
-import { createPrisma, applyBaseMiddleware, installHealthRoutes,
-         createInternalAuthMiddleware } from "@miamo/shared/service";
-import { logger } from "@miamo/shared/logger";
+import { forYou } from '@miamo/shared/algo/forYou';
+import { SignalReader } from '@miamo/shared/algo/signals';
 
-const prisma = createPrisma();
-const app = express();
-applyBaseMiddleware(app);
-installHealthRoutes(app);
-app.use(createInternalAuthMiddleware());
+const reader = new SignalReader(prisma);
+const viewer = await reader.read(priyaId);
+const candidates = await reader.readMany(candidateIds);
 
-app.get("/api/v1/myservice/ping", async (req, res) => {
-  logger.info("ping", { uid: req.headers["x-user-id"] });
-  res.json({ ok: true });
-});
+const scored = candidates.map(c => ({
+  candidate: c,
+  score: forYou(viewer, c)
+})).sort((a, b) => b.score - a.score);
 
-app.listen(Number(process.env.PORT ?? 3300));
+return scored.slice(0, 10);
 ```
 
-## 8. Local dev
+## 8. Run the tests
 
 ```bash
-# Generate Prisma client (must be run after schema changes)
 cd services/shared
-npx prisma generate
-
-# Migrate + seed (from repo root)
-npm run db:migrate
-npm run db:seed
+npm install
+npm test          # 225 tests, ~1.2s
 ```
 
-## 9. Tests
+## 9. How we know it works
 
-[tests/algo-e2e.test.ts](../../tests/algo-e2e.test.ts), `tests/algo-discover-fatigue.test.ts`, `tests/algo-feed-augment.test.ts`. All run against `FakeSignalReader` — no DB. 225 cases.
+- **`__tests__/forYou.test.ts`** — score in [0,1], monotonic in each input.
+- **`__tests__/aiPicks.test.ts`** — only returns a pick when threshold met.
+- **`__tests__/hash.test.ts`** — `userHash` deterministic and one-way.
+- **`__tests__/lru.test.ts`** — cache eviction order.
+- (…225 in total across 17 algo files + helpers)
 
-```bash
-npx vitest run
-```
+## 10. If something breaks
 
-## 10. Failure modes & operational notes
+| Symptom                              | First check                                       |
+|--------------------------------------|---------------------------------------------------|
+| Build error "Prisma client outdated"  | `npx prisma generate` after schema change         |
+| Algo returns NaN                      | a signal was `null` — verify SignalReader query   |
+| Migration conflict                    | two devs added a migration with the same date    |
 
-- **Schema drift** between services → only the migrations checked into `services/shared/prisma/migrations` run. Avoid editing migrations after they ship.
-- **PII in logs** → `logger.ts` redacts known fields (email, password, token). New sensitive fields must be added to the redact list.
-- **`sanitize` recursion depth** is capped at 5; deeper structures get truncated.
-- **Algo registry** — algos register on import. A service that never imports an algo file won't have it in its in-process registry; only tracking-worker's `/v4/status` is meant to enumerate all algos.
+## 11. What changed and why it's better
 
-## 11. What changed & why it's good
-
-- **Before:** Each service had its own logger, sanitiser, Prisma client, and bespoke middleware. The 17 ranking functions were copy-pasted into the services that needed them.
-- **After:** One library, one schema, one set of conventions; algos live behind the `SignalReader` interface so swapping data sources is a one-class change.
-- **Why it matters:** A new service is ~30 lines (see §7). A ranker change is one file plus one test. The blast radius of any shared change is bounded by the test suite.
+- **Before:** every service had its own Prisma client and re-implemented common middleware. Schema drift was a real problem.
+- **After:** one schema, one Prisma client, one set of algorithms, one logger. All consumed via TypeScript imports — type safety across services.
+- **Why Priya feels it:** consistent behaviour. A rule (like "blocked users never appear in any list") only needs to be implemented once and applies everywhere.

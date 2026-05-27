@@ -1,102 +1,203 @@
-# Architecture
+# Architecture — how the pieces fit
 
-Boundaries, ownership, sync vs async paths, and where the seams are.
+It's 9pm. Priya taps "Like" on Arjun. Her phone sends one HTTPS
+request. Twelve milliseconds later, three different servers have
+collaborated to record the like, check if Arjun liked her back, open
+a chat room, queue a push notification, and fire a tracking event —
+and her phone has been told "It's a match!" already.
 
-## 1. Topology
+This document explains the boxes and arrows that make that possible.
+
+---
+
+## 1. The whole picture in one diagram
 
 ```mermaid
 flowchart TB
-  subgraph Edge["Edge (public)"]
-    WEB[web :3100]
-    GW[gateway :3200]
-    ING[ingest :3260]
-  end
-  subgraph Domain["Domain (private, ClusterIP)"]
-    AUTH[auth :3201]
-    USERS[users :3202]
-    SOC[social :3203]
-    MSG[messaging :3204]
-    CON[content :3205]
-    NOT[notifications :3206]
-  end
-  subgraph Worker["Async plane"]
+    Phone[Priya's phone<br/>Next.js web app]
+    GW[gateway :3200<br/>rate-limit + JWT + proxy]
+    Auth[auth :3201]
+    Users[users :3202]
+    Social[social :3203]
+    Msg[messaging :3204]
+    Content[content :3205]
+    Notif[notifications :3206]
+    Ingest[ingest :3260]
     TW[tracking-worker :3261]
-  end
-  subgraph Data
-    PG[(Postgres 16)]
-    RD[(Redis 7)]
-  end
-  WEB --> GW
-  WEB --> ING
-  GW --> AUTH & USERS & SOC & MSG & CON & NOT
-  GW <-->|SSE bus| WEB
-  NOT -->|/internal/push-event| GW
-  MSG -->|/internal/push-event| GW
-  SOC -->|comm-profile| MSG
-  AUTH & USERS & SOC & MSG & CON & NOT --> PG
-  GW --> RD
-  ING --> RD
-  RD --> TW
-  TW --> PG
+    DB[(Postgres 16<br/>one shared schema)]
+    R[(Redis 7<br/>cache + rate-limit + Stream)]
+
+    Phone -- HTTPS --> GW
+    GW --> Auth
+    GW --> Users
+    GW --> Social
+    GW --> Msg
+    GW --> Content
+    GW --> Notif
+    Phone -- tracking only --> Ingest
+
+    Auth --> DB
+    Users --> DB
+    Social --> DB
+    Msg --> DB
+    Content --> DB
+    Notif --> DB
+
+    GW --> R
+    Ingest --> R
+    R --> TW
+    TW --> DB
+
+    Social -. SSE bus .-> GW
+    Msg   -. SSE bus .-> GW
+    Notif -. SSE bus .-> GW
+    GW -- SSE --> Phone
 ```
 
-## 2. Data ownership matrix
+That's it. **10 boxes** — 1 web app, 7 HTTP services, 1 ingest, 1 worker —
+talking to **2 stores** (Postgres + Redis).
 
-Every Prisma model lives in [services/shared/prisma/schema.prisma](services/shared/prisma/schema.prisma) — one schema, many writers. Ownership is **operational**, not enforced:
+---
 
-| Model | Primary writer | Readers |
-|---|---|---|
-| `User`, `Session` | auth | users, gateway, all |
-| `Profile`, `Profile*`, `Settings`, `PrivacySettings`, `Bookmark`, `SearchLog` | users | auth, social, gateway |
-| `Like`, `Match`, `MatchRequest`, `MatchFeedback`, `MiamoMove`, `UserActivity`, `VibeCheck`, `Report`, `Block`, `DiscoverFilter` | social | messaging, notifications |
-| `Chat`, `Message`, `Beat`, `BeatEvent` | messaging | social, notifications |
-| `FeedPost*`, `Story*`, `Video*`, `Creativity*`, `Trend` | content | (read-only elsewhere) |
-| `Notification`, `AuditLog` | notifications | all (via shared `audit.ts`) |
-| `MatrimonialProfile`, `ShowcaseItem`, `AccessRequest`, `BioDataAccessRequest` | users + social | content (creativity matching) |
-| `ConsentEvent`, `EventAggHourly`, `EventAggDaily`, `FeatureSnapshot`, `PairCompatCache`, `CfNeighbourCache` | tracking-worker | all algos via `SignalReader` |
+## 2. What each box owns, in one sentence
 
-**Why one schema?** Cross-service joins (e.g., social ranking a candidate's profile) are common and forcing them across HTTP would multiply latency. The trade-off is that breaking schema changes need coordinated deploys.
+| Box                | Owns                                                          |
+|--------------------|---------------------------------------------------------------|
+| **web** (3100)     | Everything the user sees — Next.js 14 App Router              |
+| **gateway** (3200) | The single front door — proxy + rate-limit + auth check + SSE |
+| **auth** (3201)    | Signup, login, password reset, JWT issuance                   |
+| **users** (3202)   | Profile, settings, search, bookmarks, blocks                  |
+| **social** (3203)  | Discover, likes, matches, AI Match — the heart of dating      |
+| **messaging** (3204)| Encrypted 1-to-1 chats, beats, suggested openers             |
+| **content** (3205) | Feed, stories, videos, creativity prompts                     |
+| **notifications**(3206)| In-app bell, push composition, nextNotifyAt scheduling   |
+| **ingest** (3260)  | Edge endpoint for tracking events — validates and enqueues    |
+| **tracking-worker**(3261)| Consumes the stream and rolls events into features      |
+| **shared**         | Library (not a service) — Prisma schema, 17 algos, middleware |
 
-## 3. Sync vs async paths
+---
 
-| Path | Style | Why |
-|---|---|---|
-| User read/write (Discover, Messages, Profile) | **Sync** HTTP | <300ms p50 budget; user is waiting. |
-| Notification fan-out (SSE) | **Pseudo-async** via gateway | `services/notifications/src/server.ts` calls `pushToUser()` → POSTs `/internal/push-event` → gateway emits SSE. Fire-and-forget from notifications' POV. |
-| Tracking | **Fully async** via Redis Stream | Browser POSTs `/v1/track`; ingest XADDs; tracking-worker XREADGROUP. Events are lossy at the edge (return 204 even if Redis is down) but exactly-once downstream via consumer groups. |
-| Feature materialisation | **Cron-like** in tracking-worker | 15-min `FeatureAggregator`, 30-min `EmbeddingWorker`, 60-min `EnrichmentWorker`, 24-h `DailyMatchWorker`. |
-| Service → service calls | **Sync** HTTP, rare | Only `social → messaging` for comm-profile/sent-texts. |
+## 3. Why we split it this way (four reasons in plain English)
 
-## 4. Seams (where the system can be cut)
+1. **Independent deploy.** A bug fix in `messaging` ships without
+   touching `auth`. Smaller blast radius, faster iteration.
+2. **Blast radius.** If `content` starts crashing on a bad post, the
+   feed degrades — but Priya can still log in, swipe, and chat.
+3. **Scale only what's hot.** Discover gets 50× more traffic than
+   password reset. We give `social` 10 pods and `auth` 2.
+4. **Team ownership.** Each service has one CODEOWNERS team. A
+   reviewer for `users` doesn't need to know how chats are encrypted.
 
-1. **Browser ↔ Gateway** — JSON over HTTPS. Versioned at `/api/v1/`. Can be replaced by mobile clients.
-2. **Gateway ↔ Service** — internal-only HTTP. Replaceable with gRPC or a service mesh without touching the browser.
-3. **Algorithm ↔ Data** — `SignalReader` interface ([signals.ts](services/shared/src/algo/signals.ts#L1)). Today `PrismaSignalReader`. Tomorrow could be a Redis feature store, a vector DB, or a remote feature service.
-4. **Ingest ↔ Stream** — `XADD events:raw`. Could be swapped for Kafka with one file change in [services/ingest/src/stream.ts](services/ingest/src/stream.ts).
-5. **Worker output ↔ Algorithm input** — `FeatureSnapshot.raw` JSONB column. Versioned via a `_v` field; readers tolerate missing keys.
+---
 
-## 5. Why microservices here (and not monolith)
+## 4. The journey of one request, step by step
 
-Three reasons that justified the split:
+Priya taps Like. Here's exactly what happens:
 
-- **Independent scaling**: ingest needs 2–10 small replicas (write-heavy, CPU-bound on JSON parse + HMAC); messaging needs few large replicas (long-lived SSE, sticky sessions); content is read-heavy and cacheable.
-- **Fault isolation**: a runaway `dtm` ranker in social does not take down chats.
-- **Deploy cadence**: the algo team ships tracking-worker and shared without touching auth.
+```mermaid
+sequenceDiagram
+    participant P as Priya's phone
+    participant G as gateway
+    participant S as social
+    participant DB as Postgres
+    participant N as notifications
+    P->>G: POST /social/like {targetId: arjun}<br/>Authorization: Bearer eyJ…
+    G->>G: 1. rate-limit check (Redis: 30/min)
+    G->>G: 2. JWT verify (HS256, JWT_SECRET)
+    G->>G: 3. onboarding-complete gate (60s cache)
+    G->>S: forward with X-User-Id: priya-uuid
+    S->>DB: INSERT INTO "Like" (priya, arjun)
+    S->>DB: SELECT existing Like (arjun, priya)?
+    DB-->>S: yes — it's a match
+    S->>DB: INSERT INTO "Match", create "Chat"
+    S->>N: HTTP enqueue notif for arjun
+    S-->>G: {matched: true, chatId: "abc123"}
+    G-->>P: same JSON, total ~80ms
+```
 
-The cost we accept: one schema and a shared Prisma client. We compensate with the data-ownership matrix above and code review on cross-service writes.
+Everything Priya does goes through this exact pattern:
+**phone → gateway → service → Postgres → response**. The gateway is the
+only thing exposed to the internet. Internal services bind to
+`0.0.0.0` inside the cluster but are protected by NetworkPolicy.
 
-## 6. Cross-cutting concerns
+---
 
-- **AuthN**: JWT HS256 at gateway only. Domain services trust `x-user-id` + `x-internal-key`. See [docs/SECURITY.md](docs/SECURITY.md).
-- **AuthZ**: in-handler checks (chat membership, match membership, bookmark ownership). Onboarding gate enforced at gateway via cached `GET /api/v1/profiles/me/completion`.
-- **Rate limiting**: gateway only, Redis-backed, falls back to in-memory.
-- **Idempotency**: `Idempotency-Key` header → Redis `SET NX EX 86400` ([services/shared/src/idempotency.ts](services/shared/src/idempotency.ts)). Used on message send and like.
-- **Tracing**: `X-Request-ID` propagated by [requestId.ts](services/shared/src/requestId.ts).
-- **Metrics**: Prometheus text endpoint on ingest (`/metrics`); other services use `prom-client` via [metrics.ts](services/shared/src/metrics.ts).
-- **Logging**: structured JSON via [logger.ts](services/shared/src/logger.ts) with PII redaction.
+## 5. Data lives in one Postgres, schema lives in `services/shared`
 
-## 7. What changed & why it's good
+We use **one Postgres database** with **one schema** managed by Prisma
+at [services/shared/prisma/schema.prisma](services/shared/prisma/schema.prisma).
+80+ models. Each service connects with the same `DATABASE_URL` but only
+queries the tables it owns.
 
-- **Before:** Ranking lived inside `social` with inline `prisma.user.findMany()` calls; tracking was synchronous DB writes from the browser path; one schema change required redeploying every service simultaneously.
-- **After:** Algorithms are pure functions behind `SignalReader`; tracking is a Redis-Stream-buffered side channel that survives downstream outages; a 15-min `FeatureAggregator` decouples write latency from read latency.
-- **Why it matters:** The user request path no longer carries any ML cost. Algorithms can be tested without a DB. Tracking can buffer 10M events during a Postgres incident and replay cleanly.
+Why one schema?
+- **Joins are free** — `Match` joins `User` joins `Profile` in one SQL.
+- **Migrations are atomic** — one `prisma migrate` command updates all.
+- **Trade-off**: services aren't *truly* independent at the DB level.
+  Acceptable for our scale; revisit if any service hits >100k req/s.
+
+---
+
+## 6. Redis does three jobs
+
+| Job             | Used by         | Key shape                                |
+|-----------------|-----------------|------------------------------------------|
+| Rate-limit      | gateway         | `rl:{ip|user}:{route}` — TTL 60s         |
+| Cache           | gateway, users  | `cache:onboard:{userId}` — TTL 60s       |
+| Event stream    | ingest, worker  | `events:raw` — Redis Stream, consumer group `tw-rollup` |
+
+The stream is the magic. Even if `tracking-worker` is down for an hour,
+no events are lost — they queue on the conveyor belt. When it comes
+back, it reads from the last acknowledged ID and catches up.
+
+---
+
+## 7. Real-time push (SSE)
+
+When Arjun's chat tab is open and Priya sends a message, his screen
+updates in **<200ms** without polling. This is done with
+**Server-Sent Events** (one-way push from server to browser):
+
+1. Arjun's tab opens `GET /events/sse` against the gateway.
+2. Gateway keeps the connection open.
+3. When `messaging` saves Priya's message, it `POST`s to a gateway
+   internal endpoint `POST /internal/sse/publish` with `{userId, event}`.
+4. Gateway pushes the event down Arjun's open SSE connection.
+5. Arjun's tab renders the new message.
+
+No WebSockets, no extra infra. SSE is enough for what we need today.
+
+---
+
+## 8. Run it locally in one command
+
+```bash
+docker compose up
+```
+
+That boots Postgres + Redis + all 10 services in dependency order. The
+web app is at <http://localhost:3100>. Demo login `demo@miamo.app` /
+`demo1234` (seeded by [scripts/seed-dtm.js](scripts/seed-dtm.js)).
+
+---
+
+## 9. What changed and why it's better
+
+- **Before:** one monolith Express app with all routes mixed together.
+  A bug in feed brought down login.
+- **After:** 7 small HTTP services + 1 ingest + 1 worker, each
+  independently deployable, each with its own CPU/memory budget.
+- **Why Priya feels it:** when we ship a feed improvement we don't have
+  to take login offline. When chat traffic spikes, only chat scales.
+  No more "the app is down" because the wrong service caught fire.
+
+---
+
+## 10. If something breaks
+
+| Symptom                              | First check                                     |
+|--------------------------------------|-------------------------------------------------|
+| Phone gets `502` on every request    | gateway pod healthy? `kubectl get pods -l app=gateway` |
+| Login works but discover is empty    | social pod healthy + DB reachable from it       |
+| Tracking events not affecting algos  | `tracking-worker` lag — `XINFO GROUPS events:raw` |
+
+More in [RUNBOOK.md](RUNBOOK.md).

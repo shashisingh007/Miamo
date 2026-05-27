@@ -1,140 +1,214 @@
-# Security
+# Security — the 7 doors a hacker would try
 
-## 1. Authentication
+Priya's photos, messages, and personal life are inside Miamo. She trusts
+us with them. Below are the seven doors an attacker would push on, and
+exactly what we put behind each one. Each defence has a file path so
+you can audit the code yourself.
 
-### User JWT (HS256)
+---
 
-- Issued by [services/auth/src/server.ts](services/auth/src/server.ts) at `POST /api/v1/auth/login`. Access token 15 min, refresh token 30 days.
-- Verified at the **gateway only** ([services/gateway/src/server.ts](services/gateway/src/server.ts)). Cheap regex format check (`^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$`) before `jwt.verify` to short-circuit garbage.
-- Authorization header rejected if > 2 KB or malformed (sanitised away by `sanitizeHeaders`).
-- Gateway injects `x-user-id` + `x-internal-key` headers when proxying. Domain services trust these (no second JWT round-trip).
-- SSE accepts the token via query param (EventSource has no header hook).
+## Door 1 — guessing Priya's password
 
-### Internal service auth
+**The attack.** Hit `/auth/login` with `priya@example.com` and a list
+of common passwords until one works.
 
-- `INTERNAL_SERVICE_KEY` = `openssl rand -hex 32`. Sent as `x-internal-key` on every gateway → service call and on direct service → service calls (`social → messaging`).
-- Domain services reject any request without it.
+**The defence.** We store passwords using **bcrypt** (a slow hashing
+algorithm — slow on purpose). Cost factor **12** means each guess takes
+~250ms on a modern CPU. A 1-billion-password dictionary attack would
+take **~8 years** even at full server load.
 
-### Sessions
+```ts
+// services/auth/src/server.ts
+const hash = await bcrypt.hash(password, 12);
+```
 
-- Tracked in `Session` (device, browser, OS, IP, UA, lastActiveAt). Listed at `GET /api/v1/auth/sessions`. Per-session revoke at `POST /api/v1/auth/sessions/:id/revoke`.
-- Password change revokes **all** sessions ([services/auth/src/server.ts](services/auth/src/server.ts) `PUT /api/v1/auth/password`).
-- Passwords stored as `bcryptjs` hashes (cost 12). `passwordHash` never leaves the auth service in any response payload.
+Plus rate-limit (Door 4) caps wrong-password attempts at 5/min per IP.
 
-## 2. Encryption
+---
 
-### Messages (AES-256-GCM)
+## Door 2 — hijacking Priya's session
 
-- [services/messaging/src/server.ts](services/messaging/src/server.ts), lines ~41–57.
-- Format on disk: `enc:<iv-hex>:<authTag-hex>:<ciphertext-hex>`.
-- Each message has its own random 16-byte IV. AuthTag enforces tamper detection on decrypt.
-- Plaintext fallback only for legacy/system messages (read path tolerates it; write path always encrypts).
-- Key derivation: `scrypt(ENCRYPTION_KEY, ENCRYPTION_SALT, 32)`. **Never rotate** `ENCRYPTION_KEY` or `ENCRYPTION_SALT` without a re-encryption job; doing so will orphan every existing message.
+**The attack.** Steal her cookie via XSS, reuse it forever.
 
-### Tracking pseudonymisation (HMAC)
+**The defence — three layers.**
 
-- [services/ingest/src/hash.ts](services/ingest/src/hash.ts) and [services/shared/src/track/hash.ts](services/shared/src/track/hash.ts).
-- `uidHash = base64url(HMAC-SHA256(uid, TRACKING_HASH_SECRET))[:22]`.
-- Tracking tables (`EventAggDaily`, `FeatureSnapshot`, `PairCompatCache`) store **only** `uidHash`. Raw user IDs never enter the analytics plane.
-- **Never rotate** `TRACKING_HASH_SECRET` — it orphans every historical row.
+1. **httpOnly cookies.** JavaScript on the page cannot read the cookie,
+   so an XSS bug can't steal it.
+2. **Short access token.** JWT (HS256, signed with `JWT_SECRET`) is
+   valid for **15 minutes**. Stolen cookies stop working quickly.
+3. **Revocable refresh tokens.** The refresh token is stored
+   server-side; we can revoke an entire session row.
+   Password change → all sessions revoked.
 
-## 3. Secrets (env vars)
+```ts
+// services/auth/src/server.ts — on password change
+await prisma.session.deleteMany({ where: { userId } });
+```
 
-| Var | Generator | Rotatable | Used by |
-|---|---|---|---|
-| `JWT_SECRET` | `openssl rand -hex 64` | Yes (rolling) | auth (sign), gateway (verify) |
-| `JWT_REFRESH_SECRET` | `openssl rand -hex 32` | Yes | auth |
-| `INTERNAL_SERVICE_KEY` | `openssl rand -hex 32` | Yes (rolling) | all services |
-| `ENCRYPTION_KEY` | 32 bytes | **No** (would orphan messages) | messaging |
-| `ENCRYPTION_SALT` | 16 bytes | **No** | messaging |
-| `TRACKING_HASH_SECRET` | 32+ bytes | **No** (would orphan analytics) | ingest, tracking-worker |
-| `POSTGRES_PASSWORD` | strong | Yes | all |
-| `REDIS_URL` | host+auth | Yes | gateway, ingest, tracking-worker |
+---
 
-Storage:
-- Local: `.env` (gitignored). See [.env.example](.env.example).
-- Compose: shell env with `${VAR:?required}` fail-fast.
-- K8s: `Secret` resource templated from [k8s/templates/](k8s/templates/). External Secrets Operator (AWS Secrets Manager / Vault) or Bitnami Sealed Secrets recommended in real prod.
+## Door 3 — calling internal services directly
 
-## 4. Rate limiting
+**The attack.** Find a pod IP for `social` and call its `/like`
+endpoint without going through the gateway, bypassing rate-limit and
+auth.
 
-[services/gateway/src/server.ts](services/gateway/src/server.ts), Redis-backed (`rate-limit-redis`), in-memory fallback.
+**The defence — two layers.**
 
-| Limiter | Limit | Key |
-|---|---|---|
-| Global API | 5000 / 15 min | user or IP |
-| Auth (login/register) | 30 / 15 min | IP |
-| Forgot-password | 5 / 1 h | IP |
-| Refresh token | 60 / 15 min | user |
-| Report | 30 / 24 h | user |
-| Discover / Search | 20 / min | user |
-| Feed | 60 / min | user |
-| SSE streams | 10 / 1 h | user |
+1. **NetworkPolicy** (k8s) — default-deny; only the gateway can reach
+   backend service ports. An attacker inside another pod can't talk
+   to them.
+2. **`INTERNAL_SERVICE_KEY` header.** Every internal call carries
+   `X-Internal-Key: $INTERNAL_SERVICE_KEY`. Services reject calls
+   without it (or with a wrong value).
 
-Ingest has its own per-device limiter: 60 / min (silent drop).
+```ts
+// services/shared/src/middleware/internalAuth.ts
+if (req.headers['x-internal-key'] !== process.env.INTERNAL_SERVICE_KEY) {
+  return res.status(403).json({ error: 'forbidden' });
+}
+```
 
-## 5. Input handling
+---
 
-- **Helmet** strict CSP (`directives.defaultSrc: ["'self'"]`, `base-uri: ['none']`). Also enforces HSTS, X-Frame-Options DENY, X-Content-Type-Options nosniff. Ingest disables CSP (no HTML response surface) and sets CORP `cross-origin`.
-- **CORS** allowlist via `ALLOWED_ORIGINS` + `FRONTEND_URL`. Dev-only `CORS_BYPASS=true` to allow any origin.
-- **Sanitisation** ([services/shared/src/sanitize.ts](services/shared/src/sanitize.ts)) — strips HTML tags, `javascript:`/`data:`/`vbscript:`/event-handlers, null bytes. Recursive object sanitisation (max depth 5). Used by notifications, messaging, content on every user-supplied string.
-- **Zod schemas** ([services/shared/src/schemas.ts](services/shared/src/schemas.ts), [services/ingest/src/validate.ts](services/ingest/src/validate.ts)) validate every body.
-- **Body size limits**: 64 KB on `/v1/track`, 1 MB on messaging/notifications, 10 MB on users/social/content (for photos & media metadata).
-- **Idempotency-Key** ([services/shared/src/idempotency.ts](services/shared/src/idempotency.ts)) — Redis `SET NX EX 86400` on message send and likes. 8–128 chars alnum. Fails open on Redis outage.
+## Door 4 — spamming us off the internet
 
-## 6. AuthZ patterns
+**The attack.** Hammer `/auth/login` or `/social/like` with millions
+of requests to either DoS us or brute-force.
 
-- **Onboarding gate** at gateway: 60 s cache of `GET /api/v1/profiles/me/completion`. Below threshold (60 casual / 75 DTM) → `403 ONBOARDING_INCOMPLETE` → client redirects to `/onboarding`.
-- **Membership checks** in-handler:
-  - Chat message ops verify the user is `user1Id` or `user2Id` of the chat.
-  - Match ops verify ownership.
-  - Bookmark ops verify ownership.
-- **Block list** enforced in discovery and messaging: users blocked by either side never appear in lists.
-- **Visibility rules** ([services/shared/src/visibility.ts](services/shared/src/visibility.ts)): `CASUAL_PROFILE_VISIBILITY` vs `DTM_PROFILE_VISIBILITY` redact bio-data fields for non-matched viewers.
+**The defence.** Redis-backed rate-limit at the gateway, two layers:
 
-## 7. Consent & privacy
+| Layer    | Key                             | Default limits         |
+|----------|---------------------------------|-----------------------|
+| Per-IP   | `rl:ip:{ip}:{route}`            | 60 req/min per route   |
+| Per-user | `rl:user:{userId}:{route}`      | 30 req/min on writes   |
 
-- Client `ConsentBanner` modal; persisted state. SDK refuses to queue until decided.
-- `Do-Not-Track: 1` honoured at ingest.
-- `TRACKING_KILL=1` env stops both ingest writes and worker consumers (global emergency stop).
-- GDPR export: `GET /api/v1/settings/export`.
-- GDPR right-to-erasure: `DELETE /api/v1/settings/delete` (hard cascade in OLTP) + `npm run forget -- --uid <uid>` in tracking-worker (purges aggregates by `uidHash`).
+Exceeding the limit returns **`429 Too Many Requests`** with a
+`Retry-After` header. The keys auto-expire — no cleanup needed.
 
-## 8. OWASP Top 10 mapping (2021)
+```ts
+// services/gateway/src/server.ts
+app.use(rateLimitMiddleware({
+  windowSec: 60,
+  perIp: 60,
+  perUser: 30,
+}));
+```
 
-| Risk | Mitigation |
-|---|---|
-| A01 Broken access control | Gateway onboarding gate; per-handler membership checks; internal-key segregation |
-| A02 Cryptographic failures | AES-256-GCM with per-message IV; HMAC for tracking; bcrypt cost 12 for passwords |
-| A03 Injection | Prisma parameterised queries; Zod validation; sanitise.ts strips XSS payloads |
-| A04 Insecure design | One ingress (gateway); algorithms can't reach raw DB; tracking decoupled via Redis Stream |
-| A05 Security misconfiguration | Helmet strict CSP; `${VAR:?required}` fail-fast secrets; default-deny NetworkPolicy |
-| A06 Vulnerable components | `npm audit` in CI; Prisma 5.22; Node 20-alpine base |
-| A07 Identification & auth failures | JWT format pre-check; bcrypt; per-device rate limit on auth (30/15min); session revocation on password change |
-| A08 Software & data integrity | AuthTag on message decrypt; Idempotency-Key on writes; Prisma migration history checksummed |
-| A09 Logging & monitoring | Structured JSON logs (PII-redacted); Prometheus metrics; AuditLog table |
-| A10 SSRF | No user-controlled outbound URLs; `images.remotePatterns` allowlist in Next.js |
+---
 
-## 9. Network posture (K8s)
+## Door 5 — reading chats from the database
 
-- `default-deny` NetworkPolicy at namespace level.
-- Pod-to-pod allowed only within the namespace.
-- Only **gateway** and **web** have ingress from the world.
-- Egress to DNS (53 TCP/UDP) allowed.
-- Postgres + Redis are headless StatefulSets — not exposed.
+**The attack.** Steal a Postgres dump and read everyone's private
+messages.
 
-## 10. Headers (frontend)
+**The defence.** Every message body is encrypted with **AES-256-GCM**
+before insert. The plaintext never touches Postgres. Even our DBAs
+cannot read messages.
 
-[services/web/next.config.js](services/web/next.config.js) — applied to every response:
+```ts
+// services/messaging/src/crypto.ts
+const iv = randomBytes(12);                          // fresh per message
+const cipher = createCipheriv('aes-256-gcm', KEY, iv);
+const ciphertext = Buffer.concat([cipher.update(plain, 'utf8'), cipher.final()]);
+const authTag = cipher.getAuthTag();
+// stored: { iv, ciphertext, authTag }   ← all three needed to decrypt
+```
 
-- `Strict-Transport-Security: max-age=31536000`
-- `X-Frame-Options: DENY`
-- `X-Content-Type-Options: nosniff`
-- `Referrer-Policy: strict-origin-when-cross-origin`
-- `Permissions-Policy: camera=(), microphone=(), geolocation=()`
+Key derivation: `KEY = scrypt(ENCRYPTION_KEY, ENCRYPTION_SALT, 32)`.
+**Never rotate** these two env vars once messages exist — rotation
+makes all stored ciphertext permanently unreadable.
 
-## 11. What changed & why it's good
+---
 
-- **Before:** JWT verification was duplicated in every service; message ciphertext shared one IV across a chat; tracking stored raw user IDs in analytics tables.
-- **After:** JWT is verified once at the gateway; messages use per-message random IVs with authTags; tracking uses HMAC `uidHash` only.
-- **Why it matters:** A leaked downstream pod doesn't compromise tokens. A leaked analytics dump can't be re-identified without `TRACKING_HASH_SECRET`. A tampered ciphertext fails the authTag check loudly instead of decrypting to garbage.
+## Door 6 — SQL injection / mass assignment
+
+**The attack.** Smuggle `'; DROP TABLE Users;--` through a form, or
+POST `{ "isAdmin": true }` to a profile-update endpoint.
+
+**The defence — two layers.**
+
+1. **Prisma ORM** — parameterised queries everywhere. There is no raw
+   SQL string concatenation in the codebase.
+2. **Zod schemas at every boundary.** Every request body is validated
+   against an explicit Zod schema before any service code runs. Extra
+   fields are stripped, wrong types are rejected.
+
+```ts
+const ProfileUpdate = z.object({
+  displayName: z.string().min(1).max(60),
+  bio: z.string().max(280).optional(),
+}).strict();   // extra fields rejected
+```
+
+---
+
+## Door 7 — secrets leaking through logs
+
+**The attack.** Find an error log that printed a JWT or DB password,
+walk in through the front door.
+
+**The defence — three layers.**
+
+1. **Central logger with redaction** in
+   [services/shared/src/logger.ts](services/shared/src/logger.ts):
+   any field named `password`, `token`, `secret`, `authorization`,
+   `cookie` is replaced with `'[REDACTED]'` before serialisation.
+2. **Strict CSP** on web responses — blocks inline scripts, blocks
+   third-party origins. Reduces blast radius of any XSS.
+3. **No console.log in services.** Lint rule blocks it; only the
+   logger is allowed.
+
+---
+
+## Bonus — the things you must never do
+
+1. **Don't rotate `TRACKING_HASH_SECRET` once events exist.**
+   It makes every historical userHash unjoinable.
+2. **Don't rotate `ENCRYPTION_KEY` or `ENCRYPTION_SALT` once chats
+   exist.** It makes every stored message permanently unreadable.
+3. **Don't disable rate-limit "just to test."** Always test in staging
+   with realistic limits.
+4. **Don't `npm install` random packages** — supply-chain attacks are
+   real. Use pinned versions in package-lock.json.
+
+---
+
+## OWASP Top 10 mapping
+
+| OWASP                                    | Where we address it                            |
+|------------------------------------------|------------------------------------------------|
+| A01 Broken Access Control                | Gateway auth + per-service authorization       |
+| A02 Cryptographic Failures               | AES-256-GCM (chats), bcrypt cost 12 (passwords)|
+| A03 Injection                            | Prisma + Zod                                   |
+| A04 Insecure Design                      | This document                                  |
+| A05 Security Misconfiguration            | `${VAR:?required}` in compose; strict CSP      |
+| A06 Vulnerable Components                | Renovate bot + `npm audit` in CI               |
+| A07 Identification & Auth Failures       | Bcrypt + short JWT + refresh-token revocation  |
+| A08 Software & Data Integrity Failures   | Signed images + k8s pod security               |
+| A09 Logging & Monitoring Failures        | Central logger + Prometheus alerts             |
+| A10 SSRF                                 | Egress NetworkPolicy + URL allowlist           |
+
+---
+
+## What changed and why it's better
+
+- **Before:** plaintext messages, single long-lived JWT, no rate-limit,
+  no internal-service auth.
+- **After:** AES-256-GCM at rest with per-message IV, 15-min JWT with
+  revocable refresh, Redis-backed rate-limit at the gateway, internal
+  service key required on every internal call.
+- **Why Priya feels it:** she can have hard conversations on chat
+  knowing nobody — not even us — can read them. If her phone is
+  stolen, the thief has at most 15 minutes before her access token
+  expires.
+
+---
+
+## If something breaks
+
+| Symptom                                  | First check                                                |
+|------------------------------------------|------------------------------------------------------------|
+| Users mass-logged out                    | `JWT_SECRET` changed unexpectedly?                         |
+| Messages decoding to garbage             | `ENCRYPTION_KEY` / `ENCRYPTION_SALT` rotated — restore!    |
+| Real users getting 429 from gateway      | Per-user rate-limit too tight — check `windowSec`/`perUser`|

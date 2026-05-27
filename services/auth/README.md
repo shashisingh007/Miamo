@@ -1,110 +1,100 @@
 # auth
 
-## 1. Purpose
+> The bouncer at the door — checks IDs, hands out wristbands, and remembers who is here.
 
-Owns user identity: registration, login, JWT issuance, password change, session inventory and revocation. The only writer of `User.passwordHash`. Everything else (profile fields, settings, etc.) lives in [users](../users/README.md).
+## 1. The story (60 seconds)
 
-## 2. Mental model
+Priya types her email and password, taps "Sign in", and a second later
+she's on the Discover screen. Two weeks later her laptop is stolen; she
+opens Miamo from a new phone, changes her password, and every old
+session — including the one on the stolen laptop — stops working
+immediately. Both of those moments are this service.
 
-A pure HTTP service in front of the `User` and `Session` tables. Stateless. Issues JWT (HS256) access tokens (~15 min) and refresh tokens (~30 days). Password hashing uses `bcryptjs` cost 12. Sessions are tracked per device (browser, OS, IP, UA) for visibility and per-session revoke. Changing the password revokes every session at once.
+## 2. What this service is (in one picture)
 
-## 3. Public surface
-
-| Method | Path | Auth | Purpose | Source |
-|---|---|---|---|---|
-| POST | `/api/v1/auth/register` | none | Create user + initialise Profile | [server.ts](src/server.ts#L91) |
-| POST | `/api/v1/auth/login` | none | Issue JWT + session row | [server.ts](src/server.ts#L125) |
-| POST | `/api/v1/auth/logout` | bearer | Revoke all sessions; mark offline | [server.ts](src/server.ts#L165) |
-| PUT | `/api/v1/auth/password` | bearer | Verify current, hash new, revoke sessions | [server.ts](src/server.ts#L177) |
-| GET | `/api/v1/auth/me` | bearer | Full user + profile + counts | [server.ts](src/server.ts#L201) |
-| POST | `/api/v1/auth/refresh` | refresh | New access token | [server.ts](src/server.ts#L215) |
-| GET | `/api/v1/auth/sessions` | bearer | List active sessions | [server.ts](src/server.ts#L240) |
-| POST | `/api/v1/auth/sessions/:id/revoke` | bearer | Revoke single session | [server.ts](src/server.ts#L253) |
-| GET | `/healthz`, `/readyz` | none | Probes | shared |
-
-## 4. Data model
-
-Cross-service shared schema ([services/shared/prisma/schema.prisma](../shared/prisma/schema.prisma)). Models written by auth:
-
-| Model | Purpose |
-|---|---|
-| `User` | id, email, passwordHash, displayName, username, miamoId, verified, active, deactivated, timestamps |
-| `Profile` | extended user data (auth initialises a row at registration) |
-| `Session` | one row per device; token, deviceType, browser, OS, IP, UA, lastActiveAt, revoked |
-| `Settings`, `PrivacySettings` | initialised at registration with defaults |
-
-## 5. Dependencies
-
-| Talks to | Why | How |
-|---|---|---|
-| Postgres | Read/write `User`, `Session`, init Profile/Settings | Prisma |
-| bcryptjs | Password hashing | in-process |
-| jsonwebtoken | Sign/verify JWT | in-process |
-
-No other service is called outbound.
-
-## 6. Configuration
-
-| Env | Default | Required | Purpose |
-|---|---|---|---|
-| `PORT` | `3201` | no | HTTP port |
-| `DATABASE_URL` | — | yes | Postgres connection |
-| `JWT_SECRET` | — | yes | HS256 sign key |
-| `JWT_REFRESH_SECRET` | — | yes | HS256 refresh key |
-| `INTERNAL_SERVICE_KEY` | — | yes | Internal call auth |
-| `NODE_ENV` | `production` | no | `test` skips `app.listen()` |
-
-## 7. Worked example — register + login
-
-```bash
-# 1. Register
-curl -X POST http://localhost:3200/api/v1/auth/register \
-  -H 'content-type: application/json' \
-  -d '{"email":"alex@example.com","password":"S3cret!","displayName":"Alex"}'
-
-# → 201
-# {
-#   "user": { "id":"clx...", "email":"alex@example.com", "miamoId":"AX-..." },
-#   "accessToken": "eyJ...",  "refreshToken": "eyJ..."
-# }
-
-# Side effects in DB:
-#   INSERT User (passwordHash = bcrypt(password, 12))
-#   INSERT Profile (defaults; completionScore=0)
-#   INSERT Settings, PrivacySettings (defaults)
-#   INSERT Session (this device)
-
-# 2. Login
-curl -X POST http://localhost:3200/api/v1/auth/login \
-  -H 'content-type: application/json' \
-  -d '{"email":"alex@example.com","password":"S3cret!"}'
-# → 200, returns new accessToken + new Session row
+```mermaid
+flowchart LR
+    Priya[Priya's phone] --> GW[gateway]
+    GW --> Auth[auth :3201]
+    Auth --> DB[(Postgres<br/>User, Session)]
+    Auth -. "issues JWT wristband" .-> Priya
 ```
 
-## 8. Local dev
+## 3. What it can do (the menu)
+
+| When Priya does this…              | …the app calls                         | …and gets back                          | Source |
+|------------------------------------|----------------------------------------|-----------------------------------------|--------|
+| Signs up                           | `POST /auth/signup`                    | `{accessToken, refreshToken, userId}`   | [src](services/auth/src/server.ts) |
+| Logs in                            | `POST /auth/login`                     | same as above                           | [src](services/auth/src/server.ts) |
+| Refreshes her session              | `POST /auth/refresh`                   | new `{accessToken}`                     | [src](services/auth/src/server.ts) |
+| Changes password (revokes all)     | `POST /auth/password`                  | `{ok: true}` + all sessions deleted     | [src](services/auth/src/server.ts) |
+| Logs out                           | `POST /auth/logout`                    | `204 No Content`                        | [src](services/auth/src/server.ts) |
+
+## 4. The data it remembers
+
+- **`User`** — one row per person. Holds email, bcrypt password hash, `emailVerified`, `deletedAt`.
+- **`Session`** — one row per active login. Holds `refreshToken` hash, device info, `expiresAt`.
+
+Schema lives in [services/shared/prisma/schema.prisma](services/shared/prisma/schema.prisma).
+
+## 5. Who it talks to
+
+- **Postgres** — its own `User` and `Session` tables only.
+- Nobody else outbound. Auth is leaf.
+
+## 6. The knobs (configuration)
+
+| Env var                | What it does (plain English)                              | Example                             | What breaks if wrong                       |
+|------------------------|-----------------------------------------------------------|-------------------------------------|--------------------------------------------|
+| `DATABASE_URL`         | Where Postgres lives                                       | `postgresql://miamo:miamo@db:5432/miamo` | Service can't start                      |
+| `JWT_SECRET`           | Signs the 15-min access wristband (JWT)                    | 32+ random bytes                    | Rotating it logs everyone out             |
+| `JWT_REFRESH_SECRET`   | Signs the 30-day refresh wristband                         | 32+ random bytes                    | Same — invalidates refresh tokens         |
+| `BCRYPT_COST`          | How slow to hash passwords (defaults to 12)                | `12`                                | Lower = brute-force easier; higher = login slow |
+| `PORT`                 | Listen port                                                | `3201`                              | Gateway can't reach it                    |
+
+## 7. A real example, end-to-end
+
+Priya signs up.
+
+> "Her phone POSTs her email + password to the gateway."
+> ```bash
+> curl -X POST http://localhost:3200/auth/signup \
+>   -H 'content-type: application/json' \
+>   -d '{"email":"priya@example.com","password":"trekL0ver!"}'
+> ```
+> "Gateway forwards to auth. Auth bcrypts the password, inserts a User row,
+> issues a 15-min JWT and a 30-day refresh token."
+> ```json
+> {
+>   "userId": "usr_priya",
+>   "accessToken": "eyJhbGciOiJIUzI1NiIs…",   // 15 min
+>   "refreshToken": "eyJhbGciOiJIUzI1NiIs…"   // 30 days
+> }
+> ```
+> "Phone stores both as httpOnly cookies. Next request to any service
+> carries the access token; gateway verifies it and forwards."
+
+## 8. Run it on your laptop
 
 ```bash
-cd services/auth
-npx prisma generate --schema=../shared/prisma/schema.prisma
-npm run dev          # tsx watch src/server.ts → :3201
-curl :3201/healthz
+docker compose up -d postgres
+cd services/auth && npm install && npm run dev
 ```
 
-The shared seed (`npm run db:seed` at repo root) creates `miamo1`..`miamo20` with password = username.
+## 9. How we know it works (tests)
 
-## 9. Tests
+- **`auth.test.ts`** — wrong password is rejected; right password returns a token; expired access token returns 401; refresh issues a new access token; password change deletes all sessions.
 
-No service-local tests. Auth flow covered indirectly by `scripts/test-demo-users.py` and `scripts/api-test.sh`.
+## 10. If something breaks
 
-## 10. Failure modes & operational notes
+| Symptom                                  | First check                                    |
+|------------------------------------------|------------------------------------------------|
+| Every login returns 401                  | `JWT_SECRET` mismatch between auth and gateway |
+| Signup hangs                             | bcrypt cost too high or DB unreachable         |
+| Password change doesn't invalidate session| `Session` table delete failed — check logs    |
 
-- **JWT_SECRET rotated badly** → existing tokens reject at gateway. Symptom: `401` on every request. Fix: roll the env back.
-- **Postgres pool exhausted** at registration storm. Bump pool size or scale Postgres.
-- **bcrypt cost too high on tiny pods** → login latency spikes. Cost 12 is calibrated for ≥ 256 MB containers.
-- **`passwordHash` accidentally serialised** — handlers explicitly destructure `{ passwordHash, ...user }` before returning. New endpoints must do the same.
+## 11. What changed and why it's better
 
-## 11. What changed & why it's good
-
-- **Before:** Login lived in a monolithic `social` service alongside ranking, so login latency moved with discover load.
-- **After:** Auth is a small, stateless service that scales independently and exposes one clean surface (`/api/v1/auth/*`).
-- **Why it matters:** A spike in discover traffic no longer slows login. Token rotation is a one-service deploy.
+- **Before:** one long-lived JWT (30d). A stolen cookie meant a month of risk.
+- **After:** 15-min access + revocable 30-day refresh. Password change revokes everything.
+- **Why Priya feels it:** if she changes her password, the stolen laptop is locked out instantly — not in 30 days.

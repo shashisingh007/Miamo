@@ -1,97 +1,102 @@
 # messaging
 
-## 1. Purpose
+> Private encrypted chats — what Priya and Arjun actually say to each other.
 
-Owns chats, messages, beats, and chat-level UX state (pin/mute/archive/theme/background). Encrypts every user-authored message at rest with AES-256-GCM. Exposes two read endpoints consumed by social: communication-style profile and recent-sent-texts (for Miamo Move generation).
+## 1. The story (60 seconds)
 
-## 2. Mental model
+Priya and Arjun match. The chat opens with a friendly suggested
+opener: "Hampta Pass — was the river crossing scary?". She edits it,
+adds a laughing emoji, sends. Two hundred milliseconds later Arjun's
+phone (which had the chat tab open) shows the message. By message 20,
+the app quietly shows them a "vibe match" badge — their reply tempos
+have aligned.
 
-A 1:1 chat per `Match` (`Chat.matchId` unique). Every `Message` carries an enum `type` (`text`, `voice`, `image`, `gif`) and an opaque encrypted `content` blob. The handler decrypts on read, encrypts on write. Smart-reply suggestions are computed in-process via `suggestMessages` + `suggestMoves` from [services/shared/src/algo](../shared/src/algo/).
+## 2. What this service is (in one picture)
 
-## 3. Public surface
-
-| Method | Path | Purpose | Source |
-|---|---|---|---|
-| GET | `/api/v1/messages/chats` | Active chats w/ unread + last-msg preview | [server.ts](src/server.ts#L79) |
-| GET | `/api/v1/messages/chats/archived` | Archived chats | [server.ts](src/server.ts#L120) |
-| GET | `/api/v1/messages/chats/:chatId/messages` | Cursor-paged messages (decrypt + mark read) | [server.ts](src/server.ts#L140) |
-| POST | `/api/v1/messages/chats/:chatId/messages` | Send (idempotent via Idempotency-Key) | [server.ts](src/server.ts#L165) |
-| PUT | `/api/v1/messages/messages/:id` | Edit own | [server.ts](src/server.ts#L213) |
-| POST | `/api/v1/messages/messages/:id/delete-for-me` | Soft delete | [server.ts](src/server.ts#L222) |
-| POST | `/api/v1/messages/messages/:id/delete-for-all` | Hard delete (2h window, sender only) | [server.ts](src/server.ts#L890) |
-| POST | `/api/v1/messages/messages/:id/react` | Toggle emoji reaction | [server.ts](src/server.ts#L247) |
-| POST | `/api/v1/messages/chats/:chatId/{pin,mute,archive,unarchive,theme}` | Chat state | [server.ts](src/server.ts#L270) |
-| DELETE | `/api/v1/messages/chats/:chatId/clear` | Clear for me | [server.ts](src/server.ts#L343) |
-| GET | `/api/v1/messages/chats/:chatId/search` | In-thread search (decrypt in memory) | [server.ts](src/server.ts#L363) |
-| POST | `/api/v1/messages/chats/:chatId/suggestions` | Smart reply (legacy) | [server.ts](src/server.ts#L385) |
-| POST | `/api/v1/messages/chats/:chatId/suggestions-v4` | Smart reply (v4 flag) | server.ts (Phase H) |
-| GET | `/api/v1/messages/comm-profile/:userId` | Communication style vector (for social) | server.ts |
-| GET | `/api/v1/messages/sent-texts/:userId?limit=N` | Recent sent messages (for Move generation) | server.ts |
-
-## 4. Data model
-
-Writes: `Chat`, `Message`, `Beat`, `BeatEvent`. Reads: `Match`, `Profile`, `Block`.
-
-## 5. Dependencies
-
-| Talks to | Why | How |
-|---|---|---|
-| Postgres | Chat, Message, Beat | Prisma |
-| Node `crypto` | AES-256-GCM + scrypt key derivation | in-process |
-| gateway | SSE fan-out via `/internal/push-event` | HTTP |
-| `services/shared/src/algo/{messageSuggest,moves}` | suggestions | in-process |
-
-## 6. Configuration
-
-| Env | Default | Purpose |
-|---|---|---|
-| `PORT` | `3204` | HTTP port |
-| `DATABASE_URL` | — | Postgres |
-| `INTERNAL_SERVICE_KEY` | — | Internal-call auth |
-| `ENCRYPTION_KEY` | — | AES-256-GCM key (do NOT rotate) |
-| `ENCRYPTION_SALT` | — | scrypt salt (do NOT rotate) |
-| `GATEWAY_URL` | `http://localhost:3200` | SSE push target |
-| `ALGO_V4_RANK_ENABLED_MESSAGING` | `0` | Enable `/suggestions-v4` |
-
-## 7. Worked example — send message
-
-```bash
-curl -X POST http://localhost:3200/api/v1/messages/chats/<chatId>/messages \
-  -H 'authorization: Bearer eyJ...' \
-  -H 'idempotency-key: 8f3c...' \
-  -H 'content-type: application/json' \
-  -d '{"content":"hey 👋","type":"text"}'
+```mermaid
+flowchart LR
+    Priya[Priya's phone] --> GW[gateway]
+    Arjun[Arjun's phone] --> GW
+    GW --> Msg[messaging :3204]
+    Msg --> DB[(Postgres<br/>Chat, Message<br/>ciphertext only)]
+    Msg --> Shared[shared/algo<br/>messageSuggest, beats]
+    Msg -. SSE publish .-> GW
+    GW -. SSE push .-> Arjun
 ```
 
-Server flow:
+## 3. What it can do (the menu)
 
-1. Verify membership of `chatId`.
-2. Encrypt: `ciphertext = enc:<iv>:<authTag>:<aes-256-gcm(plaintext)>`.
-3. `INSERT Message ...; UPDATE Chat.lastMessageAt`.
-4. POST `/internal/push-event` to gateway → SSE to the other user.
-5. Return `{ id, createdAt, type }` — never the ciphertext.
+| When Priya does this…                  | …the app calls                               | …and gets back                  | Source |
+|----------------------------------------|----------------------------------------------|---------------------------------|--------|
+| Lists her chats                        | `GET /messaging/chats`                       | array of chat summaries          | [src](services/messaging/src/server.ts) |
+| Opens a chat                           | `GET /messaging/chats/{id}/messages?cursor=` | last 50 decrypted messages       | [src](services/messaging/src/server.ts) |
+| Gets an opener suggestion              | `GET /messaging/chats/{id}/suggest`          | `{text: "Hampta Pass — was…"}`   | [src](services/messaging/src/server.ts) |
+| Sends a message                        | `POST /messaging/chats/{id}/messages`        | `{id, sentAt}`                   | [src](services/messaging/src/server.ts) |
+| Sees vibe-match badge                  | `GET /messaging/chats/{id}/beats`            | `{vibeMatch: true}`              | [src](services/messaging/src/server.ts) |
 
-## 8. Local dev
+## 4. The data it remembers
+
+- **`Chat`** — one row per pair (created when they match).
+- **`Message`** — one row per message: `{chatId, senderId, iv, ciphertext, authTag, createdAt}`. **Plaintext is never stored.**
+
+## 5. Who it talks to
+
+- **Postgres** — its own tables.
+- **shared/algo** — `messageSuggest` (opener), `beats` (vibe).
+- **gateway** — pushes live updates via internal SSE publish endpoint.
+
+## 6. The knobs (configuration)
+
+| Env var                                  | What it does                                       | Example     | What breaks                                |
+|------------------------------------------|----------------------------------------------------|-------------|--------------------------------------------|
+| `DATABASE_URL`                            | Postgres                                           | …           | service won't start                         |
+| `ENCRYPTION_KEY`                          | Master key for AES-256-GCM                         | 32+ bytes   | **Rotation breaks every old message**       |
+| `ENCRYPTION_SALT`                         | Salt for scrypt key derivation                     | random      | **Rotation breaks every old message**       |
+| `INTERNAL_SERVICE_KEY`                    | Verifies social's internal calls                   | …           | new chats can't be created                  |
+| `ALGO_V4_RANK_ENABLED_MESSAGING`          | Enables opener suggestion endpoint                  | `'1'`       | suggest endpoint returns empty               |
+| `ALGO_V4_RANK_ENABLED_BEATS`              | Enables vibe-match badge                            | `'1'`       | badge never shows                            |
+| `PORT`                                    | Listen port                                         | `3204`      | gateway can't reach                          |
+
+## 7. A real example, end-to-end
+
+Priya sends a message.
+
+> ```bash
+> curl -X POST http://localhost:3200/messaging/chats/cht_abc123/messages \
+>   -H 'authorization: Bearer eyJ…' \
+>   -H 'content-type: application/json' \
+>   -d '{"text":"Hey, where was that trek photo taken?"}'
+> ```
+> "Messaging generates a fresh 12-byte IV, encrypts the text with
+> AES-256-GCM, stores `{iv, ciphertext, authTag}`, publishes an SSE
+> event so Arjun's open tab updates."
+> ```json
+> { "id": "msg_x1y2", "sentAt": "2026-05-27T15:34:22Z" }
+> ```
+
+## 8. Run it on your laptop
 
 ```bash
-cd services/messaging
-npx prisma generate --schema=../shared/prisma/schema.prisma
-npm run dev
+docker compose up -d postgres
+cd services/messaging && npm install && npm run dev
 ```
 
-## 9. Tests
+## 9. How we know it works (tests)
 
-None local. Algo tests at root cover `suggestMessages` and `suggestMoves`.
+- **`crypto.test.ts`** — encrypt then decrypt round-trips; tampered ciphertext fails auth tag verification.
+- **`messages.test.ts`** — message persisted, pagination by cursor works, can't read another user's chat.
+- **`suggest.test.ts`** — produces a non-empty opener when profile has interests.
 
-## 10. Failure modes & operational notes
+## 10. If something breaks
 
-- **AuthTag mismatch on decrypt** → likely key/salt rotated, or DB row tampered. Handler logs and returns a sanitised placeholder; preserves raw ciphertext for forensics.
-- **N+1 unread counts** → addressed via `groupBy`. New endpoints listing chats must use the same pattern.
-- **Search decrypts every match in memory** → expensive on huge threads. Capped at 200 messages per search.
-- **Suggestions LRU** capped at 200 entries; mostly hits within a session.
+| Symptom                                  | First check                                      |
+|------------------------------------------|--------------------------------------------------|
+| Messages decode to garbage                | `ENCRYPTION_KEY` / `ENCRYPTION_SALT` rotated?    |
+| Messages save but Arjun doesn't see them  | SSE pipe to gateway broken — check logs          |
+| Suggest endpoint always returns empty     | `ALGO_V4_RANK_ENABLED_MESSAGING='0'`              |
 
-## 11. What changed & why it's good
+## 11. What changed and why it's better
 
-- **Before:** Messages were stored in plaintext; one IV per chat exposed pattern correlations; smart replies were template strings.
-- **After:** Per-message random IVs + authTag; suggestions are scored by `messageSuggest` (attentionFit/recencyFit/noveltyFit/intentFit/chronoFit) and ranked.
-- **Why it matters:** A DB dump leaks no message content. Replies adapt to the receiver's communication profile and active hours.
+- **Before:** messages stored as plaintext. Any DB read could leak chats.
+- **After:** AES-256-GCM with per-message IV and auth tag. Even our DBAs cannot read.
+- **Why Priya feels it:** she can have hard, honest conversations knowing they are private — full stop.

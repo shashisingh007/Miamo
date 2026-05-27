@@ -1,110 +1,103 @@
 # social
 
-## 1. Purpose
+> The heart of dating — who shows up in Discover, who matches with whom, who pairs up for AI Match.
 
-The matching engine: discover, likes/passes, matches, Miamo Moves, vibe checks, safety reports, and the daily AI Match endpoint. Largest service in the repo (~2300 LoC) and the heaviest consumer of the v4 algo system.
+## 1. The story (60 seconds)
 
-## 2. Mental model
+Priya opens Discover. She sees Arjun's smiling trek photo. She swipes
+right. The screen flashes "It's a match!" and a chat appears in her
+Matches tab. Tomorrow morning the app shows her one curated AI Pick:
+Meera, who shares 8 of her 10 interests. Every one of those moments is
+this service.
+
+## 2. What this service is (in one picture)
 
 ```mermaid
 flowchart LR
-  CLIENT -->|GET /discover| SOC[social]
-  SOC -->|reader.features+pair| TW_DATA[(FeatureSnapshot<br/>PairCompatCache)]
-  SOC -->|17 algos| RANKER[scoreAiPicksV4]
-  SOC -->|reader.targetImpressions| TW_DATA
-  RANKER --> SOC
-  SOC -->|/comm-profile| MSG[messaging]
-  SOC --> PG[(Postgres)]
+    Priya[Priya's phone] --> GW[gateway]
+    GW --> Social[social :3203]
+    Social --> Shared[shared/algo<br/>forYou, aiPicks,<br/>aiMatch, cf, dtm…]
+    Social --> DB[(Postgres<br/>Like, Pass, Match, DailyMatch)]
+    Social --> Notif[notifications<br/>internal HTTP]
+    Social --> Msg[messaging<br/>internal HTTP]
 ```
 
-On every read, social loads candidates, asks `SignalReader` for features and pair-compatibility, runs `scoreAiPicksV4`, applies `postImpressionPenalty`, and returns ranked candidates with `explain`. Writes the resulting impression event to the tracking pipeline via the browser SDK.
+## 3. What it can do (the menu)
 
-## 3. Public surface
+| When Priya does this…              | …the app calls                            | …and gets back                       | Source |
+|------------------------------------|-------------------------------------------|--------------------------------------|--------|
+| Loads Discover                     | `GET /social/discover?limit=10`           | array of ranked candidates           | [src](services/social/src/server.ts) |
+| Likes Arjun                        | `POST /social/like` `{targetId}`          | `{matched: true, chatId}` if mutual  | [src](services/social/src/server.ts) |
+| Passes on Rohan                    | `POST /social/pass` `{targetId}`          | `204`                                | [src](services/social/src/server.ts) |
+| Sees today's AI Pick               | `GET /social/ai-picks/today`              | `{userId, score, reason}`            | [src](services/social/src/server.ts) |
+| Sees AI Match suggestions          | `GET /social/ai-match`                    | array of symmetric matches           | [src](services/social/src/server.ts) |
+| Runs vibe-check (chat-style intro) | `POST /social/vibe-check`                 | `{compatibility: 0.78}`              | [src](services/social/src/server.ts) |
 
-| Method | Path | Purpose | Source |
-|---|---|---|---|
-| POST | `/api/v1/activity/track` | Forward activity from gateway | [server.ts](src/server.ts#L315) |
-| GET | `/api/v1/activity/analysis` | Behavioural cluster, temporal pattern | [server.ts](src/server.ts#L327) |
-| GET | `/api/v1/discover` | Ranked candidates (v4 when flag on) | [server.ts](src/server.ts#L358) |
-| POST | `/api/v1/discover/:id/like` | Insert Like; create Match on mutual | server.ts |
-| POST | `/api/v1/discover/:id/pass` | Insert pass | server.ts |
-| POST | `/api/v1/discover/:id/comment` | Like/pass with note | server.ts |
-| POST | `/api/v1/discover/:id/move` | Send Miamo Move (opener) | server.ts |
-| GET | `/api/v1/matches`, `/incoming` | Active matches, incoming likes | server.ts |
-| POST | `/api/v1/matches/:id/{favorite,pin,report}` | Match actions | server.ts |
-| POST | `/api/v1/matches/incoming/:userId/match-back[-move]` | Reciprocate | server.ts |
-| POST | `/api/v1/ai-match/suggestions` | Daily AI Match candidate(s); reads `reader.dailyMatch` | server.ts |
-| POST | `/api/v1/vibe-check` | Save vibe (mood/energy/intent/topics) | server.ts |
-| POST | `/api/v1/safety/report` | Report user | server.ts |
-| GET | `/api/v1/discover/filters`, PUT | DiscoverFilter CRUD | server.ts |
+## 4. The data it remembers
 
-## 4. Data model
+- **`Like`** — one row per (viewer → target) like.
+- **`Pass`** — one row per (viewer → target) pass.
+- **`Match`** — one row per mutual-like pair.
+- **`DailyMatch`** — overnight-computed daily pick per user.
 
-Writes: `Like`, `Match`, `MatchRequest`, `MatchFeedback`, `UserActivity`, `VibeCheck`, `Report`, `Block`, `MiamoMove`, `DiscoverFilter`. Reads: `User`, `Profile`, `FeatureSnapshot`, `PairCompatCache`.
+## 5. Who it talks to
 
-## 5. Dependencies
+- **shared/algo** for ranking (`forYou`, `aiPicks`, `aiMatch`, `cf`, `dtm`, `new`, `active`, `verified`, `serious`, `moves`).
+- **messaging** — on match, opens a chat room (internal HTTP).
+- **notifications** — on match, enqueues "you have a new match" for Arjun.
+- **Postgres** — its own tables + read-only access to `User`/`Profile`.
 
-| Talks to | Why | How |
-|---|---|---|
-| Postgres | matches, likes, activity | Prisma |
-| messaging | `GET /api/v1/messages/comm-profile/:userId`, `/sent-texts/:userId?limit=10` (for Move generation) | HTTP |
-| `services/shared/src/algo/*` | 17 algos | in-process |
-| `PrismaSignalReader` | feature + pair lookups | in-process |
-| ML state cache | per-user bandit + LRU caches | in-process + UserData persistence |
+## 6. The knobs (configuration)
 
-## 6. Configuration
+| Env var                                    | What it does                                          | Example | What breaks                              |
+|--------------------------------------------|-------------------------------------------------------|---------|------------------------------------------|
+| `DATABASE_URL`                              | Postgres                                              | …       | service won't start                       |
+| `INTERNAL_SERVICE_KEY`                      | Verifies internal calls + used to call notif/msg      | …       | matches don't create chats / notifs       |
+| `ALGO_V4_RANK_ENABLED_DISCOVER`             | If `'1'`, Discover uses v4 ranking; else chronological| `'1'`   | Discover ranking falls back               |
+| `ALGO_V4_RANK_ENABLED_AIMATCH`              | If `'1'`, AI Match endpoint is live                   | `'0'`   | endpoint returns 404                      |
+| `ALGO_V4_WORKERS_ENABLED`                   | Read-only flag — informs which features are populated | `'1'`   | DTM-based picks may be empty               |
+| `PORT`                                      | Listen port                                           | `3203`  | gateway can't reach                       |
 
-| Env | Default | Purpose |
-|---|---|---|
-| `PORT` | `3203` | HTTP port |
-| `DATABASE_URL` | — | Postgres |
-| `INTERNAL_SERVICE_KEY` | — | Internal-call auth |
-| `MESSAGING_SERVICE_URL` | `http://localhost:3204` | Comm-profile lookup |
-| `ALGO_V4_RANK_ENABLED_DISCOVER` | `0` | Switch discover to v4 ensemble |
-| `ALGO_V4_RANK_ENABLED_AIMATCH` | `0` | Switch AI Match to v4 |
-| `ALGO_V4_RANK_ENABLED_DEEPCOMPAT` | `0` | Use v4 dtm for compat surface |
+## 7. A real example, end-to-end
 
-## 7. Worked example — Discover with v4 enabled
+Priya likes Arjun (he already liked her).
 
-```
-1. Gateway → GET /api/v1/discover (x-user-id=<uid>)
-2. Load my Profile + DiscoverFilter; query candidate pool (e.g. 60 users)
-3. aHash = reader.hashOf(uid); cHashes = candidates.map(reader.hashOf)
-4. me = reader.features(aHash); pairs = reader.pairCompat(aHash, cHashes)
-   imp = reader.targetImpressions(aHash, cHashes, 7)
-5. For each candidate c:
-     inputs = { me, cand=reader.features(cHash), pair=pairs.get(cHash),
-                intent, distance, age, interests, prior, impressions=imp.get(cHash) }
-     sub = { forYou, cf, active, serious, affinity, vibe, explore }
-     { score, explain } = scoreAiPicksV4({ ...inputs, sub })
-     penalty = postImpressionPenalty(impressions, secsSinceLast)
-     c._rank = max(0, score - penalty)
-6. Sort by _rank desc; attach `explain` and `algo: 'v4'` tag; return 24 items
-```
+> ```bash
+> curl -X POST http://localhost:3200/social/like \
+>   -H 'authorization: Bearer eyJ…' \
+>   -H 'content-type: application/json' \
+>   -d '{"targetId":"usr_arjun"}'
+> ```
+> "Social inserts the Like, finds Arjun's earlier Like, creates a Match
+> and a Chat, fires a notification to Arjun, returns the chatId."
+> ```json
+> { "matched": true, "chatId": "cht_abc123", "matchedAt": "2026-05-27T15:32:11Z" }
+> ```
 
-## 8. Local dev
+## 8. Run it on your laptop
 
 ```bash
-cd services/social
-npx prisma generate --schema=../shared/prisma/schema.prisma
-npm run dev
-# Toggle v4 locally
-ALGO_V4_RANK_ENABLED_DISCOVER=1 npm run dev
+docker compose up -d postgres messaging notifications
+cd services/social && npm install && npm run dev
 ```
 
-## 9. Tests
+## 9. How we know it works (tests)
 
-Algo tests at the workspace root cover the 17 rankers ([tests/algo-e2e.test.ts](../../tests/algo-e2e.test.ts), `algo-discover-fatigue.test.ts`, `algo-feed-augment.test.ts`).
+- **`discover.test.ts`** — returns N candidates, never includes self, never includes blocked users.
+- **`like.test.ts`** — non-mutual like returns `matched:false`; mutual returns `matched:true` with chatId.
+- **`ai-picks.test.ts`** — returns at most one pick per user per day.
+- **`vibe-check.test.ts`** — compatibility score is always in [0,1].
 
-## 10. Failure modes & operational notes
+## 10. If something breaks
 
-- **SignalReader cold cache** → first request after deploy ~280 ms p50. Warms to ~120 ms in seconds.
-- **DailyMatch not set** → `/ai-match` falls back to top of `scoreAiPicksV4`. No user-visible error.
-- **Messaging unavailable** → Move generation uses neutral defaults (logs a warning, returns generic opener).
-- **Bandit state out of sync** → loaded lazily from UserData. Worst case: cold start ranking.
+| Symptom                              | First check                                          |
+|--------------------------------------|------------------------------------------------------|
+| Discover returns 0 candidates         | filters too tight (age/distance) or DB has no users  |
+| Match happens but no chat appears     | messaging unreachable — check internal HTTP logs     |
+| AI Picks always empty                 | `ALGO_V4_WORKERS_ENABLED='0'` so DailyMatch is stale |
 
-## 11. What changed & why it's good
+## 11. What changed and why it's better
 
-- **Before:** Discover ranker was a 600-line function that imported Prisma and emitted scores with no `explain`. A/B was a code branch and a deploy.
-- **After:** Discover dispatches to `scoreAiPicksV4` behind a flag; the algo reads features through `SignalReader`; every score returns `explain`; a daily background worker pre-computes the top pick.
-- **Why it matters:** Support can answer "why this card?" from a single response payload. Ramps are one env var. Tests run without a DB.
+- **Before:** Discover was `ORDER BY last_active DESC`. Everyone saw the same order.
+- **After:** 17 algorithms in shared/algo, each behind a flag. Discover is personalised within 15 min of using the app.
+- **Why Priya feels it:** the people she actually swipes right on start showing up at the top, fast.

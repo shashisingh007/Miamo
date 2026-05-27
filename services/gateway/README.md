@@ -1,114 +1,109 @@
 # gateway
 
-## 1. Purpose
+> The single front door. Everything Priya's phone sends goes through here first.
 
-The single ingress for the browser. Verifies JWTs, enforces onboarding gates, rate-limits, sanitises headers, proxies to domain services, fans out Server-Sent Events to connected clients, and exposes aggregate health.
+## 1. The story (60 seconds)
 
-## 2. Mental model
+Priya's phone never talks directly to `auth`, `social`, `messaging`, or
+any other internal service. It only talks to `gateway`. Gateway checks
+her wristband (JWT), makes sure she's not hammering us (rate-limit),
+makes sure she's done onboarding before letting her into Discover,
+forwards her request to the right service, and keeps an SSE pipe open
+so live updates can stream back. One door. One firewall. One audit log.
+
+## 2. What this service is (in one picture)
 
 ```mermaid
 flowchart LR
-  BR[Browser] -->|JWT| GW[gateway :3200]
-  GW -->|/api/v1/auth/*| AU[auth]
-  GW -->|/api/v1/users, profiles, search/*| US[users]
-  GW -->|/api/v1/discover, matches, activity/*| SO[social]
-  GW -->|/api/v1/messages, beats/*| MS[messaging]
-  GW -->|/api/v1/feed, stories, videos, creativity/*| CO[content]
-  GW -->|/api/v1/notifications/*| NO[notifications]
-  GW -->|/api/v1/track/*| IN[ingest]
-  NO -.->|/internal/push-event| GW
-  MS -.->|/internal/push-event| GW
-  GW -.->|SSE| BR
-  GW <--> RD[(Redis<br/>rate-limit store)]
+    Priya[Priya's phone] --HTTPS--> GW[gateway :3200]
+    GW --> Auth[auth :3201]
+    GW --> Users[users :3202]
+    GW --> Social[social :3203]
+    GW --> Msg[messaging :3204]
+    GW --> Content[content :3205]
+    GW --> Notif[notifications :3206]
+    GW --> R[(Redis<br/>rate-limit + onboarding cache)]
+    GW -. SSE pipe .-> Priya
 ```
 
-Stateless and proxy-only — owns no Prisma model. The SSE registry is the only in-process state (per-user → connection map, 10 conn / user, multi-tab).
+## 3. What it can do (the menu)
 
-## 3. Public surface
+| When Priya does this…                  | …the gateway does                                  | Source |
+|----------------------------------------|----------------------------------------------------|--------|
+| Any `/auth/*` call                     | forward to `auth`, no JWT required                  | [src](services/gateway/src/server.ts) |
+| Any other `/svc/*` call                | check JWT, onboarding gate, rate-limit, then forward | [src](services/gateway/src/server.ts) |
+| Opens `/events/sse`                    | keep connection open; route per-user events down it | [src](services/gateway/src/server.ts) |
+| (Internal) `POST /internal/sse/publish`| push event to user's open SSE connection            | [src](services/gateway/src/server.ts) |
 
-| Method | Path | Auth | Purpose | Source |
-|---|---|---|---|---|
-| GET | `/healthz` | none | Liveness | [server.ts](src/server.ts#L314) |
-| GET | `/readyz` | none | Aggregate downstream ready | [server.ts](src/server.ts#L319) |
-| GET | `/health` | none | Full report incl. each service | [server.ts](src/server.ts#L334) |
-| GET | `/api/v1/events/stream` | bearer (JWT via header or `?token=`) | SSE stream, 25 s heartbeat | [server.ts](src/server.ts#L357) |
-| POST | `/internal/push-event` | `x-internal-key` | Fan-out to SSE subscribers of a user | [server.ts](src/server.ts#L419) |
-| POST | `/api/v1/activity/track` | bearer | Forward to social `/activity/track` | [server.ts](src/server.ts#L428) |
-| PROXY | `/api/v1/auth/**` | mixed | → auth | [server.ts](src/server.ts#L492) |
-| PROXY | `/api/v1/track/**` | none (rate-limited) | → ingest (pathRewrite `/v1/track`) | [server.ts](src/server.ts#L487) |
-| PROXY | `/api/v1/users/**`, `/profiles/**`, `/search/**`, `/bookmarks/**`, `/user-data/**`, `/settings/**` | bearer | → users | [server.ts](src/server.ts#L495) |
-| PROXY | `/api/v1/discover/**`, `/matches/**`, `/activity/**`, `/safety/**`, `/vibe-check/**`, `/ai-match/**` | bearer + onboarded | → social | [server.ts](src/server.ts#L503) |
-| PROXY | `/api/v1/messages/**`, `/beats/**` | bearer + onboarded | → messaging | [server.ts](src/server.ts#L512) |
-| PROXY | `/api/v1/feed/**`, `/stories/**`, `/videos/**`, `/creativity/**` | bearer | → content | [server.ts](src/server.ts#L516) |
-| PROXY | `/api/v1/notifications/**` | bearer | → notifications | [server.ts](src/server.ts#L524) |
+## 4. The data it remembers
 
-## 4. Data model
+Nothing in Postgres. Two stateful caches in Redis:
 
-None. Reads no DB tables directly. Reads `Profile.completionScore` via a cached HTTP call to users.
+- **Rate-limit counters** — `rl:{ip|user}:{route}` with 60s TTL.
+- **Onboarding cache** — `cache:onboard:{userId}` with 60s TTL (so we don't hammer `users` on every page load).
 
-## 5. Dependencies
+## 5. Who it talks to
 
-| Talks to | Why | How |
-|---|---|---|
-| auth, users, social, messaging, content, notifications, ingest | proxy | HTTP |
-| users | onboarding gate (cached 60 s) | HTTP |
-| Redis | distributed rate-limit store; SSE coordination optional | `redis` v4 client |
+- **Every backend service** (proxy).
+- **Redis** (rate-limit, cache).
+- **users** (to check onboarding-complete, once every 60s per user).
 
-## 6. Configuration
+## 6. The knobs (configuration)
 
-| Env | Default | Purpose |
-|---|---|---|
-| `PORT` | `3200` | HTTP port |
-| `REDIS_URL` | — | Distributed rate-limit store (memory fallback if absent) |
-| `JWT_SECRET`, `JWT_REFRESH_SECRET`, `INTERNAL_SERVICE_KEY` | — | JWT verify + internal call auth |
-| `AUTH_SERVICE_URL` | `http://localhost:3201` | Upstream |
-| `USER_SERVICE_URL` | `http://localhost:3202` | Upstream |
-| `SOCIAL_SERVICE_URL` | `http://localhost:3203` | Upstream |
-| `MESSAGING_SERVICE_URL` | `http://localhost:3204` | Upstream |
-| `CONTENT_SERVICE_URL` | `http://localhost:3205` | Upstream |
-| `NOTIFICATION_SERVICE_URL` | `http://localhost:3206` | Upstream |
-| `INGEST_SERVICE_URL` | `http://localhost:3260` | Upstream |
-| `ALLOWED_ORIGINS`, `FRONTEND_URL` | `http://localhost:3100` | CORS allowlist |
-| `CORS_BYPASS` | `false` | Dev-only any-origin |
-| `TRACKING_KILL` | `0` | Block `/v1/track` proxy |
-| `NODE_ENV` | `production` | Dev mode enables CORS_BYPASS check |
+| Env var                  | What it does                                       | Example                 | What breaks                                |
+|--------------------------|----------------------------------------------------|-------------------------|--------------------------------------------|
+| `JWT_SECRET`             | Verifies user wristbands                            | (matches auth's)        | every authed request returns 401            |
+| `INTERNAL_SERVICE_KEY`   | Stamps internal calls to backends                   | random 32 bytes         | backends reject our calls                    |
+| `REDIS_URL`              | Rate-limit + cache store                            | `redis://redis:6379`    | rate-limit fails open (configurable)         |
+| `RATE_LIMIT_PER_IP`      | Cap per IP per route per minute                     | `60`                    | too low = real users 429; too high = no protection |
+| `RATE_LIMIT_PER_USER`    | Cap per user per route per minute                   | `30`                    | same                                         |
+| `AUTH_URL`, `USERS_URL`, `SOCIAL_URL`, `MSG_URL`, `CONTENT_URL`, `NOTIF_URL` | Upstream service URLs | `http://auth:3201` | requests time out                |
+| `PORT`                   | Listen port                                         | `3200`                  | phone can't reach                            |
 
-## 7. Worked example — a Discover request
+## 7. A real example, end-to-end
 
-```
-Browser:   GET /api/v1/discover  Authorization: Bearer eyJ...
-Gateway:   sanitizeHeaders → JWT regex pre-check → jwt.verify(HS256)
-           rate-limit (discover: 20/min) via Redis
-           extractUserId → req.headers['x-user-id'] = '<uid>'
-           extractUserId → req.headers['x-internal-key'] = '<INTERNAL_SERVICE_KEY>'
-           requireOnboarded → GET users /api/v1/profiles/me/completion (60s cache hit)
-           proxy → http://social:3203/api/v1/discover
-Social:    returns ranked candidates
-Gateway:   strips x-internal-key from response; gzip; back to browser
-```
+Priya likes Arjun.
 
-## 8. Local dev
+> "Phone hits the gateway."
+> ```bash
+> curl -X POST http://localhost:3200/social/like \
+>   -H 'authorization: Bearer eyJ…' \
+>   -d '{"targetId":"usr_arjun"}'
+> ```
+> Gateway pipeline, in order:
+> 1. Rate-limit check (Redis INCR + EXPIRE). 60 req/min per IP, 30/min per user on writes. If exceeded → `429`.
+> 2. JWT verify (HS256 with `JWT_SECRET`). If invalid → `401`.
+> 3. Onboarding gate. If `cache:onboard:usr_priya` says incomplete → `403 onboarding_required`.
+> 4. Forward to `http://social:3203/like` with `X-User-Id` and `X-Internal-Key` headers.
+> 5. Return the response body unchanged.
+>
+> Total gateway overhead: **~5ms p95**.
+
+## 8. Run it on your laptop
 
 ```bash
-cd services/gateway
-npm run dev      # tsx watch src/server.ts → :3200
-curl :3200/health
+docker compose up -d redis auth users social messaging content notifications
+cd services/gateway && npm install && npm run dev
 ```
 
-## 9. Tests
+## 9. How we know it works (tests)
 
-None at the gateway level. Smoke via `bash scripts/api-test.sh <TOKEN>`.
+- **`auth.test.ts`** — missing JWT → 401; expired JWT → 401; valid → forwarded.
+- **`rate-limit.test.ts`** — 31st write in 60s → 429.
+- **`onboarding.test.ts`** — unboarded user blocked from `/social/*`.
+- **`sse.test.ts`** — internal publish reaches the right connection.
 
-## 10. Failure modes & operational notes
+## 10. If something breaks
 
-- **Auth header > 2 KB** → rejected before `jwt.verify` (protection against header-bomb attacks).
-- **Redis down** → rate-limit falls back to in-memory (per-pod). Distributed limits become per-pod limits.
-- **Downstream slow** → proxy timeouts surface as `504`. Check `/health` for the slow downstream.
-- **SSE connection limit** = 10 per user. Excess connections are rejected; the SDK retries.
-- **CSP** is strict (`defaultSrc: ["'self'"]`, `base-uri: ['none']`). Any new inline script will be blocked.
+| Symptom                                  | First check                                          |
+|------------------------------------------|------------------------------------------------------|
+| All requests 502                          | one or more upstream URLs wrong/unreachable          |
+| All requests 401 after deploy             | `JWT_SECRET` mismatch between auth and gateway       |
+| Users randomly 429                        | rate-limit thresholds too tight                      |
+| Live updates stop showing                 | SSE heartbeat dropped — check 25s keep-alive         |
 
-## 11. What changed & why it's good
+## 11. What changed and why it's better
 
-- **Before:** Each service handled its own auth, CORS, and rate-limit. Auth bugs needed N deploys.
-- **After:** One gateway owns auth, CORS, rate-limit, sanitisation, SSE, and the onboarding gate. Domain services trust a single `x-user-id` header.
-- **Why it matters:** Security policy lives in one file; downstream services have no JWT code. Rolling a new rate limit is a one-service deploy.
+- **Before:** the phone called each service directly. Adding rate-limit or auth meant changing every service.
+- **After:** one door, one place for rate-limit, JWT, onboarding gate, and SSE fan-out.
+- **Why Priya feels it:** consistent behaviour across the app. When we add a new safety check, it lights up everywhere at once — no service is "the one we forgot".

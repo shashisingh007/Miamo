@@ -1,92 +1,95 @@
 # content
 
-## 1. Purpose
+> The "scroll while you wait for a match" surface — feed, stories, videos, creativity prompts.
 
-Owns user-generated content: long-form feed posts, ephemeral 7-day stories, videos, and the creativity gallery (categorised art / poetry / music / fitness). Provides the personalised creativity feed and the optional v4 feed augmentation.
+## 1. The story (60 seconds)
 
-## 2. Mental model
+Priya has swiped through her batch. She taps the Feed tab. A photo of
+Arjun's latest hike appears at the top — not the newest post in the
+system, but the one most relevant to her. She watches a 15-second
+story of Meera cooking pasta. She taps a creativity prompt: "Two truths
+and a lie about your weekend." All of those surfaces are this service.
 
-Pure CRUD service on top of the content tables. Two "smart" surfaces:
+## 2. What this service is (in one picture)
 
-- **`/api/v1/feed`** — chronological by default; when `ALGO_V4_RANK_ENABLED_FEED=1`, blends `sourceScore` (50%) + `forYou` (30%) + recency (20% with 6h halflife) via `rerankFeed`.
-- **`/api/v1/creativity/feed`** — collaborative filtering + activity signals + category engagement; deterministic, no v4 dependency.
-
-## 3. Public surface
-
-| Method | Path | Purpose |
-|---|---|---|
-| GET / POST / PUT / DELETE | `/api/v1/feed[/:id]` | Feed CRUD |
-| POST | `/api/v1/feed/:id/react`, `/comments`, GET `/comments` | Reactions + comments |
-| GET / POST / DELETE | `/api/v1/stories[/:id]` | Story CRUD (7-day expiry) |
-| POST | `/api/v1/stories/:id/{view,like,react,post-to-feed}` | Story actions |
-| GET / POST / DELETE | `/api/v1/stories/:id/comments` | Story comments (matched users only) |
-| GET / POST | `/api/v1/videos[/:id]` | Video CRUD |
-| POST | `/api/v1/videos/:id/react`, `/comments` | Video reactions/comments |
-| GET | `/api/v1/creativity/categories` | Categories + counts |
-| GET | `/api/v1/creativity/feed` | Personalised gallery (CF + activity) |
-| GET / POST | `/api/v1/creativity[/:id]` | Creativity items CRUD |
-| POST | `/api/v1/creativity/:id/{react,view,hide,share}` | Item actions |
-| GET | `/api/v1/creativity/trends` | Trending items by category |
-
-Source: [server.ts](src/server.ts) (~1740 lines).
-
-## 4. Data model
-
-Writes: `FeedPost`, `FeedComment`, `FeedReaction`, `Story`, `StoryView`, `StoryComment`, `StoryLike`, `Video`, `VideoComment`, `VideoReaction`, `CreativityCategory`, `CreativityItem`, `CreativityView`, `CreativityReaction`, `CreativityComment`, `Trend`.
-
-## 5. Dependencies
-
-| Talks to | Why | How |
-|---|---|---|
-| Postgres | content tables | Prisma |
-| `services/shared/src/algo/{feedAugment,scoreUserActivity,dtm}` | feed re-rank, creativity personalisation | in-process |
-| LRU caches | `feedCache`, `activityCache` | in-process |
-
-No outbound HTTP.
-
-## 6. Configuration
-
-| Env | Default | Purpose |
-|---|---|---|
-| `PORT` | `3205` | HTTP port |
-| `DATABASE_URL` | — | Postgres |
-| `INTERNAL_SERVICE_KEY` | — | Internal-call auth |
-| `ALGO_V4_RANK_ENABLED_FEED` | `0` | Enable feed re-rank |
-
-## 7. Worked example — feed with v4 enabled
-
-```
-Browser:  GET /api/v1/feed?cursor=<id>&limit=20
-Content:  load 60 candidate posts (followed authors + matches, last 7d)
-          for each post p:
-            sourceScore = invertedIndex(p.author, viewer)   # 0..1
-            forYouScore = scoreForYou({ me, cand=p.author, ... }).score / 100
-            ageSec      = (now - p.createdAt)/1000
-            blended     = rerankFeed({ sourceScore, forYouScore, itemAgeSec: ageSec })
-            p._rank = blended
-          sort by _rank desc; return 20
+```mermaid
+flowchart LR
+    Priya[Priya's phone] --> GW[gateway]
+    GW --> Content[content :3205]
+    Content --> DB[(Postgres<br/>Post, Story, Video, Prompt)]
+    Content --> Shared[shared/algo<br/>feedAugment, postImpressionRerank]
 ```
 
-## 8. Local dev
+## 3. What it can do (the menu)
+
+| When Priya does this…              | …the app calls                             | …and gets back                | Source |
+|------------------------------------|--------------------------------------------|-------------------------------|--------|
+| Opens Feed                         | `GET /content/feed?cursor=`                | 20 posts + nextCursor          | [src](services/content/src/server.ts) |
+| Posts something                    | `POST /content/posts`                      | `{id, createdAt}`              | [src](services/content/src/server.ts) |
+| Lists Stories                      | `GET /content/stories`                     | array of active stories         | [src](services/content/src/server.ts) |
+| Views Videos                       | `GET /content/videos?cursor=`              | array of short videos           | [src](services/content/src/server.ts) |
+| Answers creativity prompt          | `POST /content/prompts/{id}/answer`        | `{id}`                          | [src](services/content/src/server.ts) |
+
+## 4. The data it remembers
+
+- **`Post`** — text/photo posts.
+- **`Story`** — 24h photo stories (auto-expire).
+- **`Video`** — short video metadata + URLs.
+- **`CreativityPrompt`**, **`PromptAnswer`** — daily prompts and answers.
+
+## 5. Who it talks to
+
+- **shared/algo** — `feedAugment` (re-rank feed), `postImpressionRerank` (penalise ignored authors).
+- **Postgres** — its own tables.
+
+## 6. The knobs (configuration)
+
+| Env var                              | What it does                                   | Example | What breaks                            |
+|--------------------------------------|------------------------------------------------|---------|----------------------------------------|
+| `DATABASE_URL`                        | Postgres                                       | …       | service won't start                     |
+| `ALGO_V4_RANK_ENABLED_FEED`           | If `'1'`, feed re-ranked; else chronological   | `'1'`   | feed falls back to newest-first         |
+| `PORT`                                | Listen port                                    | `3205`  | gateway can't reach                     |
+
+## 7. A real example, end-to-end
+
+> ```bash
+> curl -H 'authorization: Bearer eyJ…' \
+>   'http://localhost:3200/content/feed?cursor=0&limit=20'
+> ```
+> "Content fetches ~200 recent posts from people Priya follows, asks
+> feedAugment to re-rank, returns the top 20."
+> ```json
+> {
+>   "items": [
+>     { "id":"p_1", "author":"usr_arjun", "text":"…trek...", "imageUrl":"…" }
+>   ],
+>   "nextCursor": "p_1"
+> }
+> ```
+
+## 8. Run it on your laptop
 
 ```bash
-cd services/content
-npx prisma generate --schema=../shared/prisma/schema.prisma
-npm run dev
+docker compose up -d postgres
+cd services/content && npm install && npm run dev
 ```
 
-## 9. Tests
+## 9. How we know it works (tests)
 
-[tests/algo-feed-augment.test.ts](../../tests/algo-feed-augment.test.ts) asserts deterministic scoring and that strong `forYou` authors can outrank slightly newer weak authors.
+- **`feed.test.ts`** — pagination cursor is stable; blocked authors filtered.
+- **`stories.test.ts`** — expired (>24h) stories never returned.
+- **`prompts.test.ts`** — answer is rejected if prompt expired.
 
-## 10. Failure modes & operational notes
+## 10. If something breaks
 
-- **Feed cache TTL** — defaults to short window; spikes during create/delete are absorbed by invalidation on mutation.
-- **Creativity hide** is per-user — a hidden item never resurfaces in the personalised feed for that viewer.
-- **Story expiry** — `expiresAt` filter on reads; no background sweeper (rows kept for analytics; queries filter).
+| Symptom                            | First check                                  |
+|------------------------------------|----------------------------------------------|
+| Feed shows the same order for all   | `ALGO_V4_RANK_ENABLED_FEED='0'`              |
+| Stories never expire                 | cron/cleanup job for `Story.expiresAt`       |
+| Video URLs broken                    | upstream CDN config                          |
 
-## 11. What changed & why it's good
+## 11. What changed and why it's better
 
-- **Before:** Feed was strict chronological; strong content from an active connection could be buried under timeline noise.
-- **After:** When `ALGO_V4_RANK_ENABLED_FEED=1`, recent items still dominate, but a strong-affinity author can surface to the top. Feed remains deterministic and explainable.
-- **Why it matters:** Engagement improves without sacrificing user trust in the timeline — recency stays the dominant signal at 50%.
+- **Before:** feed was `ORDER BY createdAt DESC`. Active authors crowded out the people Priya cared about.
+- **After:** `feedAugment` re-ranks by `affinity + recency + engagement + diversity`.
+- **Why Priya feels it:** the posts she actually wants to see are near the top, even if they're 6h old.

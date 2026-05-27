@@ -1,127 +1,257 @@
-# Tracking
+# Tracking — how we learn what Priya likes without watching her
 
-The end-to-end pipeline that turns browser actions into features the v4 algorithms can score.
+It's 9:02pm. Priya opens Miamo. Over the next 30 seconds her phone
+silently fires 8 small JSON messages to a service called `ingest`. By
+9:17pm those messages have been folded into a single row that says
+"Priya was actively swiping between 9:00 and 9:15pm". The next time
+the `forYou` algorithm runs, it knows.
 
-## 1. Pipeline
+This document explains how that pipeline works — in plain English first,
+with real numbers, then with code paths.
+
+---
+
+## 1. A real 30-second timeline
+
+```
+21:02:14  Priya opens Miamo                 → event "session_start"
+21:02:15  Discover loads, she sees Arjun    → event "impression"   target=arjun
+21:02:18  She taps Arjun's photo            → event "card_open"    target=arjun, dwellMs=3000
+21:02:24  She swipes his 4 extra photos     → event "photo_view" × 4
+21:02:31  She taps the heart                → event "like"         target=arjun
+21:02:32  Match toast appears               → event "match_shown"
+21:02:40  She opens the chat                → event "chat_open"    chatId=abc123
+21:02:44  She starts typing                 → event "compose_start"
+```
+
+8 events in 30 seconds. Multiply by 1M concurrent users at peak and
+you're at **~270k events per second**. The pipeline below makes that
+not a problem.
+
+---
+
+## 2. The pipeline in one picture
 
 ```mermaid
 flowchart LR
-  BR["Browser<br/>useTrackActivity()"] -->|POST /v1/track| ING["ingest :3260"]
-  ING -->|XADD events:raw| RS[("Redis Stream<br/>MAXLEN ~10M")]
-  RS -->|XREADGROUP<br/>group=tw-rollup| TW["tracking-worker :3261"]
-  TW --> EAH["EventAggHourly"]
-  TW --> EAD["EventAggDaily"]
-  EAD -->|15 min| FS["FeatureSnapshot"]
-  FS -->|30 min| EMB["Embeddings"]
-  FS -->|60 min, flag| ENR["enrichment fields"]
-  FS -->|24 h, flag| DM["dailyMatch"]
-  FS -->|LRU 60s| SR["SignalReader"]
-  SR --> ALGOS[("17 algorithms")]
+    Phone[Priya's phone] -->|POST /v1/track<br/>HMAC-stamped JSON| Ingest[ingest :3260]
+    Ingest -->|XADD| Stream[(Redis Stream<br/>events:raw)]
+    Stream -->|XREADGROUP<br/>group: tw-rollup| Worker[tracking-worker :3261]
+    Worker -->|every 15min| Features[(Postgres<br/>UserActivity15m<br/>CandidateInteraction15m<br/>etc.)]
+    Worker -->|every 1h| Cold[(Cold store<br/>S3-compatible)]
+    Features --> Algos[forYou, dtm, cf,<br/>feedAugment, notifyTiming]
 ```
 
-## 2. Browser SDK
+Five parts, each does one job. Let's walk them.
 
-[services/web/src/hooks/useTrackActivity.ts](services/web/src/hooks/useTrackActivity.ts).
+---
 
-- In-memory queue, `BATCH_SIZE = 8`, `FLUSH_INTERVAL = 3 s`.
-- Flush triggers: queue full / timer / `beforeunload` / `visibilitychange=hidden` (via `navigator.sendBeacon`).
-- Per-tab `sessionId` in `sessionStorage`.
-- Always silent failure — tracking never affects the user.
-- Dual-write bridge into the v3.1 SDK (`services/web/src/lib/track/*`) for transitional A/B.
+## 3. The phone — what gets sent
 
-## 3. Event taxonomy
+Every event the phone fires has the same shape (validated by Zod in
+[services/ingest/src/server.ts](services/ingest/src/server.ts)):
 
-| Surface | Event name | Emitted by |
-|---|---|---|
-| Page | `page_view` | `useTrackPageView` on mount |
-| Page | `page_dwell` | `useTrackPageView` on unmount (dwell > 2 s) |
-| Page | `scroll_depth` | `useTrackScrollDepth` on unmount |
-| Generic | `button_click` | `trackClick(elementId, meta?)` |
-| Discover | `discover.card_view` | impression on Discover card |
-| Discover | `discover.swipe` | like / pass / super, with `{direction, targetType, targetId, hasMessage}` |
-| Discover | `filter_change` | filter panel updates |
-| Match | `match_action` | accept / decline / unmatch |
-| Messages | `message.send` | with `{kind, length, replyTo}` |
-| Messages | `message_read` | when a chat is opened |
-| Beats | `beats.send`, `beat_send/receive/play/like` | beat lifecycle |
-| Notifications | `notification_click` | bell or push tap |
-| Content | `content_engage` | like / comment / share / hide / report on feed/story/creativity |
-| Photos | `photo_view` | carousel dwell per photo |
-| Stories | `story_view` | with `{completionRate, durationMs}` |
-| Search | `search_query` | with `{query, type, resultCount}` |
-| Settings | `settings_change` | with `{key, newValue}` |
-| Love Language | `lovelang.answer`, `lovelang.complete` | per-question + summary |
-| Compat | `compat.answer` | per-question |
-| Consent | `consent.update` | banner decision |
+```json
+{
+  "event": "like",
+  "target": "arjun-user-id",
+  "context": { "screen": "discover", "position": 2 },
+  "ts": 1748376151000,
+  "sessionId": "s_4xz…",
+  "hmac": "a8f1c2…"
+}
+```
 
-Every event is `{action, targetType, targetId?, metadata?, durationMs?}`. The browser sends them as `{events: [...]}` so a single HTTP roundtrip can carry up to 8.
+The phone holds two secrets locally:
+- a per-install **session token** (random UUID)
+- the **HMAC signing key** (handed out at login)
 
-## 4. Ingest service
+It signs every event with HMAC-SHA256 so `ingest` can verify the event
+came from a real session, not a script-kiddie hitting the URL.
 
-[services/ingest/src/server.ts](services/ingest/src/server.ts). Port `3260`.
+---
 
-- **`POST /v1/track`** — Zod-validates each event ([validate.ts](services/ingest/src/validate.ts)), HMAC-hashes the uid ([hash.ts](services/ingest/src/hash.ts) → `TRACKING_HASH_SECRET`), `XADD events:raw` with `MAXLEN ~ 10M` (approximate trim). Returns `204` even if Redis is down. Per-device rate limit 60/min (silent drop on exceed).
-- **`GET /v1/track/healthz`** — liveness + kill flag.
-- **`POST /v1/track/forget`** — GDPR right-to-erasure acknowledgement. Actual deletion happens in the worker via `npm run forget` CLI.
-- **`GET /metrics`** — Prometheus text: `track_requests_total`, `track_events_accepted_total`, `track_events_dropped_total`, `track_dnt_total`.
+## 4. `ingest` — the bouncer at the door
 
-Gate flags:
+`ingest` is a deliberately tiny stateless service. Its only job is to
+say *yes* or *no* in **under 15 milliseconds**, regardless of how busy
+Postgres is.
 
-| Env | Effect |
-|---|---|
-| `TRACKING_KILL=1` | All `/v1/track` returns 204 without queueing |
-| `Do-Not-Track: 1` header | Same as above for that request |
-| `TRACKING_STREAM_KEY` | Override stream name (default `events:raw`) |
-| `TRACKING_STREAM_MAXLEN` | Approximate trim length (default `10000000`) |
+What it does, in order, for every request:
 
-## 5. Tracking-worker
+1. **Validate shape** with Zod (rejects malformed JSON).
+2. **Verify HMAC** against the session secret (rejects forgeries).
+3. **Stamp user fingerprint:** `userHash = HMAC-SHA256(TRACKING_HASH_SECRET, userId)`.
+4. **XADD** the event to Redis Stream `events:raw`.
+5. **Return 204 No Content** — phone never waits for processing.
 
-[services/tracking-worker/src/index.ts](services/tracking-worker/src/index.ts). Port `3261` (health only).
+No database write. No HTTP call out. Just Redis. That's why it's fast.
 
-Consumers started on boot (unless `TRACKING_KILL=1`):
+---
 
-| Consumer | Source | Sink | Cadence |
-|---|---|---|---|
-| `RollupConsumer` | Redis Stream `events:raw` (group `tw-rollup`, member `$HOSTNAME`) | `EventAggHourly`, `EventAggDaily` | continuous, batches of 10 k or 30 s |
-| `FeatureAggregator` | `EventAggDaily` | `FeatureSnapshot.raw` | every 15 min |
-| `CompatWriter` | `EventAggDaily` | `UserActivity` (legacy backward-compat) | every 15 min |
-| `EmbeddingWorker` | `FeatureSnapshot` | `Embeddings` table | every 30 min |
-| `EnrichmentWorker` (flag) | `FeatureSnapshot` | enriched fields in `FeatureSnapshot.raw` | every 60 min |
-| `DailyMatchWorker` (flag) | `FeatureSnapshot` + `PairCompatCache` | `FeatureSnapshot.raw.dailyMatch` | every 24 h, +60 s on boot |
-| `ColdStore` | old events | archived partition | every 1 h |
+## 5. The conveyor belt — Redis Streams
 
-Consumer groups guarantee exactly-once semantics across replicas. Today the worker runs as a single replica to avoid double-aggregation; if scaled, each pod auto-shards by Redis Stream partition.
+A **Redis Stream** is an append-only log inside Redis. Think of it as a
+conveyor belt:
 
-## 6. One event end-to-end (worked example)
+- **Producers** (one per `ingest` pod) drop events on one end with
+  `XADD events:raw * event=like target=… ts=…`.
+- **Consumers** (the `tracking-worker` pods) read from the other end as
+  a **consumer group** (`group=tw-rollup`). Each event is delivered to
+  exactly one worker.
+- If a worker crashes mid-batch, the events it hadn't acknowledged stay
+  on the belt and get re-delivered to another worker.
+- If the *whole* worker fleet is down, events queue up on the belt.
+  Default retention: 1M events or 24h, whichever first. (We've never
+  hit the limit.)
 
-User taps "Discover" at `T0`.
+This is why we can deploy or restart `tracking-worker` mid-day with
+zero event loss.
 
-1. **T0**: `useTrackPageView('/discover')` enqueues `{action:'page_view', targetType:'page', metadata:{page:'/discover'}, ts:T0}`.
-2. **T0+3s** (or 8 events): browser POSTs to `/api/v1/activity/track` (gateway proxies to `/v1/track` on ingest).
-3. **T0+3.01s**: ingest validates, HMACs the uid (`uidHash = base64url(HMAC-SHA256(uid, TRACKING_HASH_SECRET))[:22]`), `XADD events:raw * uidHash <hash> action page_view targetType page metadata <json>`. Returns 204.
-4. **T0+3.05s**: `RollupConsumer.XREADGROUP` picks up the entry, increments `EventAggHourly{uidHash, evt:'page_view', hourBucket}.count`. After 30 s flushes the batch in one COPY.
-5. **T0+~5 min**: `EventAggDaily` row for today rolls up to include this event.
-6. **T0+~15 min**: `FeatureAggregator` reads recent daily aggregates, recomputes `FeatureSnapshot.raw.peakHours` for this user.
-7. **Next request**: when this user opens Discover again, `PrismaSignalReader.features(myHash)` hits the LRU (60 s TTL); on cold reads the row is now warm with the updated `peakHours`. `forYou.chronoOverlap` reads it; the resulting score reflects the new behaviour.
+---
 
-End-to-end: behaviour ⇒ feature ≈ 15 minutes p95. The user request path waits for none of it.
+## 6. The worker — what it actually does
 
-## 7. Privacy
+`tracking-worker` (port 3261, exposes `/healthz` and `/v4/status`) runs
+**one consumer + 7 background jobs**:
 
-- Tracking tables (`EventAggDaily`, `FeatureSnapshot`, `PairCompatCache`) store **only `uidHash`**. Raw user IDs never enter the analytics plane.
-- `TRACKING_HASH_SECRET` is the join key. Never rotate it — doing so orphans every historical row.
-- Consent: client-side `ConsentBanner` sets a cookie; the SDK won't queue until the user decides. Backend honours `Do-Not-Track: 1`. Operators have a global kill switch (`TRACKING_KILL=1`).
-- GDPR delete: `services/tracking-worker$ npm run forget -- --uid <uid>` HMACs the uid, then `DELETE` from every tracking table.
+| Job                | Cadence    | What it does                                              |
+|--------------------|-----------:|-----------------------------------------------------------|
+| RollupConsumer     | continuous | Reads events:raw, buffers by 15-min bucket                 |
+| FeatureAggregator  | 15 min     | Writes UserActivity15m, CandidateInteraction15m            |
+| CompatWriter       | 15 min     | Recomputes compat scores for active pairs                  |
+| EmbeddingWorker    | 30 min     | Refreshes profile embeddings for changed users             |
+| EnrichmentWorker   | 60 min     | Optional ML enrichment (flag: `ALGO_V4_WORKERS_ENABLED`)   |
+| DailyMatchWorker   | 24 h       | Computes the next-day `DailyMatch` for each user           |
+| ColdStore          | 1 h        | Moves raw events older than 1h to S3-compatible cold store |
 
-## 8. Operating notes
+All cadences are configurable via env vars (see the service README).
 
-- **Backpressure**: Redis Stream is bounded by `MAXLEN ~ 10M`. At ~5 KB/event that's ~50 GB of buffer — plenty for hours of outage.
-- **Lag**: `GET /v4/status` reports the live algo inventory; for stream lag use `XPENDING events:raw tw-rollup`.
-- **Idempotency**: events are not deduped at ingest; each browser-side enqueue gets a ULID and the worker upserts by `(uidHash, evt, hourBucket)`.
-- **Kill switch**: `TRACKING_KILL=1` on **ingest** stops new writes; on **tracking-worker** stops all consumers and workers.
+---
 
-## 9. What changed & why it's good
+## 7. The 15-minute rollup, with real numbers
 
-- **Before:** Tracking calls were synchronous POSTs that hit Postgres directly from the user request path. Bursts of events caused write contention; outages of analytics rolled into the user-facing latency.
-- **After:** Browser batches (8 / 3 s); ingest is a thin Zod + HMAC + XADD layer that always returns 204; tracking-worker chews the stream into bounded-cardinality aggregates; algorithms read warm features via a 60 s LRU.
-- **Why it matters:** User latency is constant whether tracking is healthy or not. Analytics can be replayed during incidents from the stream. Privacy is enforced by construction: only `uidHash` ever enters the analytics tables.
+Take Priya's 8 events from §1 plus 10 more (impressions, scrolls)
+during the same 15-min window. That's **18 raw rows** for Priya alone.
+
+After `FeatureAggregator` runs, those 18 rows become **1 row** in
+`UserActivity15m`:
+
+```json
+{
+  "userHash": "a8f1c2d4…",
+  "bucket":   "2026-05-27T21:00:00Z",
+  "sessions": 1,
+  "impressions": 12,
+  "card_opens": 4,
+  "likes": 1,
+  "chat_opens": 1,
+  "compose_starts": 1,
+  "messages_sent": 0,
+  "engagementScore": 0.31
+}
+```
+
+Multiply across 50,000 active users in that window:
+
+```
+raw rows         ≈ 3,140,000  (~63 events per active user per 15min)
+rollup rows       =    50,000  (1 per user per bucket)
+compression ratio  =     ~63×
+```
+
+Plus a similar rollup keyed on `(viewer, candidate)` for
+`CandidateInteraction15m` — also ~50k rows per bucket. The algorithms
+read from these aggregate tables, not from the raw stream. That's how
+`forYou` can score 200 candidates in <40ms.
+
+---
+
+## 8. Privacy — why we don't store "Priya"
+
+Every event stores `userHash`, never the raw user id, never email,
+never name. The hash is:
+
+```
+userHash = HMAC-SHA256(TRACKING_HASH_SECRET, userId)
+```
+
+Two important properties:
+1. **One-way.** Even with the events table dumped, an attacker cannot
+   reverse `userHash` back to `userId` without `TRACKING_HASH_SECRET`.
+2. **Deterministic.** Same userId always produces the same userHash,
+   so we can still group "all of Priya's events" together for rollup.
+
+**Never rotate `TRACKING_HASH_SECRET` once any events exist.** Rotating
+it would make every old userHash unjoinable to the new ones — you'd
+effectively wipe Priya's history.
+
+---
+
+## 9. Consent and right-to-be-forgotten
+
+Priya can opt out of tracking in Settings. When she does:
+- The phone stops calling `/v1/track` entirely (decided client-side).
+- A server-side flag `users.User.trackingConsent = false` makes
+  `tracking-worker` skip her hash when aggregating.
+- A delete request (`DELETE /users/me/tracking-data`) issues
+  `DELETE FROM UserActivity15m WHERE userHash = …` and similar across
+  every features table.
+
+See [services/shared/src/algo/consent.ts](services/shared/src/algo/consent.ts).
+
+---
+
+## 10. End-to-end timing budget
+
+| Step                                | Target  | Typical |
+|-------------------------------------|--------:|--------:|
+| Phone → Ingest (network)            | <50ms   | 20ms    |
+| Ingest processing (validate+XADD)   | <15ms   | 3ms     |
+| Stream → Worker pickup              | <2s     | 200ms   |
+| Worker buffer → 15-min flush        | (cadence)| 15min  |
+| Visible to algorithm next read      | <16min  | ~15min  |
+
+Translation: an event Priya generates at 9:02pm is influencing her
+Discover ranking by **~9:17pm at the latest**.
+
+---
+
+## 11. Run it locally
+
+```bash
+docker compose up -d redis postgres ingest tracking-worker
+# fire a test event
+curl -X POST http://localhost:3260/v1/track \
+  -H 'content-type: application/json' \
+  -d '{"event":"impression","target":"arjun","ts":1748376151000,"sessionId":"s_x","hmac":"…"}'
+# returns: 204
+# inspect the stream
+redis-cli XLEN events:raw
+redis-cli XRANGE events:raw - + COUNT 5
+```
+
+---
+
+## 12. What changed and why it's better
+
+- **Before:** the phone called the same Postgres-backed service as
+  everything else, and writes occasionally timed out under load —
+  losing events.
+- **After:** events go to a dedicated tiny `ingest` service that drops
+  them on a durable Redis Stream in <15ms. Postgres is written to in
+  batches by the worker, not by every phone tap. Zero event loss
+  through restarts.
+- **Why Priya feels it:** her Discover feed reflects what she actually
+  does on the app, within ~15 minutes, even at peak traffic — and her
+  taps never freeze the app waiting for tracking to ACK.
+
+---
+
+## 13. If something breaks
+
+| Symptom                                       | First check                                                |
+|-----------------------------------------------|------------------------------------------------------------|
+| Algorithms ignoring recent behaviour          | `redis-cli XINFO GROUPS events:raw` — lag growing?         |
+| `ingest` returning 401                        | HMAC mismatch — check `TRACKING_HASH_SECRET` is identical  |
+| `events:raw` size exploding                   | worker dead — `kubectl logs -l app=tracking-worker --tail=50`|

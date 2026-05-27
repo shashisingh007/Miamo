@@ -1,130 +1,267 @@
-# Runbook
+# Runbook — what to do when something breaks at 2am
 
-On-call companion. "Service X is wrong → check Y first."
+It's 2am. PagerDuty is buzzing. Priya is one of 50,000 users who can't
+open the app. This document is what you read first.
 
-## 1. Health endpoints
+For each incident: **Symptom** → **First check** → **Likely cause** →
+**Fix** → **Prevent next time**.
 
-| Service | URL | What it tells you |
-|---|---|---|
-| gateway | `:3200/health` | Full report — gateway + every downstream `/healthz` |
-| gateway | `:3200/readyz` | Aggregate ready (4xx if any downstream not ready) |
-| auth / users / social / messaging / content / notifications | `:32xx/healthz` | Liveness |
-| auth / users / ... | `:32xx/readyz` | Readiness (Prisma connected) |
-| ingest | `:3260/v1/track/healthz` | Liveness + kill flag |
-| ingest | `:3260/metrics` | Prometheus text |
-| tracking-worker | `:3261/healthz` | `{ok, kill, v4Workers, algos: <count>}` |
-| tracking-worker | `:3261/v4/status` | Live algo inventory + flags |
+---
 
-## 2. Common incidents
+## 1. "App is down" — gateway returning 502 everywhere
 
-### A. "Discover is slow"
+**Symptom.** Every request returns 502. PagerDuty alert from external
+synthetic check.
 
-1. `curl :3200/health` — is `social` healthy?
-2. `kubectl logs -n miamo deploy/social --tail=200 | grep -i 'slow\|prisma\|timeout'`.
-3. Check Postgres slow log (`log_min_duration_statement = 500`).
-4. If v4 path is hot: `curl :3261/v4/status | jq '.flags'`. To disable: `kubectl set env deploy/social ALGO_V4_RANK_ENABLED_DISCOVER=0`.
-5. Check Redis (`redis-cli info clients`) — rate-limit store overloaded?
-6. Last resort: scale social `kubectl scale deploy/social --replicas=6`.
-
-### B. "Chats are not arriving in realtime"
-
-1. SSE is fan-out from `notifications` / `messaging` → gateway → browser.
-2. `kubectl logs deploy/gateway --tail=200 | grep SSE` — heartbeats every 25 s expected.
-3. Check `/internal/push-event` POSTs from messaging/notifications: `kubectl logs deploy/messaging | grep push-event`.
-4. Browsers behind proxies with short idle timeouts may need reconnect — the SDK does this automatically.
-5. Hard reset: `kubectl rollout restart deploy/gateway` (drains 30 s grace).
-
-### C. "Tracking-worker lag spike"
-
-1. `redis-cli XPENDING events:raw tw-rollup` — pending count.
-2. If > 100k pending: tracking-worker is behind. `kubectl logs deploy/tracking-worker --tail=200`.
-3. If a single bad event is poisoning the consumer: `redis-cli XACK events:raw tw-rollup <id>` to skip.
-4. Scale safely: tracking-worker is single-replica by design (avoid double aggregation). To scale, ensure consumer-group sharding is enabled in [services/tracking-worker/src/rollup.ts](services/tracking-worker/src/rollup.ts) and bump replicas.
-5. Emergency stop ingest while you catch up: `kubectl set env deploy/ingest TRACKING_KILL=1`.
-
-### D. "Login is failing across the board"
-
-1. `kubectl logs deploy/auth --tail=200 | grep -i 'jwt\|bcrypt\|prisma'`.
-2. JWT_SECRET rotated incorrectly? — auth still signs new tokens but gateway can't verify. Roll the gateway env back.
-3. Postgres `max_connections` exhausted? `psql -c 'SELECT count(*) FROM pg_stat_activity;'` — bump connection pool or scale Postgres.
-4. Rate limit too aggressive after a password leak? Inspect Redis: `redis-cli --scan --pattern 'rl:auth:*' | wc -l`.
-
-### E. "Messages won't decrypt"
-
-1. `ENCRYPTION_KEY` or `ENCRYPTION_SALT` rotated? If so → DATA LOSS for historical messages. Roll back immediately.
-2. Otherwise: `kubectl logs deploy/messaging --tail=200 | grep -i 'authtag\|decrypt'`.
-3. AuthTag failures = ciphertext tampered or wrong key. The handler logs `enc:` failures and falls back to a sanitised placeholder; raw payload preserved.
-
-### F. "Feature flag rollout"
-
+**First check.**
 ```bash
-# Enable v4 discover on staging
-kubectl set env -n miamo-staging deploy/social ALGO_V4_RANK_ENABLED_DISCOVER=1
-kubectl rollout status deploy/social
-# Watch
-kubectl logs -n miamo-staging deploy/social --tail=100 -f | grep v4
-# Disable instantly
-kubectl set env -n miamo-staging deploy/social ALGO_V4_RANK_ENABLED_DISCOVER=0
+kubectl get pods -l app=gateway
+kubectl logs -l app=gateway --tail=100
 ```
 
-### G. "Rollback"
+**Likely cause.** All gateway pods crash-looping. Usually a bad config
+push (missing env var) or upstream DB unreachable.
 
+**Fix.**
 ```bash
-kubectl rollout undo deploy/<service>
-kubectl rollout history deploy/<service>
+# rollback latest deploy
+kubectl rollout undo deployment/gateway
+# wait
+kubectl rollout status deployment/gateway
 ```
 
-PDB ensures at least 1 pod stays up. Rolling strategy: `maxUnavailable: 0, maxSurge: 1`.
+**Prevent.** Staging smoke test before prod deploy. Required env vars
+declared with `${VAR:?required}` in compose so missing vars fail at
+build, not at 2am.
 
-## 3. Useful one-liners
+---
+
+## 2. Login works but Discover is empty
+
+**Symptom.** Users see "No more profiles" immediately after logging in.
+
+**First check.**
+```bash
+kubectl logs -l app=social --tail=200 | grep -i error
+psql $DATABASE_URL -c 'SELECT count(*) FROM "User";'
+```
+
+**Likely cause.** Either `social` can't reach Postgres, or the
+candidate query returns 0 (data issue, e.g. wrong env pointing at
+empty DB).
+
+**Fix.** Restart pod, confirm correct `DATABASE_URL`. If 0 candidates,
+check seed scripts.
+
+**Prevent.** Add a `/healthz/deep` endpoint that runs a minimal
+candidate query.
+
+---
+
+## 3. Tracking events not influencing algorithms
+
+**Symptom.** Users complain Discover hasn't adapted to their swipes
+for hours.
+
+**First check.**
+```bash
+redis-cli XLEN events:raw                         # should be < 50k
+redis-cli XINFO GROUPS events:raw                 # check lag
+kubectl logs -l app=tracking-worker --tail=200
+```
+
+**Likely cause.** `tracking-worker` crashed or its consumer group is
+stuck.
+
+**Fix.**
+```bash
+kubectl rollout restart deployment/tracking-worker
+# if a single consumer is stuck:
+redis-cli XGROUP DELCONSUMER events:raw tw-rollup <consumer-name>
+```
+
+**Prevent.** Alert on `XLEN > 100k` and on consumer lag > 60s.
+
+---
+
+## 4. Chats decrypting to garbage
+
+**Symptom.** Users see "[unable to decrypt]" on existing messages.
+
+**First check.** `ENCRYPTION_KEY` and `ENCRYPTION_SALT` env vars on
+`messaging` pods — were they rotated?
+
+**Likely cause.** Someone rotated the encryption secrets. **This is
+unrecoverable for existing messages.**
+
+**Fix.** **Immediately** restore the old `ENCRYPTION_KEY` and
+`ENCRYPTION_SALT` from the secret backup. If no backup exists, the
+ciphertext is permanently unreadable.
+
+**Prevent.** Tag these two secrets in your secret manager as
+"never rotate". Add a pre-deploy hook that diffs secret values and
+blocks if these change.
+
+---
+
+## 5. Mass logout / "please sign in again"
+
+**Symptom.** All users forced to re-login at the same time.
+
+**First check.** `JWT_SECRET` value on `auth` and `gateway` pods.
+
+**Likely cause.** `JWT_SECRET` was rotated or unset.
+
+**Fix.** Restore the previous `JWT_SECRET`. Users with refresh tokens
+will silently reauth on next request; users with only access tokens
+re-login.
+
+**Prevent.** JWT secret rotations are intentional and announced —
+never accidental. Add a startup check that warns if `JWT_SECRET` is
+shorter than 32 bytes.
+
+---
+
+## 6. Push notifications delayed by hours
+
+**Symptom.** Match notifications arrive an hour after the match.
+
+**First check.**
+```bash
+kubectl get jobs -l app=notifications
+kubectl logs -l app=notifications --tail=200 | grep -i error
+```
+
+**Likely cause.** Notifications worker behind on its queue, or the
+upstream push provider (FCM/APNS) is failing.
+
+**Fix.** Scale up the notifications deployment temporarily:
+```bash
+kubectl scale deployment/notifications --replicas=5
+```
+
+**Prevent.** Alert on `nextNotifyAt` queue lag > 5 min.
+
+---
+
+## 7. Postgres CPU pinned at 100%
+
+**Symptom.** Every API call slow; Postgres CPU red in Grafana.
+
+**First check.**
+```sql
+SELECT pid, query, state, query_start
+FROM pg_stat_activity
+WHERE state = 'active'
+ORDER BY query_start ASC
+LIMIT 20;
+```
+
+**Likely cause.** A query without an index, or `n+1` query loop
+introduced in the last release.
+
+**Fix.** Kill the offending query (`SELECT pg_cancel_backend(pid)`),
+then deploy a fix or roll back the release that introduced it.
+
+**Prevent.** EXPLAIN ANALYZE every new query in PR review. Set
+`statement_timeout = '5s'` so a bad query can't pin CPU forever.
+
+---
+
+## 8. Redis memory at 95%
+
+**Symptom.** `RedisOOM` alert; cache writes failing.
+
+**First check.**
+```bash
+redis-cli INFO memory | grep used_memory_human
+redis-cli --bigkeys
+```
+
+**Likely cause.** `events:raw` stream uncapped (worker dead — see #3)
+or a runaway cache key without TTL.
+
+**Fix.**
+```bash
+# trim the stream
+redis-cli XTRIM events:raw MAXLEN 100000
+```
+
+**Prevent.** Set `MAXLEN ~100000` on every XADD. Audit all SETs for TTL.
+
+---
+
+## 9. One user complains they can't log in
+
+**Symptom.** Single-user ticket: "I can't log in."
+
+**First check.** Check the user's row:
+```sql
+SELECT id, email, "emailVerified", "deletedAt"
+FROM "User" WHERE email = 'priya@example.com';
+SELECT count(*) FROM "Session" WHERE "userId" = '<id>';
+```
+
+**Likely cause.** Email unverified, account soft-deleted, or all
+sessions revoked.
+
+**Fix.** Triage per the cause. Document outcome on the ticket.
+
+**Prevent.** Improve login error messages to be more specific (without
+leaking whether email exists).
+
+---
+
+## 10. CI pipeline failing on every PR
+
+**Symptom.** Green PRs suddenly going red in CI; tests pass locally.
+
+**First check.** Is it shared/algo tests, or service tests? Did Node
+version change?
+
+**Likely cause.** A flaky test, a dependency drift, or CI's Postgres
+image rebuilt with a new default.
+
+**Fix.** Pin the image tag; rerun. If a single test is flaky, mark it
+with `it.skip` and open a ticket — don't blanket-disable suites.
+
+**Prevent.** Pin every container image to a SHA. Track flakiness — any
+test failing >1% of the time gets fixed or removed.
+
+---
+
+## Quick reference
 
 ```bash
-# Row counts per table
-bash scripts/db-check.sh
+# pods
+kubectl get pods -n miamo
 
-# Full API smoke (Bearer token required)
-TOKEN=$(curl -s -X POST :3200/api/v1/auth/login \
-  -d '{"email":"miamo1@miamo.test","password":"miamo1"}' \
-  -H 'content-type: application/json' | jq -r .accessToken)
-bash scripts/api-test.sh "$TOKEN"
+# logs (last 100 lines, one service)
+kubectl logs -l app=<service> --tail=100 -n miamo
 
-# Algo smoke (no HTTP — direct invocation)
-npx tsx scripts/algo-smoke.ts --limit=5
+# rollback
+kubectl rollout undo deployment/<service> -n miamo
 
-# Watch the Redis stream
+# scale temporarily
+kubectl scale deployment/<service> --replicas=5 -n miamo
+
+# Redis stream health
 redis-cli XLEN events:raw
-redis-cli XPENDING events:raw tw-rollup
+redis-cli XINFO GROUPS events:raw
 
-# Tail prod logs for a service
-kubectl logs -n miamo-prod -l app=social --tail=200 -f
-
-# Force a single feature snapshot recompute (dev)
-psql $DATABASE_URL -c "DELETE FROM \"FeatureSnapshot\" WHERE \"uidHash\" = '<hash>';"
-# Worker will recreate on next 15-min tick
-
-# GDPR purge a single user's analytics (worker)
-cd services/tracking-worker && npm run forget -- --uid <userId>
+# Postgres top queries
+psql $DATABASE_URL -c "SELECT pid,query,state,query_start FROM pg_stat_activity WHERE state='active' ORDER BY query_start;"
 ```
 
-## 4. Dashboards you wish you had
+---
 
-If you set up Grafana with the Prometheus scrape (`/metrics` on ingest + `prom-client` HTTP middleware everywhere else):
+## After every incident
 
-- **Latency** — p50/p95/p99 per route per service
-- **Error rate** — non-2xx count
-- **Stream lag** — `XLEN events:raw - XPENDING events:raw tw-rollup`
-- **Algo throughput** — registered count from `/v4/status` polled hourly
-- **Redis hit rate** — `redis-cli info stats | grep keyspace_hit_rate`
-- **Postgres connections** — `pg_stat_activity` count
+Within 24h: write a 1-page postmortem with:
+1. **Timeline** (UTC).
+2. **What happened** in plain English.
+3. **What stopped it.**
+4. **What we'll do so it doesn't repeat.**
 
-## 5. Escalation
-
-- **Data corruption**: stop writes (set `TRACKING_KILL=1` on ingest, scale offending service to 0), take a pg_dump, file an incident.
-- **Secret leaked**: rotate `JWT_SECRET` and `INTERNAL_SERVICE_KEY` immediately. **Do not** rotate `ENCRYPTION_KEY`, `ENCRYPTION_SALT`, or `TRACKING_HASH_SECRET` — coordinate a re-encryption / re-keying job.
-- **Compromised account**: `POST /api/v1/auth/sessions/:id/revoke` for every session, force password reset, mark profile deactivated.
-
-## 6. What changed & why it's good
-
-- **Before:** Incidents required reading code to know which service owned what; no kill switches; no live algo inventory.
-- **After:** One runbook page tells you the first command for the seven most common incidents; `/v4/status` enumerates the rankers in real-time; `TRACKING_KILL=1` shuts the pipeline cleanly.
-- **Why it matters:** Mean time to recovery drops because the on-call doesn't need to guess. Bad rollouts are reverted with one `kubectl set env`.
+Add the prevention item to this Runbook so the next on-call doesn't
+relearn the lesson.
