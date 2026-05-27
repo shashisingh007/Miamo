@@ -27,7 +27,9 @@ export type NewInputs = ForYouInputs & {
   completeness: number; // 0..1
 };
 
-export function scoreNew(inp: NewInputs): { score: number; explain: Record<string, unknown> } {
+import { v5FeatureEnabled } from './flags';
+
+export function scoreNewV4(inp: NewInputs): { score: number; explain: Record<string, unknown> } {
   const ageDays = Math.max(0, (Date.now() - inp.candCreatedAtMs) / 86400_000);
   const recency = expDecay(ageDays, 7);
   const fy = scoreForYou(inp);
@@ -39,6 +41,20 @@ export function scoreNew(inp: NewInputs): { score: number; explain: Record<strin
   };
   const score = clip100(compose(breakdown, NEW_WEIGHTS) * 100);
   return { score, explain: { algo: 'new', consentScope: inp.consent, breakdown, weights: NEW_WEIGHTS, finalScore: score, forYouExplain: fy.explain } };
+}
+
+/** Back-compat: existing callers use `scoreNew` (= v4). */
+export const scoreNew = scoreNewV4;
+
+/** v5 reserved — identical to v4 today. Flag exists so we can ship
+ *  tuned behaviour (e.g. dwell-aware recency) without a redeploy. */
+export function scoreNewV5(inp: NewInputs) {
+  const r = scoreNewV4(inp);
+  return { score: r.score, explain: { ...r.explain, algoVersion: 'v5' } };
+}
+
+export function scoreNewDispatch(inp: NewInputs) {
+  return v5FeatureEnabled('new') ? scoreNewV5(inp) : scoreNewV4(inp);
 }
 
 registerAlgo({

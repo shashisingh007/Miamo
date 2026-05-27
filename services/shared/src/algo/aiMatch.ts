@@ -9,6 +9,7 @@
  */
 import { scoreAiPicksV4, type AiPicksInputs } from './aiPicks';
 import { registerAlgo } from './registry';
+import { v5FeatureEnabled } from './flags';
 
 export function pickAiMatch(cands: Array<AiPicksInputs & { candId: string }>): { candId: string; score: number; explain: ReturnType<typeof scoreAiPicksV4>['explain'] } | null {
   let best: { candId: string; score: number; explain: ReturnType<typeof scoreAiPicksV4>['explain'] } | null = null;
@@ -18,6 +19,13 @@ export function pickAiMatch(cands: Array<AiPicksInputs & { candId: string }>): {
     if (!best || score > best.score) best = { candId: c.candId, score, explain };
   }
   return best;
+}
+
+/** v5 reserved — identical to v4 today. */
+export const pickAiMatchV4 = pickAiMatch;
+export const pickAiMatchV5 = pickAiMatch;
+export function pickAiMatchDispatch(cands: Array<AiPicksInputs & { candId: string }>) {
+  return v5FeatureEnabled('aiMatch') ? pickAiMatchV5(cands) : pickAiMatchV4(cands);
 }
 
 registerAlgo({
