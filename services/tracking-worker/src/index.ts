@@ -18,6 +18,25 @@ import { EmbeddingWorker } from './embeddings';
 import { ColdStore } from './cold-store';
 import { EnrichmentWorker } from './enrich';
 import { DailyMatchWorker } from './daily-match';
+import { getRegistry } from '../../shared/src/algo/registry';
+import { v4FlagSnapshot } from '../../shared/src/algo/flags';
+// Register every algo so getRegistry() returns the full inventory.
+import '../../shared/src/algo/forYou';
+import '../../shared/src/algo/aiPicks';
+import '../../shared/src/algo/moves';
+import '../../shared/src/algo/new';
+import '../../shared/src/algo/active';
+import '../../shared/src/algo/verified';
+import '../../shared/src/algo/serious';
+import '../../shared/src/algo/dtm';
+import '../../shared/src/algo/cf';
+import '../../shared/src/algo/messageSuggest';
+import '../../shared/src/algo/beats';
+import '../../shared/src/algo/notifyTiming';
+import '../../shared/src/algo/searchAugment';
+import '../../shared/src/algo/feedAugment';
+import '../../shared/src/algo/postImpressionRerank';
+import '../../shared/src/algo/aiMatch';
 
 const PORT = Number(process.env.PORT || 3261);
 const KILL = process.env.TRACKING_KILL === '1';
@@ -33,7 +52,19 @@ const enrich = new EnrichmentWorker(prisma);
 const dailyMatch = new DailyMatchWorker(prisma);
 
 const app = express();
-app.get('/healthz', (_req, res) => res.json({ ok: true, kill: KILL, v4Workers: V4_WORKERS, ts: Date.now() }));
+app.get('/healthz', (_req, res) => res.json({
+  ok: true, kill: KILL, v4Workers: V4_WORKERS,
+  algos: getRegistry().length, ts: Date.now(),
+}));
+app.get('/v4/status', (_req, res) => {
+  const reg = getRegistry();
+  res.json({
+    ts: Date.now(),
+    kill: KILL,
+    flags: v4FlagSnapshot(),
+    algos: reg.map((r) => ({ name: r.name, surface: r.surface, weights: r.weights, usesEvents: r.usesEvents })),
+  });
+});
 
 async function main(): Promise<void> {
   if (!KILL) {
