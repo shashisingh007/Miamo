@@ -15,6 +15,7 @@ import { installErrors } from './collectors/errors';
 import { installAutotrack } from './collectors/autotrack';
 import { installForms } from './collectors/forms';
 import { installPerf } from './collectors/perf';
+import { installAttention } from './collectors/attention';
 import { hasConsent, readConsent, writeConsent, type ConsentScope, type ConsentState } from './consent';
 import { setUid } from './envelope';
 import type { TrackEvent } from './types';
@@ -111,6 +112,7 @@ export function mount(): void {
   state.uninstallers.push(installForms(emit));
   state.uninstallers.push(installPerf(emit));
   state.uninstallers.push(installErrors(emit));
+  state.uninstallers.push(installAttention(emit));
 
   state.mounted = true;
 }

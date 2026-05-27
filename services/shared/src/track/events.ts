@@ -73,6 +73,65 @@ export type TrackEventName =
   | 'moves.play'
   | 'date.plan_open'
   | 'date.plan_save'
+  // ─── v4 additions ──────────────────────────────────────────────────
+  // attention / idle / passive
+  | 'attention.idle'
+  | 'attention.away'
+  | 'attention.return'
+  | 'attention.long_heartbeat'
+  // card-level interactions (Discover stack)
+  | 'card.impression.50'
+  | 'card.impression.100'
+  | 'card.bio.expand'
+  | 'card.bio.collapse'
+  | 'card.photo.swipe'
+  | 'card.hover'
+  // swipe decision telemetry
+  | 'swipe.start'
+  | 'swipe.abort'
+  | 'swipe.commit'
+  | 'swipe.undo'
+  | 'swipe.regret'
+  | 'swipe.repeat_pass'
+  // discovery filters & search (no raw text leaves device)
+  | 'filter.open'
+  | 'filter.change'
+  | 'filter.apply'
+  | 'filter.reset'
+  | 'search.query'
+  | 'search.result_click'
+  | 'search.no_results'
+  // notifications
+  | 'notification.shown'
+  | 'notification.opened'
+  | 'notification.dismissed'
+  | 'notification.snoozed'
+  // media
+  | 'media.photo.zoom'
+  | 'media.video.play'
+  | 'media.video.pause'
+  | 'media.video.seek'
+  | 'media.video.complete'
+  // lifecycle
+  | 'lifecycle.network'
+  | 'lifecycle.fullscreen'
+  // intent micro-signals
+  | 'intent.cta.hover'
+  | 'intent.price.hover'
+  | 'intent.profile.settle'
+  | 'intent.bookmark'
+  | 'intent.screenshot'
+  | 'intent.copy'
+  // chat micro-signals
+  | 'chat.typing.start'
+  | 'chat.typing.stop'
+  | 'chat.draft_deleted'
+  | 'chat.scroll_history'
+  // perf / error extensions
+  | 'error.long_task'
+  | 'error.slow_api'
+  | 'error.sse_disconnect'
+  | 'error.sse_reconnect'
   // generic
   | 'custom';
 
