@@ -91,6 +91,7 @@ export function suggestMessages(inp: SuggestInputs, top = 3): Suggestion[] {
 registerAlgo({
   name: 'messageSuggest',
   surface: 'messaging',
-  usesEvents: ['msg.send', 'msg.read', 'msg.thread_open', 'msg.compose_start', 'msg.voice_record', 'msg.reaction'],
+  usesEvents: ['msg.send', 'msg.read', 'msg.thread_open', 'msg.compose_start', 'msg.voice_record', 'msg.reaction',
+    'chat.typing.start', 'chat.typing.stop', 'chat.draft_deleted', 'chat.scroll_history'],
   weights: WEIGHTS,
 });

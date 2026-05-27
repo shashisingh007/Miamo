@@ -37,6 +37,8 @@ export function rerankSearch(inp: SearchInputs): { score: number; explain: Recor
 registerAlgo({
   name: 'searchAugment',
   surface: 'search',
-  usesEvents: ['profile.view', 'discover.card_view', 'click'],
+  usesEvents: ['profile.view', 'discover.card_view', 'click',
+    'filter.open', 'filter.change', 'filter.apply', 'filter.reset',
+    'search.query', 'search.result_click', 'search.no_results'],
   weights: WEIGHTS,
 });

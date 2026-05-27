@@ -40,6 +40,7 @@ export function nextNotifyAt(inp: NotifyInputs): Date {
 registerAlgo({
   name: 'notifyTiming',
   surface: 'notifications',
-  usesEvents: ['session.heartbeat', 'session.start', 'session.end'],
+  usesEvents: ['session.heartbeat', 'session.start', 'session.end',
+    'notification.shown', 'notification.opened', 'notification.dismissed', 'notification.snoozed'],
   weights: { peakFit: 1 },
 });

@@ -25,6 +25,15 @@ export type FeatureRow = {
   vibeEmb: Float32Array | null;
   behaviorEmb: Float32Array | null;
   peakHours: number[] | null;
+  /** v4: 5-bucket dwell distribution from card.impression.100 dwellMs
+   *  Buckets: <750ms, <2s, <5s, <10s, >=10s. Null if not yet computed. */
+  dwellHistogram?: number[] | null;
+  /** v4: median ms from card visible -> swipe.commit, last 14d. */
+  hesitationP50Ms?: number | null;
+  /** v4: fraction of commits undone within 3s. 0..1. */
+  regretRate?: number | null;
+  /** v4: fraction of card.impressions on candidates already passed-twice. 0..1. */
+  repeatPassRate?: number | null;
 };
 
 export type PairRow = {
@@ -43,6 +52,18 @@ export type PairRow = {
 
 export type EvtCount = { evt: string; count: number; days: number };
 
+/** v4: per-pair behaviour signals consumed by forYou v5 + postImpressionRerank. */
+export type PairBehavior = {
+  /** undo events on this candidate in last N days */
+  regrets: number;
+  /** swipe.repeat_pass count: cand shown >=2x and passed in session */
+  repeatPasses: number;
+  /** intent.profile.settle count: returns to this profile within session */
+  returns: number;
+  /** longest single card.impression.100 dwell (ms) on this candidate */
+  maxDwellMs: number;
+};
+
 export interface SignalReader {
   hashOf(userId: string): string;
   features(uidHash: string): Promise<FeatureRow | null>;
@@ -56,6 +77,8 @@ export interface SignalReader {
   targetImpressions(aHash: string, bHashes: string[], days: number): Promise<Map<string, number>>;
   /** Daily AI Match pre-compute (FeatureSnapshot.raw->'dailyMatch'). */
   dailyMatch(uidHash: string): Promise<{ bHash: string; score: number; computedAt: string } | null>;
+  /** v4: per-pair behaviour signals (regrets, repeat-passes, returns, dwell). */
+  pairBehavior(aHash: string, bHashes: string[], days: number): Promise<Map<string, PairBehavior>>;
 }
 
 const FEATURES_TTL_MS = 60_000;
@@ -83,10 +106,14 @@ export class PrismaSignalReader implements SignalReader {
       `SELECT "uidHash","chronotype","attentionProfile","rageClickRate","deadClickRate",
               "swipeRightRatio","replyPersonaP50Ms","responseRate",
               "interestVec","vibeEmb","behaviorEmb",
-              ("raw"->'peakHours') AS "peakHours"
+              ("raw"->'peakHours') AS "peakHours",
+              ("raw"->'dwellHistogram') AS "dwellHistogram",
+              ("raw"->>'hesitationP50Ms')::float AS "hesitationP50Ms",
+              ("raw"->>'regretRate')::float AS "regretRate",
+              ("raw"->>'repeatPassRate')::float AS "repeatPassRate"
        FROM "FeatureSnapshot" WHERE "uidHash" = $1`,
       uidHash,
-    )) as Array<FeatureRow & { interestVec: Buffer | null; vibeEmb: Buffer | null; behaviorEmb: Buffer | null; peakHours: unknown }>;
+    )) as Array<FeatureRow & { interestVec: Buffer | null; vibeEmb: Buffer | null; behaviorEmb: Buffer | null; peakHours: unknown; dwellHistogram: unknown }>;
     if (rows.length === 0) {
       this.featuresCache.set(uidHash, null, FEATURES_TTL_MS);
       return null;
@@ -98,6 +125,10 @@ export class PrismaSignalReader implements SignalReader {
       vibeEmb: bufToF32(r.vibeEmb as unknown as Buffer | null),
       behaviorEmb: bufToF32(r.behaviorEmb as unknown as Buffer | null),
       peakHours: Array.isArray(r.peakHours) ? (r.peakHours as number[]) : null,
+      dwellHistogram: Array.isArray(r.dwellHistogram) ? (r.dwellHistogram as number[]) : null,
+      hesitationP50Ms: typeof r.hesitationP50Ms === 'number' ? r.hesitationP50Ms : null,
+      regretRate: typeof r.regretRate === 'number' ? r.regretRate : null,
+      repeatPassRate: typeof r.repeatPassRate === 'number' ? r.repeatPassRate : null,
     };
     this.featuresCache.set(uidHash, out, FEATURES_TTL_MS);
     return out;
@@ -190,5 +221,42 @@ export class PrismaSignalReader implements SignalReader {
     const dm = rows[0]?.dm;
     if (!dm || typeof dm.bHash !== 'string' || typeof dm.score !== 'number') return null;
     return { bHash: dm.bHash, score: dm.score, computedAt: dm.computedAt ?? '' };
+  }
+
+  async pairBehavior(aHash: string, bHashes: string[], days: number): Promise<Map<string, PairBehavior>> {
+    const out = new Map<string, PairBehavior>();
+    if (bHashes.length === 0) return out;
+    // Read per-target counts for the four v4 swipe/return events from EventAggDaily.meta.targets.
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `SELECT "evt", meta->'targets' AS targets, meta->>'maxDwellMs' AS "maxDwellMs"
+       FROM "EventAggDaily"
+       WHERE "uidHash" = $1
+         AND "day" >= NOW() - ($2 || ' days')::interval
+         AND "evt" IN ('swipe.regret','swipe.repeat_pass','intent.profile.settle','card.impression.100')
+         AND meta ? 'targets'`,
+      aHash, String(days),
+    )) as Array<{ evt: string; targets: Record<string, number> | null; maxDwellMs: string | null }>;
+    const bSet = new Set(bHashes);
+    const ensure = (b: string): PairBehavior => {
+      let cur = out.get(b);
+      if (!cur) { cur = { regrets: 0, repeatPasses: 0, returns: 0, maxDwellMs: 0 }; out.set(b, cur); }
+      return cur;
+    };
+    for (const r of rows) {
+      if (!r.targets) continue;
+      for (const [b, c] of Object.entries(r.targets)) {
+        if (!bSet.has(b)) continue;
+        const pb = ensure(b);
+        const n = Number(c);
+        if (r.evt === 'swipe.regret') pb.regrets += n;
+        else if (r.evt === 'swipe.repeat_pass') pb.repeatPasses += n;
+        else if (r.evt === 'intent.profile.settle') pb.returns += n;
+        else if (r.evt === 'card.impression.100') {
+          const dwell = Number(r.maxDwellMs || 0);
+          if (dwell > pb.maxDwellMs) pb.maxDwellMs = dwell;
+        }
+      }
+    }
+    return out;
   }
 }
