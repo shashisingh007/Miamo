@@ -83,6 +83,37 @@ Arjun's v5 score for Priya is **≈ 73** out of 100 — a slight improvement ove
 
 ---
 
+## v5 across the full algorithm fleet
+
+`forYou` was the headliner, but v5 ships behind eight more flags. Every one is **off by default** and the v4 code path is intact, so a stuck deploy or a bad metric is a one-env-var rollback.
+
+| Algorithm | Flag | v5 change in one line |
+|---|---|---|
+| `forYou` | `ALGO_V5_FOR_YOU_ENABLED` | Adds attentionFit + hesitationFit lanes, and regret/repeat/return adjustments. |
+| `aiPicks` | `ALGO_V5_AI_PICKS_ENABLED` | Adds a `returnRate` lane (Priya keeps coming back to this profile? bump it). |
+| `active` | `ALGO_V5_ACTIVE_ENABLED` | "Likely to reply now" uses `lastAnyActivityMs` (return / long-heartbeat / commit) instead of heartbeat alone. |
+| `postImpressionRerank` | `ALGO_V5_POST_IMPRESSION_RERANK_ENABLED` | Dwell ≥2s / 5s, `card.bio.expand`, `intent.profile.settle` become positive deltas for the next batch; `swipe.repeat_pass` adds a hard −15 negative. |
+| `cf` | `ALGO_V5_CF_ENABLED` | Dwell-weighted item-item neighbours: shared viewers who *lingered* count more than shared viewers who scrolled past. |
+| `searchAugment` | `ALGO_V5_SEARCH_AUGMENT_ENABLED` | Reads 7d `search.no_results` / `search.result_click` rollups, blends a `searchHealth` lane so frustrated searches get fresher candidates. |
+| `feedAugment` | `ALGO_V5_FEED_AUGMENT_ENABLED` | New `filterAffinity` lane reads recent `filter.apply` set; items matching Priya's filters bubble up. |
+| `notifyTiming` | `ALGO_V5_NOTIFY_TIMING_ENABLED` | Daily cap (default 4) and dismiss-back-off (default 3 consecutive dismisses → defer to next day 09:00 UTC). |
+| `messageSuggest` | `ALGO_V5_MESSAGE_SUGGEST_ENABLED` | Damps suggestions Priya has been drafting then deleting: at full delete rate the opener score halves. |
+
+Seven more algorithms (`new`, `verified`, `serious`, `dtm`, `moves`, `beats`, `aiMatch`) ship **reserved dispatchers** today — `scoreXDispatch(...)` is wired in and gated on a v5 flag, but the v5 path returns the same numbers as v4. This lets us swap in tuned behaviour later without another deploy.
+
+### Where the new signals come from
+
+All nine active v5 upgrades read tracking data through `SignalReader` only — never directly from Redis or Postgres. `FeatureSnapshot.raw` now carries the v5 keys (`dwellHistogram`, `hesitationP50Ms`, `regretRate`, `repeatPassRate`) populated by the tracking-worker rollup; the histogram bin edges are a single shared contract (`[0, 750, 2000, 5000, 10000]` ms) between [services/tracking-worker/src/rollup.ts](../services/tracking-worker/src/rollup.ts) and [services/shared/src/algo/forYou.ts](../services/shared/src/algo/forYou.ts).
+
+### Rollback drill (any v5 flag)
+
+1. Unset the relevant `ALGO_V5_*_ENABLED` env var in the affected service's `values.yaml`.
+2. `kubectl rollout restart deployment/<service>` — or wait for the next deploy; values take effect immediately on new requests.
+3. Verify by hitting the service's `/debug/flags` endpoint (returns `v4FlagSnapshot()`).
+4. PairCompatCache and FeatureSnapshot rows are untouched — the v4 path reads from the same tables.
+
+---
+
 ---
 
 ## How to read this
