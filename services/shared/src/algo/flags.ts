@@ -25,10 +25,14 @@ export function v4WorkersEnabled(): boolean {
  *  rollout is per-feature, not per-surface. */
 export type V5Feature =
   | 'forYou'                  // attentionFit + hesitationFit + regret/repeat/return adjustments
+  | 'aiPicks'                 // returnRate as ensemble term
   | 'postImpressionRerank'    // dwell-aware re-rank of the next batch
   | 'active'                  // smooth decay over lastActivityAt
   | 'notifyTiming'            // per-user daily cap + idle-aware
-  | 'messageSuggest';         // typing-pattern-aware opener ranking
+  | 'messageSuggest'          // typing-pattern-aware opener ranking
+  | 'cf'                      // dwell-weighted collaborative filter
+  | 'searchAugment'           // search.no_results penalty + search.result_click boost
+  | 'feedAugment';            // filter.* into rerank
 
 export function v5FeatureEnabled(feature: V5Feature): boolean {
   const key = `ALGO_V5_${feature.replace(/[A-Z]/g, (m) => '_' + m).toUpperCase()}_ENABLED`;

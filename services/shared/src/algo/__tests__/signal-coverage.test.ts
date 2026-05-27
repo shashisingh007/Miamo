@@ -60,7 +60,6 @@ const OPERATIONAL_EVENTS = new Set<string>([
   'date.plan_save',         // funnel
   'custom',                 // by definition unrestricted
   // ─── v4 additions ──────────────────────────────────────────────
-  'attention.long_heartbeat', // session-state long ping (operational)
   'card.bio.collapse',        // paired with bio.expand; only expand is a ranking signal
   'card.photo.swipe',         // within-card nav; folded into attentionProfile via worker
   'card.hover',               // attention; folded into FeatureSnapshot
