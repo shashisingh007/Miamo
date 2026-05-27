@@ -2,6 +2,55 @@
 
 **TL;DR:** every tap Priya makes is a sticky note (a tracking event) that her phone writes and posts to our mailbox (`ingest`). Back-room clerks (`tracking-worker`) sort the sticky notes into ledgers (Postgres tables) every 10 seconds, every 5 minutes, every 15 minutes. Within 15 minutes those ledgers shape what Priya sees next.
 
+> **v4 additions (May 2026)** — see §"v4 additions" below for ~40 new events covering idle/away, swipe hesitation, regret, repeat-pass, card-level dwell, filters, notifications, and intent micro-signals. All new events are additive (the v=1 envelope is unchanged); the new collectors (`installAttention`, `swipeTracker`, `cardTracker`) are gated by the existing `analytics` consent.
+
+---
+
+## v4 additions
+
+### New event families
+
+| Family | New events | Why we collect it | Privacy class |
+|---|---|---|---|
+| Attention / idle | `attention.idle`, `attention.away`, `attention.return`, `attention.long_heartbeat` | Distinguishes "Priya is reading the bio carefully" from "Priya put the phone down" so dwell isn't double-counted | quality |
+| Card impressions | `card.impression.50`, `card.impression.100`, `card.bio.expand`, `card.bio.collapse`, `card.photo.swipe`, `card.hover` | Lets `forYou v5` compute `attentionFit` (cosine between dwell histograms) | quality |
+| Swipe telemetry | `swipe.start`, `swipe.commit` (`{dir, velocity, hesitationMs}`), `swipe.abort`, `swipe.undo`, `swipe.regret` (undo within 3s), `swipe.repeat_pass` | Drives `hesitationFit`, `regretPenalty`, `repeatPassDamp` in `forYou v5`. Repeat-pass and regret are the strongest negative signals in the v5 model | personalization |
+| Discovery filters | `filter.open`, `filter.change`, `filter.apply`, `filter.reset` | Powers `searchAugment` rerank when explicit filters disagree with the implicit `forYou` score | personalization |
+| Search | `search.query` (hash + length only, never raw text), `search.result_click`, `search.no_results` | Same. Raw query text is hashed client-side and never leaves the device | personalization |
+| Notifications | `notification.shown`, `notification.opened`, `notification.dismissed`, `notification.snoozed` | Closes the loop for `notifyTiming` — the model learns which moments led to opens vs dismisses, per user | personalization |
+| Media | `media.photo.zoom`, `media.video.play/pause/seek/complete` | Refines attention signal beyond raw dwell | quality |
+| Lifecycle | `lifecycle.network`, `lifecycle.fullscreen` | Operational debugging | essential |
+| Intent micro | `intent.profile.settle` (returned to same profile within 30s), `intent.cta.hover`, `intent.price.hover`, `intent.bookmark`, `intent.screenshot`, `intent.copy` | `intent.profile.settle` becomes a positive boost (+6 max) in `forYou v5`; the rest are reserved | personalization |
+| Chat micro | `chat.typing.start`, `chat.typing.stop`, `chat.draft_deleted`, `chat.scroll_history` | Feeds `messageSuggest` — opener variants Priya typically *sends* vs *drafts then deletes* | personalization |
+| Perf / error | `error.long_task`, `error.slow_api`, `error.sse_disconnect`, `error.sse_reconnect` | Operational only | essential |
+
+### New web SDK collectors
+
+- [services/web/src/lib/track/collectors/attention.ts](../services/web/src/lib/track/collectors/attention.ts) — installed by `mount()`. Emits idle/away/return + 2/5/10-minute "still here" heartbeats.
+- [services/web/src/lib/track/collectors/swipe.ts](../services/web/src/lib/track/collectors/swipe.ts) — `swipeTracker` imperative helper called by the Discover card component on visible / start / commit / abort / undo. In-session memory tracks repeat-passes.
+- [services/web/src/lib/track/collectors/cards.ts](../services/web/src/lib/track/collectors/cards.ts) — `cardTracker` imperative helper for `observeCard(el, targetId)` + `onHover` / `onBioExpand` / `onPhotoSwipe`. Detects `intent.profile.settle` when the same target re-enters the viewport within 30s.
+
+### New worker-side signals
+
+Aggregated into `FeatureSnapshot.raw` (no migration needed — `raw` is a JSON column):
+
+| Key | Source events | Used by |
+|---|---|---|
+| `dwellHistogram` (5 buckets <0.75s, <2s, <5s, <10s, ≥10s) | `card.impression.100` durations | `attentionFit` in `forYou v5` |
+| `hesitationP50Ms` | `swipe.commit.hesitationMs` over 14d | `hesitationFit` in `forYou v5` |
+| `regretRate` | `swipe.regret` / `swipe.commit` | reserved (planned for v6) |
+| `repeatPassRate` | `swipe.repeat_pass` / `card.impression.100` | reserved |
+
+Per-pair counts (per-target counts inside `EventAggDaily.meta.targets`) for `swipe.regret`, `swipe.repeat_pass`, `intent.profile.settle`, `card.impression.100` are read directly by the new `SignalReader.pairBehavior()` method.
+
+### Privacy + consent recap
+
+- Every new event is gated by the existing `analytics` consent (transport refuses to send otherwise).
+- Search queries are hashed client-side (`search.query.p.hash`); only the SHA-256 prefix + length leaves the device.
+- Cursor coordinates remain bucketed to 0.1% of viewport (existing behaviour).
+- Idle/away thresholds (`5s` / `30s`) are constants in `attention.ts`; no PII.
+- New events still respect `MAX_EVENTS_PER_BATCH=50` and `MAX_ENVELOPE_BYTES=32KB`. The new collectors keep emission rates well under the cap.
+
 ---
 
 ## How to read this
