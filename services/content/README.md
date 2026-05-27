@@ -1,205 +1,92 @@
-# Miamo Content Service
+# content
 
-**Port:** 3205  
-**Role:** Feed, stories, videos, creativity hub  
-**Tech:** Express 4.21, Prisma 5.22
+## 1. Purpose
 
----
+Owns user-generated content: long-form feed posts, ephemeral 7-day stories, videos, and the creativity gallery (categorised art / poetry / music / fitness). Provides the personalised creativity feed and the optional v4 feed augmentation.
 
-## What It Does
+## 2. Mental model
 
-The Content Service manages all user-generated content:
+Pure CRUD service on top of the content tables. Two "smart" surfaces:
 
-1. **Feed** — Timeline posts with likes, comments, sharing
-2. **Stories** — Ephemeral 24h content with views and reactions
-3. **Videos** — Short-form video content with engagement tracking
-4. **Creativity** — Creative categories, items, trends, community features
+- **`/api/v1/feed`** — chronological by default; when `ALGO_V4_RANK_ENABLED_FEED=1`, blends `sourceScore` (50%) + `forYou` (30%) + recency (20% with 6h halflife) via `rerankFeed`.
+- **`/api/v1/creativity/feed`** — collaborative filtering + activity signals + category engagement; deterministic, no v4 dependency.
 
-This is the **largest service** with 27 endpoints.
+## 3. Public surface
 
-## API Endpoints
+| Method | Path | Purpose |
+|---|---|---|
+| GET / POST / PUT / DELETE | `/api/v1/feed[/:id]` | Feed CRUD |
+| POST | `/api/v1/feed/:id/react`, `/comments`, GET `/comments` | Reactions + comments |
+| GET / POST / DELETE | `/api/v1/stories[/:id]` | Story CRUD (7-day expiry) |
+| POST | `/api/v1/stories/:id/{view,like,react,post-to-feed}` | Story actions |
+| GET / POST / DELETE | `/api/v1/stories/:id/comments` | Story comments (matched users only) |
+| GET / POST | `/api/v1/videos[/:id]` | Video CRUD |
+| POST | `/api/v1/videos/:id/react`, `/comments` | Video reactions/comments |
+| GET | `/api/v1/creativity/categories` | Categories + counts |
+| GET | `/api/v1/creativity/feed` | Personalised gallery (CF + activity) |
+| GET / POST | `/api/v1/creativity[/:id]` | Creativity items CRUD |
+| POST | `/api/v1/creativity/:id/{react,view,hide,share}` | Item actions |
+| GET | `/api/v1/creativity/trends` | Trending items by category |
 
-### Feed (Social Timeline)
+Source: [server.ts](src/server.ts) (~1740 lines).
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/api/v1/feed` | Required | Get feed posts |
-| `POST` | `/api/v1/feed` | Required | Create a post |
-| `GET` | `/api/v1/feed/:id` | Required | Get single post |
-| `PUT` | `/api/v1/feed/:id` | Required | Edit a post |
-| `DELETE` | `/api/v1/feed/:id` | Required | Delete a post |
-| `POST` | `/api/v1/feed/:id/react` | Required | React to a post |
-| `GET` | `/api/v1/feed/:id/comments` | Required | Get post comments |
-| `POST` | `/api/v1/feed/:id/comments` | Required | Add a comment |
+## 4. Data model
 
-### Stories (Ephemeral Content)
+Writes: `FeedPost`, `FeedComment`, `FeedReaction`, `Story`, `StoryView`, `StoryComment`, `StoryLike`, `Video`, `VideoComment`, `VideoReaction`, `CreativityCategory`, `CreativityItem`, `CreativityView`, `CreativityReaction`, `CreativityComment`, `Trend`.
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/api/v1/stories` | Required | Get active stories |
-| `POST` | `/api/v1/stories` | Required | Create a story |
-| `GET` | `/api/v1/stories/:id` | Required | Get a story |
-| `DELETE` | `/api/v1/stories/:id` | Required | Delete a story |
-| `POST` | `/api/v1/stories/:id/view` | Required | Record a view |
-| `POST` | `/api/v1/stories/:id/react` | Required | React to a story |
-| `GET` | `/api/v1/stories/:id/viewers` | Required | See who viewed |
+## 5. Dependencies
 
-### Videos (Short-Form)
+| Talks to | Why | How |
+|---|---|---|
+| Postgres | content tables | Prisma |
+| `services/shared/src/algo/{feedAugment,scoreUserActivity,dtm}` | feed re-rank, creativity personalisation | in-process |
+| LRU caches | `feedCache`, `activityCache` | in-process |
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/api/v1/videos` | Required | List videos |
-| `POST` | `/api/v1/videos` | Required | Upload a video |
-| `GET` | `/api/v1/videos/:id` | Required | Get a video |
-| `DELETE` | `/api/v1/videos/:id` | Required | Delete a video |
-| `POST` | `/api/v1/videos/:id/react` | Required | React to video |
-| `GET` | `/api/v1/videos/:id/comments` | Required | Get video comments |
-| `POST` | `/api/v1/videos/:id/comments` | Required | Add video comment |
-| `POST` | `/api/v1/videos/:id/view` | Required | Record video view |
+No outbound HTTP.
 
-### Creativity Hub
+## 6. Configuration
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/api/v1/creativity/categories` | Required | List creative categories |
-| `GET` | `/api/v1/creativity` | Required | List creative items |
-| `POST` | `/api/v1/creativity` | Required | Create creative item |
-| `GET` | `/api/v1/creativity/:id` | Required | Get creative item |
-| `POST` | `/api/v1/creativity/:id/react` | Required | React to item |
-| `GET` | `/api/v1/creativity/:id/comments` | Required | Get item comments |
-| `POST` | `/api/v1/creativity/:id/comments` | Required | Add item comment |
-| `POST` | `/api/v1/creativity/:id/view` | Required | Record item view |
-| `GET` | `/api/v1/creativity/trends` | Required | Get trending items |
+| Env | Default | Purpose |
+|---|---|---|
+| `PORT` | `3205` | HTTP port |
+| `DATABASE_URL` | — | Postgres |
+| `INTERNAL_SERVICE_KEY` | — | Internal-call auth |
+| `ALGO_V4_RANK_ENABLED_FEED` | `0` | Enable feed re-rank |
 
-## Feed System
-
-### Post Object
-
-```json
-{
-  "id": "uuid",
-  "authorId": "uuid",
-  "content": "Enjoying a beautiful sunset! 🌅",
-  "mediaUrls": ["https://cdn.miamo.app/photos/abc.jpg"],
-  "type": "photo",
-  "reactions": { "❤️": 12, "🔥": 5, "😍": 3 },
-  "commentCount": 8,
-  "createdAt": "2026-05-02T...",
-  "author": {
-    "displayName": "Sarah",
-    "profile": { "photos": [...] }
-  }
-}
-```
-
-### Feed Algorithm
+## 7. Worked example — feed with v4 enabled
 
 ```
-1. Fetch posts from matched users + followed users
-2. Sort by recency (newest first)
-3. Boost posts from active matches
-4. Include own posts
-5. Paginate (default: 20 per page)
+Browser:  GET /api/v1/feed?cursor=<id>&limit=20
+Content:  load 60 candidate posts (followed authors + matches, last 7d)
+          for each post p:
+            sourceScore = invertedIndex(p.author, viewer)   # 0..1
+            forYouScore = scoreForYou({ me, cand=p.author, ... }).score / 100
+            ageSec      = (now - p.createdAt)/1000
+            blended     = rerankFeed({ sourceScore, forYouScore, itemAgeSec: ageSec })
+            p._rank = blended
+          sort by _rank desc; return 20
 ```
 
-## Stories System
-
-### Story Lifecycle
-
-```
-Create Story → Active (24 hours) → Automatically expires
-                  ↓
-         Views tracked per user
-         Reactions tracked per user
-         Viewers list visible to author
-```
-
-### Key Behaviors
-
-- Stories are visible for **24 hours** from creation
-- Each user can view a story once (tracked)
-- Author can see who viewed their stories
-- Stories appear in a horizontal carousel in the UI
-- Expired stories are soft-deleted (kept for analytics)
-
-## Videos System
-
-### Video Features
-
-- **Upload** — Videos stored with URL reference, thumbnail, duration metadata
-- **View tracking** — Each view recorded with viewer ID
-- **Reactions** — Emoji-based reactions (same system as feed)
-- **Comments** — Threaded comments on videos
-- **Feed integration** — Videos appear in the main feed
-
-## Creativity Hub
-
-### What It Is
-
-A TikTok-style creative space where users share:
-- Photo edits and filters
-- Art and illustrations
-- Music/audio creations
-- Writing and poetry
-- Date ideas and experiences
-
-### Category System
-
-```
-GET /api/v1/creativity/categories
-→ Returns: Photography, Art, Music, Writing, Date Ideas, Cooking, Travel, etc.
-```
-
-### Trending Algorithm
-
-```
-GET /api/v1/creativity/trends
-                ↓
-Score = (reactions × 2) + (comments × 3) + (views × 1)
-        ───────────────────────────────────────────────
-                    hours_since_posted
-                ↓
-Top 20 items returned, refreshed hourly
-```
-
-## Database Models Used
-
-- **Post** — `id, authorId, content, mediaUrls, type (text/photo/video), isActive`
-- **PostReaction** — `id, postId, userId, emoji`
-- **Comment** — `id, postId/storyId/videoId, authorId, content, parentId (threading)`
-- **Story** — `id, authorId, mediaUrl, type, expiresAt, isActive`
-- **StoryView** — `id, storyId, viewerId, viewedAt`
-- **StoryReaction** — `id, storyId, userId, emoji`
-- **Video** — `id, authorId, url, thumbnailUrl, duration, title, description`
-- **VideoView** — `id, videoId, viewerId, viewedAt`
-- **VideoReaction** — `id, videoId, userId, emoji`
-- **CreativeItem** — `id, authorId, categoryId, title, content, mediaUrls, viewCount`
-- **CreativeCategory** — `id, name, description, icon`
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3205` | Service port |
-| `DATABASE_URL` | — | PostgreSQL connection string |
-| `INTERNAL_SERVICE_KEY` | dev key | Validates internal requests |
-
-## Run Standalone
+## 8. Local dev
 
 ```bash
 cd services/content
-npm install
-npx prisma generate
-DATABASE_URL=postgresql://miamo:miamo@localhost:5432/miamo npx tsx src/server.ts
+npx prisma generate --schema=../shared/prisma/schema.prisma
+npm run dev
 ```
 
-## Files
+## 9. Tests
 
-```
-services/content/
-├── src/server.ts      ← Routes, feed/stories/videos/creativity logic
-├── package.json
-├── tsconfig.json
-├── Dockerfile
-└── .dockerignore
-```
+[tests/algo-feed-augment.test.ts](../../tests/algo-feed-augment.test.ts) asserts deterministic scoring and that strong `forYou` authors can outrank slightly newer weak authors.
+
+## 10. Failure modes & operational notes
+
+- **Feed cache TTL** — defaults to short window; spikes during create/delete are absorbed by invalidation on mutation.
+- **Creativity hide** is per-user — a hidden item never resurfaces in the personalised feed for that viewer.
+- **Story expiry** — `expiresAt` filter on reads; no background sweeper (rows kept for analytics; queries filter).
+
+## 11. What changed & why it's good
+
+- **Before:** Feed was strict chronological; strong content from an active connection could be buried under timeline noise.
+- **After:** When `ALGO_V4_RANK_ENABLED_FEED=1`, recent items still dominate, but a strong-affinity author can surface to the top. Feed remains deterministic and explainable.
+- **Why it matters:** Engagement improves without sacrificing user trust in the timeline — recency stays the dominant signal at 50%.

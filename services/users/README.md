@@ -1,131 +1,90 @@
-# Miamo Users Service
+# users
 
-**Port:** 3202  
-**Role:** User profiles, settings, privacy, search, GDPR  
-**Tech:** Express 4.21, Prisma 5.22
+## 1. Purpose
 
----
+Owns the user-facing profile surface: profile fields, photos, prompts, interests, settings, privacy, search, bookmarks, and the generic `UserData` key-value store. Hosts the onboarding-completion endpoint used by the gateway gate.
 
-## What It Does
+## 2. Mental model
 
-The Users Service manages:
+A wide CRUD service on top of `Profile` and its satellites. Pure HTTP, stateless. The only "smart" endpoint is `/api/v1/search`, which combines a Postgres lexical query with the shared `rerankSearch` v4 algo when the flag is on.
 
-1. **User Profiles** — CRUD operations, photos, prompts, interests
-2. **Settings** — Notification preferences, theme, language, privacy controls
-3. **Search** — Find users by name/interest with privacy filters
-4. **Privacy** — Block/unblock users, control visibility
-5. **GDPR Compliance** — Export all user data on request
-6. **Account Lifecycle** — Deactivate/reactivate accounts
+## 3. Public surface
 
-## API Endpoints
+| Method | Path | Purpose | Source |
+|---|---|---|---|
+| GET | `/api/v1/users` | First 50 active users + photos | [server.ts](src/server.ts#L33) |
+| GET | `/api/v1/users/:id` | One user + photos + prompts + interests | [server.ts](src/server.ts#L42) |
+| GET | `/api/v1/profiles/me` | My profile | [server.ts](src/server.ts#L57) |
+| PUT | `/api/v1/profiles/me` | Update fields + recompute `completionScore` | [server.ts](src/server.ts#L67) |
+| GET | `/api/v1/profiles/me/completion` | Score + threshold + missing buckets + DTM flag | [server.ts](src/server.ts#L113) |
+| PUT | `/api/v1/profiles/me/prompts` | Set Q&A list (ordered) | [server.ts](src/server.ts#L122) |
+| PUT | `/api/v1/profiles/me/interests` | Set interest tags | [server.ts](src/server.ts#L136) |
+| POST | `/api/v1/profiles/me/photos` | Upload photo (max 9; auto-position) | [server.ts](src/server.ts#L151) |
+| DELETE | `/api/v1/profiles/me/photos/:photoId` | Delete + reorder | [server.ts](src/server.ts#L163) |
+| GET / PUT | `/api/v1/settings` | Read / update Settings | [server.ts](src/server.ts#L180) |
+| PUT | `/api/v1/settings/privacy` | Update PrivacySettings | [server.ts](src/server.ts#L208) |
+| POST | `/api/v1/settings/deactivate` | Soft-delete | [server.ts](src/server.ts#L240) |
+| POST | `/api/v1/settings/reactivate` | Undo soft-delete | [server.ts](src/server.ts#L249) |
+| GET | `/api/v1/settings/export` | GDPR data export | [server.ts](src/server.ts#L256) |
+| GET | `/api/v1/settings/blocks` | List Block rows | [server.ts](src/server.ts#L267) |
+| DELETE | `/api/v1/settings/delete` | Hard cascade delete | [server.ts](src/server.ts#L276) |
+| GET | `/api/v1/search` | Lexical + (flag) v4 re-rank | [server.ts](src/server.ts#L303) |
+| GET / POST / DELETE | `/api/v1/bookmarks` | Bookmarks CRUD | [server.ts](src/server.ts#L403) |
+| GET / POST / PUT / DELETE / PUT `/upsert/:type` | `/api/v1/user-data` | Generic JSON KV store | [server.ts](src/server.ts#L440) |
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/api/v1/users` | Required | List all users |
-| `GET` | `/api/v1/users/:id` | Required | Get user by ID |
-| `PUT` | `/api/v1/users/:id` | Required | Update user |
-| `DELETE` | `/api/v1/users/:id` | Required | Delete user |
-| `GET` | `/api/v1/profiles/me` | Required | Get own profile with score |
-| `PUT` | `/api/v1/profiles/me` | Required | Update own profile |
-| `GET` | `/api/v1/profiles/me/prompts` | Required | Get profile prompts |
-| `PUT` | `/api/v1/profiles/me/interests` | Required | Update interests |
-| `GET` | `/api/v1/settings` | Required | Get user settings |
-| `PUT` | `/api/v1/settings` | Required | Update settings |
-| `GET` | `/api/v1/settings/privacy` | Required | Get privacy settings |
-| `POST` | `/api/v1/users/deactivate` | Required | Deactivate account |
-| `POST` | `/api/v1/users/reactivate` | Required | Reactivate account |
-| `GET` | `/api/v1/users/export` | Required | GDPR data export |
+## 4. Data model
 
-## Profile Score Calculation
+Writes `Profile`, `ProfilePhoto`, `ProfilePrompt`, `ProfileInterest`, `Settings`, `PrivacySettings`, `Bookmark`, `SearchLog`, `UserData`. Reads `User`, `Block`, `Match` (for search relevance).
 
-The `GET /profiles/me` endpoint returns a `profileScore` (0-100%) based on:
+## 5. Dependencies
 
-```
-Score Components                  Points
-──────────────                    ──────
-Has bio                           +20
-Has at least one photo            +20
-Has date of birth                 +10
-Has location set                  +10
-Has "looking for" set             +10
-Has gender set                    +10
-Has at least one interest         +20
-────────────────────────────────────────
-Maximum Score                     100
-```
+| Talks to | Why | How |
+|---|---|---|
+| Postgres | profile / settings / bookmarks | Prisma |
+| `services/shared/src/completion.ts` | `recomputeAndPersistCompletion`, threshold logic | in-process |
+| `services/shared/src/algo/searchAugment` | optional v4 re-rank | in-process |
 
-This encourages users to complete their profiles. The score is displayed in the UI as a ring indicator.
+## 6. Configuration
 
-## Search Feature
+| Env | Default | Purpose |
+|---|---|---|
+| `PORT` | `3202` | HTTP port |
+| `DATABASE_URL` | — | Postgres |
+| `INTERNAL_SERVICE_KEY` | — | Reject calls not from gateway |
+| `ALGO_V4_RANK_ENABLED_SEARCH` | `0` | Turn on `rerankSearch` blend |
+
+## 7. Worked example — onboarding gate
 
 ```
-GET /api/v1/search?q=<query>
+Browser:   GET /api/v1/profiles/me/completion
+Users:     SELECT Profile + counts of photos, prompts, interests
+           computeCompletionScore(Profile) → e.g. { score: 72, threshold: 60,
+                                                    missing: ['bio','prompts'], dtm: false }
+           UPDATE Profile.completionScore = 72
+           → 200
+Gateway:   caches result 60 s; next /api/v1/discover passes the gate.
 ```
 
-- Searches by `displayName` (case-insensitive, contains match)
-- Searches by `interests` (array contains match)
-- Excludes the requesting user from results
-- Respects user privacy settings
-- Returns user + profile data
-
-## GDPR Data Export
-
-```
-GET /api/v1/users/export
-```
-
-Returns a complete JSON dump of:
-- User account data
-- Profile information
-- All settings
-- Match history
-- Messages sent/received
-- Content posted
-- Notification history
-
-## Account Deactivation
-
-```
-POST /api/v1/users/deactivate
-→ Sets user.isActive = false (soft delete)
-
-POST /api/v1/users/reactivate
-→ Sets user.isActive = true
-```
-
-Deactivated accounts are hidden from search and discovery but retain all data.
-
-## Database Models Used
-
-- **User** — Core account info, auth fields
-- **Profile** — Bio, photos, location, interests, dating preferences
-- **Settings** — Notification prefs, theme, language, privacy
-- **Block** — User blocking relationships
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3202` | Service port |
-| `DATABASE_URL` | — | PostgreSQL connection string |
-| `INTERNAL_SERVICE_KEY` | dev key | Validates internal requests |
-
-## Run Standalone
+## 8. Local dev
 
 ```bash
 cd services/users
-npm install
-npx prisma generate
-DATABASE_URL=postgresql://miamo:miamo@localhost:5432/miamo npx tsx src/server.ts
+npx prisma generate --schema=../shared/prisma/schema.prisma
+npm run dev          # tsx watch → :3202
 ```
 
-## Files
+## 9. Tests
 
-```
-services/users/
-├── src/server.ts      ← Routes, profile logic, search, GDPR
-├── package.json
-├── tsconfig.json
-├── Dockerfile
-└── .dockerignore
-```
+None local. Covered by `scripts/api-test.sh` and the Python suites.
+
+## 10. Failure modes & operational notes
+
+- **Photo upload of >10 MB** → rejected by gateway body limit. Bump only if needed.
+- **`completionScore` stale** → gateway cache is 60 s; a profile edit takes effect within a minute on the gate.
+- **`rerankSearch` failure** → handler catches and falls back to lexical order; logs a warning.
+
+## 11. What changed & why it's good
+
+- **Before:** Profile reads were scattered across services; search was a `LIKE` query with no personalisation.
+- **After:** One owner for profile state; search blends lexical + `forYou` behind a flag; onboarding score is one cached endpoint.
+- **Why it matters:** Adding a profile field is a one-service change. Search relevance can be A/B-tested without touching the query layer.

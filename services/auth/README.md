@@ -1,137 +1,110 @@
-# Miamo Auth Service
+# auth
 
-**Port:** 3201  
-**Role:** User registration, login, JWT token management  
-**Tech:** Express 4.21, Prisma 5.22, bcrypt, jsonwebtoken
+## 1. Purpose
 
----
+Owns user identity: registration, login, JWT issuance, password change, session inventory and revocation. The only writer of `User.passwordHash`. Everything else (profile fields, settings, etc.) lives in [users](../users/README.md).
 
-## What It Does
+## 2. Mental model
 
-The Auth Service handles:
+A pure HTTP service in front of the `User` and `Session` tables. Stateless. Issues JWT (HS256) access tokens (~15 min) and refresh tokens (~30 days). Password hashing uses `bcryptjs` cost 12. Sessions are tracked per device (browser, OS, IP, UA) for visibility and per-session revoke. Changing the password revokes every session at once.
 
-1. **Registration** — Creates new users with hashed passwords + default profile
-2. **Login** — Validates credentials, returns JWT access + refresh tokens
-3. **Token Refresh** — Issues new access token using refresh token
-4. **Session** — Returns current authenticated user info
-5. **Logout** — Placeholder for token invalidation
+## 3. Public surface
 
-## API Endpoints
+| Method | Path | Auth | Purpose | Source |
+|---|---|---|---|---|
+| POST | `/api/v1/auth/register` | none | Create user + initialise Profile | [server.ts](src/server.ts#L91) |
+| POST | `/api/v1/auth/login` | none | Issue JWT + session row | [server.ts](src/server.ts#L125) |
+| POST | `/api/v1/auth/logout` | bearer | Revoke all sessions; mark offline | [server.ts](src/server.ts#L165) |
+| PUT | `/api/v1/auth/password` | bearer | Verify current, hash new, revoke sessions | [server.ts](src/server.ts#L177) |
+| GET | `/api/v1/auth/me` | bearer | Full user + profile + counts | [server.ts](src/server.ts#L201) |
+| POST | `/api/v1/auth/refresh` | refresh | New access token | [server.ts](src/server.ts#L215) |
+| GET | `/api/v1/auth/sessions` | bearer | List active sessions | [server.ts](src/server.ts#L240) |
+| POST | `/api/v1/auth/sessions/:id/revoke` | bearer | Revoke single session | [server.ts](src/server.ts#L253) |
+| GET | `/healthz`, `/readyz` | none | Probes | shared |
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `POST` | `/api/v1/auth/register` | Public | Create new account |
-| `POST` | `/api/v1/auth/login` | Public | Sign in |
-| `POST` | `/api/v1/auth/logout` | Required | Sign out |
-| `GET` | `/api/v1/auth/me` | Required | Get current user |
-| `POST` | `/api/v1/auth/refresh` | Public | Refresh access token |
+## 4. Data model
 
-## Authentication Flow
+Cross-service shared schema ([services/shared/prisma/schema.prisma](../shared/prisma/schema.prisma)). Models written by auth:
 
-### Registration (`POST /register`)
+| Model | Purpose |
+|---|---|
+| `User` | id, email, passwordHash, displayName, username, miamoId, verified, active, deactivated, timestamps |
+| `Profile` | extended user data (auth initialises a row at registration) |
+| `Session` | one row per device; token, deviceType, browser, OS, IP, UA, lastActiveAt, revoked |
+| `Settings`, `PrivacySettings` | initialised at registration with defaults |
 
-```
-Client sends: { email, password, displayName, dateOfBirth, gender }
-                ↓
-1. Check if email already exists → 409 if so
-2. Hash password with bcrypt (12 rounds)
-3. Create User + Profile in a Prisma transaction
-4. Sign JWT access token (7 days) + refresh token (30 days)
-5. Return { user, accessToken, refreshToken }
-```
+## 5. Dependencies
 
-### Login (`POST /login`)
+| Talks to | Why | How |
+|---|---|---|
+| Postgres | Read/write `User`, `Session`, init Profile/Settings | Prisma |
+| bcryptjs | Password hashing | in-process |
+| jsonwebtoken | Sign/verify JWT | in-process |
 
-```
-Client sends: { email, password }
-                ↓
-1. Find user by email → 401 if not found
-2. Compare password with bcrypt → 401 if wrong
-3. Sign JWT access token (7 days) + refresh token (30 days)
-4. Return { user, accessToken, refreshToken }
-```
+No other service is called outbound.
 
-### Token Refresh (`POST /refresh`)
+## 6. Configuration
 
-```
-Client sends: { refreshToken }
-                ↓
-1. Verify refresh token with JWT_SECRET → 401 if invalid
-2. Find user by decoded userId → 401 if not found
-3. Sign new access token (7 days)
-4. Return { accessToken }
-```
+| Env | Default | Required | Purpose |
+|---|---|---|---|
+| `PORT` | `3201` | no | HTTP port |
+| `DATABASE_URL` | — | yes | Postgres connection |
+| `JWT_SECRET` | — | yes | HS256 sign key |
+| `JWT_REFRESH_SECRET` | — | yes | HS256 refresh key |
+| `INTERNAL_SERVICE_KEY` | — | yes | Internal call auth |
+| `NODE_ENV` | `production` | no | `test` skips `app.listen()` |
 
-### Current User (`GET /me`)
+## 7. Worked example — register + login
 
-```
-Requires: x-user-id header (set by gateway)
-                ↓
-1. Find user by id, include Profile
-2. Return user object (minus password)
-```
+```bash
+# 1. Register
+curl -X POST http://localhost:3200/api/v1/auth/register \
+  -H 'content-type: application/json' \
+  -d '{"email":"alex@example.com","password":"S3cret!","displayName":"Alex"}'
 
-## How Auth Headers Work
+# → 201
+# {
+#   "user": { "id":"clx...", "email":"alex@example.com", "miamoId":"AX-..." },
+#   "accessToken": "eyJ...",  "refreshToken": "eyJ..."
+# }
 
-The Auth Service supports **two authentication methods**:
+# Side effects in DB:
+#   INSERT User (passwordHash = bcrypt(password, 12))
+#   INSERT Profile (defaults; completionScore=0)
+#   INSERT Settings, PrivacySettings (defaults)
+#   INSERT Session (this device)
 
-1. **Direct JWT** — Reads `Authorization: Bearer <token>`, verifies it, extracts `userId`
-2. **Internal Header** — Reads `x-user-id` header (set by Gateway after JWT validation)
-
-The `authMiddleware` in the service checks both, preferring `x-user-id` from internal routing.
-
-## JWT Token Structure
-
-```javascript
-// Access Token payload
-{
-  userId: "uuid-string",
-  email: "user@example.com",
-  iat: 1714651234,
-  exp: 1715256034  // 7 days
-}
-
-// Refresh Token payload
-{
-  userId: "uuid-string",
-  type: "refresh",
-  iat: 1714651234,
-  exp: 1717243234  // 30 days
-}
+# 2. Login
+curl -X POST http://localhost:3200/api/v1/auth/login \
+  -H 'content-type: application/json' \
+  -d '{"email":"alex@example.com","password":"S3cret!"}'
+# → 200, returns new accessToken + new Session row
 ```
 
-## Database Models Used
-
-- **User** — `id, email, passwordHash, displayName, role, isActive, isPremium, lastSeen`
-- **Profile** — `userId, bio, photos, dateOfBirth, gender, location, lookingFor, interests`
-
-Both are created in a single Prisma transaction during registration.
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3201` | Service port |
-| `DATABASE_URL` | — | PostgreSQL connection string |
-| `JWT_SECRET` | dev secret | Token signing key |
-| `INTERNAL_SERVICE_KEY` | dev key | Validates internal requests |
-
-## Run Standalone
+## 8. Local dev
 
 ```bash
 cd services/auth
-npm install
-npx prisma generate
-DATABASE_URL=postgresql://miamo:miamo@localhost:5432/miamo npx tsx src/server.ts
+npx prisma generate --schema=../shared/prisma/schema.prisma
+npm run dev          # tsx watch src/server.ts → :3201
+curl :3201/healthz
 ```
 
-## Files
+The shared seed (`npm run db:seed` at repo root) creates `miamo1`..`miamo20` with password = username.
 
-```
-services/auth/
-├── src/server.ts      ← Routes, auth logic, JWT helpers
-├── package.json
-├── tsconfig.json
-├── Dockerfile
-└── .dockerignore
-```
+## 9. Tests
+
+No service-local tests. Auth flow covered indirectly by `scripts/test-demo-users.py` and `scripts/api-test.sh`.
+
+## 10. Failure modes & operational notes
+
+- **JWT_SECRET rotated badly** → existing tokens reject at gateway. Symptom: `401` on every request. Fix: roll the env back.
+- **Postgres pool exhausted** at registration storm. Bump pool size or scale Postgres.
+- **bcrypt cost too high on tiny pods** → login latency spikes. Cost 12 is calibrated for ≥ 256 MB containers.
+- **`passwordHash` accidentally serialised** — handlers explicitly destructure `{ passwordHash, ...user }` before returning. New endpoints must do the same.
+
+## 11. What changed & why it's good
+
+- **Before:** Login lived in a monolithic `social` service alongside ranking, so login latency moved with discover load.
+- **After:** Auth is a small, stateless service that scales independently and exposes one clean surface (`/api/v1/auth/*`).
+- **Why it matters:** A spike in discover traffic no longer slows login. Token rotation is a one-service deploy.

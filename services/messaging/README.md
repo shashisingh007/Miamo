@@ -1,179 +1,97 @@
-# Miamo Messaging Service
+# messaging
 
-**Port:** 3204  
-**Role:** Real-time chats, messages, reactions, beats/streaks  
-**Tech:** Express 4.21, Prisma 5.22
+## 1. Purpose
 
----
+Owns chats, messages, beats, and chat-level UX state (pin/mute/archive/theme/background). Encrypts every user-authored message at rest with AES-256-GCM. Exposes two read endpoints consumed by social: communication-style profile and recent-sent-texts (for Miamo Move generation).
 
-## What It Does
+## 2. Mental model
 
-The Messaging Service handles:
+A 1:1 chat per `Match` (`Chat.matchId` unique). Every `Message` carries an enum `type` (`text`, `voice`, `image`, `gif`) and an opaque encrypted `content` blob. The handler decrypts on read, encrypts on write. Smart-reply suggestions are computed in-process via `suggestMessages` + `suggestMoves` from [services/shared/src/algo](../shared/src/algo/).
 
-1. **Chats** — List, archive, manage conversations between matched users
-2. **Messages** — Send, edit, delete, react to messages
-3. **Chat Actions** — Pin, mute, archive conversations
-4. **Beats (Streaks)** — Daily interaction streaks with gamification
+## 3. Public surface
 
-## API Endpoints
+| Method | Path | Purpose | Source |
+|---|---|---|---|
+| GET | `/api/v1/messages/chats` | Active chats w/ unread + last-msg preview | [server.ts](src/server.ts#L79) |
+| GET | `/api/v1/messages/chats/archived` | Archived chats | [server.ts](src/server.ts#L120) |
+| GET | `/api/v1/messages/chats/:chatId/messages` | Cursor-paged messages (decrypt + mark read) | [server.ts](src/server.ts#L140) |
+| POST | `/api/v1/messages/chats/:chatId/messages` | Send (idempotent via Idempotency-Key) | [server.ts](src/server.ts#L165) |
+| PUT | `/api/v1/messages/messages/:id` | Edit own | [server.ts](src/server.ts#L213) |
+| POST | `/api/v1/messages/messages/:id/delete-for-me` | Soft delete | [server.ts](src/server.ts#L222) |
+| POST | `/api/v1/messages/messages/:id/delete-for-all` | Hard delete (2h window, sender only) | [server.ts](src/server.ts#L890) |
+| POST | `/api/v1/messages/messages/:id/react` | Toggle emoji reaction | [server.ts](src/server.ts#L247) |
+| POST | `/api/v1/messages/chats/:chatId/{pin,mute,archive,unarchive,theme}` | Chat state | [server.ts](src/server.ts#L270) |
+| DELETE | `/api/v1/messages/chats/:chatId/clear` | Clear for me | [server.ts](src/server.ts#L343) |
+| GET | `/api/v1/messages/chats/:chatId/search` | In-thread search (decrypt in memory) | [server.ts](src/server.ts#L363) |
+| POST | `/api/v1/messages/chats/:chatId/suggestions` | Smart reply (legacy) | [server.ts](src/server.ts#L385) |
+| POST | `/api/v1/messages/chats/:chatId/suggestions-v4` | Smart reply (v4 flag) | server.ts (Phase H) |
+| GET | `/api/v1/messages/comm-profile/:userId` | Communication style vector (for social) | server.ts |
+| GET | `/api/v1/messages/sent-texts/:userId?limit=N` | Recent sent messages (for Move generation) | server.ts |
 
-### Chats
+## 4. Data model
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/api/v1/messages/chats` | Required | List all chats |
-| `GET` | `/api/v1/messages/chats/archived` | Required | List archived chats |
+Writes: `Chat`, `Message`, `Beat`, `BeatEvent`. Reads: `Match`, `Profile`, `Block`.
 
-### Messages
+## 5. Dependencies
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/api/v1/messages/:chatId` | Required | Get messages in a chat |
-| `POST` | `/api/v1/messages/:chatId` | Required | Send a message |
-| `PUT` | `/api/v1/messages/:chatId/:messageId` | Required | Edit a message |
-| `DELETE` | `/api/v1/messages/:chatId/:messageId/me` | Required | Delete for self |
-| `DELETE` | `/api/v1/messages/:chatId/:messageId/all` | Required | Delete for everyone |
-| `POST` | `/api/v1/messages/:chatId/:messageId/react` | Required | React to message |
+| Talks to | Why | How |
+|---|---|---|
+| Postgres | Chat, Message, Beat | Prisma |
+| Node `crypto` | AES-256-GCM + scrypt key derivation | in-process |
+| gateway | SSE fan-out via `/internal/push-event` | HTTP |
+| `services/shared/src/algo/{messageSuggest,moves}` | suggestions | in-process |
 
-### Chat Actions
+## 6. Configuration
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `POST` | `/api/v1/messages/:chatId/pin` | Required | Pin a chat |
-| `POST` | `/api/v1/messages/:chatId/mute` | Required | Mute a chat |
-| `POST` | `/api/v1/messages/:chatId/archive` | Required | Archive a chat |
+| Env | Default | Purpose |
+|---|---|---|
+| `PORT` | `3204` | HTTP port |
+| `DATABASE_URL` | — | Postgres |
+| `INTERNAL_SERVICE_KEY` | — | Internal-call auth |
+| `ENCRYPTION_KEY` | — | AES-256-GCM key (do NOT rotate) |
+| `ENCRYPTION_SALT` | — | scrypt salt (do NOT rotate) |
+| `GATEWAY_URL` | `http://localhost:3200` | SSE push target |
+| `ALGO_V4_RANK_ENABLED_MESSAGING` | `0` | Enable `/suggestions-v4` |
 
-### Beats (Streaks)
+## 7. Worked example — send message
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/api/v1/beats` | Required | List all active beats |
-| `POST` | `/api/v1/beats/:matchId/start` | Required | Start a beat with a match |
-| `POST` | `/api/v1/beats/:id/complete` | Required | Complete today's beat |
-| `POST` | `/api/v1/beats/:id/miss` | Required | Record a missed day |
-| `POST` | `/api/v1/beats/:id/expire` | Required | Expire a beat |
-| `POST` | `/api/v1/beats/:id/restore` | Required | Restore an expired beat |
-| `PUT` | `/api/v1/beats/:id/archive` | Required | Archive a beat |
-
-## Chat System
-
-### How Chats Work
-
-```
-User A matches with User B (via Social Service)
-       ↓
-Chat is created automatically (or on first message)
-       ↓
-Both users can send messages via POST /messages/:chatId
-       ↓
-Messages support: text, emoji reactions, edit, delete
-       ↓
-Chats can be: pinned, muted, archived
+```bash
+curl -X POST http://localhost:3200/api/v1/messages/chats/<chatId>/messages \
+  -H 'authorization: Bearer eyJ...' \
+  -H 'idempotency-key: 8f3c...' \
+  -H 'content-type: application/json' \
+  -d '{"content":"hey 👋","type":"text"}'
 ```
 
-### Message Object
+Server flow:
 
-```json
-{
-  "id": "uuid",
-  "chatId": "uuid",
-  "senderId": "uuid",
-  "content": "Hey! How's it going?",
-  "type": "text",
-  "reactions": [
-    { "userId": "uuid", "emoji": "❤️" }
-  ],
-  "editedAt": null,
-  "deletedForMe": false,
-  "createdAt": "2026-05-02T..."
-}
-```
+1. Verify membership of `chatId`.
+2. Encrypt: `ciphertext = enc:<iv>:<authTag>:<aes-256-gcm(plaintext)>`.
+3. `INSERT Message ...; UPDATE Chat.lastMessageAt`.
+4. POST `/internal/push-event` to gateway → SSE to the other user.
+5. Return `{ id, createdAt, type }` — never the ciphertext.
 
-### Delete Modes
-
-- **Delete for me** (`DELETE /:chatId/:messageId/me`) — Only hides from your view
-- **Delete for everyone** (`DELETE /:chatId/:messageId/all`) — Removes for both users (sender only, within time limit)
-
-## Beats (Streaks) System
-
-Beats encourage daily interaction between matches. Think of it like Snapchat streaks for dating.
-
-### Beat Lifecycle
-
-```
-Start → Active → Complete (daily) → Active → ... → Miss → Weak → ... → Expire → Archived
-                                                      ↓
-                                                   Restore (costs premium credit)
-```
-
-### Beat States
-
-| State | Description |
-|-------|-------------|
-| `active` | Beat is running, daily interaction expected |
-| `weak` | One or more missed days, at risk of expiring |
-| `expired` | Too many missed days, beat ended |
-| `archived` | Manually archived by user |
-
-### How Beats Work
-
-```
-1. User starts a beat with a match → POST /beats/:matchId/start
-2. Both users must interact daily → POST /beats/:id/complete
-3. Streak counter increments each day both complete
-4. Missing a day → beat becomes "weak" → POST /beats/:id/miss
-5. Multiple misses → beat expires → POST /beats/:id/expire
-6. Premium users can restore → POST /beats/:id/restore
-7. Users can archive old beats → PUT /beats/:id/archive
-```
-
-### Beat Object
-
-```json
-{
-  "id": "uuid",
-  "matchId": "uuid",
-  "userId": "uuid",
-  "partnerId": "uuid",
-  "streak": 15,
-  "longestStreak": 23,
-  "status": "active",
-  "lastCompletedAt": "2026-05-02T...",
-  "createdAt": "2026-04-17T..."
-}
-```
-
-## Database Models Used
-
-- **Chat** — `id, participants (user IDs), isPinned, isMuted, isArchived, lastMessageAt`
-- **Message** — `id, chatId, senderId, content, type, editedAt, deletedForSender, deletedForAll`
-- **MessageReaction** — `id, messageId, userId, emoji`
-- **Beat** — `id, matchId, userId, partnerId, streak, longestStreak, status, lastCompletedAt`
-
-## Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `PORT` | `3204` | Service port |
-| `DATABASE_URL` | — | PostgreSQL connection string |
-| `INTERNAL_SERVICE_KEY` | dev key | Validates internal requests |
-
-## Run Standalone
+## 8. Local dev
 
 ```bash
 cd services/messaging
-npm install
-npx prisma generate
-DATABASE_URL=postgresql://miamo:miamo@localhost:5432/miamo npx tsx src/server.ts
+npx prisma generate --schema=../shared/prisma/schema.prisma
+npm run dev
 ```
 
-## Files
+## 9. Tests
 
-```
-services/messaging/
-├── src/server.ts      ← Routes, chat logic, beats system
-├── package.json
-├── tsconfig.json
-├── Dockerfile
-└── .dockerignore
-```
+None local. Algo tests at root cover `suggestMessages` and `suggestMoves`.
+
+## 10. Failure modes & operational notes
+
+- **AuthTag mismatch on decrypt** → likely key/salt rotated, or DB row tampered. Handler logs and returns a sanitised placeholder; preserves raw ciphertext for forensics.
+- **N+1 unread counts** → addressed via `groupBy`. New endpoints listing chats must use the same pattern.
+- **Search decrypts every match in memory** → expensive on huge threads. Capped at 200 messages per search.
+- **Suggestions LRU** capped at 200 entries; mostly hits within a session.
+
+## 11. What changed & why it's good
+
+- **Before:** Messages were stored in plaintext; one IV per chat exposed pattern correlations; smart replies were template strings.
+- **After:** Per-message random IVs + authTag; suggestions are scored by `messageSuggest` (attentionFit/recencyFit/noveltyFit/intentFit/chronoFit) and ranked.
+- **Why it matters:** A DB dump leaks no message content. Replies adapt to the receiver's communication profile and active hours.
