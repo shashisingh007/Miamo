@@ -1416,15 +1416,30 @@ app.get('/api/v1/ai-match/suggestions', authMiddleware, async (req: AuthRequest,
           scored.push({ user: userData, aiScore: score, explain });
         }
         scored.sort((a, b) => b.aiScore - a.aiScore);
-        const v4Results = scored.slice(0, 20).map((s) => ({
-          user: s.user,
-          aiScore: s.aiScore,
-          algorithm: 'ai-picks-v4',
-          reasons: [],
-          concerns: [],
-          commonInterests: myInterestNamesV4.filter((n) => (s.user.interests || []).some((i: { name: string }) => i.name === n)),
-          explain: s.explain,
-        }));
+        // If DailyMatchWorker has pre-computed today's hero pick, mark it.
+        let featuredHash: string | null = null;
+        try {
+          const dm = await reader.dailyMatch(myHash);
+          if (dm) featuredHash = dm.bHash;
+        } catch { /* ignore */ }
+        const v4Results = scored.slice(0, 20).map((s, idx) => {
+          const candHash = reader.hashOf(s.user.id);
+          const isFeatured = featuredHash !== null && candHash === featuredHash;
+          return {
+            user: s.user,
+            aiScore: s.aiScore,
+            algorithm: 'ai-picks-v4',
+            featured: isFeatured,
+            reasons: [],
+            concerns: [],
+            commonInterests: myInterestNamesV4.filter((n) => (s.user.interests || []).some((i: { name: string }) => i.name === n)),
+            explain: s.explain,
+            // Surface the featured row at the top regardless of order
+            _sortKey: isFeatured ? Number.POSITIVE_INFINITY : (s.aiScore - idx * 0.0001),
+          };
+        });
+        v4Results.sort((a, b) => b._sortKey - a._sortKey);
+        v4Results.forEach((r) => { delete (r as { _sortKey?: number })._sortKey; });
         trackActivity(prisma, userId, 'view', 'ai-match', undefined, { resultCount: v4Results.length, algo: 'v4' });
         aiMatchCache.set(cacheKey, v4Results, TTL.AI_MATCH);
         return res.json({ data: v4Results });

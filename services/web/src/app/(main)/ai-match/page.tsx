@@ -75,6 +75,7 @@ export default function AIMatchPage() {
  <div className="flex items-center gap-2 mb-1">
  <h4 className="text-sm font-semibold">{user.displayName || 'User'}</h4>
  <Badge>{score}% match</Badge>
+ {item.featured ? <span className="text-[9px] uppercase tracking-wider text-rose-main font-semibold ml-1">★ Today’s pick</span> : null}
  {algoTag ? <span className="text-[9px] uppercase tracking-wider text-text-muted/70 ml-1">{algoTag}</span> : null}
  </div>
  <div className="space-y-1.5 mt-2">

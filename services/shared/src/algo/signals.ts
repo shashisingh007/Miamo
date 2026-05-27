@@ -54,6 +54,8 @@ export interface SignalReader {
   priorTargets(aHash: string, bHashes: string[], days: number): Promise<Map<string, number>>;
   /** Per-candidate impression counts (discover.card_view → targets) over the last N days. */
   targetImpressions(aHash: string, bHashes: string[], days: number): Promise<Map<string, number>>;
+  /** Daily AI Match pre-compute (FeatureSnapshot.raw->'dailyMatch'). */
+  dailyMatch(uidHash: string): Promise<{ bHash: string; score: number; computedAt: string } | null>;
 }
 
 const FEATURES_TTL_MS = 60_000;
@@ -177,5 +179,16 @@ export class PrismaSignalReader implements SignalReader {
       }
     }
     return out;
+  }
+
+  async dailyMatch(uidHash: string): Promise<{ bHash: string; score: number; computedAt: string } | null> {
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `SELECT "raw"->'dailyMatch' AS dm
+       FROM "FeatureSnapshot" WHERE "uidHash" = $1`,
+      uidHash,
+    )) as Array<{ dm: { bHash?: string; score?: number; computedAt?: string } | null }>;
+    const dm = rows[0]?.dm;
+    if (!dm || typeof dm.bHash !== 'string' || typeof dm.score !== 'number') return null;
+    return { bHash: dm.bHash, score: dm.score, computedAt: dm.computedAt ?? '' };
   }
 }

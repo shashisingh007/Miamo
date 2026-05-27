@@ -75,6 +75,9 @@ class FakeSignalReader implements SignalReader {
   async targetImpressions(_a: string, _b: string[], _d: number): Promise<Map<string, number>> {
     return new Map();
   }
+  async dailyMatch(_u: string): Promise<{ bHash: string; score: number; computedAt: string } | null> {
+    return null;
+  }
 }
 
 function feature(uidHash: string, seed: number): FeatureRow {
