@@ -11,6 +11,7 @@
 import { compose, clip100, expDecay } from './math';
 import type { FeatureRow } from './signals';
 import { registerAlgo } from './registry';
+import { v5FeatureEnabled } from './flags';
 
 export type SuggestionKind =
   | 'open_question' | 'callback_to_last' | 'voice_invite'
@@ -86,6 +87,37 @@ export function scoreSuggestion(kind: SuggestionKind, inp: SuggestInputs): Sugge
 
 export function suggestMessages(inp: SuggestInputs, top = 3): Suggestion[] {
   return ALL.map((k) => scoreSuggestion(k, inp)).sort((a, b) => b.score - a.score).slice(0, top);
+}
+
+/**
+ * v5 extension — typing-aware. The caller may supply per-kind
+ * `draftedDeletedRate` ∈ [0, 1] = how often *Priya* started typing this
+ * kind of opener then deleted it before sending. Higher rate → opener
+ * deserves a damping penalty (Priya talks herself out of it). Applied as a
+ * multiplicative damp factor `1 - 0.5 * rate` on the final score so a
+ * 100% deletion rate halves the score and a 0% rate is a no-op.
+ *
+ * The dispatcher `suggestMessages` reads `process.env.ALGO_V5_MESSAGE_SUGGEST_ENABLED`.
+ */
+export type SuggestInputsV5 = SuggestInputs & {
+  draftedDeletedRate?: Partial<Record<SuggestionKind, number>>;
+};
+
+export function scoreSuggestionV5(kind: SuggestionKind, inp: SuggestInputsV5): Suggestion {
+  const base = scoreSuggestion(kind, inp);
+  const rate = Math.max(0, Math.min(1, inp.draftedDeletedRate?.[kind] ?? 0));
+  const damp = 1 - 0.5 * rate;
+  return {
+    kind,
+    score: Math.round(base.score * damp),
+    why: { ...base.why, draftedDeletedRate: rate, damp },
+  };
+}
+
+export function suggestMessagesDispatch(inp: SuggestInputsV5, top = 3): Suggestion[] {
+  const on = v5FeatureEnabled('messageSuggest');
+  const ranked = ALL.map((k) => on ? scoreSuggestionV5(k, inp) : scoreSuggestion(k, inp));
+  return ranked.sort((a, b) => b.score - a.score).slice(0, top);
 }
 
 registerAlgo({
