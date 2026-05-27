@@ -17,6 +17,7 @@ import { CompatWriter } from './compat';
 import { EmbeddingWorker } from './embeddings';
 import { ColdStore } from './cold-store';
 import { EnrichmentWorker } from './enrich';
+import { DailyMatchWorker } from './daily-match';
 
 const PORT = Number(process.env.PORT || 3261);
 const KILL = process.env.TRACKING_KILL === '1';
@@ -29,6 +30,7 @@ const compat = new CompatWriter(prisma);
 const embed = new EmbeddingWorker(prisma);
 const coldStore = new ColdStore(prisma);
 const enrich = new EnrichmentWorker(prisma);
+const dailyMatch = new DailyMatchWorker(prisma);
 
 const app = express();
 app.get('/healthz', (_req, res) => res.json({ ok: true, kill: KILL, v4Workers: V4_WORKERS, ts: Date.now() }));
@@ -41,6 +43,7 @@ async function main(): Promise<void> {
     embed.start();
     coldStore.start();
     if (V4_WORKERS) enrich.start();
+    if (V4_WORKERS) dailyMatch.start();
   } else {
     // eslint-disable-next-line no-console
     console.warn('[worker] TRACKING_KILL=1 — loops disabled, only /healthz live');
@@ -51,6 +54,7 @@ async function main(): Promise<void> {
   });
   const shutdown = async (): Promise<void> => {
     server.close();
+    dailyMatch.stop();
     enrich.stop();
     coldStore.stop();
     embed.stop();
