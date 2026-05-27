@@ -46,7 +46,7 @@ export const swipeTracker = {
     const hesitationMs = Math.round(now - currentCardVisibleAt);
     const velocity = Math.round(velocityPxPerSec / 50) * 50;
     track('swipe.commit', {
-      dir, velocity, distance: Math.round(distance), hesitationMs,
+      dir, velocity, distance: Math.round(distance), hesitationMs, d: hesitationMs,
     });
     lastCommit = { id: currentCardId, dir, at: now };
     if (dir === 'left') {

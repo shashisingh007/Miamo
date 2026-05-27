@@ -41,6 +41,21 @@ export class PercentileEstimator {
     const rank = Math.min(sorted.length - 1, Math.max(0, Math.floor((p / 100) * sorted.length)));
     return sorted[rank];
   }
+  /**
+   * Count samples that fall into each `[edges[i], edges[i+1])` bucket plus one
+   * tail bucket for values >= edges[edges.length-1]. Returns an integer array
+   * of length `edges.length`. Used by the feature aggregator to expose a
+   * dwell histogram on `card.impression.100` for v5 attentionFit.
+   */
+  histogram(edges: number[]): number[] {
+    const out = new Array(edges.length).fill(0);
+    for (const v of this.samples) {
+      let i = edges.length - 1;
+      while (i > 0 && v < edges[i]) i -= 1;
+      out[i] += 1;
+    }
+    return out;
+  }
   get size(): number {
     return this.samples.length;
   }

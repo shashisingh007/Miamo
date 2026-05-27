@@ -30,6 +30,13 @@ const READ_COUNT = Number(process.env.TRACKING_READ_COUNT || 500);
 const READ_BLOCK_MS = Number(process.env.TRACKING_READ_BLOCK_MS || 2000);
 const FLUSH_MS = Number(process.env.TRACKING_FLUSH_MS || 5000);
 
+/**
+ * Dwell-histogram bucket edges (ms) used for v5 `attentionFit`. Stored on
+ * `EventAggHourly.meta.hist` whenever any sample landed in the bucket. Edges
+ * must match the v5 `dwellHistogram` contract in `services/shared/src/algo/forYou.ts`.
+ */
+const HIST_EDGES_MS = [0, 750, 2_000, 5_000, 10_000];
+
 type HourKey = string; // `${uidHash}|${evt}|${hourTs}`
 type DayKey = string;  // `${uidHash}|${evt}|${dayTs}`
 
@@ -183,16 +190,23 @@ export class RollupConsumer {
     // Hourly upserts — additive counters via raw upsert to avoid races.
     for (const h of hourEntries) {
       try {
+        const hist = h.pe.size > 0 ? h.pe.histogram(HIST_EDGES_MS) : null;
         await this.prisma.$executeRawUnsafe(
           `INSERT INTO "EventAggHourly" ("uidHash","evt","bucket","count","durSum","durP50","durP95","meta")
-           VALUES ($1,$2,$3,$4,$5,$6,$7,'{}'::jsonb)
+           VALUES ($1,$2,$3,$4,$5,$6,$7, $8::jsonb)
            ON CONFLICT ("uidHash","evt","bucket") DO UPDATE SET
              "count"  = "EventAggHourly"."count" + EXCLUDED."count",
              "durSum" = "EventAggHourly"."durSum" + EXCLUDED."durSum",
              "durP50" = GREATEST("EventAggHourly"."durP50", EXCLUDED."durP50"),
-             "durP95" = GREATEST("EventAggHourly"."durP95", EXCLUDED."durP95")`,
+             "durP95" = GREATEST("EventAggHourly"."durP95", EXCLUDED."durP95"),
+             "meta"   = jsonb_set(
+               COALESCE("EventAggHourly"."meta", '{}'::jsonb),
+               '{hist}',
+               COALESCE(EXCLUDED."meta"->'hist', "EventAggHourly"."meta"->'hist', '[]'::jsonb)
+             )`,
           h.uidHash, h.evt, h.bucket, h.count, h.durSum,
           Math.round(h.pe.percentile(50)), Math.round(h.pe.percentile(95)),
+          hist ? JSON.stringify({ hist }) : '{}',
         );
       } catch (e) {
         // eslint-disable-next-line no-console

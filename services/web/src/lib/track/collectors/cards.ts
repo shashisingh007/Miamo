@@ -25,32 +25,50 @@ export const cardTracker = {
   observeCard(el: HTMLElement, targetId: string): () => void {
     if (typeof IntersectionObserver === 'undefined') return () => undefined;
     let fired50 = false;
-    let fired100 = false;
+    let inFull = false;
+    let enteredFullAt = 0;
     const io = new IntersectionObserver(
       (entries) => {
         for (const e of entries) {
+          // 50% threshold — entry only.
           if (e.intersectionRatio >= 0.5 && !fired50) {
             fired50 = true;
             track('card.impression.50', { tid: targetId });
           }
-          if (e.intersectionRatio >= 0.99 && !fired100) {
-            fired100 = true;
-            track('card.impression.100', { tid: targetId });
-            // settle detection
-            const now = Date.now();
+          // Track full-visibility entry/exit so we can attach a dwell duration
+          // to `card.impression.100`. Emitted ON EXIT with `d: dwellMs` so the
+          // worker's PercentileEstimator naturally builds a dwellHistogram.
+          if (e.intersectionRatio >= 0.99 && !inFull) {
+            inFull = true;
+            enteredFullAt = performance.now();
+            // settle detection: same target re-entering full view within RETURN_MS
+            const wall = Date.now();
             const prev = lastSeenAt.get(targetId);
-            if (prev && now - prev <= RETURN_MS && !settleEmitted.has(targetId)) {
+            if (prev && wall - prev <= RETURN_MS && !settleEmitted.has(targetId)) {
               settleEmitted.add(targetId);
-              track('intent.profile.settle', { tid: targetId, gapMs: now - prev });
+              track('intent.profile.settle', { tid: targetId, gapMs: wall - prev });
             }
-            lastSeenAt.set(targetId, now);
+            lastSeenAt.set(targetId, wall);
+          }
+          if (e.intersectionRatio < 0.5 && inFull) {
+            inFull = false;
+            const dwellMs = Math.round(performance.now() - enteredFullAt);
+            track('card.impression.100', { tid: targetId, d: dwellMs });
           }
         }
       },
       { threshold: [0.5, 0.99] },
     );
     io.observe(el);
-    return () => io.disconnect();
+    return () => {
+      // On unmount, if still in full view, flush the in-progress dwell so it
+      // is not silently lost.
+      if (inFull) {
+        const dwellMs = Math.round(performance.now() - enteredFullAt);
+        track('card.impression.100', { tid: targetId, d: dwellMs });
+      }
+      io.disconnect();
+    };
   },
 
   onHover(targetId: string, ms: number): void {
