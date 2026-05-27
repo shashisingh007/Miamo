@@ -1,102 +1,147 @@
-# messaging
+# messaging — the locked diary (port 3204)
 
-> Private encrypted chats — what Priya and Arjun actually say to each other.
+**TL;DR:** messaging is the chat service. Every message Priya sends is sealed in a locked diary (AES-256-GCM encryption — even we can't read it without the key) before it touches our database.
 
-## 1. The story (60 seconds)
+---
 
-Priya and Arjun match. The chat opens with a friendly suggested
-opener: "Hampta Pass — was the river crossing scary?". She edits it,
-adds a laughing emoji, sends. Two hundred milliseconds later Arjun's
-phone (which had the chat tab open) shows the message. By message 20,
-the app quietly shows them a "vibe match" badge — their reply tempos
-have aligned.
+## How to read this
 
-## 2. What this service is (in one picture)
+- **Meera**: Sections 1–2.
+- **Priya / PM**: Sections 1–4 and 8.
+- **Engineer**: All.
 
-```mermaid
-flowchart LR
-    Priya[Priya's phone] --> GW[gateway]
-    Arjun[Arjun's phone] --> GW
-    GW --> Msg[messaging :3204]
-    Msg --> DB[(Postgres<br/>Chat, Message<br/>ciphertext only)]
-    Msg --> Shared[shared/algo<br/>messageSuggest, beats]
-    Msg -. SSE publish .-> GW
-    GW -. SSE push .-> Arjun
+---
+
+## 1. A scene
+
+10:14pm. Priya types "hey Arjun, where were those mountain photos taken?" and hits send. Her phone fires `POST /v1/chats/<chatId>/messages`. In ~30ms:
+
+1. Her phone (or messaging) encrypts the plaintext with a per-message random IV (initialization vector) + auth tag.
+2. The ciphertext lands in Postgres. The plaintext does not.
+3. Arjun's open chat tab gets a Server-Sent Event push: a new message arrived.
+4. His app fetches the ciphertext + IV + tag, decrypts it, and shows "hey Arjun, where were those mountain photos taken?"
+
+If someone steals our Postgres backup tonight, the only thing they get is gibberish.
+
+---
+
+## 2. What this service is responsible for
+
+- **Threads** — every match becomes a `ChatRoom` row.
+- **Messages** — encrypted send / receive / read receipts.
+- **Reactions** — emoji reactions on messages.
+- **Voice notes** — uploaded as encrypted blobs.
+- **Typing indicators** — ephemeral, in Redis.
+- **Real-time push** — via Server-Sent Events (SSE) on the gateway.
+
+---
+
+## 3. Endpoints
+
+| Method | Path                                       | Plain English                              |
+|--------|--------------------------------------------|--------------------------------------------|
+| GET    | `/v1/chats`                                | All my chat threads                         |
+| GET    | `/v1/chats/:id/messages?cursor=…`          | Page of messages (newest first)             |
+| POST   | `/v1/chats/:id/messages`                   | Send a message                              |
+| POST   | `/v1/chats/:id/read`                       | Mark thread as read up to messageId         |
+| POST   | `/v1/messages/:id/reactions`               | Add / remove a reaction                     |
+| POST   | `/v1/chats/:id/typing`                     | "I'm typing…" (ephemeral)                  |
+| GET    | `/v1/chats/:id/stream` (SSE)               | Live updates while the chat is open         |
+
+---
+
+## 4. Encryption — worked example
+
+```
+Plaintext:  "hey Arjun"
+Random IV:  12 random bytes (different every message)
+Key:        scrypt(ENCRYPTION_KEY, ENCRYPTION_SALT, 32 bytes)
+
+Cipher = AES-256-GCM(plaintext, key, iv)
+       → ciphertext (variable bytes)
+       + authTag (16 bytes)
+
+Stored:  { iv, ciphertext, authTag }
 ```
 
-## 3. What it can do (the menu)
+Same plaintext sent twice produces **two completely different ciphertexts** because the IV is random. An attacker with our DB sees pairs that look unrelated even when they are the same string.
 
-| When Priya does this…                  | …the app calls                               | …and gets back                  | Source |
-|----------------------------------------|----------------------------------------------|---------------------------------|--------|
-| Lists her chats                        | `GET /messaging/chats`                       | array of chat summaries          | [src](services/messaging/src/server.ts) |
-| Opens a chat                           | `GET /messaging/chats/{id}/messages?cursor=` | last 50 decrypted messages       | [src](services/messaging/src/server.ts) |
-| Gets an opener suggestion              | `GET /messaging/chats/{id}/suggest`          | `{text: "Hampta Pass — was…"}`   | [src](services/messaging/src/server.ts) |
-| Sends a message                        | `POST /messaging/chats/{id}/messages`        | `{id, sentAt}`                   | [src](services/messaging/src/server.ts) |
-| Sees vibe-match badge                  | `GET /messaging/chats/{id}/beats`            | `{vibeMatch: true}`              | [src](services/messaging/src/server.ts) |
+To decrypt:
 
-## 4. The data it remembers
+```
+Decipher = AES-256-GCM(ciphertext, key, iv, authTag)
+         → "hey Arjun" or  ERROR if the message was tampered with
+```
 
-- **`Chat`** — one row per pair (created when they match).
-- **`Message`** — one row per message: `{chatId, senderId, iv, ciphertext, authTag, createdAt}`. **Plaintext is never stored.**
+If anyone flips even one bit of the ciphertext, the authTag check fails and decryption raises.
 
-## 5. Who it talks to
+---
 
-- **Postgres** — its own tables.
-- **shared/algo** — `messageSuggest` (opener), `beats` (vibe).
-- **gateway** — pushes live updates via internal SSE publish endpoint.
+## 5. Tables it owns
 
-## 6. The knobs (configuration)
+- `ChatRoom` — one per match
+- `Message` — `{id, roomId, senderId, iv, ciphertext, authTag, sentAt}`
+- `Reaction` — emoji reactions
+- `ReadReceipt` — last read message per user per room
 
-| Env var                                  | What it does                                       | Example     | What breaks                                |
-|------------------------------------------|----------------------------------------------------|-------------|--------------------------------------------|
-| `DATABASE_URL`                            | Postgres                                           | …           | service won't start                         |
-| `ENCRYPTION_KEY`                          | Master key for AES-256-GCM                         | 32+ bytes   | **Rotation breaks every old message**       |
-| `ENCRYPTION_SALT`                         | Salt for scrypt key derivation                     | random      | **Rotation breaks every old message**       |
-| `INTERNAL_SERVICE_KEY`                    | Verifies social's internal calls                   | …           | new chats can't be created                  |
-| `ALGO_V4_RANK_ENABLED_MESSAGING`          | Enables opener suggestion endpoint                  | `'1'`       | suggest endpoint returns empty               |
-| `ALGO_V4_RANK_ENABLED_BEATS`              | Enables vibe-match badge                            | `'1'`       | badge never shows                            |
-| `PORT`                                    | Listen port                                         | `3204`      | gateway can't reach                          |
+---
 
-## 7. A real example, end-to-end
+## 6. Code layout
 
-Priya sends a message.
+```
+services/messaging/src/
+├── server.ts
+├── routes/
+│   ├── messages.ts
+│   └── threads.ts
+├── encrypt.ts                 # AES-256-GCM wrapper
+└── stream.ts                  # SSE delivery
+```
 
-> ```bash
-> curl -X POST http://localhost:3200/messaging/chats/cht_abc123/messages \
->   -H 'authorization: Bearer eyJ…' \
->   -H 'content-type: application/json' \
->   -d '{"text":"Hey, where was that trek photo taken?"}'
-> ```
-> "Messaging generates a fresh 12-byte IV, encrypts the text with
-> AES-256-GCM, stores `{iv, ciphertext, authTag}`, publishes an SSE
-> event so Arjun's open tab updates."
-> ```json
-> { "id": "msg_x1y2", "sentAt": "2026-05-27T15:34:22Z" }
-> ```
+---
 
-## 8. Run it on your laptop
+## 7. Configuration
+
+| Env var                | What it does                                                      |
+|------------------------|-------------------------------------------------------------------|
+| `ENCRYPTION_KEY`       | 32-byte master key. **Never rotate once messages exist.**          |
+| `ENCRYPTION_SALT`      | 16-byte salt. **Never rotate once messages exist.**                |
+| `DATABASE_URL`         | Postgres                                                           |
+| `REDIS_URL`            | Typing indicators + SSE fan-out                                    |
+| `INTERNAL_SERVICE_KEY` | For social to create a `ChatRoom` on match                         |
+
+---
+
+## 8. Why the keys cannot rotate
+
+If we change `ENCRYPTION_KEY` and then try to read an old message, decryption returns gibberish. There is no way to recover the original text. So:
+
+- Keys are stored in Kubernetes Secrets, double-encrypted at rest.
+- Rotation is a deliberate one-way operation that requires re-encrypting every existing message — a multi-hour migration with no shortcuts.
+- We back the keys up to a vault separate from Postgres backups.
+
+---
+
+## 9. Run locally / test
 
 ```bash
-docker compose up -d postgres
-cd services/messaging && npm install && npm run dev
+cd services/messaging && pnpm dev   # 3204
 ```
 
-## 9. How we know it works (tests)
+---
 
-- **`crypto.test.ts`** — encrypt then decrypt round-trips; tampered ciphertext fails auth tag verification.
-- **`messages.test.ts`** — message persisted, pagination by cursor works, can't read another user's chat.
-- **`suggest.test.ts`** — produces a non-empty opener when profile has interests.
+## 10. What changed and why it's better
 
-## 10. If something breaks
+- **Before:** messages stored as plaintext. Database leak = every conversation exposed.
+- **After:** plaintext never lives in the database. Every message has a unique IV. Even our DBAs cannot read chats.
+- **Why Priya feels it:** she can be honest in chat without worrying that an internal employee can read what she wrote.
 
-| Symptom                                  | First check                                      |
-|------------------------------------------|--------------------------------------------------|
-| Messages decode to garbage                | `ENCRYPTION_KEY` / `ENCRYPTION_SALT` rotated?    |
-| Messages save but Arjun doesn't see them  | SSE pipe to gateway broken — check logs          |
-| Suggest endpoint always returns empty     | `ALGO_V4_RANK_ENABLED_MESSAGING='0'`              |
+---
 
-## 11. What changed and why it's better
+## 11. If something breaks
 
-- **Before:** messages stored as plaintext. Any DB read could leak chats.
-- **After:** AES-256-GCM with per-message IV and auth tag. Even our DBAs cannot read.
-- **Why Priya feels it:** she can have hard, honest conversations knowing they are private — full stop.
+| Symptom                                  | First check                                | Fix                            |
+|------------------------------------------|--------------------------------------------|--------------------------------|
+| Messages all show "[unable to decrypt]"  | `ENCRYPTION_KEY` / `_SALT` rotated?        | **Restore old keys immediately.** |
+| New messages do not push in real time    | SSE connection alive at gateway            | restart pod, check NGINX timeout |
+| Reactions duplicated                     | Idempotency key missing                    | check `reactions` route        |

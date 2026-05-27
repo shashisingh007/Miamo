@@ -1,97 +1,167 @@
-# web
+# web — the actual website Priya sees (port 3100)
 
-> Everything Priya sees. The Next.js 14 app at <http://localhost:3100>.
+**TL;DR:** the Next.js 14 web app. Renders pages, fetches from the gateway, ships tracking events. Everything Priya touches lives here.
 
-## 1. The story (60 seconds)
+---
 
-Priya opens her browser to miamo.app. Within 600ms she sees Arjun's
-trek photo — not a spinner, not a skeleton, the actual first card. She
-swipes right, the heart turns red instantly, a "It's a match!" toast
-appears, and a chat icon lights up in her bottom nav. The whole thing
-feels native. It's not — it's a server-rendered React app, but the
-design makes it feel that way.
+## How to read this
 
-## 2. What this service is (in one picture)
+- **Meera**: Sections 1–2.
+- **Priya / PM**: Sections 1–4.
+- **Engineer**: All.
 
-```mermaid
-flowchart LR
-    Priya[Priya's browser/phone] --> Web[web :3100<br/>Next.js 14 standalone]
-    Web -- fetch --> GW[gateway :3200]
-    Web -- EventSource --> GW
+---
+
+## 1. A scene
+
+9:02pm. Priya types `miamo.in` on her iPhone. CDN serves the Next.js app shell (~120 KB gzipped). Within 250 ms the first page paints, the tracking SDK boots, the first `page.view` event fires. She taps "Discover". Server-side rendering means the first card stack is rendered on the server and streamed to her — no spinner, no flash.
+
+---
+
+## 2. What this service is
+
+A Next.js 14 application using the App Router, React server components by default, client components where interactivity is needed. Talks to **one URL only** — the gateway. Ships the tracking SDK in `src/track/`.
+
+---
+
+## 3. The page map
+
+| Route                | What Priya sees / does                                       |
+|----------------------|--------------------------------------------------------------|
+| `/`                  | Landing — value prop + sign in                                |
+| `/login`             | Phone + OTP sign-in                                           |
+| `/onboarding`        | Vibe check + DTM topics                                       |
+| `/discover`          | The swipe stack                                               |
+| `/aipicks`           | Today's curated picks                                         |
+| `/aimatch`           | The one daily AI Match                                        |
+| `/profile/[id]`      | Public profile view                                           |
+| `/profile/edit`      | Edit my own profile                                           |
+| `/chat`              | Threads list                                                  |
+| `/chat/[id]`         | One conversation                                              |
+| `/feed`              | Posts from people I follow / match with                       |
+| `/post/[id]`         | Single post + comments                                        |
+| `/beats`             | Music-match game                                              |
+| `/dtm`               | Deep-Compat topics                                            |
+| `/vibe`              | Vibe check                                                    |
+| `/search`            | Search profiles                                                |
+| `/notifications`     | My notifications                                              |
+| `/settings`          | Preferences, consent, devices                                  |
+
+---
+
+## 4. Worked example — a page load
+
+```
+1. Priya  types miamo.in
+2. CDN    serves the Next.js shell (cached)
+3. Phone  Next.js boots, calls gateway:3200/v1/users/me  via SSR
+4. Server renders /discover with the first 10 candidates inline
+5. Phone  paints first card in ~250ms LCP
+6. Track  src/track/ boots → page.view event fired
+7. Priya  taps Like → optimistic UI → POST /v1/social/swipe
 ```
 
-Web is the **only** service Priya's browser talks to. Web is the
-**only** service that talks to the gateway from the user's behalf
-(via cookie-forwarded fetch).
+---
 
-## 3. What it contains (the menu)
+## 5. Code layout
 
-| Route group   | Routes                                                           |
-|---------------|------------------------------------------------------------------|
-| `(auth)`      | `/login`, `/signup`, `/reset-password`                            |
-| `(main)`      | `/discover`, `/matches`, `/chat/[chatId]`, `/feed`, `/stories`, `/ai-picks`, `/notifications`, `/profile` |
-| (top-level)   | `/onboarding`                                                    |
+```
+services/web/
+├── next.config.js
+├── tailwind.config.ts
+├── public/                # static assets
+└── src/
+    ├── app/               # App Router routes
+    │   ├── (auth)/
+    │   ├── (main)/
+    │   │   ├── discover/page.tsx
+    │   │   ├── chat/[id]/page.tsx
+    │   │   ├── profile/[id]/page.tsx
+    │   │   └── ...
+    │   └── layout.tsx
+    ├── components/        # reusable UI
+    ├── lib/               # fetch helpers, auth helpers
+    ├── hooks/             # React hooks
+    └── track/             # the tracking SDK (see TRACKING.md)
+```
 
-Full breakdown in [docs/FRONTEND.md](docs/FRONTEND.md).
+---
 
-## 4. The data it stores
+## 6. The tracking SDK in 6 bullets
 
-Nothing on a server. All persistence is in the backend through the
-gateway. Client state lives in three places:
-- URL (chat id, search params)
-- Server (re-fetch when needed)
-- React hooks (transient composer text, scroll position)
+The SDK in `src/track/` does six things on Priya's behalf:
 
-## 5. Who it talks to
+1. **Batches** up to 50 events or 32 KB.
+2. **Flushes** every 2.5 s, or on `visibilitychange` / `pagehide`.
+3. **Throttles** `cursor.sample` to 5/s only while moving.
+4. **Coalesces** `dwell` — only emits after a card is in viewport ≥800ms.
+5. **Detects rage** — ≥3 clicks within 800ms on the same element fires one `click.rage`.
+6. **Falls back** to `navigator.sendBeacon` on tab close so the last batch survives.
 
-- **gateway** (HTTP + SSE). That's it.
+A blocked or offline `ingest` does not stall the UI — the SDK stashes the batch in `localStorage` and retries next visit.
 
-## 6. The knobs (configuration)
+---
 
-| Env var                              | What it does                                       | Example                       | What breaks                  |
-|--------------------------------------|----------------------------------------------------|-------------------------------|------------------------------|
-| `NEXT_PUBLIC_API_URL`                 | Base URL for browser-side fetches                  | `http://localhost:3200`       | every API call fails          |
-| `INTERNAL_API_URL`                    | Same URL from server-side context (often identical)| `http://gateway:3200`         | SSR fetches fail              |
-| `PORT`                                | Listen port                                        | `3100`                        | not reachable                 |
+## 7. State management
 
-## 7. A real example, end-to-end
+We do not use Redux. We use:
 
-Priya hits `/discover`.
+- **URL** — page state ("/chat/abc123"), the source of truth for what page.
+- **Server** — data on the page (fetched fresh, revalidated by Next.js).
+- **React hooks (`useState`, `useReducer`)** — temporary UI state (typed text, modals).
 
-> 1. Next.js renders the Discover page on the server.
-> 2. Server component calls `fetch(API + '/social/discover?limit=10')` with Priya's cookie.
-> 3. Gateway → social → returns 10 ranked candidates.
-> 4. Server renders the first card; HTML sent to browser.
-> 5. Browser hydrates; subsequent swipes are client-side `fetch`.
+Three places, no sync logic. Fewer bugs.
 
-## 8. Run it on your laptop
+---
+
+## 8. Performance budget
+
+| Metric                | Target          | Tracked by                       |
+|-----------------------|-----------------|----------------------------------|
+| LCP (Largest Contentful Paint) | < 2.5 s | `perf.web_vitals` event           |
+| INP (Interaction to Next Paint) | < 200 ms | `perf.web_vitals`                 |
+| CLS (Cumulative Layout Shift) | < 0.1 | `perf.web_vitals`                 |
+| First load JS         | < 130 KB gzipped | bundle analyzer                  |
+
+---
+
+## 9. Configuration
+
+| Env var                    | What it does                                  |
+|----------------------------|-----------------------------------------------|
+| `NEXT_PUBLIC_API_URL`      | Gateway URL                                    |
+| `NEXT_PUBLIC_TRACK_URL`    | Ingest URL                                     |
+| `NEXT_PUBLIC_RELEASE`      | Release id, stamped onto events                |
+| `SESSION_COOKIE_SECRET`    | Encrypts the session cookie                    |
+
+---
+
+## 10. Run locally / test
 
 ```bash
-# bring up the backend
-docker compose up -d gateway auth users social messaging content notifications postgres redis
-
-# run web in dev mode
 cd services/web
-npm install
-NEXT_PUBLIC_API_URL=http://localhost:3200 npm run dev
-# open http://localhost:3100
+pnpm install
+pnpm dev          # 3100
+
+open http://localhost:3100
+# Demo login: demo@miamo.app / demo1234
 ```
 
-## 9. How we know it works (tests)
-
-- **Playwright smoke**: login → discover → swipe right → match toast → open chat → send message. Runs in ~30s in CI.
-
-## 10. If something breaks
-
-| Symptom                                  | First check                                                 |
-|------------------------------------------|-------------------------------------------------------------|
-| Pages flash blank then content            | RSC cache miss — `kubectl logs -l app=web --tail=100`       |
-| API calls failing in browser              | `NEXT_PUBLIC_API_URL` not set at build time                  |
-| Login OK then bounced back to login       | Cookie not set — cross-origin / CORS issue                  |
-| Live updates not arriving in chat tab     | SSE connection dropped — check gateway heartbeats           |
+---
 
 ## 11. What changed and why it's better
 
-- **Before:** React SPA, full client-side render. First card took ~2.5s on 4G.
-- **After:** Next.js 14 App Router with server components. First card paints in ~600ms.
-- **Why Priya feels it:** the app opens. No spinner. She's swiping before she'd have stopped tapping the app icon on the old version.
+- **Before:** a client-only React SPA. Blank screen until JS booted, ~2.5 s to first card on 4G.
+- **After:** Next.js 14 server components stream the first card from the server. ~250 ms LCP on 4G.
+- **Why Priya feels it:** she taps the icon and sees a face. No spinner.
+
+---
+
+## 12. If something breaks
+
+| Symptom                              | First check                                  | Fix                              |
+|--------------------------------------|----------------------------------------------|----------------------------------|
+| Blank page then content appears      | SSR fetch failed silently                    | check gateway URL + logs         |
+| Login loops back to /login            | Cookie not set                                | CORS + `sameSite`                |
+| Chat messages do not stream in       | SSE connection dropped                        | restart gateway pod              |
+| `perf.web_vitals` always reports null | Browser does not support web-vitals          | acceptable on old Safari         |

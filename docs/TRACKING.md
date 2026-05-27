@@ -1,8 +1,44 @@
 # Tracking — the complete catalogue
 
-> The exhaustive reference for everything Miamo records about user behaviour.
-> Every event name, every payload field, every Postgres table this pipeline
-> writes, every helper that turns raw clicks into algorithm signals.
+**TL;DR:** every tap Priya makes is a sticky note (a tracking event) that her phone writes and posts to our mailbox (`ingest`). Back-room clerks (`tracking-worker`) sort the sticky notes into ledgers (Postgres tables) every 10 seconds, every 5 minutes, every 15 minutes. Within 15 minutes those ledgers shape what Priya sees next.
+
+---
+
+## How to read this
+
+- **Meera (non-tech reader)**: read this overview + §13. Skip everything in between.
+- **Priya / PM**: read §1, §2, §9, §10.
+- **Arjun-the-engineer**: read everything.
+
+---
+
+## Plain-English overview (the whole pipeline in 4 paragraphs)
+
+**1. Sticky notes.** Every time Priya taps anything in the app — opens a page, sees a card, looks at it for 800ms, swipes, sends a message — her phone writes a small sticky note (an "event") with: what happened (`e`), when (`t`), and a little context (the card id, how long she looked). The phone bundles up to 50 sticky notes at a time and posts them to one URL: `POST /v1/track`.
+
+**2. The mailbox.** That URL lands at our `ingest` service. It does three things in 3 milliseconds: (a) check the sticky notes are well-formed (Zod validation), (b) replace Priya's user id with a tamper-proof fingerprint (HMAC-SHA256), and (c) drop them onto a never-ending receipt printer — a Redis Stream called `events:raw`. Then it returns. Priya's phone never waits.
+
+**3. The back-room clerks.** A separate service (`tracking-worker`) is constantly reading from the receipt printer. Every 10 seconds it flushes the counts into ledgers (`EventAggHourly`, `EventAggDaily`). Every 5 minutes a second clerk reads the ledgers and derives **summary signals** — Priya's chronotype (morning vs evening person), her attention profile (reader vs scanner), how many times she has seen Arjun in the last 48 hours.
+
+**4. The algorithms read the ledgers.** The 17 ranking algorithms ([docs/ALGORITHMS.md](ALGORITHMS.md)) never touch raw events. They read the summary signals through a single typed interface (`SignalReader`). So an event at 21:02 is already shaping Priya's Discover order by **21:17 at the latest** — never tomorrow, never "in a few days".
+
+```mermaid
+flowchart LR
+    Phone[Priya's phone<br/>writes 47 sticky notes] -->|"POST /v1/track"| Mailbox[ingest :3260]
+    Mailbox -->|"XADD"| Printer[("Redis Stream<br/>events:raw")]
+    Printer -->|"every 10s"| Clerk[tracking-worker :3261]
+    Clerk -->|"counts"| Ledger[("Postgres<br/>EventAggDaily, FeatureSnapshot,<br/>PairCompatCache")]
+    Ledger --> Algos[17 ranking<br/>algorithms]
+    Algos -->|"updates Discover"| Phone
+```
+
+That is the whole system. Everything below is the catalogue: every sticky note name, every ledger row, every clerk job, every cadence.
+
+---
+
+## What this document goes on to cover
+
+The exhaustive reference for everything Miamo records about user behaviour. Every event name, every payload field, every Postgres table this pipeline writes, every helper that turns raw clicks into algorithm signals.
 
 It's 9:02pm. Priya opens the app. Over the next 30 seconds her browser
 will fire **47 tracking events** — session start, three page views, twelve

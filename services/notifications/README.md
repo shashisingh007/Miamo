@@ -1,100 +1,125 @@
-# notifications
+# notifications — the polite tap (port 3206)
 
-> The bell with the badge. The reason Priya opens the app at 8:15am instead of forgetting it for a week.
+**TL;DR:** notifications is the polite tap on the shoulder. It picks the right moment to nudge Priya (using the `notifyTiming` algorithm) and delivers via push, email, or SMS.
 
-## 1. The story (60 seconds)
+---
 
-It's 8:14am Tuesday. Priya's `notifyTiming` histogram says she opens
-the app between 8 and 9 on Tuesdays. At 8:15 her phone buzzes:
-*"Arjun replied to your message."* She taps, the chat opens, she
-replies before her coffee is ready. At midnight while she sleeps,
-nothing buzzes. That's this service doing its job.
+## How to read this
 
-## 2. What this service is (in one picture)
+- **Meera**: Sections 1–2.
+- **Priya / PM**: Sections 1–4.
+- **Engineer**: All.
 
-```mermaid
-flowchart LR
-    Social[social] -- enqueue --> Notif[notifications :3206]
-    Msg[messaging] -- enqueue --> Notif
-    Content[content] -- enqueue --> Notif
-    Notif --> Shared[shared/algo<br/>notifyTiming]
-    Notif --> DB[(Postgres<br/>Notification, NotificationPref)]
-    Notif --> Push[FCM / APNS]
-    Notif -. SSE .-> GW[gateway]
-    GW --> Priya[Priya's phone]
+---
+
+## 1. A scene
+
+Tuesday 08:15am. Arjun's message from last night is waiting. We don't ping Priya at 03:00 like a bad app. We waited because her last-28-days hour-of-week histogram shows she opens the app reliably between 08:00 and 09:00 on Tuesdays (p(open) = 0.78). Her phone buzzes at exactly 08:15.
+
+---
+
+## 2. What this service is responsible for
+
+- **Schedule** — decide *when* to deliver each notification using the `notifyTiming` algo.
+- **Deliver** — push (FCM/APNs), email, SMS, in-app.
+- **Preferences** — what channels each user wants.
+- **Read state** — mark in-app notifications as read.
+
+It does **not** generate the content. Other services (social, messaging, content) emit "events" and notifications decides whether, when, and how to deliver.
+
+---
+
+## 3. Endpoints
+
+| Method | Path                                 | Plain English                                 |
+|--------|--------------------------------------|-----------------------------------------------|
+| GET    | `/v1/notifications`                  | My in-app notifications                       |
+| POST   | `/v1/notifications/:id/read`         | Mark one as read                              |
+| POST   | `/v1/devices`                        | Register FCM/APNs token                       |
+| DELETE | `/v1/devices/:token`                 | Unregister on logout                          |
+| GET    | `/v1/notifications/preferences`      | Channel & quiet-hours prefs                   |
+| PATCH  | `/v1/notifications/preferences`      | Update prefs                                  |
+| POST   | `/internal/notify`                   | (service-only) emit an event to deliver       |
+
+---
+
+## 4. Worked example — Arjun's message → push
+
+```
+22:47   Arjun sends message to Priya.
+22:47   messaging → POST /internal/notify { to: priya, kind: 'message', from: arjun }
+22:47   notifications applies notifyTiming:
+        - load Priya's 168-bucket hour-of-week histogram from last 28d
+        - scan forward 24h from now
+        - find first bucket where p(open) ≥ 0.6
+        - Tue 08:00 hour → p = 0.78
+        - jitter ±29 min → schedule 08:15
+22:47   Insert NotificationSchedule row with sendAt = Tue 08:15
+Tue 08:15  Worker tick fires → FCM push to Priya's iPhone.
 ```
 
-## 3. What it can do (the menu)
+If Priya happens to be active inside the app at 22:47 (heartbeat in last 5 min), we deliver in-app immediately instead of scheduling.
 
-| When Priya does this…                       | …the app calls                          | …and gets back                    | Source |
-|---------------------------------------------|-----------------------------------------|-----------------------------------|--------|
-| Opens the bell                              | `GET /notifications`                    | last 50 notifications              | [src](services/notifications/src/server.ts) |
-| Checks unread count (poll when tab hidden)  | `GET /notifications/unread/count`       | `{count: 3}`                       | [src](services/notifications/src/server.ts) |
-| Marks all read                              | `POST /notifications/read-all`          | `204`                              | [src](services/notifications/src/server.ts) |
-| Edits notification prefs                    | `PUT /notifications/prefs`              | updated prefs                      | [src](services/notifications/src/server.ts) |
-| (Internal) social enqueues a "match" notif  | `POST /internal/notifications/enqueue`  | `{id, scheduledFor}`               | [src](services/notifications/src/server.ts) |
+---
 
-## 4. The data it remembers
+## 5. Tables it owns
 
-- **`Notification`** — `{userId, type, payload, scheduledFor, deliveredAt, readAt, nextNotifyAt}`.
-- **`NotificationPref`** — per-user channel prefs (push on/off, types muted).
+- `Notification` — in-app notification rows
+- `Device` — FCM/APNs tokens, one per device
+- `NotifyPreference` — per-user channel + quiet-hours
+- `NotificationSchedule` — queued deliveries with `sendAt`
 
-## 5. Who it talks to
+---
 
-- **shared/algo** — `notifyTiming` picks the delivery minute.
-- **gateway** — SSE publish for live bell-badge updates.
-- **FCM / APNS** — push to phones.
+## 6. Code layout
 
-## 6. The knobs (configuration)
+```
+services/notifications/src/
+├── server.ts
+├── routes/
+│   ├── notify.ts
+│   ├── prefs.ts
+│   └── devices.ts
+├── timing.ts        # calls notifyTiming algo
+├── push.ts          # FCM + APNs
+└── email.ts         # SES wrapper
+```
 
-| Env var                                          | What it does                                  | Example | What breaks                       |
-|--------------------------------------------------|-----------------------------------------------|---------|-----------------------------------|
-| `DATABASE_URL`                                    | Postgres                                      | …       | service won't start                |
-| `INTERNAL_SERVICE_KEY`                            | Verifies social/msg internal enqueues         | …       | enqueue returns 403                |
-| `ALGO_V4_RANK_ENABLED_NOTIFICATIONS`              | If `'1'`, use notifyTiming; else send ASAP    | `'1'`   | nudges arrive at random hours      |
-| `FCM_SERVER_KEY` / `APNS_KEY`                     | Push provider credentials                     | …       | pushes silently dropped            |
-| `PORT`                                            | Listen port                                   | `3206`  | gateway can't reach                |
+---
 
-## 7. A real example, end-to-end
+## 7. Configuration
 
-Social tells notifications "Arjun got a match from Priya".
+| Env var                       | What it does                       |
+|-------------------------------|------------------------------------|
+| `DATABASE_URL`                | Postgres                           |
+| `REDIS_URL`                   | Schedule queue                     |
+| `FCM_SERVER_KEY`              | Android push                       |
+| `APNS_KEY_ID`, `APNS_TEAM_ID` | iOS push                           |
+| `SES_REGION`, `SES_FROM`      | Email                              |
+| `ALGO_V4_RANK_ENABLED_NOTIFICATIONS` | Flip `notifyTiming` on/off  |
 
-> ```bash
-> # internal call, requires X-Internal-Key
-> curl -X POST http://notifications:3206/internal/notifications/enqueue \
->   -H 'x-internal-key: $INTERNAL_SERVICE_KEY' \
->   -d '{"userId":"usr_arjun","type":"match","payload":{"from":"Priya"}}'
-> ```
-> "Notifications inserts a row, asks notifyTiming for the best minute,
-> sets `scheduledFor=2026-05-27T08:15:00Z`. A worker scans every 60s
-> and delivers ready rows."
-> ```json
-> { "id":"n_77", "scheduledFor":"2026-05-27T08:15:00Z" }
-> ```
+---
 
-## 8. Run it on your laptop
+## 8. Run locally / test
 
 ```bash
-docker compose up -d postgres
-cd services/notifications && npm install && npm run dev
+cd services/notifications && pnpm dev   # 3206
 ```
 
-## 9. How we know it works (tests)
+---
 
-- **`enqueue.test.ts`** — without internal key returns 403; with key, row inserted.
-- **`timing.test.ts`** — scheduledFor is within the next 24h.
-- **`prefs.test.ts`** — muted type is never delivered.
+## 9. What changed and why it's better
+
+- **Before:** every notification fired immediately. Priya got a buzz at 03:14 and the next morning the app sat unopened.
+- **After:** `notifyTiming` learns Priya's hour-of-week histogram and only pings her when she is likely to actually open. Jittered to avoid thundering-herd.
+- **Why Priya feels it:** her phone does not buzz at 3am. Notifications arrive when she'd open them anyway.
+
+---
 
 ## 10. If something breaks
 
-| Symptom                              | First check                                |
-|--------------------------------------|--------------------------------------------|
-| No notifications arriving             | worker scanning? `kubectl logs -l app=notifications` |
-| Notifications at 3am                  | `ALGO_V4_RANK_ENABLED_NOTIFICATIONS='0'`   |
-| Push delivered but no in-app row      | DB insert failed — check Postgres logs     |
-
-## 11. What changed and why it's better
-
-- **Before:** every match/message sent a push immediately. Notifications at midnight. Users muted us.
-- **After:** `notifyTiming` schedules to the user's most-likely-open minute, falls back to silence if no good slot.
-- **Why Priya feels it:** her phone buzzes when she's about to look at it, not when she's sleeping.
+| Symptom                         | First check                                | Fix                            |
+|---------------------------------|--------------------------------------------|--------------------------------|
+| No pushes delivered             | FCM/APNs credentials                       | Re-check env                   |
+| Every push goes at 09:00 sharp  | Jitter not applied                         | Check `timing.ts` jitter logic |
+| `notifyTiming` returns null     | < 28d of `session.start` events             | Fall back to next 1h          |

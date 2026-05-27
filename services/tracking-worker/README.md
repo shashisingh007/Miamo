@@ -1,124 +1,147 @@
-# tracking-worker
+# tracking-worker — the back-room clerks (port 3261)
 
-> The kitchen behind the mail slot. Reads events off the Redis Stream, folds them into features the algorithms can use.
+**TL;DR:** tracking-worker is the team of back-room clerks (consumers of the receipt printer) who read events from the Redis Stream, aggregate them, and write the features the 17 ranking algorithms read.
 
-## 1. The story (60 seconds)
+---
 
-Every event Priya generates ends up on the `events:raw` conveyor belt
-in Redis. This service reads them off, buffers them in memory by
-15-minute bucket, and every quarter-hour writes one tidy summary row
-per user to Postgres. The next time `forYou` runs, Priya's most recent
-behaviour is already baked into her ranking.
+## How to read this
 
-## 2. What this service is (in one picture)
+- **Meera**: Sections 1–2.
+- **Priya / PM**: Sections 1–4.
+- **Engineer**: All.
 
-```mermaid
-flowchart LR
-    R[(Redis Stream<br/>events:raw)] --> TW[tracking-worker :3261]
-    TW --> Feat[(Postgres<br/>UserActivity15m<br/>CandidateInteraction15m<br/>DailyMatch<br/>…)]
-    TW --> Cold[(Cold store<br/>S3-compatible)]
-    TW -. exposes .-> Status[/healthz<br/>/v4/status]
-```
+---
 
-## 3. What it can do (the menu)
+## 1. A scene
 
-| Job                | Cadence    | What it does                                              |
-|--------------------|-----------:|-----------------------------------------------------------|
-| RollupConsumer     | continuous | XREADGROUP from `events:raw`, buffer by 15-min bucket      |
-| FeatureAggregator  | 15 min     | Flush buffers → `UserActivity15m`, `CandidateInteraction15m` |
-| CompatWriter       | 15 min     | Recompute compat scores for recently active pairs          |
-| EmbeddingWorker    | 30 min     | Refresh profile embeddings for changed users               |
-| EnrichmentWorker   | 60 min     | Optional ML enrichment (flag-gated)                         |
-| DailyMatchWorker   | 24 h       | Compute the next-day `DailyMatch` per user                 |
-| ColdStore          | 1 h        | Move raw events older than 1h to cold storage              |
+9:02pm Priya generates 47 events. By 9:02:13 they are on the Redis stream. By 9:02:23 (10s flush) the rollup consumer has counted them into `EventAggHourly`. By 9:07 the FeatureSnapshot job has updated her `chronotype`, `attentionProfile`, and `impressionsLast48h`. By 9:17 the PairCompatCache has a fresh row for her × Arjun. The next time she opens Discover, the ranking already reflects what she just did.
 
-HTTP endpoints (for ops):
+**An event at 21:02 is influencing Discover by 21:17 at the latest.**
 
-| Endpoint              | Returns                                          | Source |
-|-----------------------|--------------------------------------------------|--------|
-| `GET /healthz`        | `{ok:true}` if Redis + Postgres reachable        | [src](services/tracking-worker/src/server.ts) |
-| `GET /v4/status`      | Lag per job, last-run-at, queue depth             | [src](services/tracking-worker/src/server.ts) |
+---
 
-## 4. The data it writes
+## 2. What this service is responsible for
 
-- **`UserActivity15m`** — one row per (userHash, 15-min bucket).
-- **`CandidateInteraction15m`** — one row per (viewerHash, candidateHash, bucket).
-- **`DailyMatch`** — overnight curated pick per user.
-- **`CompatScore`** — current compat for active pairs.
-- **`ProfileEmbedding`** — vector representation of each profile.
+One pod runs multiple loops, each a different clerk job:
 
-## 5. Who it talks to
+| Job                | File                | Cadence       | Writes to                              |
+|--------------------|---------------------|---------------|----------------------------------------|
+| RollupConsumer     | `rollup.ts`         | continuous, flush every 10s | `EventAggHourly`, `EventAggDaily`, `EventTargetAgg` |
+| FeatureAggregator  | `feature.ts`        | every 5 min   | `FeatureSnapshot`                      |
+| CompatWriter       | `compat.ts`         | every 15 min  | `PairCompatCache`                      |
+| EmbeddingWorker    | `embeddings.ts`     | every 30 min  | `ProfileEmbedding`                     |
+| EnrichmentWorker   | `enrich.ts`         | every 60 min (flag-gated) | various enrichment tables |
+| DailyMatchWorker   | `daily-match.ts`    | every 24 h    | `DailyMatch` (top-1 per user)          |
+| ColdStore          | `cold-store.ts`     | every 1 h     | S3 + XTRIM the stream                  |
+| RightToBeForgotten | `forget.ts`         | on-demand     | DELETE-cascade across tables           |
 
-- **Redis** — XREADGROUP from `events:raw`.
-- **Postgres** — writes feature tables.
-- **Cold store** — periodic S3 dump.
+---
 
-## 6. The knobs (configuration)
-
-| Env var                                  | What it does                                       | Example | What breaks                              |
-|------------------------------------------|----------------------------------------------------|---------|------------------------------------------|
-| `REDIS_URL`                               | Where to read events                               | …       | nothing to consume                        |
-| `DATABASE_URL`                            | Where to write features                            | …       | service won't start                       |
-| `TRACKING_HASH_SECRET`                    | Verify userHash determinism (must match ingest)    | …       | userHashes mismatch — data appears split  |
-| `ALGO_V4_WORKERS_ENABLED`                 | If `'0'`, skip optional jobs (enrichment, DTM)     | `'1'`   | Daily picks/enrichment stale              |
-| `ROLLUP_INTERVAL_SEC`                     | Aggregator cadence                                 | `900`   | too low = DB write churn; too high = stale |
-| `COLD_STORE_AFTER_SEC`                    | Move raw older than this to cold                   | `3600`  | Redis OOM if too high                     |
-| `STREAM_NAME`                             | Defaults `events:raw`                              | …       | empty stream                              |
-| `CONSUMER_GROUP`                          | Defaults `tw-rollup`                               | …       | duplicate consumption if multiple groups  |
-| `PORT`                                    | Listen port for healthz/status                     | `3261`  | k8s liveness fails                        |
-
-## 7. A real example, end-to-end
-
-3,142 raw events from 50k active users land in one 15-min bucket.
+## 3. The stream contract
 
 ```
-21:00:00  bucket starts
-21:00:01–21:14:59  events stream in, buffered in memory by (userHash, bucket)
-21:15:00  FeatureAggregator fires
-21:15:02  buffer drained → ~50,000 rows INSERT INTO "UserActivity15m"
-21:15:02  ColdStore moves events older than 1h to S3
-21:15:03  next bucket begins
+key:        events:raw
+maxlen:     ~100000
+group:      rollup
+consumer:   <HOSTNAME>-<pid>      (unique per pod, XACKs prevent duplicates)
+read cmd:   XREADGROUP COUNT 500 BLOCK 2000ms
 ```
 
-After: `forYou` reading at 21:15:30 sees the new data.
+When the worker successfully writes its rollup, it `XACK`s the entries. If the DB write fails, it does **not** XACK — the message redelivers next read.
 
-Check status:
+---
+
+## 4. Worked example — chronotype derivation
+
+```
+EventAggDaily for Priya, last 24h:
+  hour 06  → 4 events
+  hour 19  → 80 events
+  hour 20  → 80 events
+  total 224
+
+morning (5..12) = 42
+day     (12..18)= 18
+evening (18..23)= 160
+night   (23..5) = 4
+
+peak = evening
+peak / total = 160 / 224 = 0.71  ≥ 0.45  → chronotype = 'evening'
+```
+
+This row is what `forYou.chronoOverlap` will read for Priya in the next ranking call.
+
+---
+
+## 5. Tables it writes
+
+- `EventAggHourly` (uidHash, evt, hour) → count, durSum
+- `EventAggDaily`  (uidHash, evt, day)
+- `EventTargetAgg` (uidHash, targetHash, evt, day) — for CF
+- `FeatureSnapshot` — chronotype, attentionProfile, rageClickRate
+- `PairCompatCache` — viewerHash × candidateHash cached score
+- `ProfileEmbedding` — for searchAugment / feedAugment
+- `DailyMatch` — top-1 daily aiMatch row
+
+---
+
+## 6. Code layout
+
+```
+services/tracking-worker/src/
+├── server.ts                  # health + metrics
+├── rollup.ts                  # continuous loop
+├── feature.ts
+├── compat.ts
+├── embeddings.ts
+├── enrich.ts
+├── daily-match.ts
+├── cold-store.ts
+├── forget.ts
+└── buckets.ts                 # PercentileEstimator, DistinctCounter helpers
+```
+
+---
+
+## 7. Configuration
+
+| Env var                          | What it does                                  |
+|----------------------------------|-----------------------------------------------|
+| `REDIS_URL`                      | Stream                                         |
+| `DATABASE_URL`                   | Postgres                                       |
+| `TRACKING_HASH_SECRET`           | Same as ingest. **Never rotate.**              |
+| `ROLLUP_FLUSH_MS`                | Default `10000`                                |
+| `FEATURE_INTERVAL_MS`            | Default `300000` (5 min)                       |
+| `COMPAT_INTERVAL_MS`             | Default `900000` (15 min)                      |
+| `EMBED_INTERVAL_MS`              | Default `1800000` (30 min)                     |
+| `DAILY_MATCH_INTERVAL_MS`        | Default `86400000` (24 h)                      |
+| `COLD_STORE_INTERVAL_MS`         | Default `3600000` (1 h)                        |
+| `ALGO_V4_WORKERS_ENABLED`        | Master flag for the enrichment workers         |
+
+---
+
+## 8. Run locally / test
+
 ```bash
-curl http://localhost:3261/v4/status
-```
-```json
-{
-  "rollupConsumer": { "lagMs": 124, "lastEventAt": "2026-05-27T21:15:01Z" },
-  "featureAggregator": { "lastRunAt": "2026-05-27T21:15:02Z", "rowsWritten": 49823 },
-  "dailyMatchWorker": { "lastRunAt": "2026-05-27T03:00:14Z" }
-}
+cd services/tracking-worker && pnpm dev   # 3261
+redis-cli XINFO GROUPS events:raw           # observe lag
 ```
 
-## 8. Run it on your laptop
+---
 
-```bash
-docker compose up -d redis postgres ingest
-cd services/tracking-worker && npm install && npm run dev
-# fire a test event with curl from the ingest README, watch it appear
-redis-cli XLEN events:raw
-```
+## 9. What changed and why it's better
 
-## 9. How we know it works (tests)
+- **Before:** raw events lived in Postgres as billions of rows. Queries were slow, indexes were huge, vacuum was painful.
+- **After:** Postgres only sees compact aggregates. Workers retry safely via consumer-group XACKs. A new feature is one new loop, not a schema migration.
+- **Why Priya feels it:** her clicks visibly influence her ranking within 15 minutes, every time.
 
-- **`rollup.test.ts`** — 100 fake events for 5 users → exactly 5 rollup rows.
-- **`consumer.test.ts`** — events ACKed only after successful DB write.
-- **`cold-store.test.ts`** — events older than threshold leave Redis.
+---
 
 ## 10. If something breaks
 
-| Symptom                            | First check                                       |
-|------------------------------------|---------------------------------------------------|
-| `events:raw` length growing         | this service dead — `kubectl logs -l app=tracking-worker` |
-| Rollup rows have 0 in every column   | RollupConsumer ACKing but not buffering — bug      |
-| Stale DailyMatch                     | `ALGO_V4_WORKERS_ENABLED='0'`                      |
-
-## 11. What changed and why it's better
-
-- **Before:** algorithms read directly from raw event logs at query time — slow, expensive, often timed out.
-- **After:** pre-aggregated 15-min features in Postgres; algorithms read a tiny indexed table.
-- **Why Priya feels it:** Discover loads in <500ms even at peak. Her behaviour shows up in rankings within 15 min.
+| Symptom                              | First check                              | Fix                                  |
+|--------------------------------------|------------------------------------------|--------------------------------------|
+| `XLEN events:raw` growing past 100k  | Worker dead or DB writes failing         | Restart, scale replicas, check DB    |
+| FeatureSnapshot rows stale > 1 h     | feature.ts loop crashed                  | Logs + restart                       |
+| `chronotype` null for active user    | < 5 events in last 24h                   | Likely correct; check ingest path    |
+| DailyMatch never populated           | `ALGO_V4_WORKERS_ENABLED='0'`            | Flip flag, restart                   |

@@ -1,103 +1,149 @@
-# social
+# social — the matchmaker (port 3203)
 
-> The heart of dating — who shows up in Discover, who matches with whom, who pairs up for AI Match.
+**TL;DR:** social is the matchmaker. It decides who Priya sees in Discover, AI Picks, and AI Match — by calling the 17 ranking algorithms (recipes that score how well two people match) and applying a fatigue penalty so she does not see the same face twice in 48 hours.
 
-## 1. The story (60 seconds)
+---
 
-Priya opens Discover. She sees Arjun's smiling trek photo. She swipes
-right. The screen flashes "It's a match!" and a chat appears in her
-Matches tab. Tomorrow morning the app shows her one curated AI Pick:
-Meera, who shares 8 of her 10 interests. Every one of those moments is
-this service.
+## How to read this
 
-## 2. What this service is (in one picture)
+- **Meera**: Sections 1–2.
+- **Priya / PM**: Sections 1–4.
+- **Engineer**: All.
 
-```mermaid
-flowchart LR
-    Priya[Priya's phone] --> GW[gateway]
-    GW --> Social[social :3203]
-    Social --> Shared[shared/algo<br/>forYou, aiPicks,<br/>aiMatch, cf, dtm…]
-    Social --> DB[(Postgres<br/>Like, Pass, Match, DailyMatch)]
-    Social --> Notif[notifications<br/>internal HTTP]
-    Social --> Msg[messaging<br/>internal HTTP]
+---
+
+## 1. A scene
+
+9:02pm. Priya opens Discover. Her phone fires `GET /v1/social/discover?limit=10`. In ~40ms the social service:
+
+1. Fetches ~200 candidate profiles within her preference filters.
+2. For each candidate, asks the `forYou` algorithm for a score (0–100).
+3. Subtracts a fatigue penalty so anyone she's seen ≥6 times in 48h is demoted.
+4. Sorts by final score and returns the top 10.
+
+The first card she sees: Arjun (score 69). She swipes right.
+
+---
+
+## 2. What this service is responsible for
+
+- **Discover** — the swipe stack, ranked by `forYou`.
+- **Swipe** — record like / pass / super-like; create Match if mutual.
+- **AI Picks** — daily curated list using the `aiPicks` algo.
+- **AI Match** — one top-1 curated daily card, computed by worker (`daily-match.ts`).
+- **Boost surfaces** — New, Active, Verified, Serious (each a different algo).
+- **Search** — keyword + `searchAugment` re-rank.
+
+What it does **not** do: feed/posts (`content`), chat (`messaging`), notifications (`notifications`).
+
+---
+
+## 3. Endpoints
+
+| Method | Path                       | Plain English                                         |
+|--------|----------------------------|-------------------------------------------------------|
+| GET    | `/v1/social/discover`      | Next 10 cards, ranked                                  |
+| POST   | `/v1/social/swipe`         | `{targetId, dir: right\|left\|super}`                  |
+| GET    | `/v1/social/matches`       | All my matches                                         |
+| GET    | `/v1/social/aipicks`       | Today's AI Picks (top ~20)                             |
+| GET    | `/v1/social/aimatch`       | Today's AI Match (top 1)                               |
+| GET    | `/v1/social/new`           | New joiners surfaced by `new` algo                     |
+| GET    | `/v1/social/active`        | Online / active users                                  |
+| GET    | `/v1/social/verified`      | Verified profiles                                      |
+| GET    | `/v1/social/serious`       | Marriage / serious-intent ranked                       |
+| POST   | `/v1/social/search`        | Keyword + augmented re-rank                            |
+
+---
+
+## 4. Worked example — Priya × Arjun
+
+```
+1. GET /v1/social/discover
+2. Social fetches 200 candidates within Priya's filters.
+3. For each: forYou.score(priya, candidate)
+   → Arjun:
+     interestCos      = 0.81   (jaccard on tags)
+     vibeCos          = 0.78
+     behaviorCos      = 0.70
+     chronoOverlap    = 1.00   (both evening)
+     prior            = 0.45
+     intentMatch      = 1.00
+     distance         = 0.00   (857km)
+     ageDelta         = 0.71
+     raw = 0.729 → clip100 → 73
+     impressionsLast48h = 6
+     fatigue = 2·ln(1+6) = 3.89
+     final = 73 - 3.89 = 69
+4. Sort all 200, take top 10 → Arjun at position 4.
 ```
 
-## 3. What it can do (the menu)
+---
 
-| When Priya does this…              | …the app calls                            | …and gets back                       | Source |
-|------------------------------------|-------------------------------------------|--------------------------------------|--------|
-| Loads Discover                     | `GET /social/discover?limit=10`           | array of ranked candidates           | [src](services/social/src/server.ts) |
-| Likes Arjun                        | `POST /social/like` `{targetId}`          | `{matched: true, chatId}` if mutual  | [src](services/social/src/server.ts) |
-| Passes on Rohan                    | `POST /social/pass` `{targetId}`          | `204`                                | [src](services/social/src/server.ts) |
-| Sees today's AI Pick               | `GET /social/ai-picks/today`              | `{userId, score, reason}`            | [src](services/social/src/server.ts) |
-| Sees AI Match suggestions          | `GET /social/ai-match`                    | array of symmetric matches           | [src](services/social/src/server.ts) |
-| Runs vibe-check (chat-style intro) | `POST /social/vibe-check`                 | `{compatibility: 0.78}`              | [src](services/social/src/server.ts) |
+## 5. Tables it owns
 
-## 4. The data it remembers
+- `Swipe` — every right/left/super
+- `Match` — when two users like each other
+- `Block` — explicit block list
+- `Boost` — paid-boost windows
+- `PairCompatCache` — written by tracking-worker, read by forYou cache-hit path
+- `DailyMatch` — written by `daily-match.ts` worker, read by AI Match screen
 
-- **`Like`** — one row per (viewer → target) like.
-- **`Pass`** — one row per (viewer → target) pass.
-- **`Match`** — one row per mutual-like pair.
-- **`DailyMatch`** — overnight-computed daily pick per user.
+---
 
-## 5. Who it talks to
+## 6. Code layout
 
-- **shared/algo** for ranking (`forYou`, `aiPicks`, `aiMatch`, `cf`, `dtm`, `new`, `active`, `verified`, `serious`, `moves`).
-- **messaging** — on match, opens a chat room (internal HTTP).
-- **notifications** — on match, enqueues "you have a new match" for Arjun.
-- **Postgres** — its own tables + read-only access to `User`/`Profile`.
+```
+services/social/src/
+├── server.ts
+├── routes/
+│   ├── discover.ts
+│   ├── swipe.ts
+│   ├── aipicks.ts
+│   └── aimatch.ts
+└── ranker.ts                 # calls algos from services/shared/src/algo/
+```
 
-## 6. The knobs (configuration)
+The 17 algorithms themselves live in `services/shared/src/algo/`. Social does not contain ranking logic — it composes.
 
-| Env var                                    | What it does                                          | Example | What breaks                              |
-|--------------------------------------------|-------------------------------------------------------|---------|------------------------------------------|
-| `DATABASE_URL`                              | Postgres                                              | …       | service won't start                       |
-| `INTERNAL_SERVICE_KEY`                      | Verifies internal calls + used to call notif/msg      | …       | matches don't create chats / notifs       |
-| `ALGO_V4_RANK_ENABLED_DISCOVER`             | If `'1'`, Discover uses v4 ranking; else chronological| `'1'`   | Discover ranking falls back               |
-| `ALGO_V4_RANK_ENABLED_AIMATCH`              | If `'1'`, AI Match endpoint is live                   | `'0'`   | endpoint returns 404                      |
-| `ALGO_V4_WORKERS_ENABLED`                   | Read-only flag — informs which features are populated | `'1'`   | DTM-based picks may be empty               |
-| `PORT`                                      | Listen port                                           | `3203`  | gateway can't reach                       |
+---
 
-## 7. A real example, end-to-end
+## 7. Configuration
 
-Priya likes Arjun (he already liked her).
+| Env var                                    | What it does                       |
+|--------------------------------------------|------------------------------------|
+| `DATABASE_URL`                             | Postgres                           |
+| `REDIS_URL`                                | Cache + rate limit                 |
+| `ALGO_V4_RANK_ENABLED_DISCOVER`            | Light switch — flip without redeploy |
+| `ALGO_V4_RANK_ENABLED_AIMATCH`             | Same                                |
+| `ALGO_V4_RANK_ENABLED_SEARCH`              | Same                                |
+| `EXPLORE_EPSILON`                          | 0.10 — explore vs exploit balance  |
 
-> ```bash
-> curl -X POST http://localhost:3200/social/like \
->   -H 'authorization: Bearer eyJ…' \
->   -H 'content-type: application/json' \
->   -d '{"targetId":"usr_arjun"}'
-> ```
-> "Social inserts the Like, finds Arjun's earlier Like, creates a Match
-> and a Chat, fires a notification to Arjun, returns the chatId."
-> ```json
-> { "matched": true, "chatId": "cht_abc123", "matchedAt": "2026-05-27T15:32:11Z" }
-> ```
+All algo flags default `'0'` (off). Production overrides per env in `configuration/{env}/values.yaml`.
 
-## 8. Run it on your laptop
+---
+
+## 8. Run locally / test
 
 ```bash
-docker compose up -d postgres messaging notifications
-cd services/social && npm install && npm run dev
+cd services/social && pnpm dev   # 3203
+pnpm -w test                     # 225+ algo unit tests in ~1.2s
 ```
 
-## 9. How we know it works (tests)
+---
 
-- **`discover.test.ts`** — returns N candidates, never includes self, never includes blocked users.
-- **`like.test.ts`** — non-mutual like returns `matched:false`; mutual returns `matched:true` with chatId.
-- **`ai-picks.test.ts`** — returns at most one pick per user per day.
-- **`vibe-check.test.ts`** — compatibility score is always in [0,1].
+## 9. What changed and why it's better
+
+- **Before:** ranking was an `ORDER BY interest_score DESC LIMIT 10` SQL clause with hard-coded weights. No audit, no A/B, no explain.
+- **After:** 17 pure-function algorithms with explicit weights, an `explain` output per ranking, 225 unit tests, and feature flags.
+- **Why Priya feels it:** her Discover order genuinely learns from her behaviour. If an experiment hurts her CTR we flip a flag and her experience reverts in seconds.
+
+---
 
 ## 10. If something breaks
 
-| Symptom                              | First check                                          |
-|--------------------------------------|------------------------------------------------------|
-| Discover returns 0 candidates         | filters too tight (age/distance) or DB has no users  |
-| Match happens but no chat appears     | messaging unreachable — check internal HTTP logs     |
-| AI Picks always empty                 | `ALGO_V4_WORKERS_ENABLED='0'` so DailyMatch is stale |
-
-## 11. What changed and why it's better
-
-- **Before:** Discover was `ORDER BY last_active DESC`. Everyone saw the same order.
-- **After:** 17 algorithms in shared/algo, each behind a flag. Discover is personalised within 15 min of using the app.
-- **Why Priya feels it:** the people she actually swipes right on start showing up at the top, fast.
+| Symptom                            | First check                                  | Fix                                |
+|------------------------------------|----------------------------------------------|------------------------------------|
+| Discover returns chronological order | `ALGO_V4_RANK_ENABLED_DISCOVER='1'`?       | Flip the flag on                   |
+| AI Match always empty              | `daily-match.ts` worker running?             | Check tracking-worker logs         |
+| Same person over and over          | Fatigue penalty disabled?                    | Check `impressionsLast48h` source  |
+| Scores all 50                      | `SignalReader` returning neutral defaults    | Consent scope missing              |

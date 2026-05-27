@@ -1,95 +1,130 @@
-# content
+# content — the feed and beats (port 3205)
 
-> The "scroll while you wait for a match" surface — feed, stories, videos, creativity prompts.
+**TL;DR:** content owns posts, comments, the feed, Beats (music match), Moves (chat-move recommender data), and DTM (Decision-Tree-Match topic answers).
 
-## 1. The story (60 seconds)
+---
 
-Priya has swiped through her batch. She taps the Feed tab. A photo of
-Arjun's latest hike appears at the top — not the newest post in the
-system, but the one most relevant to her. She watches a 15-second
-story of Meera cooking pasta. She taps a creativity prompt: "Two truths
-and a lie about your weekend." All of those surfaces are this service.
+## How to read this
 
-## 2. What this service is (in one picture)
+- **Meera**: Sections 1–2.
+- **Priya / PM**: Sections 1–4.
+- **Engineer**: All.
 
-```mermaid
-flowchart LR
-    Priya[Priya's phone] --> GW[gateway]
-    GW --> Content[content :3205]
-    Content --> DB[(Postgres<br/>Post, Story, Video, Prompt)]
-    Content --> Shared[shared/algo<br/>feedAugment, postImpressionRerank]
+---
+
+## 1. A scene
+
+Saturday morning. Priya posts a photo from last weekend's Sandakphu trek. Arjun, who matched her two days ago, opens the feed at 11am. His feed shows Priya's post in the top 3, scored by `feedAugment`. He scrolls past Rohan's third "good morning" post in a row — `postImpressionRerank` will demote Rohan's next post by 15 points.
+
+---
+
+## 2. What this service is responsible for
+
+- **Posts** — text + photo posts.
+- **Comments** — threaded comments under a post.
+- **Likes** — on posts.
+- **Feed** — chronological + ranked feed.
+- **Beats** — short music clips, music-taste matching.
+- **Moves** — list of chat moves available; `moves` algo picks one.
+- **DTM** — Decision-Tree-Match topics, questions, answers, derived `DtmVector`.
+- **Vibe** — vibe-check questionnaire, answers, derived vibe vector.
+
+---
+
+## 3. Endpoints
+
+| Method | Path                              | Plain English                                  |
+|--------|-----------------------------------|------------------------------------------------|
+| GET    | `/v1/feed`                        | Ranked feed                                     |
+| POST   | `/v1/posts`                       | New post                                        |
+| GET    | `/v1/posts/:id/comments`          | Comments on a post                              |
+| POST   | `/v1/comments`                    | Add a comment                                   |
+| POST   | `/v1/likes`                       | Like a post                                     |
+| GET    | `/v1/beats`                       | Beats ranked by `beats` algo                    |
+| POST   | `/v1/beats/:id/play`              | Record a play (also fires a tracking event)     |
+| GET    | `/v1/dtm/topics`                  | DTM topics list                                 |
+| POST   | `/v1/dtm/answers`                 | Save an answer                                  |
+| GET    | `/v1/moves/suggest?pairId=…`      | Suggested next chat move (calls `moves` algo)   |
+| POST   | `/v1/vibe/answers`                | Save vibe-check answer                          |
+
+---
+
+## 4. Worked example — feed rank
+
+```
+1. Phone   GET /v1/feed?cursor=…
+2. Content fetches the chronological 50 newest posts from people Priya follows.
+3. For each: feedAugment.score(priya, post)
+   For Arjun's mountain photo:
+     sourceScore = 0.80 (top-quartile chronological)
+     forYou       = 0.69
+     recency      = expDecay(3h, 12h) = 0.84
+     raw = 0.50·0.80 + 0.30·0.69 + 0.20·0.84
+         = 0.775 → clip100 → 77
+4. postImpressionRerank applies a penalty if she has been skipping the author.
+5. Return top 20 sorted.
 ```
 
-## 3. What it can do (the menu)
+---
 
-| When Priya does this…              | …the app calls                             | …and gets back                | Source |
-|------------------------------------|--------------------------------------------|-------------------------------|--------|
-| Opens Feed                         | `GET /content/feed?cursor=`                | 20 posts + nextCursor          | [src](services/content/src/server.ts) |
-| Posts something                    | `POST /content/posts`                      | `{id, createdAt}`              | [src](services/content/src/server.ts) |
-| Lists Stories                      | `GET /content/stories`                     | array of active stories         | [src](services/content/src/server.ts) |
-| Views Videos                       | `GET /content/videos?cursor=`              | array of short videos           | [src](services/content/src/server.ts) |
-| Answers creativity prompt          | `POST /content/prompts/{id}/answer`        | `{id}`                          | [src](services/content/src/server.ts) |
+## 5. Tables it owns
 
-## 4. The data it remembers
+- `Post`, `Comment`, `Like`
+- `Beat`, `BeatPlay`
+- `Move` (move kinds catalog)
+- `DtmTopic`, `DtmQuestion`, `DtmAnswer`, `DtmVector`
+- `VibeQuestion`, `VibeAnswer`, `VibeVector`
 
-- **`Post`** — text/photo posts.
-- **`Story`** — 24h photo stories (auto-expire).
-- **`Video`** — short video metadata + URLs.
-- **`CreativityPrompt`**, **`PromptAnswer`** — daily prompts and answers.
+---
 
-## 5. Who it talks to
+## 6. Code layout
 
-- **shared/algo** — `feedAugment` (re-rank feed), `postImpressionRerank` (penalise ignored authors).
-- **Postgres** — its own tables.
+```
+services/content/src/
+├── server.ts
+├── routes/
+│   ├── feed.ts
+│   ├── posts.ts
+│   ├── beats.ts
+│   ├── dtm.ts
+│   └── moves.ts
+└── ranker.ts        # calls feedAugment, beats, moves algos
+```
 
-## 6. The knobs (configuration)
+---
 
-| Env var                              | What it does                                   | Example | What breaks                            |
-|--------------------------------------|------------------------------------------------|---------|----------------------------------------|
-| `DATABASE_URL`                        | Postgres                                       | …       | service won't start                     |
-| `ALGO_V4_RANK_ENABLED_FEED`           | If `'1'`, feed re-ranked; else chronological   | `'1'`   | feed falls back to newest-first         |
-| `PORT`                                | Listen port                                    | `3205`  | gateway can't reach                     |
+## 7. Configuration
 
-## 7. A real example, end-to-end
+| Env var                            | What it does                  |
+|------------------------------------|-------------------------------|
+| `DATABASE_URL`                     | Postgres                      |
+| `REDIS_URL`                        | Feed cache, beats cache       |
+| `ALGO_V4_RANK_ENABLED_FEED`        | Flip the new feed ranker      |
+| `ALGO_V4_RANK_ENABLED_BEATS`       | Flip the new beats ranker     |
 
-> ```bash
-> curl -H 'authorization: Bearer eyJ…' \
->   'http://localhost:3200/content/feed?cursor=0&limit=20'
-> ```
-> "Content fetches ~200 recent posts from people Priya follows, asks
-> feedAugment to re-rank, returns the top 20."
-> ```json
-> {
->   "items": [
->     { "id":"p_1", "author":"usr_arjun", "text":"…trek...", "imageUrl":"…" }
->   ],
->   "nextCursor": "p_1"
-> }
-> ```
+---
 
-## 8. Run it on your laptop
+## 8. Run locally / test
 
 ```bash
-docker compose up -d postgres
-cd services/content && npm install && npm run dev
+cd services/content && pnpm dev   # 3205
+node services/content/seed-dtm.js  # seed DTM topics + questions
 ```
 
-## 9. How we know it works (tests)
+---
 
-- **`feed.test.ts`** — pagination cursor is stable; blocked authors filtered.
-- **`stories.test.ts`** — expired (>24h) stories never returned.
-- **`prompts.test.ts`** — answer is rejected if prompt expired.
+## 9. What changed and why it's better
+
+- **Before:** the feed was reverse-chronological only. Beats was random.
+- **After:** the feed re-ranks by `feedAugment` and penalises ignored authors. Beats personalises by genre and tempo fit.
+- **Why Priya feels it:** her feed surfaces posts she actually wants to read; she stops scrolling past 4 of the same person's morning selfies.
+
+---
 
 ## 10. If something breaks
 
-| Symptom                            | First check                                  |
-|------------------------------------|----------------------------------------------|
-| Feed shows the same order for all   | `ALGO_V4_RANK_ENABLED_FEED='0'`              |
-| Stories never expire                 | cron/cleanup job for `Story.expiresAt`       |
-| Video URLs broken                    | upstream CDN config                          |
-
-## 11. What changed and why it's better
-
-- **Before:** feed was `ORDER BY createdAt DESC`. Active authors crowded out the people Priya cared about.
-- **After:** `feedAugment` re-ranks by `affinity + recency + engagement + diversity`.
-- **Why Priya feels it:** the posts she actually wants to see are near the top, even if they're 6h old.
+| Symptom                          | First check                              | Fix                              |
+|----------------------------------|------------------------------------------|----------------------------------|
+| Feed is chronological            | `ALGO_V4_RANK_ENABLED_FEED='1'`?         | Flip the flag                    |
+| Beats all the same songs         | Novelty signal not updating              | Worker embedding refresh         |
+| DTM affinity always null         | DtmVector not computed                   | `daily-match.ts` worker logs     |

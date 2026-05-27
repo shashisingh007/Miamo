@@ -1,93 +1,132 @@
-# users
+# users — the profile keeper (port 3202)
 
-> Priya's photo, her bio, her settings, her "looking for", and the search box.
+**TL;DR:** users keeps Priya's profile (the permanent filing cabinet drawer with her name on it) — name, age, photos, intent, preferences — and decides who can see what.
 
-## 1. The story (60 seconds)
+---
 
-Priya finishes login. The first thing she does is tap "Edit profile",
-upload a new trek photo, and set her interest to "Photography,
-Hiking, Coffee". A week later she searches "vegetarian, Mumbai, 25–32"
-and saves three profiles to bookmarks. All of that is this service.
+## How to read this
 
-## 2. What this service is (in one picture)
+- **Meera**: Sections 1–2.
+- **Priya / PM**: Sections 1–4.
+- **Engineer**: All.
 
-```mermaid
-flowchart LR
-    Priya[Priya's phone] --> GW[gateway]
-    GW --> Users[users :3202]
-    Users --> DB[(Postgres<br/>Profile, Setting,<br/>Bookmark, Block)]
+---
+
+## 1. A scene
+
+7pm Sunday. Priya wants to update her bio from "trekker, photographer" to "trekker, photographer, learning Tamil". She taps Edit, types, hits save. Her phone fires `PATCH /v1/users/me`. In ~25ms the users service updates her row in Postgres and invalidates her profile cache. Within 15 minutes the social service re-ranks her against all candidates with the fresh signal.
+
+---
+
+## 2. What this service is responsible for
+
+- **Profile** — name, age, gender, location, bio, photos, languages.
+- **Preferences** — age range, distance, intent (`serious` / `casual`).
+- **Albums** — photo uploads, primary photo selection, unlock requests.
+- **Consent scopes** — `analytics`, `personalization`, `social_signals`, `ml_enrichment`.
+- **Visibility** — who can see your profile (matched / discoverable / paused).
+
+What it does **not** do: matching, swiping (`social`), chat (`messaging`), tracking (`ingest`).
+
+---
+
+## 3. Endpoints
+
+| Method | Path                              | Plain English                                          |
+|--------|-----------------------------------|--------------------------------------------------------|
+| GET    | `/v1/users/me`                    | My full profile                                         |
+| PATCH  | `/v1/users/me`                    | Update name/bio/etc.                                    |
+| PATCH  | `/v1/users/me/preferences`        | Change age range, intent, distance                      |
+| POST   | `/v1/users/me/photos`             | Upload a new album photo                                |
+| DELETE | `/v1/users/me/photos/:id`         | Remove a photo                                          |
+| GET    | `/v1/users/:id`                   | Public-safe view of another user's profile              |
+| POST   | `/v1/users/me/consent`            | Grant or revoke a consent scope                         |
+| POST   | `/v1/users/me/pause`              | Pause my account                                        |
+| DELETE | `/v1/users/me`                    | Right-to-be-forgotten — shred my file                   |
+
+---
+
+## 4. Worked example — bio update
+
+```
+1. Phone   PATCH /v1/users/me   { bio: "trekker, photographer, learning Tamil" }
+2. Gateway verifies JWT → forwards with X-User-Id: priya-uuid
+3. Users   UPDATE "User" SET bio=... WHERE id=priya-uuid  (~10ms)
+4. Users   redis DEL cache:profile:priya-uuid (so next read is fresh)
+5. Users   Returns 200 + updated row.
+6. ~15min later: tracking-worker's next FeatureSnapshot picks up the change.
+7. Social  Next Discover refresh uses the new bio for `interestCos`.
 ```
 
-## 3. What it can do (the menu)
+---
 
-| When Priya does this…                  | …the app calls                       | …and gets back                       | Source |
-|----------------------------------------|--------------------------------------|--------------------------------------|--------|
-| Views her profile                      | `GET /users/me`                      | `{profile, settings}`                | [src](services/users/src/server.ts) |
-| Edits profile                          | `PATCH /users/me`                    | updated profile                       | [src](services/users/src/server.ts) |
-| Saves settings (notif prefs, etc.)     | `PUT /users/me/settings`             | updated settings                      | [src](services/users/src/server.ts) |
-| Searches users                         | `GET /users/search?q=…&city=…`       | `[{id, displayName, photo}]`         | [src](services/users/src/server.ts) |
-| Bookmarks Arjun                        | `POST /users/me/bookmarks/{arjunId}` | `204`                                | [src](services/users/src/server.ts) |
-| Blocks Rohan                           | `POST /users/me/blocks/{rohanId}`    | `204` + hides from Discover          | [src](services/users/src/server.ts) |
+## 5. Tables it owns
 
-## 4. The data it remembers
+From `services/shared/prisma/schema.prisma`:
 
-- **`Profile`** — display name, bio, photos, age, city, interests.
-- **`Setting`** — notification prefs, discoverability, tracking consent.
-- **`Bookmark`** — Priya saved Arjun for later.
-- **`Block`** — Priya never wants to see Rohan again.
+- `User` (shared with auth — auth writes `phone`, users writes everything else)
+- `Photo` — one row per album image
+- `Preference` — age/distance/intent
+- `ConsentScope` — grants per scope
+- `LoveLanguage`, `Lifestyle`, `Identity` — extended profile fields
 
-## 5. Who it talks to
+---
 
-- **Postgres** — only its own tables.
-- Read by `gateway` for the onboarding-complete check (with a 60s cache so we don't spam it).
+## 6. Code layout
 
-## 6. The knobs (configuration)
+```
+services/users/src/
+├── server.ts
+├── routes/
+│   ├── me.ts
+│   ├── photos.ts
+│   ├── preferences.ts
+│   └── consent.ts
+├── upload.ts         # S3-compatible photo upload
+└── completeness.ts   # computes profile-completeness score
+```
 
-| Env var                | What it does                                  | Example       | What breaks                       |
-|------------------------|-----------------------------------------------|---------------|-----------------------------------|
-| `DATABASE_URL`         | Postgres connection                            | (see auth)    | service won't start               |
-| `INTERNAL_SERVICE_KEY` | Required header from internal callers         | random 32 bytes | gateway/social calls return 403 |
-| `PORT`                 | Listen port                                    | `3202`        | gateway can't reach               |
+---
 
-## 7. A real example, end-to-end
+## 7. Configuration
 
-Priya searches "Mumbai, vegetarian, 26–34".
+| Env var               | What it does                              |
+|-----------------------|-------------------------------------------|
+| `DATABASE_URL`        | Postgres                                  |
+| `REDIS_URL`           | Profile cache                             |
+| `S3_BUCKET`, `S3_KEY`, `S3_SECRET` | Photo storage                |
+| `INTERNAL_SERVICE_KEY`| For service-to-service calls (from social) |
 
-> ```bash
-> curl -H 'authorization: Bearer eyJ…' \
->   'http://localhost:3200/users/search?city=Mumbai&diet=veg&ageMin=26&ageMax=34&limit=20'
-> ```
-> "Gateway forwards. Users runs a Prisma query with index on (city, diet, age), returns up to 20 hits."
-> ```json
-> [
->   {"id": "usr_arjun", "displayName": "Arjun", "city": "Bangalore", "age": 30},
->   {"id": "usr_meera", "displayName": "Meera", "city": "Delhi",    "age": 32}
-> ]
-> ```
+---
 
-## 8. Run it on your laptop
+## 8. Privacy notes
+
+- Photos are stored in S3 with signed URLs (expire in 1 hour).
+- Public profile endpoint (`GET /v1/users/:id`) strips phone + email and includes only fields the viewer is allowed to see.
+- `DELETE /v1/users/me` cascades: it deletes profile, photos, preferences, consent, and triggers `tracking-worker`'s `forget` job to erase tracking aggregates.
+
+---
+
+## 9. Run locally / test
 
 ```bash
-docker compose up -d postgres
-cd services/users && npm install && npm run dev
+cd services/users && pnpm dev   # 3202
 ```
 
-## 9. How we know it works (tests)
+---
 
-- **`profile.test.ts`** — edit returns 200; invalid input rejected by Zod.
-- **`search.test.ts`** — city + diet filter returns matching users only.
-- **`bookmarks.test.ts`** — duplicate bookmark is idempotent (no error).
+## 10. What changed and why it's better
 
-## 10. If something breaks
+- **Before:** the web app stitched profile data from 4 different tables across services.
+- **After:** one endpoint, one schema, one cache. Profile updates flow to ranking within 15 minutes.
+- **Why Priya feels it:** she updates her bio, and the very next Discover refresh shows her better matches.
 
-| Symptom                              | First check                                |
-|--------------------------------------|--------------------------------------------|
-| `/users/me` returns 401               | gateway's JWT verify failing — token expired? |
-| Search slow                           | Postgres index on (city, diet, age) present? |
-| Onboarding redirect loop              | `Setting.onboardingComplete` flag value      |
+---
 
-## 11. What changed and why it's better
+## 11. If something breaks
 
-- **Before:** profile was inside the auth service; one DB lock could freeze logins.
-- **After:** split out, scales independently, dedicated indexes for search.
-- **Why Priya feels it:** searches return in <100ms even when 50k users are logging in at the same time.
+| Symptom                          | First check                          | Fix                          |
+|----------------------------------|--------------------------------------|------------------------------|
+| Photo upload fails               | S3 credentials                       | Re-check env                 |
+| Profile shows stale data         | Cache TTL or DEL not running         | `redis DEL cache:profile:*`  |
+| RTBF leaves stragglers           | `tracking-worker` forget job logs    | Re-run forget for that uid   |

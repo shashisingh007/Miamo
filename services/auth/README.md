@@ -1,100 +1,143 @@
-# auth
+# auth — the bouncer (port 3201)
 
-> The bouncer at the door — checks IDs, hands out wristbands, and remembers who is here.
+**TL;DR:** auth is the bouncer that checks who Priya is and issues her a wristband (JWT — a wristband with an expiry stamp) good for 15 minutes.
 
-## 1. The story (60 seconds)
+---
 
-Priya types her email and password, taps "Sign in", and a second later
-she's on the Discover screen. Two weeks later her laptop is stolen; she
-opens Miamo from a new phone, changes her password, and every old
-session — including the one on the stolen laptop — stops working
-immediately. Both of those moments are this service.
+## How to read this
 
-## 2. What this service is (in one picture)
+- **Meera (non-tech)**: Sections 1–2.
+- **Priya / PM**: Sections 1–4.
+- **Engineer**: All.
 
-```mermaid
-flowchart LR
-    Priya[Priya's phone] --> GW[gateway]
-    GW --> Auth[auth :3201]
-    Auth --> DB[(Postgres<br/>User, Session)]
-    Auth -. "issues JWT wristband" .-> Priya
+---
+
+## 1. A scene
+
+8:59pm. Priya opens the app. Her phone shows the login screen. She types her phone number and a one-time password (OTP) we sent. Her phone fires `POST /v1/auth/login`. In ~300ms the auth service:
+
+1. Confirms the OTP is correct and not expired.
+2. Issues two wristbands: a 15-minute access token (for normal requests) and a 30-day refresh token (to silently get new access tokens).
+3. Returns both to her phone, which stores them safely.
+
+For the next 30 days Priya does not have to log in again, even though every individual access token only lasts 15 minutes.
+
+---
+
+## 2. What this service is responsible for
+
+- **Login / OTP** — phone number → SMS OTP → verify → issue tokens.
+- **Refresh** — exchange a valid refresh token for a fresh access token.
+- **Logout** — revoke a refresh token.
+- **Password reset** (for email-based test accounts) — bcryptjs cost 12.
+- **Account creation** on first successful OTP verify.
+
+What it does **not** do: profile data, photos, preferences. That is the `users` service.
+
+---
+
+## 3. Endpoints
+
+| Method | Path                          | What it does (plain English)                     |
+|--------|-------------------------------|--------------------------------------------------|
+| POST   | `/v1/auth/otp/send`           | Send OTP to a phone number                       |
+| POST   | `/v1/auth/otp/verify`         | Verify OTP, issue access + refresh wristbands    |
+| POST   | `/v1/auth/refresh`            | Trade refresh wristband for a fresh access one   |
+| POST   | `/v1/auth/logout`             | Revoke refresh wristband                         |
+| GET    | `/v1/auth/me`                 | Who am I? (used by the gateway sanity-check)     |
+
+---
+
+## 4. Worked example — first login
+
+```
+1. Phone   POST /v1/auth/otp/send   { phone: "+919876543210" }
+2. Auth    Twilio.send("+919876543210", "Your Miamo code: 482913")
+3. Phone   POST /v1/auth/otp/verify { phone, otp: "482913" }
+4. Auth    OTP matches and not expired (5 min TTL in Redis).
+5. Auth    Create User row in Postgres if first login.
+6. Auth    JWT_access  = jwt.sign({sub: uid}, JWT_SECRET, { expiresIn: '15m' })
+           JWT_refresh = jwt.sign({sub: uid}, JWT_REFRESH_SECRET, { expiresIn: '30d' })
+7. Auth    Store hashed refresh in Postgres → can revoke later.
+8. Phone   Saves both tokens, never asks again for 30 days.
 ```
 
-## 3. What it can do (the menu)
+15 minutes later her access token expires. Her phone silently calls `/v1/auth/refresh`, gets a new access token in ~50ms, and continues. Priya never notices.
 
-| When Priya does this…              | …the app calls                         | …and gets back                          | Source |
-|------------------------------------|----------------------------------------|-----------------------------------------|--------|
-| Signs up                           | `POST /auth/signup`                    | `{accessToken, refreshToken, userId}`   | [src](services/auth/src/server.ts) |
-| Logs in                            | `POST /auth/login`                     | same as above                           | [src](services/auth/src/server.ts) |
-| Refreshes her session              | `POST /auth/refresh`                   | new `{accessToken}`                     | [src](services/auth/src/server.ts) |
-| Changes password (revokes all)     | `POST /auth/password`                  | `{ok: true}` + all sessions deleted     | [src](services/auth/src/server.ts) |
-| Logs out                           | `POST /auth/logout`                    | `204 No Content`                        | [src](services/auth/src/server.ts) |
+---
 
-## 4. The data it remembers
+## 5. Tables it owns (from `services/shared/prisma/schema.prisma`)
 
-- **`User`** — one row per person. Holds email, bcrypt password hash, `emailVerified`, `deletedAt`.
-- **`Session`** — one row per active login. Holds `refreshToken` hash, device info, `expiresAt`.
+- `User` — the row that says "this phone is this uid"
+- `Session` — refresh-token records, one per device, revocable
+- `OtpAttempt` — rate-limit attempts (max 5/15 min)
 
-Schema lives in [services/shared/prisma/schema.prisma](services/shared/prisma/schema.prisma).
+---
 
-## 5. Who it talks to
+## 6. Code layout
 
-- **Postgres** — its own `User` and `Session` tables only.
-- Nobody else outbound. Auth is leaf.
+```
+services/auth/src/
+├── server.ts
+├── routes/
+│   ├── otp.ts
+│   ├── refresh.ts
+│   └── logout.ts
+├── otp.ts                  # send + verify + Redis TTL
+└── tokens.ts               # sign + verify JWTs
+```
 
-## 6. The knobs (configuration)
+---
 
-| Env var                | What it does (plain English)                              | Example                             | What breaks if wrong                       |
-|------------------------|-----------------------------------------------------------|-------------------------------------|--------------------------------------------|
-| `DATABASE_URL`         | Where Postgres lives                                       | `postgresql://miamo:miamo@db:5432/miamo` | Service can't start                      |
-| `JWT_SECRET`           | Signs the 15-min access wristband (JWT)                    | 32+ random bytes                    | Rotating it logs everyone out             |
-| `JWT_REFRESH_SECRET`   | Signs the 30-day refresh wristband                         | 32+ random bytes                    | Same — invalidates refresh tokens         |
-| `BCRYPT_COST`          | How slow to hash passwords (defaults to 12)                | `12`                                | Lower = brute-force easier; higher = login slow |
-| `PORT`                 | Listen port                                                | `3201`                              | Gateway can't reach it                    |
+## 7. Configuration
 
-## 7. A real example, end-to-end
+| Env var                 | What it does                            |
+|-------------------------|-----------------------------------------|
+| `JWT_SECRET`            | Access-token signing key                |
+| `JWT_REFRESH_SECRET`    | Refresh-token signing key               |
+| `OTP_TTL_SEC`           | OTP lifetime (default 300 = 5min)       |
+| `TWILIO_SID`, `TWILIO_TOKEN`, `TWILIO_FROM` | SMS provider creds       |
+| `DATABASE_URL`          | Postgres                                |
+| `REDIS_URL`             | Whiteboard for OTPs and attempt counters |
 
-Priya signs up.
+---
 
-> "Her phone POSTs her email + password to the gateway."
-> ```bash
-> curl -X POST http://localhost:3200/auth/signup \
->   -H 'content-type: application/json' \
->   -d '{"email":"priya@example.com","password":"trekL0ver!"}'
-> ```
-> "Gateway forwards to auth. Auth bcrypts the password, inserts a User row,
-> issues a 15-min JWT and a 30-day refresh token."
-> ```json
-> {
->   "userId": "usr_priya",
->   "accessToken": "eyJhbGciOiJIUzI1NiIs…",   // 15 min
->   "refreshToken": "eyJhbGciOiJIUzI1NiIs…"   // 30 days
-> }
-> ```
-> "Phone stores both as httpOnly cookies. Next request to any service
-> carries the access token; gateway verifies it and forwards."
+## 8. Security details
 
-## 8. Run it on your laptop
+- **bcryptjs cost 12** for stored passwords → ~250ms per check, brute-force hopeless.
+- **OTP rate-limit:** 5 attempts per phone per 15 minutes.
+- **Refresh-token rotation:** every refresh returns a new refresh token; the old one is revoked.
+- **JWT HS256** with 15-min access / 30-day refresh.
+- **Logout** deletes the Session row; even if someone keeps the old refresh token it returns 401.
+
+---
+
+## 9. Run locally / test
 
 ```bash
-docker compose up -d postgres
-cd services/auth && npm install && npm run dev
+cd services/auth
+pnpm install
+pnpm dev          # 3201
+
+curl -X POST http://localhost:3201/v1/auth/otp/send -d '{"phone":"+919999999999"}' -H content-type:application/json
 ```
 
-## 9. How we know it works (tests)
+Demo accounts (from `services/shared/prisma/seed.ts`) bypass OTP — use OTP `000000`.
 
-- **`auth.test.ts`** — wrong password is rejected; right password returns a token; expired access token returns 401; refresh issues a new access token; password change deletes all sessions.
+---
 
-## 10. If something breaks
+## 10. What changed and why it's better
 
-| Symptom                                  | First check                                    |
-|------------------------------------------|------------------------------------------------|
-| Every login returns 401                  | `JWT_SECRET` mismatch between auth and gateway |
-| Signup hangs                             | bcrypt cost too high or DB unreachable         |
-| Password change doesn't invalidate session| `Session` table delete failed — check logs    |
+- **Before:** session was a long-lived cookie. Steal it, you owned the account forever.
+- **After:** 15-minute access token + 30-day rotating refresh. Steal an access token, it expires before you can use it twice.
+- **Why Priya feels it:** she logs in once a month, and even if her phone is compromised the attacker's window is small.
 
-## 11. What changed and why it's better
+---
 
-- **Before:** one long-lived JWT (30d). A stolen cookie meant a month of risk.
-- **After:** 15-min access + revocable 30-day refresh. Password change revokes everything.
-- **Why Priya feels it:** if she changes her password, the stolen laptop is locked out instantly — not in 30 days.
+## 11. If something breaks
+
+| Symptom                         | First check                              | Fix                              |
+|---------------------------------|------------------------------------------|----------------------------------|
+| OTP never arrives               | Twilio creds + balance                   | Re-check `TWILIO_*` env          |
+| `401` after refresh             | Session row revoked or `JWT_REFRESH_SECRET` rotated | Re-login              |
+| Floods of OTP requests          | `OtpAttempt` rate limit                  | Check IP, block at gateway       |

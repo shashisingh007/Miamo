@@ -1,7 +1,61 @@
 # Algorithms — the complete reference
 
-> Every algorithm in Miamo, every input it reads, every weight it uses,
-> a worked numeric example for Priya × Arjun, and the flag that turns it on.
+**TL;DR:** Miamo's ranking is 17 small recipes (each one a "pure function" that takes Priya's signals + a candidate's signals and returns a score from 0 to 100). The most important recipe is `forYou`. Every other recipe is either a variant or a re-ranker.
+
+---
+
+## How to read this
+
+- **Meera (non-tech reader)**: read this overview only.
+- **Priya / PM**: read this overview + §0 (conventions) + the map table.
+- **Arjun-the-engineer**: read everything.
+
+---
+
+## Plain-English overview (the whole ranking system in 5 paragraphs)
+
+**1. The problem.** Priya opens Discover. There are 200 candidates that pass her basic filters (age, distance, gender, intent). Some are better matches than others. How do we order them?
+
+**2. The trick — recipes.** We have **17 small recipes**, each one scoring something specific. The main recipe (`forYou`) blends 8 ingredients: how much Priya and Arjun's interests overlap, how their vibes match, how similar their behaviour is, whether they are both morning or evening people, how close they live, etc. Each ingredient gets a weight (importance), and the recipe blends them into one number from 0 to 100.
+
+**3. A concrete example.** For Priya seeing Arjun, the `forYou` recipe computes:
+
+```
+0.25 × interests-overlap (0.81)
+0.20 × vibe-match (0.78)
+0.20 × behaviour-match (0.70)
+0.10 × same-chronotype (1.00, both evening)
+0.10 × past-interactions (0.45)
+0.05 × intent-match (1.00, both serious)
+0.05 × distance (0.00, 857 km apart)
+0.05 × age-similarity (0.71, 2 years apart)
+                              ───
+              raw score = 73
+              minus fatigue penalty (Priya has seen Arjun 6 times in 48h) = 4
+              final = 69
+```
+
+Arjun scores 69 out of 100. Of 200 candidates today, that puts him at position **4** in Priya's stack. She sees him as the fourth card she swipes through.
+
+**4. Why 17 recipes, not one.** Different surfaces want different things. The Discover swipe stack wants `forYou`. AI Picks (the daily curated strip) wants an ensemble that includes collaborative-filter signals. Notifications want to predict the next good moment to ping. Search wants to blend text matching with `forYou`. The chat composer wants to suggest the right opener. So we have a recipe per surface, and they share helpers (cosine similarity, exponential decay, jaccard overlap) from a common math library.
+
+**5. Why we can change them safely.** Each recipe is a pure TypeScript function — same inputs always produce the same output. We have **225 unit tests that run in 1.2 seconds** with no database. Every algorithm has a feature flag (an environment variable like `ALGO_V4_RANK_ENABLED_DISCOVER`) — flip it from `'1'` to `'0'` and the new recipe is off in 30 seconds, no code change needed. And every score has an `explain` object so we can audit "why was Arjun shown at position 4?" after the fact.
+
+```mermaid
+flowchart LR
+    Signals[Priya's signals<br/>chronotype, attention,<br/>impressionsLast48h,<br/>interests, vibe] --> Reader[SignalReader]
+    Reader --> Algos[17 recipes:<br/>forYou, aiPicks, new, active,<br/>verified, serious, cf, dtm,<br/>moves, messageSuggest, beats,<br/>notifyTiming, searchAugment,<br/>feedAugment, postImpressionRerank,<br/>aiMatch, registry]
+    Algos --> Score[score 0..100<br/>+ explain]
+    Score --> UI[Priya's Discover<br/>shows top 10]
+```
+
+Everything below is the catalogue: each recipe, its weights, a worked example with Priya × Arjun, and the flag that turns it on.
+
+---
+
+## What this document goes on to cover
+
+Every algorithm in Miamo, every input it reads, every weight it uses, a worked numeric example for Priya × Arjun, and the flag that turns it on.
 
 It's 9:02pm. Priya opens Discover. The order she sees is not random,
 not chronological, not even the same as the person next to her on the

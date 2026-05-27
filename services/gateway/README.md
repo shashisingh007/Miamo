@@ -1,109 +1,124 @@
-# gateway
+# gateway — the receptionist (port 3200)
 
-> The single front door. Everything Priya's phone sends goes through here first.
+**TL;DR:** Every request from Priya's phone hits the gateway first. It is the receptionist (every visitor goes through her first) that checks Priya's wristband (JWT token — a wristband with an expiry stamp), enforces rate limits, and routes to the right specialist team.
 
-## 1. The story (60 seconds)
+---
 
-Priya's phone never talks directly to `auth`, `social`, `messaging`, or
-any other internal service. It only talks to `gateway`. Gateway checks
-her wristband (JWT), makes sure she's not hammering us (rate-limit),
-makes sure she's done onboarding before letting her into Discover,
-forwards her request to the right service, and keeps an SSE pipe open
-so live updates can stream back. One door. One firewall. One audit log.
+## How to read this
 
-## 2. What this service is (in one picture)
+- **Meera (non-tech)**: Read sections 1 & 2 only. You'll know what the gateway does for Priya.
+- **Priya / PM**: Read sections 1–4.
+- **Arjun-the-engineer**: Read everything.
 
-```mermaid
-flowchart LR
-    Priya[Priya's phone] --HTTPS--> GW[gateway :3200]
-    GW --> Auth[auth :3201]
-    GW --> Users[users :3202]
-    GW --> Social[social :3203]
-    GW --> Msg[messaging :3204]
-    GW --> Content[content :3205]
-    GW --> Notif[notifications :3206]
-    GW --> R[(Redis<br/>rate-limit + onboarding cache)]
-    GW -. SSE pipe .-> Priya
+---
+
+## 1. A scene from Priya's evening
+
+9:02pm. Priya taps "Like" on Arjun. Her phone fires `POST /v1/social/swipe`. Before anything else happens, the request lands at port 3200 — the gateway. In ~5ms the gateway:
+
+1. Confirms her wristband (JWT) is real and not expired.
+2. Confirms she hasn't been hammering this endpoint (rate limit).
+3. Forwards the request to the `social` specialist team on port 3203.
+4. Streams the response back to her phone.
+
+Priya never sees the gateway. But every single thing she does in the app passes through it.
+
+---
+
+## 2. What this service is responsible for
+
+- **One front door.** All the web app talks to is `gateway:3200`. The 7 internal services (auth, users, social, messaging, content, notifications, ingest) are not exposed publicly.
+- **Wristband check.** Validate the JWT on every request. Reject expired or forged tokens with `401`.
+- **Rate limit.** Track requests per IP using Redis. Reject abusers with `429`.
+- **Routing.** URL prefix → downstream service. `/v1/auth/*` → auth, `/v1/users/*` → users, etc.
+- **Tracing.** Stamp every request with an `X-Request-Id` header so logs across services can be joined.
+- **CORS.** Allow the web origin; block everyone else.
+
+What it does **not** do: business logic, database access, ranking. It is dumb on purpose.
+
+---
+
+## 3. Routing table
+
+| URL prefix              | Forwarded to               | Plain English                                 |
+|-------------------------|----------------------------|-----------------------------------------------|
+| `/v1/auth/*`            | auth :3201                 | login, signup, refresh                         |
+| `/v1/users/*`           | users :3202                | profile, preferences, photos                   |
+| `/v1/social/*`          | social :3203               | discover, swipe, matches, AI Picks             |
+| `/v1/chats/*`           | messaging :3204            | chat threads + messages                        |
+| `/v1/feed/*`, `/v1/posts/*` | content :3205          | feed, posts, comments, beats, DTM              |
+| `/v1/notifications/*`   | notifications :3206        | push, in-app notifications                     |
+| `/v1/track`             | ingest :3260               | tracking events from the browser               |
+
+---
+
+## 4. Worked example — a "swipe right"
+
+```
+1. Phone   POST https://api.miamo.in/v1/social/swipe   (Auth: Bearer eyJ...)
+2. Gateway verifies JWT (HS256 + JWT_SECRET) → user = priya-uuid
+3. Gateway checks Redis key rate:priya-uuid:swipe → 12/60 (limit 60/min). OK.
+4. Gateway stamps X-Request-Id: 9f3c-... and X-User-Id: priya-uuid
+5. Gateway proxies → http://social:3203/v1/social/swipe
+6. Social responds in 38ms → gateway streams back to phone.
+Total gateway overhead: ~5ms.
 ```
 
-## 3. What it can do (the menu)
+---
 
-| When Priya does this…                  | …the gateway does                                  | Source |
-|----------------------------------------|----------------------------------------------------|--------|
-| Any `/auth/*` call                     | forward to `auth`, no JWT required                  | [src](services/gateway/src/server.ts) |
-| Any other `/svc/*` call                | check JWT, onboarding gate, rate-limit, then forward | [src](services/gateway/src/server.ts) |
-| Opens `/events/sse`                    | keep connection open; route per-user events down it | [src](services/gateway/src/server.ts) |
-| (Internal) `POST /internal/sse/publish`| push event to user's open SSE connection            | [src](services/gateway/src/server.ts) |
+## 5. Code layout
 
-## 4. The data it remembers
+```
+services/gateway/src/
+├── server.ts                   # express bootstrap
+├── routes.ts                   # URL → downstream mapping
+├── middleware/
+│   ├── verifyJwt.ts            # JWT check
+│   ├── rateLimit.ts            # Redis-backed limiter
+│   └── requestId.ts            # adds X-Request-Id
+└── proxy.ts                    # HTTP proxy to downstream
+```
 
-Nothing in Postgres. Two stateful caches in Redis:
+---
 
-- **Rate-limit counters** — `rl:{ip|user}:{route}` with 60s TTL.
-- **Onboarding cache** — `cache:onboard:{userId}` with 60s TTL (so we don't hammer `users` on every page load).
+## 6. Configuration
 
-## 5. Who it talks to
+| Env var                | What it does                                             |
+|------------------------|----------------------------------------------------------|
+| `PORT`                 | Listen port (default 3200)                                |
+| `JWT_SECRET`           | The signing secret for the wristband                      |
+| `REDIS_URL`            | Whiteboard URL for rate-limit counters                    |
+| `RATE_LIMIT_PER_MIN`   | Default 100 req/min per IP                                |
+| `AUTH_URL`, `USERS_URL`, …  | Downstream service URLs                              |
+| `CORS_ORIGIN`          | Allowed origin (the web app)                              |
 
-- **Every backend service** (proxy).
-- **Redis** (rate-limit, cache).
-- **users** (to check onboarding-complete, once every 60s per user).
+---
 
-## 6. The knobs (configuration)
-
-| Env var                  | What it does                                       | Example                 | What breaks                                |
-|--------------------------|----------------------------------------------------|-------------------------|--------------------------------------------|
-| `JWT_SECRET`             | Verifies user wristbands                            | (matches auth's)        | every authed request returns 401            |
-| `INTERNAL_SERVICE_KEY`   | Stamps internal calls to backends                   | random 32 bytes         | backends reject our calls                    |
-| `REDIS_URL`              | Rate-limit + cache store                            | `redis://redis:6379`    | rate-limit fails open (configurable)         |
-| `RATE_LIMIT_PER_IP`      | Cap per IP per route per minute                     | `60`                    | too low = real users 429; too high = no protection |
-| `RATE_LIMIT_PER_USER`    | Cap per user per route per minute                   | `30`                    | same                                         |
-| `AUTH_URL`, `USERS_URL`, `SOCIAL_URL`, `MSG_URL`, `CONTENT_URL`, `NOTIF_URL` | Upstream service URLs | `http://auth:3201` | requests time out                |
-| `PORT`                   | Listen port                                         | `3200`                  | phone can't reach                            |
-
-## 7. A real example, end-to-end
-
-Priya likes Arjun.
-
-> "Phone hits the gateway."
-> ```bash
-> curl -X POST http://localhost:3200/social/like \
->   -H 'authorization: Bearer eyJ…' \
->   -d '{"targetId":"usr_arjun"}'
-> ```
-> Gateway pipeline, in order:
-> 1. Rate-limit check (Redis INCR + EXPIRE). 60 req/min per IP, 30/min per user on writes. If exceeded → `429`.
-> 2. JWT verify (HS256 with `JWT_SECRET`). If invalid → `401`.
-> 3. Onboarding gate. If `cache:onboard:usr_priya` says incomplete → `403 onboarding_required`.
-> 4. Forward to `http://social:3203/like` with `X-User-Id` and `X-Internal-Key` headers.
-> 5. Return the response body unchanged.
->
-> Total gateway overhead: **~5ms p95**.
-
-## 8. Run it on your laptop
+## 7. Run locally / test
 
 ```bash
-docker compose up -d redis auth users social messaging content notifications
-cd services/gateway && npm install && npm run dev
+cd services/gateway
+pnpm install
+pnpm dev          # listens on 3200 with hot reload
+
+curl http://localhost:3200/health
 ```
 
-## 9. How we know it works (tests)
+---
 
-- **`auth.test.ts`** — missing JWT → 401; expired JWT → 401; valid → forwarded.
-- **`rate-limit.test.ts`** — 31st write in 60s → 429.
-- **`onboarding.test.ts`** — unboarded user blocked from `/social/*`.
-- **`sse.test.ts`** — internal publish reaches the right connection.
+## 8. What changed and why it's better
 
-## 10. If something breaks
+- **Before:** the web app called 7 different service URLs directly. Auth was repeated client-side. CORS was a nightmare.
+- **After:** one URL, one wristband check, one rate-limit place. Adding a new internal service does not change the phone's code.
+- **Why Priya feels it:** her phone only needs to know one URL. If we add a new service tomorrow, her app does not need to upgrade.
 
-| Symptom                                  | First check                                          |
-|------------------------------------------|------------------------------------------------------|
-| All requests 502                          | one or more upstream URLs wrong/unreachable          |
-| All requests 401 after deploy             | `JWT_SECRET` mismatch between auth and gateway       |
-| Users randomly 429                        | rate-limit thresholds too tight                      |
-| Live updates stop showing                 | SSE heartbeat dropped — check 25s keep-alive         |
+---
 
-## 11. What changed and why it's better
+## 9. If something breaks
 
-- **Before:** the phone called each service directly. Adding rate-limit or auth meant changing every service.
-- **After:** one door, one place for rate-limit, JWT, onboarding gate, and SSE fan-out.
-- **Why Priya feels it:** consistent behaviour across the app. When we add a new safety check, it lights up everywhere at once — no service is "the one we forgot".
+| Symptom                          | First check                                  | Likely cause                       |
+|----------------------------------|----------------------------------------------|------------------------------------|
+| 401 on every request             | `JWT_SECRET` matches the auth service?       | Secret rotated only on one side    |
+| 429 spam                         | `redis-cli KEYS 'rate:*'`                    | Misconfigured limit or attack      |
+| 502 to a specific path           | downstream service down                      | check `kubectl get pods -l app=…`  |
+| All requests slow                | gateway pod CPU                              | Scale replicas (HPA)               |

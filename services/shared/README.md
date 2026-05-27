@@ -1,114 +1,161 @@
-# shared
+# shared — the recipe book and tool drawer
 
-> Not a service. A library. The Prisma schema for the whole product, the 17 ranking algorithms, the middleware everyone reuses.
+**TL;DR:** `shared` is not a running service. It is the library every other service borrows from — the one Prisma schema (blueprint for the filing cabinet), the 17 ranking algorithms (recipes that score how well two people match), the event catalogue, the logger.
 
-## 1. The story (60 seconds)
+---
 
-When `social` needs to know how to rank Arjun for Priya, it imports
-`forYou` from here. When `messaging` needs to encrypt a chat, it
-imports the crypto helper from here. When *any* service needs to query
-the database, it uses the same Prisma client generated from the
-schema that lives here. One source of truth, used by everyone.
+## How to read this
 
-## 2. What this library is (in one picture)
+- **Meera**: Section 1 only.
+- **Priya / PM**: Sections 1–3.
+- **Engineer**: All.
 
-```mermaid
-flowchart TB
-    subgraph shared/
-        Schema[prisma/schema.prisma<br/>80+ models]
-        Algos[src/algo/<br/>17 algorithms + 225 tests]
-        MW[src/middleware/<br/>auth, internal-key, logger]
-        Crypto[src/crypto.ts]
-    end
-    Schema --> Auth & Users & Social & Msg & Content & Notif & TW & Ingest
-    Algos --> Social & Msg & Content & Notif & TW
-    MW --> Auth & Users & Social & Msg & Content & Notif & GW
-    Crypto --> Msg
+---
+
+## 1. Why does this exist
+
+Eleven services. One database. Seventeen ranking algorithms. If each service rolled its own schema or its own logger we would diverge in days. `shared` is the canonical place where one schema, one set of algorithms, one set of helpers live — and every other service imports from it.
+
+---
+
+## 2. What is inside
+
+```
+services/shared/
+├── package.json
+├── prisma/
+│   ├── schema.prisma          # 80+ models — the whole blueprint
+│   ├── migrations/            # every renovation of the filing cabinet, dated
+│   └── seed.ts                # 7 demo accounts incl. Priya, Arjun, Meera, Rohan
+└── src/
+    ├── algo/                  # 17 ranking algorithms, all pure functions
+    │   ├── forYou.ts          # the canonical pairwise score 0..100
+    │   ├── aiPicks.ts
+    │   ├── aiMatch.ts
+    │   ├── new.ts
+    │   ├── active.ts
+    │   ├── verified.ts
+    │   ├── serious.ts
+    │   ├── cf.ts
+    │   ├── dtm.ts
+    │   ├── moves.ts
+    │   ├── messageSuggest.ts
+    │   ├── beats.ts
+    │   ├── notifyTiming.ts
+    │   ├── searchAugment.ts
+    │   ├── feedAugment.ts
+    │   ├── postImpressionRerank.ts
+    │   ├── registry.ts        # registerAlgo() + GET /v4/registry endpoint
+    │   ├── signals.ts         # SignalReader — only boundary between DB and algos
+    │   ├── math.ts            # cosTo01, expDecay, jaccard, compose, clip100
+    │   └── __tests__/         # 225+ tests in ~1.2s, no I/O
+    ├── track/
+    │   └── events.ts          # TrackEventName union — the 50 events in 10 families
+    ├── audit.ts               # audit logging helper
+    ├── logger.ts              # Pino structured logger
+    ├── cache.ts               # Redis client wrapper
+    ├── ml-engine.ts           # light ML helpers
+    ├── activity-analyzer.ts   # derived signal helpers
+    └── algorithms.ts          # legacy v3 shim
 ```
 
-## 3. What's inside (the menu)
+---
 
-| Path                                     | What it is                                                |
-|------------------------------------------|-----------------------------------------------------------|
-| `prisma/schema.prisma`                    | The whole DB schema — 80+ models                          |
-| `prisma/seed.ts`                          | Demo users, posts, matches for local dev                  |
-| `src/algo/`                               | 17 algorithms (see [docs/ALGORITHMS.md](docs/ALGORITHMS.md)) |
-| `src/algo/__tests__/`                     | 225 unit tests, run in ~1.2s                              |
-| `src/middleware/internalAuth.ts`          | Verifies `X-Internal-Key`                                  |
-| `src/middleware/jwt.ts`                   | Verifies JWT for backend services                          |
-| `src/logger.ts`                           | Central logger with secret redaction                      |
-| `src/audit.ts`                            | Append-only audit log helper                              |
-| `src/cache.ts`                            | Redis cache helpers                                       |
-| `src/ml-engine.ts`                        | Optional ML enrichment                                    |
-| `src/activity-analyzer.ts`                | Aggregation helpers for `tracking-worker`                 |
-| `src/algorithms.ts`                       | Legacy algos wrapper (kept for compatibility)             |
+## 3. Three things every service depends on
 
-## 4. The data it owns (the whole schema)
+### 3.1 The Prisma schema
 
-All 80+ models live in `prisma/schema.prisma`. Highlights:
+`services/shared/prisma/schema.prisma` is the **single source of truth** for the database. 80+ models. One migration history. Every service runs against this schema.
 
-- **`User`, `Profile`, `Session`, `Setting`** — auth + users
-- **`Like`, `Pass`, `Match`, `Chat`, `Message`, `DailyMatch`** — social + messaging
-- **`Post`, `Story`, `Video`, `CreativityPrompt`, `PromptAnswer`** — content
-- **`Notification`, `NotificationPref`** — notifications
-- **`UserActivity15m`, `CandidateInteraction15m`, `CompatScore`, `ProfileEmbedding`** — tracking-worker feature tables
+A migration is "renovating the filing cabinet": adding a new drawer, renaming a folder. Every renovation lives forever in `prisma/migrations/`.
 
-## 5. Who uses it
+### 3.2 The 17 algorithms
 
-**Every other service.** That's the point.
+All ranking lives here, not in services. Each algorithm is a **pure function** with explicit weights and an `explain` return so we can audit any ranking after the fact.
 
-## 6. The knobs (configuration)
+See [docs/ALGORITHMS.md](../../docs/ALGORITHMS.md) for the catalogue.
 
-This library reads no env vars directly; the services that consume it
-provide their own. The library defines the **shape** that services
-configure.
+### 3.3 The event catalogue
 
-## 7. A real example
+`src/track/events.ts` defines `TrackEventName` — the 50 events organised into 10 families. Adding a new event = adding a name here.
 
-A service consumes `forYou`:
+See [docs/TRACKING.md](../../docs/TRACKING.md) for the full catalogue.
+
+---
+
+## 4. Worked example — a service importing shared
 
 ```ts
-import { forYou } from '@miamo/shared/algo/forYou';
+// services/social/src/ranker.ts
+import { PrismaClient } from '@miamo/shared/prisma';
+import { scoreForYouV4, scoreAiPicksV4 } from '@miamo/shared/algo';
 import { SignalReader } from '@miamo/shared/algo/signals';
+import { logger } from '@miamo/shared/logger';
 
+const prisma = new PrismaClient();
 const reader = new SignalReader(prisma);
-const viewer = await reader.read(priyaId);
-const candidates = await reader.readMany(candidateIds);
 
-const scored = candidates.map(c => ({
-  candidate: c,
-  score: forYou(viewer, c)
-})).sort((a, b) => b.score - a.score);
-
-return scored.slice(0, 10);
+export async function rankDiscover(viewerId: string, candidates: User[]) {
+  const ctx = await reader.loadFor(viewerId);
+  return candidates
+    .map(c => ({ ...c, score: scoreForYouV4(ctx, c).score }))
+    .sort((a, b) => b.score - a.score);
+}
 ```
 
-## 8. Run the tests
+The service does almost nothing: it composes pieces from `shared`.
+
+---
+
+## 5. The 17 algorithms registry
+
+Every algo calls `registerAlgo({ name, surface, usesEvents, weights })` at module load. The result is queryable:
+
+```bash
+curl http://gateway/v4/registry
+```
+
+Returns JSON listing every enabled algo, its surface, the events it consumes, and its weights. Used by Grafana dashboards and the admin "Why this rank?" inspector.
+
+---
+
+## 6. Running the test suite
 
 ```bash
 cd services/shared
-npm install
-npm test          # 225 tests, ~1.2s
+pnpm test           # 225+ tests, ~1.2s, no DB
 ```
 
-## 9. How we know it works
+The tests are pure-function tests against the algorithms. They run on every PR.
 
-- **`__tests__/forYou.test.ts`** — score in [0,1], monotonic in each input.
-- **`__tests__/aiPicks.test.ts`** — only returns a pick when threshold met.
-- **`__tests__/hash.test.ts`** — `userHash` deterministic and one-way.
-- **`__tests__/lru.test.ts`** — cache eviction order.
-- (…225 in total across 17 algo files + helpers)
+---
 
-## 10. If something breaks
+## 7. Adding a new algorithm (8-step recipe)
 
-| Symptom                              | First check                                       |
-|--------------------------------------|---------------------------------------------------|
-| Build error "Prisma client outdated"  | `npx prisma generate` after schema change         |
-| Algo returns NaN                      | a signal was `null` — verify SignalReader query   |
-| Migration conflict                    | two devs added a migration with the same date    |
+1. Write `src/algo/myNew.ts` as a pure function returning `{ score, explain }`.
+2. Add weights as `MY_NEW_WEIGHTS` constant.
+3. `registerAlgo({ name, surface, usesEvents, weights })`.
+4. Add `__tests__/myNew.test.ts` (≥95% branch coverage).
+5. Add `ALGO_V4_RANK_ENABLED_MYNEW` to `.env.example` (default `'0'`).
+6. Wire from the consuming service behind the flag.
+7. Ship.
+8. Flip in staging → 1 % prod → 100 %.
 
-## 11. What changed and why it's better
+---
 
-- **Before:** every service had its own Prisma client and re-implemented common middleware. Schema drift was a real problem.
-- **After:** one schema, one Prisma client, one set of algorithms, one logger. All consumed via TypeScript imports — type safety across services.
-- **Why Priya feels it:** consistent behaviour. A rule (like "blocked users never appear in any list") only needs to be implemented once and applies everywhere.
+## 8. What changed and why it's better
+
+- **Before:** ranking SQL was duplicated across three services. Schema drift between dev and prod was constant.
+- **After:** one schema, one set of algorithms, one logger. Every service stays consistent automatically.
+- **Why Priya feels it:** consistent ranking everywhere — Discover, AI Picks, AI Match, Search, Feed — because they all use the same forYou recipe under the hood.
+
+---
+
+## 9. If something breaks
+
+| Symptom                                  | First check                                       | Fix                                |
+|------------------------------------------|---------------------------------------------------|------------------------------------|
+| `pnpm i` fails on shared                 | Node version matches `package.json`?              | nvm use                            |
+| Schema drift error                       | `prisma migrate status`                           | `prisma migrate deploy`            |
+| Tests fail after refactor                | Score helper signature changed                    | Check `math.ts` exports            |
+| Algo not appearing in `/v4/registry`     | `registerAlgo()` not called at module load        | Import the file in `algo/index.ts` |
