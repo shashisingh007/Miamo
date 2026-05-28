@@ -59,6 +59,27 @@ const OPERATIONAL_EVENTS = new Set<string>([
   'date.plan_open',         // funnel
   'date.plan_save',         // funnel
   'custom',                 // by definition unrestricted
+  // ─── v4 additions ──────────────────────────────────────────────
+  'card.bio.collapse',        // paired with bio.expand; only expand is a ranking signal
+  'card.photo.swipe',         // within-card nav; folded into attentionProfile via worker
+  'card.hover',               // attention; folded into FeatureSnapshot
+  'swipe.abort',              // funnel only; non-decision so not a ranking signal
+  'media.photo.zoom',         // attention; folded via dwell
+  'media.video.play',         // attention; folded via dwell
+  'media.video.pause',        // attention; folded via dwell
+  'media.video.seek',         // attention; folded via dwell
+  'media.video.complete',     // attention; folded via dwell
+  'lifecycle.network',        // operational
+  'lifecycle.fullscreen',     // operational
+  'intent.cta.hover',         // funnel; revenue analytics
+  'intent.price.hover',       // funnel; revenue analytics
+  'intent.bookmark',          // user-organised list; reserved for a future bookmark surface
+  'intent.screenshot',        // safety + revenue signal; reserved
+  'intent.copy',              // safety + revenue signal; reserved
+  'error.long_task',          // operational
+  'error.slow_api',           // operational
+  'error.sse_disconnect',     // operational
+  'error.sse_reconnect',      // operational
 ]);
 
 function readTrackedEventNames(): string[] {

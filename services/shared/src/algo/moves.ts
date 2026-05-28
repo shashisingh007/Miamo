@@ -102,6 +102,17 @@ export function suggestMoves(inp: MoveInputs, top = 3): MoveSuggestion[] {
     .slice(0, top);
 }
 
+import { v5FeatureEnabled } from './flags';
+/** v5 reserved — identical to v4 today. */
+export const scoreMoveV4 = scoreMove;
+export function scoreMoveV5(kind: MoveKind, inp: MoveInputs): MoveSuggestion {
+  const r = scoreMoveV4(kind, inp);
+  return { ...r, why: { ...r.why, algoVersion: 1 } };
+}
+export function scoreMoveDispatch(kind: MoveKind, inp: MoveInputs): MoveSuggestion {
+  return v5FeatureEnabled('moves') ? scoreMoveV5(kind, inp) : scoreMoveV4(kind, inp);
+}
+
 registerAlgo({
   name: 'moves',
   surface: 'messaging',

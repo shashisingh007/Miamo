@@ -65,6 +65,16 @@ export function pickBeats(catalog: Beat[], inp: BeatInputs, top = 3): Array<{ be
   return catalog.map((b) => ({ beat: b, ...scoreBeat(b, inp) })).sort((a, b) => b.score - a.score).slice(0, top);
 }
 
+import { v5FeatureEnabled } from './flags';
+/** v5 reserved — identical to v4 today. */
+export const scoreBeatV4 = scoreBeat;
+export function scoreBeatV5(beat: Beat, inp: BeatInputs) {
+  return scoreBeatV4(beat, inp);
+}
+export function scoreBeatDispatch(beat: Beat, inp: BeatInputs) {
+  return v5FeatureEnabled('beats') ? scoreBeatV5(beat, inp) : scoreBeatV4(beat, inp);
+}
+
 registerAlgo({
   name: 'beats',
   surface: 'beats',

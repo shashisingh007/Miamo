@@ -39,6 +39,18 @@ export function scoreVerified(inp: VerifiedInputs): { score: number; explain: Re
   return { score, explain: { algo: 'verified', consentScope: inp.consent, breakdown, weights: VERIFIED_WEIGHTS, finalScore: score } };
 }
 
+import { v5FeatureEnabled } from './flags';
+
+/** v5 reserved — identical to v4 today. */
+export const scoreVerifiedV4 = scoreVerified;
+export function scoreVerifiedV5(inp: VerifiedInputs) {
+  const r = scoreVerifiedV4(inp);
+  return { score: r.score, explain: { ...r.explain, algoVersion: 'v5' } };
+}
+export function scoreVerifiedDispatch(inp: VerifiedInputs) {
+  return v5FeatureEnabled('verified') ? scoreVerifiedV5(inp) : scoreVerifiedV4(inp);
+}
+
 registerAlgo({
   name: 'verified',
   surface: 'discover',

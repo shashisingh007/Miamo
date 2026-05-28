@@ -78,6 +78,9 @@ class FakeSignalReader implements SignalReader {
   async dailyMatch(_u: string): Promise<{ bHash: string; score: number; computedAt: string } | null> {
     return null;
   }
+  async pairBehavior(_a: string, _b: string[], _d: number): Promise<Map<string, never>> {
+    return new Map();
+  }
 }
 
 function feature(uidHash: string, seed: number): FeatureRow {

@@ -2,6 +2,118 @@
 
 **TL;DR:** Miamo's ranking is 17 small recipes (each one a "pure function" that takes Priya's signals + a candidate's signals and returns a score from 0 to 100). The most important recipe is `forYou`. Every other recipe is either a variant or a re-ranker.
 
+> **v5 additions (May 2026)** — `forYou` gains two new ingredients (`attentionFit`, `hesitationFit`) and three behaviour-aware adjustments (`regretPenalty`, `repeatPassPenalty`, `returnBoost`). All v5 logic lives behind `ALGO_V5_FOR_YOU_ENABLED` (default `0`); the v4 path is preserved verbatim. See §"North-star metric" and §"forYou v5" below.
+
+---
+
+## North-star metric
+
+Every algorithm upgrade in v5 is judged against one number: **mutual quality interaction** — a match that produces ≥10 messages exchanged across ≥2 days, both sides. Vanity metrics (raw swipes, raw matches, raw DAU) do not count. If a v5 change moves swipes up but mutual-quality-interaction down, we ship it as a regression.
+
+This metric reflects the only outcome Priya actually values: a real conversation with someone she clicks with.
+
+---
+
+## `forYou v5` — what changed
+
+The v4 recipe stayed for a year and still works. v5 adds two more ingredients and three behaviour-aware adjustments. v5 is opt-in: set `ALGO_V5_FOR_YOU_ENABLED=1` per environment.
+
+### New weights (sum still = 1.00)
+
+| Term | v4 | v5 | What it means |
+|---|---|---|---|
+| `interestCos` | 0.25 | 0.22 | how much Priya's and Arjun's interests overlap |
+| `vibeCos` | 0.20 | 0.18 | how similar their "vibe" embeddings are |
+| `behaviorCos` | 0.20 | 0.18 | how similar their swipe/tap behaviour is |
+| `chronoOverlap` | 0.10 | 0.10 | morning vs evening person match |
+| `prior` | 0.10 | 0.10 | past interactions (capped log) |
+| `intentMatch` | 0.05 | 0.05 | both want serious vs both want casual |
+| `distance` | 0.05 | 0.05 | exp-decay over km apart |
+| `ageDelta` | 0.05 | 0.04 | exp-decay over years apart |
+| **`attentionFit`** | — | **0.04** | cosine between dwell histograms — readers stay with readers, scanners with scanners |
+| **`hesitationFit`** | — | **0.04** | exp-decay over difference in median decide-time — slow ponderers do not click with snap-deciders |
+
+### New behaviour-aware adjustments (applied after the weighted sum)
+
+| Adjustment | Range | Source signal | Rationale |
+|---|---|---|---|
+| `regretPenalty` | 0 to −8 points | `swipe.regret` count on this candidate, last 14d (2 pts each, capped) | Priya undid a like on this person — strong negative |
+| `repeatPassPenalty` | 0 or −15 points | `swipe.repeat_pass` ≥ 1 in 14d | She has been shown this profile ≥2× and passed. Stop showing it |
+| `returnBoost` | 0 to +6 points | `intent.profile.settle` count (3 pts each, capped) | She returned to the same profile within 30s — implicit "I am thinking about it" |
+
+The cache fast-path is preserved: `PairCompatCache` stays version-agnostic (the cached score is still 0..1), and v5 applies the new adjustments *on top of* the cached score. So no migration is required to ramp v5.
+
+### Worked example — Priya × Arjun, v5
+
+Both are evening readers with similar decide-time (≈4.5s vs 5s). Priya has returned to Arjun's profile once today; no regrets, no repeat-pass; she has seen him 6 times in 48h (mild fatigue).
+
+```
+0.22 × interestCos     ≈ 0.81  → 0.178
+0.18 × vibeCos         ≈ 0.78  → 0.140
+0.18 × behaviorCos     ≈ 0.70  → 0.126
+0.10 × chronoOverlap   = 1.00  → 0.100
+0.10 × prior           ≈ 0.45  → 0.045
+0.05 × intentMatch     = 1.00  → 0.050
+0.05 × distance        ≈ 0.00  → 0.000
+0.04 × ageDelta        ≈ 0.71  → 0.028
+0.04 × attentionFit    ≈ 0.97  → 0.039
+0.04 × hesitationFit   ≈ 0.94  → 0.038
+                            ────
+                raw   =  0.744 → 74.4
+                fatigue penalty 2·ln(1+6) ≈ 3.89
+                regretPenalty               0
+                repeatPassPenalty           0
+                returnBoost (1 settle × 3)  3
+                                            ────
+                final = 74.4 − 3.89 − 0 − 0 + 3 ≈ 73.5
+```
+
+Arjun's v5 score for Priya is **≈ 73** out of 100 — a slight improvement over the v4 worked example (69) because of the two new positive signals (attention + hesitation match) and the implicit return boost. With one regret, the score would drop to ~71. With a repeat-pass, it would collapse to ~58 — exactly the behaviour we want.
+
+### Code
+
+- [services/shared/src/algo/forYou.ts](../services/shared/src/algo/forYou.ts) — `scoreForYouV4`, `scoreForYouV5`, dispatcher `scoreForYou`.
+- [services/shared/src/algo/signals.ts](../services/shared/src/algo/signals.ts) — `SignalReader.pairBehavior()`, `FeatureRow.dwellHistogram | hesitationP50Ms | regretRate | repeatPassRate`.
+- [services/shared/src/algo/flags.ts](../services/shared/src/algo/flags.ts) — `v5FeatureEnabled('forYou')`.
+- [services/shared/src/algo/__tests__/forYou.v5.test.ts](../services/shared/src/algo/__tests__/forYou.v5.test.ts) — 18 new tests covering weights, helpers, penalties, dispatcher, golden Priya × Arjun.
+
+### Rollback
+
+`ALGO_V5_FOR_YOU_ENABLED=0` (or unset). Takes effect on next request; no restart needed. PairCompatCache is unaffected.
+
+---
+
+## v5 across the full algorithm fleet
+
+`forYou` was the headliner, but v5 ships behind eight more flags. Every one is **off by default** and the v4 code path is intact, so a stuck deploy or a bad metric is a one-env-var rollback.
+
+| Algorithm | Flag | v5 change in one line |
+|---|---|---|
+| `forYou` | `ALGO_V5_FOR_YOU_ENABLED` | Adds attentionFit + hesitationFit lanes, and regret/repeat/return adjustments. |
+| `aiPicks` | `ALGO_V5_AI_PICKS_ENABLED` | Adds a `returnRate` lane (Priya keeps coming back to this profile? bump it). |
+| `active` | `ALGO_V5_ACTIVE_ENABLED` | "Likely to reply now" uses `lastAnyActivityMs` (return / long-heartbeat / commit) instead of heartbeat alone. |
+| `postImpressionRerank` | `ALGO_V5_POST_IMPRESSION_RERANK_ENABLED` | Dwell ≥2s / 5s, `card.bio.expand`, `intent.profile.settle` become positive deltas for the next batch; `swipe.repeat_pass` adds a hard −15 negative. |
+| `cf` | `ALGO_V5_CF_ENABLED` | Dwell-weighted item-item neighbours: shared viewers who *lingered* count more than shared viewers who scrolled past. |
+| `searchAugment` | `ALGO_V5_SEARCH_AUGMENT_ENABLED` | Reads 7d `search.no_results` / `search.result_click` rollups, blends a `searchHealth` lane so frustrated searches get fresher candidates. |
+| `feedAugment` | `ALGO_V5_FEED_AUGMENT_ENABLED` | New `filterAffinity` lane reads recent `filter.apply` set; items matching Priya's filters bubble up. |
+| `notifyTiming` | `ALGO_V5_NOTIFY_TIMING_ENABLED` | Daily cap (default 4) and dismiss-back-off (default 3 consecutive dismisses → defer to next day 09:00 UTC). |
+| `messageSuggest` | `ALGO_V5_MESSAGE_SUGGEST_ENABLED` | Damps suggestions Priya has been drafting then deleting: at full delete rate the opener score halves. |
+
+Seven more algorithms (`new`, `verified`, `serious`, `dtm`, `moves`, `beats`, `aiMatch`) ship **reserved dispatchers** today — `scoreXDispatch(...)` is wired in and gated on a v5 flag, but the v5 path returns the same numbers as v4. This lets us swap in tuned behaviour later without another deploy.
+
+### Where the new signals come from
+
+All nine active v5 upgrades read tracking data through `SignalReader` only — never directly from Redis or Postgres. `FeatureSnapshot.raw` now carries the v5 keys (`dwellHistogram`, `hesitationP50Ms`, `regretRate`, `repeatPassRate`) populated by the tracking-worker rollup; the histogram bin edges are a single shared contract (`[0, 750, 2000, 5000, 10000]` ms) between [services/tracking-worker/src/rollup.ts](../services/tracking-worker/src/rollup.ts) and [services/shared/src/algo/forYou.ts](../services/shared/src/algo/forYou.ts).
+
+### Rollback drill (any v5 flag)
+
+1. Unset the relevant `ALGO_V5_*_ENABLED` env var in the affected service's `values.yaml`.
+2. `kubectl rollout restart deployment/<service>` — or wait for the next deploy; values take effect immediately on new requests.
+3. Verify by hitting the service's `/debug/flags` endpoint (returns `v4FlagSnapshot()`).
+4. PairCompatCache and FeatureSnapshot rows are untouched — the v4 path reads from the same tables.
+
+---
+
 ---
 
 ## How to read this

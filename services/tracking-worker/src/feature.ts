@@ -12,7 +12,7 @@ import type { PrismaClient } from '@prisma/client';
 const INTERVAL_MS = Number(process.env.FEATURE_INTERVAL_MS || 5 * 60 * 1000);
 const BATCH = Number(process.env.FEATURE_BATCH || 200);
 
-type HourRow = { uidHash: string; evt: string; bucket: Date; count: number; durSum: number };
+type HourRow = { uidHash: string; evt: string; bucket: Date; count: number; durSum: number; durP50?: number; meta?: { hist?: number[] } | null };
 type DayRow = { uidHash: string; evt: string; day: Date; count: number; durSum: number };
 
 function chronotypeOf(rows: HourRow[]): string | null {
@@ -69,6 +69,62 @@ function deadRate(rows: DayRow[]): number | null {
   return Math.round((dead / clicks) * 1000) / 1000;
 }
 
+/**
+ * v5 dwell histogram for `card.impression.100` events. Merges every hourly
+ * `meta.hist` array (5 buckets aligned to HIST_EDGES_MS in rollup.ts), then
+ * L1-normalises so the algo can treat it as a probability distribution. The
+ * worker writes whichever histogram has data; the algorithm tolerates `null`.
+ */
+function dwellHistogramOf(rows: HourRow[]): number[] | null {
+  const merged = [0, 0, 0, 0, 0];
+  let total = 0;
+  for (const r of rows) {
+    if (r.evt !== 'card.impression.100') continue;
+    const h = r.meta?.hist;
+    if (!h || h.length !== 5) continue;
+    for (let i = 0; i < 5; i += 1) {
+      merged[i] += h[i];
+      total += h[i];
+    }
+  }
+  if (total < 10) return null;
+  return merged.map((n) => Math.round((n / total) * 1000) / 1000);
+}
+
+/**
+ * v5 hesitation. Median of hourly `durP50` values for `swipe.commit` over the
+ * window. Using the median of per-hour medians is a robust enough estimator
+ * for a v5.0 launch; we can switch to a true sample-level reservoir later.
+ */
+function hesitationP50MsOf(rows: HourRow[]): number | null {
+  const samples = rows
+    .filter((r) => r.evt === 'swipe.commit' && (r.durP50 ?? 0) > 0)
+    .map((r) => r.durP50 as number)
+    .sort((a, b) => a - b);
+  if (samples.length < 5) return null;
+  return samples[Math.floor(samples.length / 2)];
+}
+
+/** v5 regret rate — swipe.regret / swipe.commit over the daily window. */
+function regretRateOf(rows: DayRow[]): number | null {
+  const commits = rows.filter((r) => r.evt === 'swipe.commit').reduce((a, b) => a + b.count, 0);
+  const regrets = rows.filter((r) => r.evt === 'swipe.regret').reduce((a, b) => a + b.count, 0);
+  if (commits < 10) return null;
+  return Math.round((regrets / commits) * 1000) / 1000;
+}
+
+/** v5 repeat-pass rate — swipe.repeat_pass / card.impression.100. */
+function repeatPassRateOf(rows: DayRow[]): number | null {
+  const impressions = rows
+    .filter((r) => r.evt === 'card.impression.100')
+    .reduce((a, b) => a + b.count, 0);
+  const repeats = rows
+    .filter((r) => r.evt === 'swipe.repeat_pass')
+    .reduce((a, b) => a + b.count, 0);
+  if (impressions < 20) return null;
+  return Math.round((repeats / impressions) * 1000) / 1000;
+}
+
 export class FeatureAggregator {
   private timer: ReturnType<typeof setInterval> | null = null;
   constructor(private prisma: PrismaClient) {}
@@ -99,7 +155,7 @@ export class FeatureAggregator {
       if (!uidHash) continue;
       try {
         const hours = (await this.prisma.$queryRawUnsafe(
-          `SELECT "uidHash","evt","bucket","count","durSum"
+          `SELECT "uidHash","evt","bucket","count","durSum","durP50","meta"
            FROM "EventAggHourly"
            WHERE "uidHash" = $1 AND "bucket" >= NOW() - INTERVAL '14 days'`,
           uidHash,
@@ -114,17 +170,29 @@ export class FeatureAggregator {
         const attention = attentionProfileOf(days);
         const rage = rageRate(days);
         const dead = deadRate(days);
+        const dwellHistogram = dwellHistogramOf(hours);
+        const hesitationP50Ms = hesitationP50MsOf(hours);
+        const regretRate = regretRateOf(days);
+        const repeatPassRate = repeatPassRateOf(days);
+        // v5 signals land in FeatureSnapshot.raw — schema is intentionally
+        // flexible so a v6 addition does not require a migration.
+        const v5: Record<string, unknown> = {};
+        if (dwellHistogram) v5.dwellHistogram = dwellHistogram;
+        if (hesitationP50Ms !== null) v5.hesitationP50Ms = hesitationP50Ms;
+        if (regretRate !== null) v5.regretRate = regretRate;
+        if (repeatPassRate !== null) v5.repeatPassRate = repeatPassRate;
         await this.prisma.$executeRawUnsafe(
           `INSERT INTO "FeatureSnapshot"
              ("uidHash","computedAt","chronotype","attentionProfile","rageClickRate","deadClickRate","raw")
-           VALUES ($1, NOW(), $2, $3, $4, $5, '{}'::jsonb)
+           VALUES ($1, NOW(), $2, $3, $4, $5, $6::jsonb)
            ON CONFLICT ("uidHash") DO UPDATE SET
              "computedAt"       = NOW(),
              "chronotype"       = EXCLUDED."chronotype",
              "attentionProfile" = EXCLUDED."attentionProfile",
              "rageClickRate"    = EXCLUDED."rageClickRate",
-             "deadClickRate"    = EXCLUDED."deadClickRate"`,
-          uidHash, chronotype, attention, rage, dead,
+             "deadClickRate"    = EXCLUDED."deadClickRate",
+             "raw"              = COALESCE("FeatureSnapshot"."raw", '{}'::jsonb) || EXCLUDED."raw"`,
+          uidHash, chronotype, attention, rage, dead, JSON.stringify(v5),
         );
         processed += 1;
       } catch (e) {
@@ -136,4 +204,5 @@ export class FeatureAggregator {
   }
 }
 
-export const _internals = { chronotypeOf, attentionProfileOf, rageRate, deadRate };
+export const _internals = { chronotypeOf, attentionProfileOf, rageRate, deadRate,
+  dwellHistogramOf, hesitationP50MsOf, regretRateOf, repeatPassRateOf };

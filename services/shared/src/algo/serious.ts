@@ -43,6 +43,17 @@ export function scoreSerious(inp: SeriousInputs): { score: number; explain: Reco
   return { score, explain: { algo: 'serious', consentScope: inp.consent, breakdown, weights: SERIOUS_WEIGHTS, finalScore: score } };
 }
 
+import { v5FeatureEnabled } from './flags';
+/** v5 reserved — identical to v4 today. */
+export const scoreSeriousV4 = scoreSerious;
+export function scoreSeriousV5(inp: SeriousInputs) {
+  const r = scoreSeriousV4(inp);
+  return { score: r.score, explain: { ...r.explain, algoVersion: 'v5' } };
+}
+export function scoreSeriousDispatch(inp: SeriousInputs) {
+  return v5FeatureEnabled('serious') ? scoreSeriousV5(inp) : scoreSeriousV4(inp);
+}
+
 registerAlgo({
   name: 'serious',
   surface: 'discover',

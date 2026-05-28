@@ -28,6 +28,14 @@ export function dtmTopicGaps(me: DtmVector | null, cand: DtmVector | null): numb
   return out;
 }
 
+import { v5FeatureEnabled } from './flags';
+/** v5 reserved — identical to v4 today. */
+export const dtmAffinityV4 = dtmAffinity;
+export const dtmAffinityV5 = dtmAffinity;
+export function dtmAffinityDispatch(me: DtmVector | null, cand: DtmVector | null): number | null {
+  return v5FeatureEnabled('dtm') ? dtmAffinityV5(me, cand) : dtmAffinityV4(me, cand);
+}
+
 registerAlgo({
   name: 'dtm',
   surface: 'deepCompat',
