@@ -4,20 +4,21 @@ import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
  Heart, X, MapPin, Briefcase, Shield, Star, ChevronDown, Sparkles,
- Send, Check,
+ Send, Check, Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProfileAttributeStrip } from '@/components/ProfileAttributeStrip';
 import { type DiscoverProfile, type AiData } from './constants';
 
 export function ProfileCard({
- user, aiData, onPass, onMove, onSuperLike, isActive,
+ user, aiData, onPass, onMove, onSuperLike, onSeeLater, isActive,
 }: {
  user: DiscoverProfile;
  aiData: AiData | null;
  onPass: () => void;
  onMove: (message: string, targetType: string, targetId?: string) => void;
  onSuperLike?: () => void;
+ onSeeLater?: () => void;
  isActive: boolean;
 }) {
  const [moveTarget, setMoveTarget] = useState<{ type: string; id?: string } | null>(null);
@@ -236,6 +237,17 @@ export function ProfileCard({
  >
  <X className="w-6 h-6 text-text-muted group-hover:text-red-400 transition-colors" />
  </motion.button>
+ {onSeeLater && (
+ <motion.button
+ whileHover={{ scale: 1.05 }}
+ whileTap={{ scale: 0.9 }}
+ onClick={onSeeLater}
+ title="Save for later"
+ className="w-14 h-14 rounded-full bg-miamo-surface border border-border flex items-center justify-center hover:bg-rose-soft hover:border-rose-main/30 transition-all group"
+ >
+ <Clock className="w-6 h-6 text-text-muted group-hover:text-rose transition-colors" />
+ </motion.button>
+ )}
  {onSuperLike && (
  <motion.button
  whileHover={{ scale: 1.05 }}

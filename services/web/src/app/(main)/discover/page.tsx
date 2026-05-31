@@ -13,6 +13,12 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useTrackPageView, useTrackActivity, useTrackScrollDepth, useTrackPhotoViews } from '@/hooks/useTrackActivity';
 import { track } from '@/lib/track';
+import {
+ trackDiscoverSeeLater,
+ trackDiscoverBatchExhausted,
+} from '@/lib/track/collectors/deferred';
+import { DeferredPileModal } from '@/components/deferred/DeferredPileModal';
+import { AllCaughtUpScreen } from '@/components/deferred/AllCaughtUpScreen';
 import { type DiscoverProfile, type AiData, type Filters, DEFAULT_FILTERS } from './components/constants';
 import { FilterPanel } from './components/FilterPanel';
 import { ProfileCard } from './components/ProfileCard';
@@ -31,6 +37,14 @@ export default function DiscoverPage() {
  const [activeQuickFilter, setActiveQuickFilter] = useState('all');
  const [passFeedback, setPassFeedback] = useState<{ userId: string; name: string } | null>(null);
  const [passCount, setPassCount] = useState(0);
+ const [showDeferred, setShowDeferred] = useState(false);
+ const [deferredCount, setDeferredCount] = useState(0);
+ // Track per-batch counters so we can emit discover.batch.exhausted with
+ // accurate `acted` / `deferred` numbers when the queue empties.
+ const [batchId, setBatchId] = useState<string>(() => `b_${Date.now()}`);
+ const [batchActed, setBatchActed] = useState(0);
+ const [batchDeferred, setBatchDeferred] = useState(0);
+ const [batchExhaustedFired, setBatchExhaustedFired] = useState(false);
  const toast = useToast();
 
  useTrackPageView('discover');
@@ -76,6 +90,10 @@ export default function DiscoverPage() {
  const data = res.data || [];
  setProfiles(data);
  setCurrentIndex(0);
+ setBatchId(`b_${Date.now()}`);
+ setBatchActed(0);
+ setBatchDeferred(0);
+ setBatchExhaustedFired(false);
  } catch (err) {
  setProfiles([]);
  if (typeof window !== 'undefined') {
@@ -86,6 +104,17 @@ export default function DiscoverPage() {
  }, [filters, activeQuickFilter, buildParams]);
 
  useEffect(() => { loadProfiles(); }, [loadProfiles]);
+
+ // Refresh deferred-pile size on mount and whenever the modal closes so
+ // the "View N deferred" CTA on the all-caught-up screen stays accurate.
+ const refreshDeferredCount = useCallback(async () => {
+ try {
+ const res = await api.listDeferred({ surface: 'discover', kind: 'pending', limit: 100 });
+ setDeferredCount(res.data?.count ?? 0);
+ } catch { /* swallow */ }
+ }, []);
+ useEffect(() => { refreshDeferredCount(); }, [refreshDeferredCount]);
+ useEffect(() => { if (!showDeferred) refreshDeferredCount(); }, [showDeferred, refreshDeferredCount]);
 
  const currentUser = profiles[currentIndex];
  useEffect(() => {
@@ -102,6 +131,7 @@ export default function DiscoverPage() {
  trackActivity('pass', 'profile', passedUser.id);
  track('discover.swipe', { dir: 'left', tt: 'profile', tid: passedUser.id });
  api.passUser(passedUser.id).catch(() => {});
+ setBatchActed((n) => n + 1);
  const newCount = passCount + 1;
  setPassCount(newCount);
  // Show feedback prompt every 3rd pass
@@ -117,6 +147,7 @@ export default function DiscoverPage() {
  if (!currentUser) return;
  trackActivity('like', 'profile', currentUser.id);
  track('discover.swipe', { dir: 'right', tt: 'profile', tid: currentUser.id, hasMessage: !!message });
+ setBatchActed((n) => n + 1);
  try {
  await api.sendMiamoMove(currentUser.id, message, targetType, targetId);
  toast.love('Move sent!', `Your move to ${currentUser.displayName} was delivered`);
@@ -131,7 +162,22 @@ export default function DiscoverPage() {
  if (!currentUser) return;
  trackActivity('super_like', 'profile', currentUser.id);
  track('discover.swipe', { dir: 'super', tt: 'profile', tid: currentUser.id });
+ setBatchActed((n) => n + 1);
  try { await api.superLikeUser(currentUser.id); toast.love('Super Like!', `${currentUser.displayName} will see your Super Like`); } catch { toast.error('Super Like failed'); }
+ if (currentIndex < profiles.length - 1) setCurrentIndex(i => i + 1);
+ else setProfiles([]);
+ };
+
+ const handleSeeLater = async () => {
+ if (!currentUser) return;
+ const tid = currentUser.id;
+ trackDiscoverSeeLater({ tid, batchId, reason: 'not_now' });
+ setBatchDeferred((n) => n + 1);
+ setDeferredCount((n) => n + 1);
+ try {
+ await api.deferItem({ surface: 'discover', targetId: tid, batchId, reason: 'not_now' });
+ toast.success('Saved for later');
+ } catch { /* still advance even if persistence fails */ }
  if (currentIndex < profiles.length - 1) setCurrentIndex(i => i + 1);
  else setProfiles([]);
  };
@@ -162,31 +208,41 @@ export default function DiscoverPage() {
  return <ProfileCardSkeleton />;
  }
 
- /* ─── Empty State ─── */
+/* ─── All Caught Up Terminal (v6.6) ─── */
  if (!currentUser) {
+ // Fire batch.exhausted exactly once per batch when the queue empties.
+ if (!batchExhaustedFired) {
+ trackDiscoverBatchExhausted({
+ batchId,
+ shown: profiles.length,
+ acted: batchActed,
+ deferred: batchDeferred,
+ });
+ setBatchExhaustedFired(true);
+ }
  return (
- <div className="h-full flex items-center justify-center">
- <motion.div
- initial={{ opacity: 0, y: 12 }}
- animate={{ opacity: 1, y: 0 }}
- className="text-center max-w-md px-8"
- >
- <div className="w-16 h-16 rounded-full bg-rose-soft border border-rose-main/15 flex items-center justify-center mx-auto mb-6">
- <Heart className="w-7 h-7 text-rose" />
- </div>
- <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-rose mb-3">A quiet moment</p>
- <h3 className="font-brand font-semibold text-3xl text-text-primary mb-3 leading-tight">
- You&apos;ve seen everyone <span className="italic text-rose">for now</span>.
- </h3>
- <p className="text-[15px] text-text-secondary mb-7 leading-relaxed">
-   Take a breath. Adjust your filters, or come back in a little while — new people arrive every day.
+ <>
+ <AllCaughtUpScreen
+ surface="discover"
+ deferredCount={deferredCount}
+ onViewDeferred={() => setShowDeferred(true)}
+ onAdjustFilters={() => setShowFilters(true)}
+ />
+ <FilterPanel isOpen={showFilters} onClose={() => setShowFilters(false)} filters={filters} onApply={handleApplyFilters} />
+ <DeferredPileModal
+ surface="discover"
+ isOpen={showDeferred}
+ onClose={() => setShowDeferred(false)}
+ renderItem={(item) => (
+ <div>
+ <p className="text-[13px] font-semibold text-text-primary">Profile {item.targetId.slice(0, 8)}…</p>
+ <p className="text-[10px] text-text-muted mt-1">
+ Saved {new Date(item.deferredAt).toLocaleDateString()}
  </p>
- <button onClick={() => setShowFilters(true)}
-   className="h-11 px-6 rounded-xl bg-rose-main text-white text-sm font-semibold hover:bg-rose-dark hover:-translate-y-0.5 transition-all duration-300 inline-flex items-center gap-2 shadow-soft">
- <SlidersHorizontal className="w-4 h-4" /> Adjust filters
- </button>
- </motion.div>
  </div>
+ )}
+ />
+ </>
  );
  }
 
@@ -293,6 +349,7 @@ export default function DiscoverPage() {
  onPass={handlePass}
  onMove={handleMove}
  onSuperLike={handleSuperLike}
+ onSeeLater={handleSeeLater}
  isActive={true}
  />
  </motion.div>
@@ -321,6 +378,21 @@ export default function DiscoverPage() {
  </div>
 
  <FilterPanel isOpen={showFilters} onClose={() => setShowFilters(false)} filters={filters} onApply={handleApplyFilters} />
+
+ {/* v6.6 Deferred-pile modal */}
+ <DeferredPileModal
+ surface="discover"
+ isOpen={showDeferred}
+ onClose={() => setShowDeferred(false)}
+ renderItem={(item) => (
+ <div>
+ <p className="text-[13px] font-semibold text-text-primary">Profile {item.targetId.slice(0, 8)}…</p>
+ <p className="text-[10px] text-text-muted mt-1">
+ Saved {new Date(item.deferredAt).toLocaleDateString()}
+ </p>
+ </div>
+ )}
+ />
 
  {/* Pass Feedback Modal */}
  <AnimatePresence>
