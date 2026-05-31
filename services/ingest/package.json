@@ -15,7 +15,6 @@
     "express-rate-limit": "^7.4.0",
     "helmet": "^7.1.0",
     "ioredis": "^5.4.1",
-    "ulid": "^2.3.0",
     "zod": "^3.25.76"
   },
   "devDependencies": {
