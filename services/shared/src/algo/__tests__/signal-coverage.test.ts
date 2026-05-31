@@ -93,6 +93,17 @@ const OPERATIONAL_EVENTS = new Set<string>([
   'msg.voice_rerecord',       // v6 reserved: messageSuggestV6 (composure signal)
   'notif.look_no_act',        // v6 reserved: notifyTimingV6 (silent-dismiss back-off)
   'dtm.partial_abandon',      // v6 reserved: dtmV6 (question-order reranker)
+  // ─── v6.5 — safety + match-state + dtm extras ────────────────────
+  // Reserved for the v6.5 learner loop (LEARNING_SYSTEM_V6_5.md Phase D).
+  // SafetyAgg / FirstMoveOutcome rollups are wired but no ranker reads
+  // them yet; they ship as data first, consumers second.
+  'safety.block',             // v6.5 reserved: learner negative reward + blacklist
+  'safety.report',            // v6.5 reserved: learner negative reward + safety queue
+  'discover.unmatch',         // v6.5 reserved: learner regret signal post-match
+  'match.hold',               // v6.5 reserved: neutral signal, do not penalize
+  'match.unhold',             // v6.5 reserved: neutral signal, do not penalize
+  'dtm.question_skip',        // v6.5 reserved: dtmV6 question-order rerank
+  'dtm.answer_revise',        // v6.5 reserved: dtmV6 answer-confidence calibrator
 ]);
 
 function readTrackedEventNames(): string[] {

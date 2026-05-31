@@ -95,6 +95,34 @@ export type FocusAffinityRow = {
   lastSeenAt: Date;
 };
 
+/** v6.5: safety + match-state daily aggregate, per-surface-per-kind. */
+export type SafetySignal = {
+  surface: string; // 'discover' | 'matches' | 'messages' | 'profile' | 'dtm'
+  kind: string;    // 'block' | 'report' | 'unmatch' | 'hold' | 'unhold'
+  count: number;
+  /** Hashed targets that this user blocked / reported / unmatched, capped 64. */
+  targets: Record<string, number>;
+};
+
+/** v6.5: first-move outcome row produced by `FirstMoveOutcomeWorker`. */
+export type FirstMoveOutcomeRow = {
+  bHash: string;
+  sentAt: Date;
+  kind: string;
+  replied: boolean;
+  replyMs: number | null;
+};
+
+/** v6.5: per-(uidHash, surface) Thompson-sampled weight profile snapshot. */
+export type WeightProfileRow = {
+  surface: string;
+  weights: Record<string, number>;
+  noveltyBoost: number;
+  diversityBoost: number;
+  explorationRate: number;
+  lastUpdatedAt: Date;
+};
+
 export interface SignalReader {
   hashOf(userId: string): string;
   features(uidHash: string): Promise<FeatureRow | null>;
@@ -114,6 +142,12 @@ export interface SignalReader {
   sessionSummaries?(uidHash: string, days: number): Promise<SessionSummaryRow[]>;
   /** v6: per-element focus/dwell affinity for a user, last N days. */
   focusAffinity?(uidHash: string, days: number): Promise<FocusAffinityRow[]>;
+  /** v6.5: safety + match-state aggregates for a user, last N days. */
+  safetySignals?(uidHash: string, days: number): Promise<SafetySignal[]>;
+  /** v6.5: first-move outcomes initiated by a user, last N days. */
+  firstMoveOutcomes?(uidHash: string, days: number): Promise<FirstMoveOutcomeRow[]>;
+  /** v6.5: current Thompson-sampled weight profile for a (uidHash, surface). */
+  weightProfile?(uidHash: string, surface: string): Promise<WeightProfileRow | null>;
 }
 
 const FEATURES_TTL_MS = 60_000;
@@ -293,5 +327,59 @@ export class PrismaSignalReader implements SignalReader {
       }
     }
     return out;
+  }
+
+  // ─── v6.5 extensions ────────────────────────────────────────────────
+
+  async safetySignals(uidHash: string, days: number): Promise<SafetySignal[]> {
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `SELECT "surface","kind", SUM("count")::int AS count,
+              jsonb_object_agg(COALESCE("day"::text, ''), COALESCE("meta"->'targets', '{}'::jsonb)) AS targets_by_day
+       FROM "SafetyAgg"
+       WHERE "uidHash" = $1 AND "day" >= NOW() - ($2 || ' days')::interval
+       GROUP BY "surface","kind"`,
+      uidHash, String(days),
+    )) as Array<{ surface: string; kind: string; count: number; targets_by_day: Record<string, Record<string, number>> | null }>;
+    return rows.map((r) => {
+      const merged: Record<string, number> = {};
+      const byDay = r.targets_by_day ?? {};
+      for (const day of Object.values(byDay)) {
+        if (!day) continue;
+        for (const [t, n] of Object.entries(day)) merged[t] = (merged[t] || 0) + Number(n);
+      }
+      return { surface: r.surface, kind: r.kind, count: Number(r.count), targets: merged };
+    });
+  }
+
+  async firstMoveOutcomes(uidHash: string, days: number): Promise<FirstMoveOutcomeRow[]> {
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `SELECT "bHash","sentAt","kind","replied","replyMs"
+       FROM "FirstMoveOutcome"
+       WHERE "aHash" = $1 AND "sentAt" >= NOW() - ($2 || ' days')::interval
+       ORDER BY "sentAt" DESC
+       LIMIT 500`,
+      uidHash, String(days),
+    )) as FirstMoveOutcomeRow[];
+    return rows;
+  }
+
+  async weightProfile(uidHash: string, surface: string): Promise<WeightProfileRow | null> {
+    const rows = (await this.prisma.$queryRawUnsafe(
+      `SELECT "surface","weights","noveltyBoost","diversityBoost",
+              "explorationRate","lastUpdatedAt"
+       FROM "UserWeightProfile"
+       WHERE "uidHash" = $1 AND "surface" = $2`,
+      uidHash, surface,
+    )) as Array<{ surface: string; weights: Record<string, number> | null; noveltyBoost: number; diversityBoost: number; explorationRate: number; lastUpdatedAt: Date }>;
+    if (rows.length === 0) return null;
+    const r = rows[0];
+    return {
+      surface: r.surface,
+      weights: r.weights || {},
+      noveltyBoost: Number(r.noveltyBoost),
+      diversityBoost: Number(r.diversityBoost),
+      explorationRate: Number(r.explorationRate),
+      lastUpdatedAt: r.lastUpdatedAt,
+    };
   }
 }

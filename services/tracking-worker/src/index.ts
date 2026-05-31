@@ -18,6 +18,11 @@ import { EmbeddingWorker } from './embeddings';
 import { ColdStore } from './cold-store';
 import { EnrichmentWorker } from './enrich';
 import { DailyMatchWorker } from './daily-match';
+import { SafetyRollup } from './safetyRollup';
+import { FirstMoveOutcomeWorker } from './firstMoveOutcome';
+import { SessionSummaryWorker } from './sessionSummary';
+import { FocusAffinityWorker } from './focusAffinity';
+import { LearnerLoop } from './learnerLoop';
 import { getRegistry } from '../../shared/src/algo/registry';
 import { v4FlagSnapshot } from '../../shared/src/algo/flags';
 // Register every algo so getRegistry() returns the full inventory.
@@ -50,6 +55,11 @@ const embed = new EmbeddingWorker(prisma);
 const coldStore = new ColdStore(prisma);
 const enrich = new EnrichmentWorker(prisma);
 const dailyMatch = new DailyMatchWorker(prisma);
+const safetyRollup = new SafetyRollup(prisma);
+const firstMoveOutcome = new FirstMoveOutcomeWorker(prisma);
+const sessionSummary = new SessionSummaryWorker(prisma);
+const focusAffinity = new FocusAffinityWorker(prisma);
+const learnerLoop = new LearnerLoop(prisma);
 
 const app = express();
 app.get('/healthz', (_req, res) => res.json({
@@ -75,6 +85,12 @@ async function main(): Promise<void> {
     coldStore.start();
     if (V4_WORKERS) enrich.start();
     if (V4_WORKERS) dailyMatch.start();
+    // v6.5 — all default-OFF; start() is a no-op unless their env flag is set.
+    safetyRollup.start();
+    firstMoveOutcome.start();
+    sessionSummary.start();
+    focusAffinity.start();
+    learnerLoop.start();
   } else {
     // eslint-disable-next-line no-console
     console.warn('[worker] TRACKING_KILL=1 — loops disabled, only /healthz live');
@@ -85,6 +101,11 @@ async function main(): Promise<void> {
   });
   const shutdown = async (): Promise<void> => {
     server.close();
+    learnerLoop.stop();
+    focusAffinity.stop();
+    sessionSummary.stop();
+    firstMoveOutcome.stop();
+    safetyRollup.stop();
     dailyMatch.stop();
     enrich.stop();
     coldStore.stop();

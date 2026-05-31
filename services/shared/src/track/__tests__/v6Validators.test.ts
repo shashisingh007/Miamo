@@ -5,6 +5,9 @@ import {
   AttentionIdleExitSchema, FilterHesitationSchema, MsgVoiceRerecordSchema,
   NotifLookNoActSchema, DtmPartialAbandonSchema, ProfileSelfViewDwellSchema,
   AttentionIdleEnterSchema,
+  SafetyBlockSchema, SafetyReportSchema, DiscoverUnmatchSchema,
+  MatchHoldSchema, MatchUnholdSchema,
+  DtmQuestionSkipSchema, DtmAnswerReviseSchema,
 } from '../v6Validators';
 
 describe('isV6Event', () => {
@@ -132,5 +135,81 @@ describe('validateV6Payload', () => {
     const r = validateV6Payload('page.view', {});
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain('not a v6 event');
+  });
+});
+
+// ─── v6.5 — safety + first-move + dtm extras ───────────────
+describe('SafetyBlockSchema', () => {
+  it('requires tid', () => {
+    expect(SafetyBlockSchema.safeParse({}).success).toBe(false);
+    expect(SafetyBlockSchema.safeParse({ tid: 'u1' }).success).toBe(true);
+  });
+  it('accepts an optional surface enum', () => {
+    expect(SafetyBlockSchema.safeParse({ tid: 'u1', surface: 'messages' }).success).toBe(true);
+    expect(SafetyBlockSchema.safeParse({ tid: 'u1', surface: 'nope' }).success).toBe(false);
+  });
+});
+
+describe('SafetyReportSchema', () => {
+  it('requires tid + valid reason', () => {
+    expect(SafetyReportSchema.safeParse({ tid: 'u1' }).success).toBe(false);
+    expect(SafetyReportSchema.safeParse({ tid: 'u1', reason: 'spam' }).success).toBe(true);
+    expect(SafetyReportSchema.safeParse({ tid: 'u1', reason: 'sneaky' }).success).toBe(false);
+  });
+});
+
+describe('DiscoverUnmatchSchema', () => {
+  it('requires matchId', () => {
+    expect(DiscoverUnmatchSchema.safeParse({}).success).toBe(false);
+    expect(DiscoverUnmatchSchema.safeParse({ matchId: 'm1' }).success).toBe(true);
+  });
+});
+
+describe('MatchHoldSchema / MatchUnholdSchema', () => {
+  it('require matchId', () => {
+    expect(MatchHoldSchema.safeParse({}).success).toBe(false);
+    expect(MatchHoldSchema.safeParse({ matchId: 'm' }).success).toBe(true);
+    expect(MatchUnholdSchema.safeParse({ matchId: 'm' }).success).toBe(true);
+  });
+});
+
+describe('DtmQuestionSkipSchema', () => {
+  it('requires topic + qid', () => {
+    expect(DtmQuestionSkipSchema.safeParse({ topic: 't', qid: 'q' }).success).toBe(true);
+    expect(DtmQuestionSkipSchema.safeParse({ topic: 't' }).success).toBe(false);
+  });
+});
+
+describe('DtmAnswerReviseSchema', () => {
+  it('requires topic + qid; from/to optional and string|number', () => {
+    expect(DtmAnswerReviseSchema.safeParse({ topic: 't', qid: 'q' }).success).toBe(true);
+    expect(DtmAnswerReviseSchema.safeParse({
+      topic: 't', qid: 'q', fromValue: 1, toValue: 'high',
+    }).success).toBe(true);
+    expect(DtmAnswerReviseSchema.safeParse({
+      topic: 't', qid: 'q', fromValue: { bad: true } as unknown as number,
+    }).success).toBe(false);
+  });
+});
+
+describe('validateV6Payload — v6.5 events', () => {
+  it('routes safety.block through the right schema', () => {
+    expect(validateV6Payload('safety.block', { tid: 'u' }).ok).toBe(true);
+    expect(validateV6Payload('safety.block', {}).ok).toBe(false);
+  });
+  it('routes safety.report through the right schema', () => {
+    expect(validateV6Payload('safety.report', { tid: 'u', reason: 'spam' }).ok).toBe(true);
+    expect(validateV6Payload('safety.report', { tid: 'u' }).ok).toBe(false);
+  });
+  it('routes discover.unmatch through the right schema', () => {
+    expect(validateV6Payload('discover.unmatch', { matchId: 'm' }).ok).toBe(true);
+  });
+  it('routes match.hold / match.unhold', () => {
+    expect(validateV6Payload('match.hold', { matchId: 'm' }).ok).toBe(true);
+    expect(validateV6Payload('match.unhold', { matchId: 'm' }).ok).toBe(true);
+  });
+  it('routes dtm.question_skip and dtm.answer_revise', () => {
+    expect(validateV6Payload('dtm.question_skip', { topic: 't', qid: 'q' }).ok).toBe(true);
+    expect(validateV6Payload('dtm.answer_revise', { topic: 't', qid: 'q' }).ok).toBe(true);
   });
 });

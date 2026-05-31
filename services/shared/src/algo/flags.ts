@@ -90,6 +90,51 @@ export function trackingTotalStateEnabled(): boolean {
   return process.env.TRACKING_TOTAL_STATE_ENABLED === '1';
 }
 
+/** v6.5 — per-surface learner ramp.
+ *
+ * Reads `ALGO_V6_LEARNER_RAMP_<SURFACE>` (e.g. `ALGO_V6_LEARNER_RAMP_DISCOVER`)
+ * as a number in [0,1] and clamps. Default 0 — i.e. the learner-derived
+ * weights have zero influence and the ranker uses defaultProfile() exactly
+ * as it does today. Operators raise it to 0.05, 0.10, ... gradually.
+ *
+ * `applyLearnerRamp(defaultW, learnedW, ramp)` performs the blend:
+ *   blended[k] = (1 - ramp) * defaultW[k] + ramp * learnedW[k]
+ * and renormalises so the result sums to 1.0.
+ */
+export function learnerRamp(surface: string): number {
+  const key = `ALGO_V6_LEARNER_RAMP_${surface.toUpperCase()}`;
+  const raw = process.env[key];
+  if (!raw) return 0;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(1, n));
+}
+
+/** Pure helper. Blend two weight maps by `ramp` and renormalise.
+ *  When `ramp === 0`, returns a copy of `defaultW` (no behavioural change).
+ *  When `ramp === 1`, returns a normalised copy of `learnedW`.
+ *  Missing keys in `learnedW` fall back to the corresponding defaultW value. */
+export function applyLearnerRamp(
+  defaultW: Record<string, number>,
+  learnedW: Record<string, number> | null | undefined,
+  ramp: number,
+): Record<string, number> {
+  if (!learnedW || ramp <= 0) return { ...defaultW };
+  const r = Math.max(0, Math.min(1, ramp));
+  const blended: Record<string, number> = {};
+  let sum = 0;
+  for (const k of Object.keys(defaultW)) {
+    const dw = defaultW[k];
+    const lw = typeof learnedW[k] === 'number' ? learnedW[k] : dw;
+    const v = (1 - r) * dw + r * lw;
+    blended[k] = v < 0 ? 0 : v;
+    sum += blended[k];
+  }
+  if (sum <= 0) return { ...defaultW };
+  for (const k of Object.keys(blended)) blended[k] /= sum;
+  return blended;
+}
+
 /** For dashboards / debug endpoints. */
 export function v4FlagSnapshot(): Record<string, boolean> {
   const surfaces: V4Surface[] = ['discover', 'messaging', 'beats', 'notifications', 'search', 'feed', 'aiMatch', 'deepCompat'];

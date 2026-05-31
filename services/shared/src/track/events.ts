@@ -154,6 +154,19 @@ export type TrackEventName =
   | 'notif.look_no_act'
   // user quits DTM mid-session (payload: answered, remaining)
   | 'dtm.partial_abandon'
+  // ─── v6.5 — safety + first-move + dtm extras ───────────────────────
+  // safety actions (always logged, gated only by analytics consent — the
+  // underlying safety API call is a separate first-class write).
+  | 'safety.block'
+  | 'safety.report'
+  | 'discover.unmatch'
+  // user holds / unholds a match (neutral signal, "let me think")
+  | 'match.hold'
+  | 'match.unhold'
+  // user skips a DTM question
+  | 'dtm.question_skip'
+  // user changes a previously-given DTM answer
+  | 'dtm.answer_revise'
   // generic
   | 'custom';
 

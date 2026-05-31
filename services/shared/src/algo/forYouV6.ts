@@ -38,6 +38,7 @@ import { cosine, cosTo01, expDecay, logScale, compose, clip100, jaccard } from '
 import type { SignalReader, FeatureRow, PairRow, PairBehavior, SessionSummaryRow } from './signals';
 import type { AlgoConsentTag } from './consent';
 import { registerAlgo } from './registry';
+import { learnerRamp, applyLearnerRamp } from './flags';
 import { attentionFit, hesitationFit, chronoOverlap, intentMatchScore, type ForYouInputs, type Explain } from './forYou';
 
 export const FORYOU_V6_WEIGHTS = {
@@ -77,6 +78,9 @@ export type ForYouV6Inputs = ForYouInputs & {
   myReplyP50Ms?: number | null;
   /** candidate's median reply latency in ms. */
   candReplyP50Ms?: number | null;
+  /** v6.5: learner-derived weight overrides for this user (from
+   *  UserWeightProfile). Blended with FORYOU_V6_WEIGHTS by `learnerRamp`. */
+  learnedWeights?: Record<string, number> | null;
 };
 
 /** Reciprocal intent: does this candidate's recent behaviour suggest they
@@ -136,7 +140,13 @@ export function scoreForYouV6(inp: ForYouV6Inputs): { score: number; explain: Ex
     me, cand, pair, priorCount, impressionsLast48h, consent, behavior,
     mySessions, candArchetype, myArchetype, myReplyP50Ms, candReplyP50Ms,
   } = inp;
-  const W = FORYOU_V6_WEIGHTS;
+  // v6.5: blend defaults with learner-derived weights by per-surface ramp.
+  // ramp defaults to 0 → W === FORYOU_V6_WEIGHTS (no behaviour change).
+  const W = applyLearnerRamp(
+    FORYOU_V6_WEIGHTS as unknown as Record<string, number>,
+    inp.learnedWeights ?? null,
+    learnerRamp('discover'),
+  ) as typeof FORYOU_V6_WEIGHTS;
   const P = FORYOU_V6_PENALTIES;
   const b: PairBehavior = behavior ?? { regrets: 0, repeatPasses: 0, returns: 0, maxDwellMs: 0 };
 
@@ -230,14 +240,16 @@ export async function rankForYouV6(
   const myHash = reader.hashOf(myId);
   const candHashes = cands.map((c) => reader.hashOf(c.id));
   const impressions = opts.impressions ?? new Map<string, number>();
-  const [me, pairMap, priorMap, behaviorMap, mySessions, ...candFeatures] = await Promise.all([
+  const [me, pairMap, priorMap, behaviorMap, mySessions, weightProfile, ...candFeatures] = await Promise.all([
     reader.features(myHash),
     reader.pairCompat(myHash, candHashes),
     reader.priorTargets(myHash, candHashes, 14),
     reader.pairBehavior(myHash, candHashes, 14),
     reader.sessionSummaries ? reader.sessionSummaries(myHash, 7) : Promise.resolve([] as SessionSummaryRow[]),
+    reader.weightProfile ? reader.weightProfile(myHash, 'discover') : Promise.resolve(null),
     ...candHashes.map((h) => reader.features(h)),
   ]);
+  const learnedWeights = weightProfile?.weights ?? null;
   const out: Array<{ id: string; score: number; explain: Explain }> = [];
   for (let i = 0; i < cands.length; i++) {
     const c = cands[i];
@@ -256,6 +268,7 @@ export async function rankForYouV6(
       mySessions,
       candArchetype: c.archetype ?? null,
       myArchetype: opts.myArchetype ?? null,
+      learnedWeights,
     });
     out.push({ id: c.id, score, explain });
   }

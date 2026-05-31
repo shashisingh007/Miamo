@@ -1135,10 +1135,13 @@ model FocusAffinityHourly {
 }
 
 // ─── v6 — Online user-learning weight profile ─────────
-// One row per active user. Updated incrementally on every refresh / reopen.
+// One row per (active user, surface). Updated incrementally on every
+// refresh / reopen. v6.5: split per surface so the bandit can carry
+// independent posteriors for `discover` vs `dtm` vs other surfaces.
 // See Phase 16 (Thompson-sampling bandit) for the update rules.
 model UserWeightProfile {
-  uidHash         String   @id
+  uidHash         String
+  surface         String   @default("discover")
   weights         Json     @default("{}") // { interestsOverlap: 0.18, vibeAlignment: 0.15, ... }
   noveltyBoost    Float    @default(0.0)
   diversityBoost  Float    @default(0.0)
@@ -1148,7 +1151,9 @@ model UserWeightProfile {
   lastUpdatedAt   DateTime @updatedAt
   schemaVersion   Int      @default(1)
 
+  @@id([uidHash, surface])
   @@index([lastUpdatedAt])
+  @@index([uidHash])
 }
 
 // ─── v6 — Miamo Move v3 archetype profile ─────────────
@@ -1166,6 +1171,48 @@ model UserMoveProfile {
 
   @@index([archetype])
   @@index([lastComputedAt])
+}
+
+// ─── v6.5 — Safety + match-state daily aggregate ─────
+// One row per (uidHash, surface, kind, day). Surfaces and kinds:
+//   surface ∈ 'discover' | 'matches' | 'messages' | 'profile' | 'dtm'
+//   kind    ∈ 'block' | 'report' | 'unmatch' | 'hold' | 'unhold'
+// Consumed by the v6.5 learner loop as hard-negative (block/report) or
+// neutral (hold/unhold) signals, separate from soft swipe regret.
+model SafetyAgg {
+  uidHash String
+  surface String
+  kind    String
+  day     DateTime // truncated to day, UTC
+  count   Int      @default(0)
+  meta    Json     @default("{}") // optional: { targets: { tHash: count, ...capped 64 } }
+
+  @@id([uidHash, surface, kind, day])
+  @@index([day])
+  @@index([uidHash, day])
+  @@index([uidHash, kind, day])
+}
+
+// ─── v6.5 — First-move reply outcomes ────────────────
+// One row per (aHash, bHash, sentAt). Reconciled twice a day by the
+// firstMoveOutcome worker by joining msg.send (firstMove=true) with
+// msg.read on the same pair within 24h. Used by Miamo Move v3 to train
+// `UserMoveProfile.byKind[kind].replied`.
+model FirstMoveOutcome {
+  aHash     String
+  bHash     String
+  sentAt    DateTime
+  kind      String   // 'text' | 'voice' | 'media' | 'reaction'
+  replied   Boolean  @default(false)
+  replyMs   Int?     // null until replied; ms between send and recipient's first read
+  archetype String?  // recipient archetype at send time (cached)
+  meta      Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@id([aHash, bHash, sentAt])
+  @@index([aHash, sentAt])
+  @@index([bHash, sentAt])
+  @@index([sentAt, replied])
 }
 
 // ─── User Data (generic feature persistence) ────────
