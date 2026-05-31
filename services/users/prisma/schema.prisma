@@ -88,6 +88,11 @@ model User {
   activities           UserActivity[]
   userData             UserData[]
 
+  // v3.2
+  showcaseItems        ShowcaseItem[]  @relation("ShowcaseAuthor")
+  accessRequestsSent   AccessRequest[] @relation("AccessRequestFrom")
+  accessRequestsRcvd   AccessRequest[] @relation("AccessRequestTo")
+
   @@index([email])
   @@index([username])
   @@index([miamoId])
@@ -125,6 +130,23 @@ model Profile {
 
   politicalViews String @default("")
   diet           String @default("")
+
+  // v3.2 — onboarding completion
+  completionScore   Int      @default(0)
+  completionMissing String[] @default([])
+
+  // v3.2 — Date-to-Marry extended fields (optional; required for DTM 80% gate)
+  familyBackground   String?  @db.VarChar(280)
+  educationLevel     String?
+  educationInstitution String?
+  employer           String?
+  incomeBand         String?
+  subCommunity       String?
+  maritalStatus      String?
+  willingToRelocate  Boolean?
+  familyInvolved     Boolean?
+  expectedTimeline   String?
+  kundliUrl          String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -873,6 +895,15 @@ model MatrimonialProfile {
   partnerDiet          String @default("")
   partnerExpectation   String @default("")
 
+  // v3.2 — extended partner preferences (new compatibility axes)
+  partnerSmoking       String  @default("")
+  partnerDrinking      String  @default("")
+  partnerFamilyType    String  @default("")
+  partnerFamilyValues  String  @default("")
+  partnerLocations     String  @default("") // CSV of preferred cities
+  partnerRelocate      String  @default("") // "yes" | "no" | "open"
+  partnerChildren      String  @default("") // "have" | "dontwant" | "wantsome" | "open"
+
   bioDataTemplate  String  @default("royal-rajasthani")
   bioDataGenerated Boolean @default(false)
 
@@ -961,6 +992,182 @@ model UserActivity {
   @@index([userId, targetType, createdAt])
 }
 
+// ─── v3.1 Tracking pipeline (Phase 1) ───────────────
+// Hot raw events live in Redis Streams; only aggregates land in Postgres.
+// All tracking tables key on uidHash (HMAC-SHA256 of userId) so an account
+// delete can break the join without a full table-rewrite.
+
+model ConsentEvent {
+  id        String   @id @default(uuid())
+  userId    String?
+  did       String   // device id (cookie)
+  scope     String   // 'analytics' | 'personalization' | 'marketing'
+  granted   Boolean
+  region    String?  // 'IN' | 'EU' | 'US' | ...
+  source    String   @default("banner") // banner | settings | api
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([did])
+  @@index([userId, scope, createdAt])
+}
+
+model EventAggHourly {
+  uidHash String
+  evt     String
+  bucket  DateTime // truncated to hour, UTC
+  count   Int      @default(0)
+  durSum  Int      @default(0)
+  durP50  Int      @default(0)
+  durP95  Int      @default(0)
+  meta    Json     @default("{}")
+
+  @@id([uidHash, evt, bucket])
+  @@index([bucket])
+  @@index([uidHash, bucket])
+}
+
+model EventAggDaily {
+  uidHash     String
+  evt         String
+  day         DateTime // truncated to day, UTC
+  count       Int      @default(0)
+  durSum      Int      @default(0)
+  uniqTargets Int      @default(0) // HLL cardinality snapshot
+  meta        Json     @default("{}")
+
+  @@id([uidHash, evt, day])
+  @@index([day])
+  @@index([uidHash, day])
+}
+
+model FeatureSnapshot {
+  uidHash             String   @id
+  computedAt          DateTime @default(now())
+  chronotype          String?  // morning | day | evening | night | mixed
+  replyPersonaP50Ms   Int?
+  replyPersonaP90Ms   Int?
+  responseRate        Float?
+  rageClickRate       Float?
+  deadClickRate       Float?
+  dwellToDecisionP50  Float?
+  swipeRightRatio     Float?
+  attentionProfile    String?  // reader | scanner | voice-first | visual
+  interestVec         Bytes? // 32 × f16
+  vibeEmb             Bytes? // 64 × f16
+  behaviorEmb         Bytes? // 64 × f16
+  cityCenterLat       Float?
+  cityCenterLng       Float?
+  raw                 Json     @default("{}")
+
+  @@index([computedAt])
+}
+
+model PairCompatCache {
+  aHash                 String
+  bHash                 String
+  computedAt            DateTime @default(now())
+  interestCos           Float    @default(0)
+  vibeCos               Float    @default(0)
+  behaviorCos           Float    @default(0)
+  magnetCos             Float    @default(0)
+  cityKm                Float    @default(0)
+  ageDelta              Int      @default(0)
+  intentMatch           Float    @default(0)
+  chronoOverlap         Float    @default(0)
+  cadenceOverlap        Float    @default(0)
+  priorInteractionScore Float    @default(0)
+  finalScore            Float    @default(0)
+  // v6 parallel score; populated by v6 PairCompatComputer behind ALGO_V6_PAIR_COMPAT_ENABLED.
+  v6Score               Float?
+  v6BreakdownJson       Json?    @default("{}")
+
+  @@id([aHash, bHash])
+  @@index([aHash, finalScore])
+  @@index([aHash, v6Score])
+  @@index([computedAt])
+}
+
+// ─── v6 — Total-state tracking ─────────────────────────
+// Produced by tracking-worker at session.end. Drives Phase 5 discoverPolicy
+// (window-shopping defence, zero-action recovery) and Phase 16 learner.
+model SessionSummary {
+  id                String   @id @default(uuid())
+  uidHash           String
+  sessionId         String
+  startedAt         DateTime
+  endedAt           DateTime
+  durationMs        Int
+  idleMs            Int      @default(0)
+  routesVisited     Json     @default("[]")
+  cardsViewed       Int      @default(0)
+  swipesLeft        Int      @default(0)
+  swipesRight       Int      @default(0)
+  msgsSent          Int      @default(0)
+  msgsRead          Int      @default(0)
+  zeroActionSession Boolean  @default(false)
+  windowShopping    Boolean  @default(false)
+  ghostedSelf       Boolean  @default(false)
+  meta              Json     @default("{}")
+  createdAt         DateTime @default(now())
+
+  @@unique([uidHash, sessionId])
+  @@index([uidHash, endedAt])
+  @@index([endedAt])
+  @@index([uidHash, zeroActionSession])
+  @@index([uidHash, windowShopping])
+}
+
+// ─── v6 — Element-level focus/dwell affinity ──────────
+// Hourly rollup of (uidHash, route, elementId) -> focusCount, dwellSumMs.
+// Consumed by Phase 5 feed personalisation by focusAffinityByKind.
+model FocusAffinityHourly {
+  uidHash    String
+  route      String
+  elementId  String
+  bucket     DateTime
+  focusCount Int      @default(0)
+  dwellSumMs Int      @default(0)
+
+  @@id([uidHash, route, elementId, bucket])
+  @@index([uidHash, bucket])
+  @@index([bucket])
+}
+
+// ─── v6 — Online user-learning weight profile ─────────
+// One row per active user. Updated incrementally on every refresh / reopen.
+// See Phase 16 (Thompson-sampling bandit) for the update rules.
+model UserWeightProfile {
+  uidHash         String   @id
+  weights         Json     @default("{}") // { interestsOverlap: 0.18, vibeAlignment: 0.15, ... }
+  noveltyBoost    Float    @default(0.0)
+  diversityBoost  Float    @default(0.0)
+  explorationRate Float    @default(0.05)
+  banditAlpha     Json     @default("{}")
+  banditBeta      Json     @default("{}")
+  lastUpdatedAt   DateTime @updatedAt
+  schemaVersion   Int      @default(1)
+
+  @@index([lastUpdatedAt])
+}
+
+// ─── v6 — Miamo Move v3 archetype profile ─────────────
+// One row per user. Computed by KMeans (4 archetypes) on send/reply patterns.
+model UserMoveProfile {
+  uidHash         String   @id
+  archetype       String   // wordsmith | voice_first | visual | fast_replier
+  archetypeProbs  Json     @default("{}") // soft cluster probabilities
+  avgMoveLenChars Int?
+  voiceShare      Float?   // fraction of moves that are voice notes
+  mediaShare      Float?   // fraction of moves that include media
+  p50ReplyMinutes Int?
+  lastComputedAt  DateTime @default(now())
+  schemaVersion   Int      @default(1)
+
+  @@index([archetype])
+  @@index([lastComputedAt])
+}
+
 // ─── User Data (generic feature persistence) ────────
 model UserData {
   id        String   @id @default(uuid())
@@ -989,4 +1196,49 @@ model DtmMessage {
 
   @@index([senderId, recipientId, createdAt])
   @@index([recipientId, read])
+}
+
+// ─── v3.2 — Showcase (replaces Creativity) ──────────────
+model ShowcaseItem {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation("ShowcaseAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  category        String
+  type            String   // link | image | text | voice
+  title           String   @db.VarChar(120)
+  body            String?  @db.VarChar(300)
+  url             String?
+  imageUrl        String?
+  ogImageCached   String?
+  voiceUrl        String?
+  voiceDurationMs Int?
+  bytes           Int      @default(0)
+  pinned          Boolean  @default(false)
+  moveCount       Int      @default(0)
+  matchCount      Int      @default(0)
+  visibility      String   @default("everyone") // everyone | matches | private
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, pinned])
+  @@index([category, createdAt])
+}
+
+// ─── v3.2 — Access Control ──────────────────────────────
+model AccessRequest {
+  id           String    @id @default(uuid())
+  fromUserId   String
+  fromUser     User      @relation("AccessRequestFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId     String
+  toUser       User      @relation("AccessRequestTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  field        String    // photos|phone|family|income|kundli|lastName|exactCity|socials|email
+  status       String    @default("pending") // pending|approved|denied|revoked|expired
+  message      String?   @db.VarChar(500)
+  createdAt    DateTime  @default(now())
+  decidedAt    DateTime?
+  expiresAt    DateTime?
+
+  @@unique([fromUserId, toUserId, field])
+  @@index([toUserId, status])
+  @@index([fromUserId, status])
 }
