@@ -139,6 +139,59 @@ export const DtmAnswerReviseSchema = z.object({
   toValue: z.union([z.string().max(64), z.number()]).optional(),
 });
 
+// ─── v6.6: see-later pile + batch-exhausted + skipped review ────────────────
+export const DiscoverSeeLaterSchema = z.object({
+  tid,
+  // The 10-card batch the deferred profile came from (for analytics).
+  batchId: z.string().min(1).max(64).optional(),
+  // Free-form reason from optional UI ("not now", "thinking", ...).
+  reason: z.enum(['not_now', 'thinking', 'unsure', 'other']).optional(),
+});
+
+export const DiscoverSeeLaterViewSchema = z.object({
+  tid,
+  // Time elapsed between defer and view, in ms (client computed).
+  ageMs: positiveMs.optional(),
+});
+
+export const DiscoverBatchExhaustedSchema = z.object({
+  batchId: z.string().min(1).max(64),
+  shown: z.number().int().nonnegative(),
+  acted: z.number().int().nonnegative(),
+  deferred: z.number().int().nonnegative(),
+  durationMs: positiveMs.optional(),
+});
+
+export const DiscoverSkippedOpenSchema = z.object({
+  pileSize: z.number().int().nonnegative(),
+});
+
+export const DiscoverSkippedActionSchema = z.object({
+  tid,
+  // The action the user finally took on the previously-skipped profile.
+  action: z.enum(['like', 'pass', 'super_like', 'see_later']),
+});
+
+export const DtmSeeLaterSchema = z.object({
+  topic: z.string().min(1).max(64),
+  qid: z.string().min(1).max(128),
+});
+
+export const DtmSeeLaterViewSchema = z.object({
+  topic: z.string().min(1).max(64),
+  qid: z.string().min(1).max(128),
+  ageMs: positiveMs.optional(),
+});
+
+export const DtmBatchExhaustedSchema = z.object({
+  topic: z.string().min(1).max(64),
+  shown: z.number().int().nonnegative(),
+  answered: z.number().int().nonnegative(),
+  skipped: z.number().int().nonnegative(),
+  deferred: z.number().int().nonnegative(),
+  durationMs: positiveMs.optional(),
+});
+
 export const V6_VALIDATORS = {
   'attention.idle.enter':    AttentionIdleEnterSchema,
   'attention.idle.exit':     AttentionIdleExitSchema,
@@ -159,6 +212,15 @@ export const V6_VALIDATORS = {
   'match.unhold':            MatchUnholdSchema,
   'dtm.question_skip':       DtmQuestionSkipSchema,
   'dtm.answer_revise':       DtmAnswerReviseSchema,
+  // v6.6
+  'discover.see_later':         DiscoverSeeLaterSchema,
+  'discover.see_later.view':    DiscoverSeeLaterViewSchema,
+  'discover.batch.exhausted':   DiscoverBatchExhaustedSchema,
+  'discover.skipped.open':      DiscoverSkippedOpenSchema,
+  'discover.skipped.action':    DiscoverSkippedActionSchema,
+  'dtm.see_later':              DtmSeeLaterSchema,
+  'dtm.see_later.view':         DtmSeeLaterViewSchema,
+  'dtm.batch.exhausted':        DtmBatchExhaustedSchema,
 } as const satisfies Record<string, z.ZodTypeAny>;
 
 export type V6EventName = keyof typeof V6_VALIDATORS;

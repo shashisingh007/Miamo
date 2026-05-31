@@ -8,6 +8,9 @@ import {
   SafetyBlockSchema, SafetyReportSchema, DiscoverUnmatchSchema,
   MatchHoldSchema, MatchUnholdSchema,
   DtmQuestionSkipSchema, DtmAnswerReviseSchema,
+  DiscoverSeeLaterSchema, DiscoverSeeLaterViewSchema, DiscoverBatchExhaustedSchema,
+  DiscoverSkippedOpenSchema, DiscoverSkippedActionSchema,
+  DtmSeeLaterSchema, DtmSeeLaterViewSchema, DtmBatchExhaustedSchema,
 } from '../v6Validators';
 
 describe('isV6Event', () => {
@@ -211,5 +214,89 @@ describe('validateV6Payload — v6.5 events', () => {
   it('routes dtm.question_skip and dtm.answer_revise', () => {
     expect(validateV6Payload('dtm.question_skip', { topic: 't', qid: 'q' }).ok).toBe(true);
     expect(validateV6Payload('dtm.answer_revise', { topic: 't', qid: 'q' }).ok).toBe(true);
+  });
+});
+
+// ─── v6.6 — see-later pile + batch-exhausted + skipped review ───────────
+describe('DiscoverSeeLaterSchema', () => {
+  it('requires tid', () => {
+    expect(DiscoverSeeLaterSchema.safeParse({}).success).toBe(false);
+    expect(DiscoverSeeLaterSchema.safeParse({ tid: 't1' }).success).toBe(true);
+  });
+  it('accepts optional batchId + reason enum', () => {
+    expect(DiscoverSeeLaterSchema.safeParse({
+      tid: 't1', batchId: 'b1', reason: 'thinking',
+    }).success).toBe(true);
+    expect(DiscoverSeeLaterSchema.safeParse({
+      tid: 't1', reason: 'whenever',
+    }).success).toBe(false);
+  });
+});
+
+describe('DiscoverSeeLaterViewSchema', () => {
+  it('requires tid; ageMs optional and bounded', () => {
+    expect(DiscoverSeeLaterViewSchema.safeParse({ tid: 't1' }).success).toBe(true);
+    expect(DiscoverSeeLaterViewSchema.safeParse({ tid: 't1', ageMs: 5000 }).success).toBe(true);
+    expect(DiscoverSeeLaterViewSchema.safeParse({ tid: 't1', ageMs: -1 }).success).toBe(false);
+  });
+});
+
+describe('DiscoverBatchExhaustedSchema', () => {
+  it('requires batchId + counts', () => {
+    expect(DiscoverBatchExhaustedSchema.safeParse({
+      batchId: 'b1', shown: 10, acted: 8, deferred: 2,
+    }).success).toBe(true);
+    expect(DiscoverBatchExhaustedSchema.safeParse({ batchId: 'b1' }).success).toBe(false);
+  });
+});
+
+describe('DiscoverSkippedOpenSchema', () => {
+  it('requires non-negative pileSize', () => {
+    expect(DiscoverSkippedOpenSchema.safeParse({ pileSize: 0 }).success).toBe(true);
+    expect(DiscoverSkippedOpenSchema.safeParse({ pileSize: -1 }).success).toBe(false);
+  });
+});
+
+describe('DiscoverSkippedActionSchema', () => {
+  it('accepts the four action values', () => {
+    for (const a of ['like', 'pass', 'super_like', 'see_later'] as const) {
+      expect(DiscoverSkippedActionSchema.safeParse({ tid: 't1', action: a }).success).toBe(true);
+    }
+    expect(DiscoverSkippedActionSchema.safeParse({ tid: 't1', action: 'wat' }).success).toBe(false);
+  });
+});
+
+describe('DtmSeeLaterSchema / View / BatchExhausted', () => {
+  it('see_later requires topic + qid', () => {
+    expect(DtmSeeLaterSchema.safeParse({ topic: 't', qid: 'q' }).success).toBe(true);
+    expect(DtmSeeLaterSchema.safeParse({ topic: 't' }).success).toBe(false);
+  });
+  it('see_later.view accepts ageMs', () => {
+    expect(DtmSeeLaterViewSchema.safeParse({ topic: 't', qid: 'q', ageMs: 100 }).success).toBe(true);
+  });
+  it('batch.exhausted requires counts', () => {
+    expect(DtmBatchExhaustedSchema.safeParse({
+      topic: 't', shown: 10, answered: 7, skipped: 2, deferred: 1,
+    }).success).toBe(true);
+    expect(DtmBatchExhaustedSchema.safeParse({ topic: 't' }).success).toBe(false);
+  });
+});
+
+describe('validateV6Payload — v6.6 events', () => {
+  it('routes discover see-later events', () => {
+    expect(validateV6Payload('discover.see_later', { tid: 't1' }).ok).toBe(true);
+    expect(validateV6Payload('discover.see_later.view', { tid: 't1' }).ok).toBe(true);
+    expect(validateV6Payload('discover.batch.exhausted', {
+      batchId: 'b', shown: 10, acted: 8, deferred: 2,
+    }).ok).toBe(true);
+    expect(validateV6Payload('discover.skipped.open', { pileSize: 5 }).ok).toBe(true);
+    expect(validateV6Payload('discover.skipped.action', { tid: 't1', action: 'like' }).ok).toBe(true);
+  });
+  it('routes dtm see-later events', () => {
+    expect(validateV6Payload('dtm.see_later', { topic: 't', qid: 'q' }).ok).toBe(true);
+    expect(validateV6Payload('dtm.see_later.view', { topic: 't', qid: 'q' }).ok).toBe(true);
+    expect(validateV6Payload('dtm.batch.exhausted', {
+      topic: 't', shown: 10, answered: 7, skipped: 2, deferred: 1,
+    }).ok).toBe(true);
   });
 });

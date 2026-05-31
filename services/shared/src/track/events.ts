@@ -167,6 +167,21 @@ export type TrackEventName =
   | 'dtm.question_skip'
   // user changes a previously-given DTM answer
   | 'dtm.answer_revise'
+  // ─── v6.6 — see-later pile + batch-exhausted + skipped review ────────────────
+  // user defers a profile to review later (4th action alongside left/right/super).
+  | 'discover.see_later'
+  // user opens a previously-deferred profile from the see-later pile.
+  | 'discover.see_later.view'
+  // current 10-card batch is exhausted ("you're all caught up").
+  | 'discover.batch.exhausted'
+  // user opens the skipped-profiles pile.
+  | 'discover.skipped.open'
+  // user takes a final action on a previously-skipped profile.
+  | 'discover.skipped.action'
+  // DTM mirrors of the same three flows.
+  | 'dtm.see_later'
+  | 'dtm.see_later.view'
+  | 'dtm.batch.exhausted'
   // generic
   | 'custom';
 

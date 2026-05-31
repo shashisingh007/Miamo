@@ -42,6 +42,17 @@ const REWARD_MAP: Record<string, { reward: number; ingredient: WeightKey }> = {
   'swipe.regret':      { reward: -1.00, ingredient: 'hesitationFit'         },
   'safety.block':      { reward: -1.00, ingredient: 'behaviouralTwinIndex'  },
   'safety.report':     { reward: -1.00, ingredient: 'behaviouralTwinIndex'  },
+  // v6.6 — see-later pile signals.
+  // Defer = soft "uncertain": small negative weight on the dominant
+  // attribute (interestsOverlap) so we don't pile up identical near-misses.
+  'discover.see_later':       { reward: -0.10, ingredient: 'interestsOverlap'      },
+  // Re-engagement with a deferred profile is a positive intent signal.
+  'discover.see_later.view':  { reward:  0.20, ingredient: 'interestsOverlap'      },
+  // Acting on a previously-skipped profile (any final action) is a strong
+  // attention signal — the user came back. Keep the reward small and
+  // positive; the actual like/pass is captured separately by the existing
+  // swipe.* events, so we only credit "they returned to it".
+  'discover.skipped.action':  { reward:  0.15, ingredient: 'reciprocalIntentScore' },
 };
 
 // `repeatPassRate` is not a WeightKey — re-map to the closest valid key.

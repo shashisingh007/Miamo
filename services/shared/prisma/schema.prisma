@@ -1215,6 +1215,35 @@ model FirstMoveOutcome {
   @@index([sentAt, replied])
 }
 
+// ─── v6.6 — See-later pile (Discover + DTM) ─────────
+// One row per deferred item. `surface` discriminates the pile so the same
+// table serves Discover ("see this profile later") and DTM ("answer this
+// question later"). When the user resolves the deferral the row is updated
+// in place (resolvedAt + resolvedAction). Rows older than 30 days are
+// pruned by tracking-worker. Consumed by:
+//   - learnerLoop (deferral as soft-negative; resolution as attribution)
+//   - discoverPolicy (skipped pile UI, "view skipped profiles")
+//   - dtmV6 (defer-then-revise question reordering)
+model DeferredItem {
+  id              String    @id @default(uuid())
+  uidHash         String
+  surface         String    // 'discover' | 'dtm'
+  targetId        String    // tid for discover, qid for dtm
+  topic           String?   // dtm only — the topic the qid belongs to
+  batchId         String?   // optional analytics tag for the batch it came from
+  reason          String?   // 'not_now' | 'thinking' | 'unsure' | 'other'
+  deferredAt      DateTime  @default(now())
+  viewedAt        DateTime? // first time the user opened it from the pile
+  resolvedAt      DateTime? // when the deferral was resolved
+  resolvedAction  String?   // 'like' | 'pass' | 'super_like' | 'see_later' | 'answered' | 'skipped'
+  meta            Json      @default("{}")
+
+  @@unique([uidHash, surface, targetId])
+  @@index([uidHash, surface, deferredAt])
+  @@index([uidHash, surface, resolvedAt])
+  @@index([deferredAt])
+}
+
 // ─── User Data (generic feature persistence) ────────
 model UserData {
   id        String   @id @default(uuid())

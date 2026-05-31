@@ -104,6 +104,15 @@ const OPERATIONAL_EVENTS = new Set<string>([
   'match.unhold',             // v6.5 reserved: neutral signal, do not penalize
   'dtm.question_skip',        // v6.5 reserved: dtmV6 question-order rerank
   'dtm.answer_revise',        // v6.5 reserved: dtmV6 answer-confidence calibrator
+  // ─── v6.6 reserved (see-later pile + batch flow) ───
+  'discover.see_later',         // v6.6 reserved: learner soft-defer signal
+  'discover.see_later.view',    // v6.6 reserved: learner re-engagement signal
+  'discover.batch.exhausted',   // v6.6 reserved: discoverPolicy "all caught up"
+  'discover.skipped.open',      // v6.6 reserved: discoverPolicy skipped pile open
+  'discover.skipped.action',    // v6.6 reserved: learner late-decision attribution
+  'dtm.see_later',              // v6.6 reserved: dtmV6 deferral signal
+  'dtm.see_later.view',         // v6.6 reserved: dtmV6 re-engagement signal
+  'dtm.batch.exhausted',        // v6.6 reserved: dtmV6 batch completion telemetry
 ]);
 
 function readTrackedEventNames(): string[] {
