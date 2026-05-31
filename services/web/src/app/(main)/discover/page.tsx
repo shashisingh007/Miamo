@@ -17,6 +17,7 @@ import {
  trackDiscoverSeeLater,
  trackDiscoverBatchExhausted,
 } from '@/lib/track/collectors/deferred';
+import { swipeTracker } from '@/lib/track/collectors/swipe';
 import { DeferredPileModal } from '@/components/deferred/DeferredPileModal';
 import { AllCaughtUpScreen } from '@/components/deferred/AllCaughtUpScreen';
 import { type DiscoverProfile, type AiData, type Filters, DEFAULT_FILTERS } from './components/constants';
@@ -130,6 +131,7 @@ export default function DiscoverPage() {
  if (passedUser) {
  trackActivity('pass', 'profile', passedUser.id);
  track('discover.swipe', { dir: 'left', tt: 'profile', tid: passedUser.id });
+ swipeTracker.onSwipeCommit('left', 0, 0);
  api.passUser(passedUser.id).catch(() => {});
  setBatchActed((n) => n + 1);
  const newCount = passCount + 1;
@@ -147,6 +149,7 @@ export default function DiscoverPage() {
  if (!currentUser) return;
  trackActivity('like', 'profile', currentUser.id);
  track('discover.swipe', { dir: 'right', tt: 'profile', tid: currentUser.id, hasMessage: !!message });
+ swipeTracker.onSwipeCommit('right', 0, 0);
  setBatchActed((n) => n + 1);
  try {
  await api.sendMiamoMove(currentUser.id, message, targetType, targetId);
@@ -162,6 +165,7 @@ export default function DiscoverPage() {
  if (!currentUser) return;
  trackActivity('super_like', 'profile', currentUser.id);
  track('discover.swipe', { dir: 'super', tt: 'profile', tid: currentUser.id });
+ swipeTracker.onSwipeCommit('up', 0, 0);
  setBatchActed((n) => n + 1);
  try { await api.superLikeUser(currentUser.id); toast.love('Super Like!', `${currentUser.displayName} will see your Super Like`); } catch { toast.error('Super Like failed'); }
  if (currentIndex < profiles.length - 1) setCurrentIndex(i => i + 1);

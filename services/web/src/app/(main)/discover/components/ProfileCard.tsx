@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
  Heart, X, MapPin, Briefcase, Shield, Star, ChevronDown, Sparkles,
@@ -8,6 +8,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProfileAttributeStrip } from '@/components/ProfileAttributeStrip';
+import { cardTracker } from '@/lib/track/collectors/cards';
+import { swipeTracker } from '@/lib/track/collectors/swipe';
+import { useReadingTime } from '@/lib/track/react/useReadingTime';
 import { type DiscoverProfile, type AiData } from './constants';
 
 export function ProfileCard({
@@ -24,6 +27,19 @@ export function ProfileCard({
  const [moveTarget, setMoveTarget] = useState<{ type: string; id?: string } | null>(null);
  const [moveText, setMoveText] = useState('');
  const [showMoveRecs, setShowMoveRecs] = useState(false);
+ const cardRootRef = useRef<HTMLDivElement | null>(null);
+ const hoverEnteredAt = useRef<number>(0);
+ const bioWords = (user.profile?.bio || '').split(/\s+/).filter(Boolean).length;
+ const bioRef = useReadingTime<HTMLParagraphElement>(`discover.bio.${user.id}`, bioWords);
+
+ useEffect(() => {
+ if (!isActive) return;
+ const el = cardRootRef.current;
+ if (!el) return;
+ swipeTracker.onCardVisible(user.id);
+ const off = cardTracker.observeCard(el, user.id);
+ return () => { off(); };
+ }, [isActive, user.id]);
 
  const photos = user.photos || [];
  const profile = user.profile || {};
@@ -48,7 +64,17 @@ export function ProfileCard({
  if (!isActive) return null;
 
  return (
- <div className="w-full">
+ <div
+ className="w-full"
+ ref={cardRootRef}
+ onPointerEnter={() => { hoverEnteredAt.current = performance.now(); }}
+ onPointerLeave={() => {
+ if (hoverEnteredAt.current) {
+ cardTracker.onHover(user.id, performance.now() - hoverEnteredAt.current);
+ hoverEnteredAt.current = 0;
+ }
+ }}
+ >
  {/* Card container */}
  <div className="rounded-[20px] overflow-hidden bg-miamo-card border border-border shadow-[0_8px_40px_rgba(201,120,86,0.08)](232,93,117,0.04)]">
 
@@ -141,7 +167,7 @@ export function ProfileCard({
  {/* ─── Bio ─── */}
  {profile.bio && (
  <div className="px-6 py-4">
- <p className="text-[14px] text-text-primary leading-[1.7] font-light">{profile.bio}</p>
+ <p ref={bioRef} className="text-[14px] text-text-primary leading-[1.7] font-light">{profile.bio}</p>
  </div>
  )}
 

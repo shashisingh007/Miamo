@@ -13,6 +13,7 @@ import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { useToast } from '@/components/ui/toast';
 import { useRouter } from 'next/navigation';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
+import { safetyTracker } from '@/lib/track/collectors/safety';
 import { mainTabs, matchFilters } from './components/constants';
 import { ProfileModal } from './components/ProfileModal';
 import { FeedbackModal } from './components/FeedbackModal';
@@ -254,6 +255,8 @@ export default function MatchesPage() {
  if (!feedbackModal) return;
  try {
  await api.unmatch(feedbackModal.matchId, reason, details);
+ const tid = getMatchById(feedbackModal.matchId)?.matchedUser?.id;
+ safetyTracker.unmatch(feedbackModal.matchId, tid, 'matches');
  setMatches(p => p.filter(m => m.id !== feedbackModal.matchId));
  setHeldItems(p => p.filter(i => (i.matchId || i.id) !== feedbackModal.matchId));
  showToast('Unmatched');
@@ -270,6 +273,9 @@ export default function MatchesPage() {
  } else {
  await api.reportMatch(feedbackModal.matchId, reason, details);
  }
+ if (targetUserId) {
+ safetyTracker.report(targetUserId, reason as any, 'matches');
+ }
  showToast('Reported — thanks for keeping Miamo safe');
  loadData();
  } catch {}
@@ -282,6 +288,7 @@ export default function MatchesPage() {
  if (!targetUserId) return;
  try {
  await api.blockUser(targetUserId);
+ safetyTracker.block(targetUserId, 'matches');
  // Store feedback reason for AI algorithm improvement
  try { await api.blockByUser(targetUserId, reason, details); } catch {}
  if (!isSynthetic) {

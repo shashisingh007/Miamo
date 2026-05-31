@@ -14,7 +14,7 @@
  * resolveDeferred, learner rewards) can be exercised end-to-end.
  * Replace `loadQuestions()` with a real fetch when the endpoint ships.
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sparkles, Clock, Check, X } from 'lucide-react';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
@@ -26,6 +26,8 @@ import {
   trackDtmSeeLater,
   trackDtmBatchExhausted,
 } from '@/lib/track/collectors/deferred';
+import { trackDtmQuestionSkip, trackDtmAnswerRevise } from '@/lib/track/collectors/firstMove';
+import { useReadingTime } from '@/lib/track/react/useReadingTime';
 import { DeferredPileModal } from '@/components/deferred/DeferredPileModal';
 import { AllCaughtUpScreen } from '@/components/deferred/AllCaughtUpScreen';
 
@@ -62,6 +64,7 @@ export default function DtmPage() {
   const [batchActed, setBatchActed] = useState(0);
   const [batchDeferred, setBatchDeferred] = useState(0);
   const [batchExhaustedFired, setBatchExhaustedFired] = useState(false);
+  const initialAnswerRef = useRef<string>('');
   const toast = useToast();
 
   useTrackPageView('dtm');
@@ -92,9 +95,25 @@ export default function DtmPage() {
   useEffect(() => { if (!showDeferred) refreshDeferredCount(); }, [showDeferred, refreshDeferredCount]);
 
   const current = questions[currentIndex];
+  const promptWords = current?.prompt.split(/\s+/).filter(Boolean).length ?? 0;
+  const promptRef = useReadingTime<HTMLHeadingElement>(
+    current ? `dtm.prompt.${current.id}` : 'dtm.prompt',
+    promptWords,
+  );
+
+  useEffect(() => { initialAnswerRef.current = ''; }, [current?.id]);
 
   const handleAnswer = async () => {
     if (!current || !answer.trim()) return;
+    if (initialAnswerRef.current && initialAnswerRef.current !== answer) {
+      trackDtmAnswerRevise({
+        topic: current.topic,
+        qid: current.id,
+        fromValue: initialAnswerRef.current,
+        toValue: answer,
+      });
+    }
+    initialAnswerRef.current = answer;
     trackActivity('answer', 'question', current.id, { topic: current.topic });
     setBatchActed((n) => n + 1);
     // TODO(v6.7): POST answer to matrimonial service when endpoint exists.
@@ -106,6 +125,7 @@ export default function DtmPage() {
 
   const handleSkip = () => {
     if (!current) return;
+    trackDtmQuestionSkip(current.topic, current.id);
     trackActivity('skip', 'question', current.id, { topic: current.topic });
     setBatchActed((n) => n + 1);
     setAnswer('');
@@ -208,7 +228,7 @@ export default function DtmPage() {
               <p className="text-[10px] font-bold text-rose uppercase tracking-[0.15em] mb-3">
                 {current.topic}
               </p>
-              <h2 className="font-brand font-semibold text-2xl text-text-primary leading-tight mb-3">
+              <h2 ref={promptRef} className="font-brand font-semibold text-2xl text-text-primary leading-tight mb-3">
                 {current.prompt}
               </h2>
               {current.hint && (
