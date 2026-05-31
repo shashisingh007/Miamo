@@ -17,6 +17,14 @@ export default defineConfig({
     environment: 'node',
     globals: false,
     testTimeout: 10_000,
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        minThreads: 1,
+        maxThreads: 8,
+        useAtomics: true,
+      },
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov'],
