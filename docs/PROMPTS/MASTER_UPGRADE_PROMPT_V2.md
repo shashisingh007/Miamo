@@ -828,9 +828,577 @@ Body must include:
 
 ---
 
-## 15. Definition of Done (no shortcuts)
+## 15. Phase 15 — Cascading rank pipeline (lakhs → 1) and the funnel contract
 
-- [ ] Phase 1 — `docs/PROMPTS/INVENTORY_V2.md` committed.
+> **Real-life framing.** User A is male, looking for female matches. India is
+> 500M+ women, the city is 5M, the basic-filter pool is ~100k, the realistic
+> candidate pool is ~1k, the discover stack is 100, and the *first card* he
+> sees is exactly 1. Every drop is a place we can lose Priya the right match
+> or push her into Arjun's stack at the wrong time. This phase makes every
+> drop deliberate, measurable, and personalisable.
+
+### 15.1 The five-stage funnel (must be implemented as named stages)
+
+Under `services/social/src/discover/pipeline.ts`, define a single function
+`buildDiscoverStack(me)` that runs the candidates through exactly five named
+stages. Each stage has its own latency budget, its own cache, its own
+telemetry counter, and its own kill-switch flag.
+
+| Stage | Pool size in → out | Latency budget | What it does | Cache | Flag |
+|---|---|---|---|---|---|
+| `S1_eligibility` | ∞ → ~100k | 50ms (postgres only) | hard filters: gender, age range, location radius, blocks, reports, banned, deleted, paused, intent-incompatible | Redis Bitset `eligible:<userIdHash>` TTL 6h | `PIPELINE_S1_ENABLED` (default on) |
+| `S2_recall` | 100k → ~5k | 100ms | cheap recall: CF neighbours ∪ interest-overlap top-k ∪ chronotype-match ∪ recent-active (last 7d) ∪ serendipity sample (1% random) | Redis Set `recall:<userIdHash>` TTL 30m | `PIPELINE_S2_ENABLED` |
+| `S3_compat_score` | 5k → ~500 | 200ms | `scoreForYouV6` over the recall set, drop everything below `minScore=45` | `PairCompatCache` (existing) | `PIPELINE_S3_ENABLED` |
+| `S4_policy_rerank` | 500 → ~100 | 50ms | discoverPolicy (window-shopping defence, zero-action recovery, fatigue, diversity buckets, repeat-pass blacklist last 24h) | none (in-memory) | `PIPELINE_S4_ENABLED` |
+| `S5_session_adapt` | 100 → 1 (top) | 20ms | per-swipe re-rank in browser using `postImpressionRerankV6` deltas from the in-session signal buffer | client-side | `PIPELINE_S5_ENABLED` |
+
+Total budget: **420ms p95** from request to first-card-rendered.
+Measured via a new histogram `discover_pipeline_latency_seconds{stage}`.
+
+### 15.2 The candidate funnel must be observable
+
+Every stage exports four counters/histograms:
+
+- `discover_pipeline_in_total{stage}` — candidates entering the stage
+- `discover_pipeline_out_total{stage}` — candidates leaving the stage
+- `discover_pipeline_dropped_total{stage,reason}` — broken out by drop reason
+  (e.g. `s1.dropped{reason="age_out_of_range"}`, `s3.dropped{reason="below_minScore"}`)
+- `discover_pipeline_latency_seconds{stage}` — p50/p95/p99
+
+A Grafana dashboard `k8s/grafana/dashboards/discover-funnel.json` visualises
+the funnel for a chosen user-id-hash, so we can debug "why am I seeing Arjun
+and not Vikram" in production with one click.
+
+### 15.3 Per-stage personalisation hooks
+
+At every stage, a per-user "learning weights" map (see Phase 16) influences
+the ranking. Stage S3 is the most personalisable: the `forYouV6` weights
+themselves are *per-user*, not constants — each user has a `UserWeightProfile`
+that starts as the global default and adapts over time. Phase 16 covers the
+learning loop; this phase covers the read-path plumbing (every stage takes
+a `weights: UserWeightProfile` argument).
+
+### 15.4 "Show me a different first card" — the cold-start escape hatch
+
+When `cardsViewed === 0 && timeOnPage > 8s` in a session, the UI shows a
+subtle "not seeing the right people?" chip below the stack. Tapping it:
+
+1. Fires `discover.refresh_request { reason: 'cold_start_no_engagement' }`.
+2. Re-runs S4 and S5 with `noveltyBoost=0.4` (pulls more candidates from the
+   serendipity sample).
+3. Re-runs S3 with `minScore=35` (loosens the threshold) for this one batch.
+4. Tracks the outcome: if the user swipes right on any of the new cards,
+   update their `UserWeightProfile` to permanently weight novelty +0.1.
+
+### 15.5 Tests required
+
+- Funnel contract test: feed a synthetic 10k candidate pool through the
+  pipeline, assert that every stage drops within its budget, total latency
+  < 420ms on the CI runner.
+- Drop-reason coverage: every drop has a labelled `reason`, no `reason="unknown"`.
+- Cold-start escape hatch: simulating 8s of no-engagement triggers the chip
+  exactly once per session; tapping it loosens minScore for one batch only.
+- Cache-hit ratio: with a warm cache, S1+S2+S3 latency drops by ≥ 60%.
+
+---
+
+## 16. Phase 16 — The user-learning loop (online learning per user, every refresh)
+
+> **Real-life framing.** User A liked tall women in June. By October, A is
+> consistently dwelling on profiles with creative bios regardless of height
+> and skipping tall profiles with sparse bios. The app must notice and
+> adapt. Today the weights are constants in code. After this phase, every
+> user has their own evolving weight profile.
+
+### 16.1 `UserWeightProfile` model
+
+```prisma
+model UserWeightProfile {
+  userIdHash       String   @id
+  // weights are stored as a Json blob keyed by lane name so we can add
+  // lanes without a migration
+  weights          Json     // { interestsOverlap: 0.18, vibeAlignment: 0.15, behaviouralTwinIndex: 0.15, ... }
+  noveltyBoost     Float    @default(0.0)   // 0..0.4
+  diversityBoost   Float    @default(0.0)
+  explorationRate  Float    @default(0.05)  // ε-greedy fraction
+  lastUpdatedAt    DateTime @updatedAt
+  // bandit state for the contextual bandit (see §16.3)
+  banditAlpha      Json     // per-lane success counts
+  banditBeta       Json     // per-lane failure counts
+  schemaVersion    Int      @default(1)
+  @@index([lastUpdatedAt])
+}
+```
+
+### 16.2 When the learner runs ("every refresh / reopen")
+
+The learner is **not** a nightly batch job. It runs incrementally at three
+triggers:
+
+1. **On every `app.foreground` event** (i.e. the user opens or re-opens the
+   app) — reconcile any pending updates from the last session, push the
+   updated `UserWeightProfile` into the hot Redis cache
+   `weights:fast:<userIdHash>` (TTL 1h).
+2. **On every `discover.refresh` event** (pull-to-refresh) — the user is
+   asking for new candidates; run the bandit update with the last batch's
+   outcome (swipes, dwells, openings).
+3. **On every `session.end`** — a full update using all session signals,
+   including derived ones (zeroActionSession, windowShopping, etc.). This
+   one runs in `tracking-worker`, not in-request, so it doesn't add latency.
+
+All three paths converge on the same `applyLearningUpdate(userIdHash, batch)`
+function in `services/shared/src/algo/learner.ts`.
+
+### 16.3 The contextual bandit (one screen of math)
+
+For each lane in the v6 recipe (interestsOverlap, vibeAlignment, twinIndex,
+reciprocalIntent, attentionFit, hesitationFit, etc.), maintain a Beta
+posterior over "does increasing this lane's weight improve outcomes for
+this user?":
+
+```
+for each card shown in the last batch:
+  outcome = mutualQualityInteractionStarted(card)  ? 1
+          : rightSwipeOnly(card)                   ? 0.4
+          : dwelt2sNoSwipe(card)                   ? 0.1
+          : leftSwipe(card)                        ? -0.2
+          : skipped(card)                          ? -0.05
+
+  for each lane L:
+    contribution_L = weight_L * breakdown[L]   // from card.explain.breakdown
+    if outcome > 0:
+      banditAlpha[L] += contribution_L * outcome
+    else:
+      banditBeta[L]  += contribution_L * |outcome|
+
+// Thompson sampling: at next forYou call, sample new weights
+for each lane L:
+  sampled_weight[L] = Beta(banditAlpha[L], banditBeta[L]).sample()
+// renormalise to sum to (1 - noveltyBoost - diversityBoost)
+weights = normalise(sampled_weight, target=1 - noveltyBoost - diversityBoost)
+```
+
+The explorationRate (ε-greedy) is the probability that for any given card
+slot, we ignore the bandit and show a candidate from the serendipity
+sample. Starts at 0.05, decays to 0.02 once the user has ≥ 200 swipes,
+bumps back to 0.10 after any week with `mutualQualityInteractionStarted = 0`.
+
+### 16.4 The drift detector ("A liked tall in June, not in October")
+
+Keep a 30-day rolling cohort score for the user: average outcome of cards
+shown 30 days ago vs cards shown today. If the cohort outcome diverges by
+> 25% lane-by-lane, mark the lane as **drifting** and *halve* its bandit
+posterior counts (so it re-learns faster). Implemented in
+`services/tracking-worker/src/drift.ts`, runs once per user per day.
+
+### 16.5 "Tell us what's wrong" — explicit negative feedback
+
+Numbers learned from behaviour are not enough — give Priya words too. On
+the discover card, long-press reveals a feedback sheet with these chips:
+
+- "Not my type" → fires `discover.feedback { reason: 'not_my_type' }`,
+  decreases `vibeAlignment` weight by δ=0.02 for this user.
+- "Wrong age range" → narrows the hard filter (S1) age window by 1y on each side.
+- "Too far" → narrows the city radius by 10%.
+- "Not serious enough" → increases `reciprocalIntentScore` weight by δ=0.03.
+- "Show me someone different" → increments `noveltyBoost` by 0.05 (capped at 0.4).
+- "I just don't know" → logs an `discover.feedback { reason: 'unknown' }`
+  with no weight change (we still surface this in the per-user dashboard).
+
+Feedback chips are also surfaced after a "left swipe with high dwell" — if
+Priya looked at the card for 6+ seconds and still rejected, the chip sheet
+slides up automatically (one-tap dismiss).
+
+Every feedback event is also a labelled training sample for the bandit
+(outcome = -0.5 for the relevant lane), so even users who never tap a chip
+benefit from those who do.
+
+### 16.6 Privacy and consent
+
+The `UserWeightProfile` is per-user-hash, never aggregated across users
+except anonymously for global priors. The feedback chips are stored under
+consent scope C only (full consent); under scope A/B the chip taps still
+adjust the local weight profile but are not retained for analytics.
+
+### 16.7 Cold-start defaults
+
+Until a user has ≥ 50 swipes, weights = global defaults (the v6 constants).
+Bandit posteriors start at Beta(1,1) so Thompson sampling is uniform.
+NoveltyBoost starts at 0.20 for cold users (they need variety to teach the
+model) and decays to 0.05 by swipe #100.
+
+### 16.8 Tests required
+
+- Weight normalisation: weights always sum to `1 - noveltyBoost - diversityBoost` ± 0.001.
+- Bandit monotonicity: a lane that gets 100 positive outcomes outranks a
+  lane that gets 100 negative outcomes.
+- Drift detector: synthetic 30d divergence halves the posterior counts.
+- Feedback chip: tapping "too far" narrows the radius for the next request.
+- Cold-start: a new user gets the global defaults; the first 50 swipes do
+  not change the weights (only fill the bandit posterior).
+- Privacy: under consent A, feedback events are not persisted to analytics.
+
+---
+
+## 17. Phase 17 — Performance, memory, storage, and cost discipline
+
+Every feature in this PR must respect strict resource budgets. The whole
+point of being smart about learning per-user is undone if we spend ₹50k/mo
+extra on Redis to do it.
+
+### 17.1 Per-request latency budgets (hard ceilings, p95)
+
+| Endpoint | Budget | Owner |
+|---|---|---|
+| `GET /v1/discover` (full pipeline) | 420ms | social |
+| `POST /v1/track` (single envelope, up to 50 events) | 80ms | ingest |
+| `GET /v1/feed/notifications` | 150ms | notifications |
+| `GET /v1/dtm/next-question` | 100ms | content |
+| `POST /v1/messages` | 200ms | messaging |
+| any read-through `PairCompatCache` lookup | 5ms | shared |
+
+If a budget is exceeded in CI (synthetic load), the PR fails. Use
+`autocannon` in CI for the hot endpoints.
+
+### 17.2 Memory ceilings (per pod, container memory limit)
+
+| Service | Limit | Why |
+|---|---|---|
+| social | 512Mi | hot path, many replicas |
+| tracking-worker | 1Gi | aggregates in-process |
+| ingest | 256Mi | thin shim |
+| messaging | 512Mi | |
+| notifications | 384Mi | |
+| content | 384Mi | |
+| users | 384Mi | |
+| auth | 256Mi | |
+| gateway | 512Mi | |
+
+Heap snapshots from CI must show no growth over a 10-minute synthetic run
+(GC stabilises). Add a `clinic doctor` job to CI for the worker.
+
+### 17.3 Storage budgets
+
+- `EventAggHourly` retention = 7 days (TTL with partition drop).
+- `EventAggDaily` retention = 90 days.
+- `SessionSummary` retention = 180 days; older rows compressed to a
+  `SessionSummaryArchive` table with only the derived flags retained.
+- `events:raw` Redis Stream `MAXLEN ~ 10_000_000` (capped).
+- `PairCompatCache` retention = 30 days from last hit; LRU eviction at
+  10M rows total.
+- `FeatureSnapshot.raw` JSONB columns must stay < 8KB per row average
+  (alert if exceeded).
+
+A new nightly job `services/tracking-worker/src/jobs/retention.ts` enforces
+all of the above. Implement, test, document in RUNBOOK.
+
+### 17.4 Cost discipline
+
+For every new feature in this PR, compute a rough ₹/month at 100k DAU:
+
+- new Postgres rows/day × ₹0.0001/row = storage cost
+- new Redis ops/day × ₹0.00001/op = compute cost
+- new outbound msgs (push notif, SMS) × ₹0.02/msg = vendor cost
+
+Reject any feature that adds > ₹5k/month per 100k DAU without a written
+justification in the PR description. Track in `docs/COST_AUDIT_V2.md`.
+
+### 17.5 Algorithmic complexity ceilings
+
+No single hot-path function (in S1-S5, in scoreForYouV6, in any
+SignalReader method) may be worse than O(n log n) where n is the candidate
+pool size. No nested loops over the candidate pool. CF neighbour lookup
+must be O(k) where k is the requested neighbour count (Redis Sorted Set
+ZREVRANGE).
+
+For every new function, write the Big-O in its JSDoc:
+
+```ts
+/** Scores a single pair. O(1) ignoring cache. */
+function scoreForYouV6(...) { ... }
+```
+
+### 17.6 Tests required
+
+- Latency budget tests: `autocannon` smoke against `discover` endpoint hits
+  p95 ≤ 420ms on the CI runner with 50 concurrent connections.
+- Memory leak test: tracking-worker processes 100k synthetic events,
+  heap-used after GC ≤ starting heap + 50MB.
+- Retention job: synthetic 30d-old EventAggHourly rows are dropped on next run.
+
+---
+
+## 18. Phase 18 — Test pyramid (unit → sanity → smoke → integration → e2e → load)
+
+The predecessor brief asked for a flat test count target. This brief
+requires explicit coverage at every level.
+
+### 18.1 The pyramid
+
+| Level | What it tests | Tool | Where it lives | Run when |
+|---|---|---|---|---|
+| Unit | pure functions, single class | Vitest | adjacent `__tests__/*.test.ts` | every commit |
+| Sanity | one happy path per public function ("can I call it without crashing") | Vitest | `**/sanity/*.test.ts` | every commit |
+| Smoke | one happy path per service (auth login → token → me) | Vitest + supertest | `services/<name>/__tests__/smoke/` | every commit |
+| Integration | cross-service contract (gateway → social → shared) | Vitest + docker-compose | `tests/integration/` | every push |
+| E2E | user journey (sign up → swipe → match → message) | Playwright | `tests/e2e/` | every push to main |
+| Load | hot endpoints under concurrency | autocannon | `tests/load/` | nightly + before release |
+| Security | OWASP top-10 sweep | OWASP ZAP baseline | `tests/security/` | weekly |
+
+Target counts (additive to the existing 314):
+
+- +60 unit tests for new algorithm code (Phase 3-5, 15-16)
+- +25 sanity tests (one per public function added)
+- +20 smoke tests (one per service touched, including auth flow)
+- +15 integration tests (discover pipeline end-to-end, learner end-to-end, Miamo Move telemetry round-trip)
+- +10 E2E Playwright tests (login → swipe → match → send move → reply)
+- +5 load tests (discover, ingest, messages, notif, feed)
+- +5 security tests (rate-limit, auth-required, input validation, no SSRF, no
+  prompt injection in user-supplied bios)
+
+**Floor: 314 → ≥ 454.** All green.
+
+### 18.2 Bug-scanning sweeps
+
+Before opening the PR, run all of:
+
+- `npm run typecheck` per service — zero errors.
+- `npm run lint` (ESLint with the existing config) — zero errors, zero warnings.
+- `npm audit --omit=dev` — zero critical, zero high.
+- `npx semgrep --config p/typescript --config p/owasp-top-ten` — zero high.
+- `npx depcheck` per service — zero unused deps reported (or document why).
+- `npx ts-prune` — zero unused exports (or document why).
+- `docker scout cves` against every built image — zero critical.
+- `kubectl --dry-run=server apply -f k8s/templates/` on a kind cluster — zero errors.
+
+Every bug found by the above is fixed in this PR. None are deferred.
+
+### 18.3 Best-practice enforcement
+
+Add a `.editorconfig`, `.prettierrc`, and `eslint.config.js` at the repo
+root if not already present, codifying:
+
+- 2-space indent, LF line endings, trailing newline.
+- No default exports outside Next.js pages.
+- No floating promises (`@typescript-eslint/no-floating-promises`).
+- No unused variables.
+- No `any` (warning) except in explicitly-named escape hatches (e.g. the
+  Zod inference layer).
+- Functions ≤ 60 lines, files ≤ 400 lines (warning).
+- Cyclomatic complexity ≤ 12 per function (warning).
+
+Wire these into a pre-commit hook (`husky` + `lint-staged`) and a CI check.
+
+---
+
+## 19. Phase 19 — UI/UX quality bar (resolutions, accessibility, polish)
+
+The Phase 6 audit lists *what* to check. This phase locks the *bar*.
+
+### 19.1 Resolutions and viewports
+
+Every page must render correctly at every breakpoint:
+
+| Breakpoint | Width | Target devices |
+|---|---|---|
+| xs | 320px | small Android (Redmi Go, KaiOS smartphone) |
+| sm | 360px | most Android phones in India |
+| md | 414px | iPhone 14/15 Pro Max |
+| lg | 768px | iPad portrait |
+| xl | 1024px | iPad landscape, small laptop |
+| 2xl | 1440px | desktop |
+| 3xl | 1920px | full HD desktop |
+| hd  | 2560px | QHD external monitor |
+
+No horizontal scroll at any breakpoint. Discover cards re-flow gracefully
+(image aspect ratio preserved, no text clipped).
+
+All user-supplied images served via `next/image` with the AVIF + WebP +
+fallback chain. Pre-compute @1x / @2x / @3x variants in `services/content/`
+at upload time.
+
+### 19.2 Accessibility (WCAG 2.2 AA minimum)
+
+- Every interactive element has an accessible name (aria-label or visible text).
+- Tab order matches visual order on every page.
+- Focus rings are visible (not removed by `outline: none`).
+- Colour contrast ≥ 4.5:1 for body text, ≥ 3:1 for large text and UI icons.
+- All form fields have associated labels.
+- All images have alt text (decorative images: `alt=""`).
+- Reduced-motion preference is honoured (swipe animation switches to fade).
+- Screen-reader pass on Discover, Chat, Profile, Settings — every action
+  is announced; the swipe gesture has a keyboard equivalent (← / →).
+- Run `axe-core` via Playwright on every page; zero violations.
+
+### 19.3 Visual polish
+
+- Design tokens (colours, spacing, radii, shadows, type scale) come from
+  one file (`services/web/src/lib/design-tokens.ts`). No magic hex values
+  in components.
+- Loading states use a skeleton shimmer matching the final layout (no
+  spinner-only states).
+- Empty states have an illustration + one-line description + primary CTA.
+- Error states have a friendly message in plain English + a retry button +
+  a "contact support" link (mailto) for repeat failures.
+- All animations ≤ 250ms unless the user is dragging (swipe).
+- All transitions use `ease-out` for entering, `ease-in` for leaving.
+- Haptic feedback (`navigator.vibrate(10)`) on successful swipe/match/match-burst,
+  honoured only if `prefers-reduced-motion: no-preference`.
+
+### 19.4 Internationalisation hooks
+
+All user-facing strings flow through `services/web/src/lib/i18n.ts`. Even
+if we ship only `en-IN` in this PR, no hardcoded strings in JSX. Number,
+date, currency formatting uses `Intl.*` APIs with the user's locale.
+
+### 19.5 Tests required
+
+- Visual regression: Playwright + percy/chromatic snapshots at xs, sm, md,
+  lg breakpoints for every page.
+- `axe-core` clean on every page.
+- Keyboard-only e2e: complete the sign-up → swipe → match → message journey
+  with no mouse / no touch.
+
+---
+
+## 20. Phase 20 — Security and compliance pass
+
+### 20.1 OWASP Top-10 sweep
+
+For each item, document where we stand in `docs/SECURITY_AUDIT_V2.md`:
+
+| Item | Coverage | Fix in this PR? |
+|---|---|---|
+| A01 Broken Access Control | every mutation gated by auth+ownership check | yes if any missing |
+| A02 Cryptographic Failures | HMAC user-id hashing; TLS everywhere; secrets in Secrets Manager | rotate `TRACKING_HASH_SECRET` doc |
+| A03 Injection | Zod on every input, Prisma parameterises queries | yes if any raw SQL found |
+| A04 Insecure Design | rate-limits + idempotency keys on every state-changing call | yes if any missing |
+| A05 Security Misconfiguration | helmet headers, CSP, no debug endpoints in prod | yes |
+| A06 Vulnerable Components | `npm audit` clean | yes |
+| A07 Auth/Identification Failures | rotation, expiry, refresh-token theft detection | document + add detection |
+| A08 Software/Data Integrity | image signing, SBOM in CI | add SBOM step |
+| A09 Logging/Monitoring | every mutation audit-logged, every auth event security-logged | yes |
+| A10 SSRF | URL allow-list on the link-preview endpoint | yes |
+
+### 20.2 Secrets handling
+
+- No secret in `values.yaml` or any committed file.
+- `TRACKING_HASH_SECRET`, `JWT_SECRET`, DB password, Redis password all
+  come from `External Secrets` / `Sealed Secrets`.
+- A new doc `docs/SECRETS.md` lists every secret, its rotation cadence,
+  and the rotation runbook.
+- HMAC rotation must be **online**: the worker accepts events signed by
+  the current OR previous secret for a 7-day window.
+
+### 20.3 PII minimisation
+
+- The `userIdHash` in tracking is HMAC-SHA-256, never reversible to the
+  raw user id without the secret.
+- Bios are stored encrypted at rest (AES-GCM with KEK in KMS).
+- Photos are stored in object storage with signed URLs, never public URLs.
+- Voice notes are stored encrypted; transcripts (if generated) are
+  per-user-encrypted.
+- A new endpoint `DELETE /v1/me/data` purges every row touching a user
+  within 30 days (GDPR + Indian DPDP Act 2023 compliant). Implement.
+
+### 20.4 Tests required
+
+- Rate-limit test: 100 requests/sec from one user gets 429.
+- Auth-required test: every mutation returns 401 unauthenticated.
+- SSRF test: link preview rejects `http://169.254.169.254/...` and any
+  private IP ranges.
+- Right-to-be-forgotten test: `DELETE /v1/me/data` removes the row from
+  every table touching that user.
+
+---
+
+## 21. Phase 21 — Documentation rewrite (technical + non-technical, with real-life examples)
+
+Every doc must be readable by **three** audiences:
+
+- **Meera** (non-tech, ops/support team): can read the top of the doc and
+  understand what changed in plain English without any code.
+- **Priya** (PM, designer, executive): can read the top + the diagrams +
+  the worked examples and make product/business decisions.
+- **Arjun** (engineer): reads the whole thing, runs the SQL snippets,
+  understands the code links.
+
+### 21.1 Section template every doc must follow
+
+```
+# <Title>
+
+## In one sentence (Meera)
+
+<one sentence, no jargon>
+
+## In one paragraph (Priya)
+
+<≤ 100 words, can include the north-star metric, no code>
+
+## A real-life example (everyone)
+
+<one concrete walkthrough: "Priya, 27, Bangalore, opens the app at 8pm,
+sees Arjun's card, dwells for 4s, swipes right, ..." with the specific
+numbers each subsystem produces>
+
+## How it works (Arjun)
+
+<the engineering body — code links, SQL, formulae, sequence diagrams>
+
+## How to operate it (Arjun + on-call)
+
+<runbook entries, alerts, rollback steps>
+
+## How we know it is working (Priya + on-call)
+
+<dashboards, metrics, the north-star, SLOs>
+```
+
+Apply this template to every doc updated in this PR, including the new
+audits.
+
+### 21.2 New docs to create
+
+- `docs/USER_LEARNING.md` — the bandit + drift + feedback loop, with Priya × Arjun worked example.
+- `docs/DISCOVER_PIPELINE.md` — the 5-stage funnel with the lakhs → 1 walkthrough.
+- `docs/FRONTEND_AUDIT_V2.md` (already named in Phase 6)
+- `docs/BACKEND_AUDIT_V2.md` (already named in Phase 7)
+- `docs/DB_AUDIT_V2.md` (already named in Phase 8)
+- `docs/REDIS_AUDIT_V2.md` (already named in Phase 9)
+- `docs/DEVOPS_AUDIT_V2.md` (already named in Phase 10)
+- `docs/COST_AUDIT_V2.md` — ₹/mo per feature from Phase 17.
+- `docs/SECURITY_AUDIT_V2.md` — OWASP table from Phase 20.
+- `docs/SECRETS.md` — rotation registry.
+- `docs/PERF_BUDGETS.md` — latency + memory + storage ceilings from Phase 17.
+
+### 21.3 Existing docs to update
+
+Every existing doc gets the Meera/Priya/Arjun sections added if missing,
+plus a real-life example. Specifically:
+
+- `docs/ARCHITECTURE.md` — add the 5-stage funnel diagram and the learner loop diagram.
+- `docs/TRACKING.md` — add the v5 event families and the total-state guarantees from Phase 2.
+- `docs/ALGORITHMS.md` — add the v6 fleet table, the v6 worked example, the learner section.
+- `docs/DEVOPS.md` — add the new HPA targets and the discover-funnel Grafana dashboard.
+- `docs/RUNBOOK.md` — add the new alerts (Phase 10) and the new rollback steps (per-flag).
+- Every `services/<name>/README.md` — add a "what we own / what we read / what we write" table.
+
+### 21.4 Diagrams
+
+Use Mermaid (already supported in the repo). Every major flow gets a
+diagram, not just prose:
+
+- The 5-stage discover funnel.
+- The total-state tracking pipeline (browser → ingest → stream → worker → SessionSummary → SignalReader → algo).
+- The learner loop (trigger → outcome → bandit update → weight refresh → next discover request).
+- The Miamo Move v3 telemetry loop (first move sent → reply detected → UserMoveProfile update → next suggestion).
+
+---
+
+## 22. Definition of Done (no shortcuts)
+
+- [ ] Phase 1 — `docs/PROMPTS/INVENTORY_V2.md` written.
 - [ ] Phase 2 — every total-state event family lives in the catalogue, the
       collector, the validator, the rollup, and the SessionSummary writer.
 - [ ] Phase 3 — `scoreForYouV6` + every v6 algorithm dispatcher behind
@@ -846,17 +1414,54 @@ Body must include:
 - [ ] Phase 8 — every Prisma model audited, every missing index added.
 - [ ] Phase 9 — every Redis key prefix documented, every missing TTL added.
 - [ ] Phase 10 — every k8s template audited, observability stack additions
-      committed.
-- [ ] Phase 11 — test count ≥ 425, 100% green on `npx vitest run`.
+      written.
+- [ ] Phase 11 — test count ≥ 454, 100% green on `npx vitest run`.
 - [ ] Phase 12 — every doc updated, v3-accessibility voice maintained.
 - [ ] Phase 13 — `ts-prune` clean (or documented exceptions), no
       `console.log` outside test files, no empty catches.
-- [ ] Phase 14 — branch pushed, PR open, DoD ticked in PR body, CI green,
-      mutual-quality-interaction dashboard monitored post-merge.
+- [ ] Phase 14 — branch pushed only after the human types `commit`; see §22.2.
+- [ ] Phase 15 — 5-stage discover pipeline implemented, each stage observable,
+      cold-start escape hatch shipped, funnel dashboard committed.
+- [ ] Phase 16 — `UserWeightProfile` + Thompson-sampling bandit + drift
+      detector + feedback chip sheet shipped behind `ALGO_V6_LEARNER_ENABLED`.
+- [ ] Phase 17 — every endpoint inside its latency budget on CI, retention
+      job implemented, cost audit written, no O(n²) hot paths.
+- [ ] Phase 18 — unit / sanity / smoke / integration / e2e / load / security
+      tests at the stated counts; all bug-scanning sweeps green.
+- [ ] Phase 19 — every page passes axe-core; visual regression snapshots at
+      every breakpoint captured; reduced-motion + keyboard-only journeys pass.
+- [ ] Phase 20 — OWASP audit table written; secrets rotation runbook
+      written; `DELETE /v1/me/data` implemented and tested.
+- [ ] Phase 21 — every doc rewritten to Meera/Priya/Arjun structure with a
+      real-life example and at least one Mermaid diagram for new flows.
+
+### 22.1 Test count summary
+
+- Predecessor PR ended at 314 tests, all green.
+- This PR ends at **≥ 454 tests**, all green, across unit/sanity/smoke/
+  integration/e2e/load/security tiers (per Phase 18).
+
+### 22.2 Commit and push policy (read this carefully)
+
+> **Do not commit. Do not push. Do not open the PR.** Stage every change in
+> the working tree across every phase. Run the full test suite locally
+> after each phase to verify green. Write a running summary of changes
+> under `docs/PROMPTS/IN_FLIGHT_V2.md`. When every phase is complete and
+> every test is green, **stop and wait** for the human operator to say one
+> of these literal commands:
+>
+> - `commit` — then create the per-phase Conventional Commits per §14.2,
+>   push to `feat/total-state-v6`, and open the PR.
+> - `commit-and-merge` — same as above, then `gh pr merge --merge`.
+> - `rollback` — `git stash` and report what was held back.
+>
+> The agent must not commit on its own initiative, must not auto-push,
+> must not open the PR before this human go-ahead. The single PR remains
+> the eventual goal, but the trigger is human, not autonomous.
 
 ---
 
-## 16. Anti-patterns — do not do these
+## 23. Anti-patterns — do not do these
 
 - ❌ Do not "stub" or "TODO later" any phase. If you cannot finish a phase
   in this PR, ship the parts you can finish and open a follow-up issue
@@ -873,17 +1478,24 @@ Body must include:
 - ❌ Do not bypass code review on this PR (no `--admin` merge).
 - ❌ Do not optimise for swipes, matches, DAU, or session length. The only
   metric that matters is mutual quality interaction.
+- ❌ Do not commit, push, or open the PR until the human operator types
+  `commit` or `commit-and-merge` (see §22.2).
+- ❌ Do not let one slow lane blow the latency budget — cache and parallelise.
+- ❌ Do not store any PII in the `userIdHash` namespace — the hash is
+  irreversible by design.
 
 ---
 
-## 17. Anti-shortcuts the user expects you to honour
+## 24. Anti-shortcuts the user expects you to honour
 
 When the user (the human reading this) says "execute", you do not:
 
 - Ask which phase to start with → start with Phase 1.
-- Ask whether to commit → commit per §14.2.
-- Ask whether to push → push after each phase passes tests.
-- Ask whether to open the PR → open it after Phase 14.
+- Ask whether to commit → **do not commit** until the human says `commit`
+  (per §22.2). Stage changes in the working tree; run tests after each phase.
+- Ask whether to push → push only after the human types `commit`.
+- Ask whether to open the PR → open it only after the human types
+  `commit` or `commit-and-merge`.
 
 The user has already approved this brief by sending it to you. The only
 thing that should pause you is a genuine ambiguity (a model field that
@@ -892,14 +1504,24 @@ data, a UI change that would require designer input). For genuine
 ambiguities, raise them as `BLOCKER:` items in `docs/PROMPTS/INVENTORY_V2.md`
 and continue with the next phase.
 
+Keep an append-only progress log at `docs/PROMPTS/IN_FLIGHT_V2.md` after
+every phase: phase name, files touched (count + a representative list),
+test delta, decisions made, blockers found, what's next. This is the
+artefact the human reads before typing `commit`.
+
 ---
 
-## 18. One-line summary for the agent
+## 25. One-line summary for the agent
 
-> Track every state (including idle), score every pair on behaviour not just
-> bio, personalise every algorithm to the recipient's archetype, audit every
-> page / endpoint / model / key / template, document everything in
-> v3-accessibility voice, ship ≥ 111 new tests, default every new flag off,
-> open one PR, watch the north-star metric.
+> Track every state including idle, learn each user's weights online with a
+> Thompson-sampled bandit that updates on every refresh, cascade lakhs of
+> candidates through five named stages to one perfectly-ranked first card,
+> let the user say "not this kind" with chips that feed the same loop, hold
+> every endpoint inside a strict latency / memory / storage / cost budget,
+> pass unit + sanity + smoke + integration + e2e + load + security tests,
+> match the OWASP top-10, render correctly from 320px to 2560px, rewrite
+> every doc for Meera · Priya · Arjun with real-life examples and Mermaid
+> diagrams, default every new flag off, **stage everything and stop — do not
+> commit until the human types `commit`**.
 
 **Go.**

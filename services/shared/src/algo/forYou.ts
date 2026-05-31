@@ -14,7 +14,8 @@ import { cosine, cosTo01, expDecay, logScale, compose, clip100, jaccard } from '
 import type { SignalReader, FeatureRow, PairRow, PairBehavior } from './signals';
 import type { AlgoConsentTag } from './consent';
 import { registerAlgo } from './registry';
-import { v5FeatureEnabled } from './flags';
+import { v5FeatureEnabled, v6FeatureEnabled } from './flags';
+import { scoreForYouV6 } from './forYouV6';
 
 export const FORYOU_WEIGHTS = {
   interestCos: 0.25,
@@ -262,8 +263,9 @@ export function scoreForYouV5(inp: ForYouInputs): { score: number; explain: Expl
   };
 }
 
-/** Dispatcher: returns v5 when the feature flag is on; otherwise v4. */
+/** Dispatcher: v6 if `ALGO_V6_FOR_YOU_ENABLED`, else v5 if `ALGO_V5_FOR_YOU_ENABLED`, else v4. */
 export function scoreForYou(inp: ForYouInputs): { score: number; explain: Explain } {
+  if (v6FeatureEnabled('forYou')) return scoreForYouV6(inp);
   return v5FeatureEnabled('forYou') ? scoreForYouV5(inp) : scoreForYouV4(inp);
 }
 

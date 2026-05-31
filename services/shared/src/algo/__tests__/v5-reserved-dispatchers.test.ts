@@ -38,11 +38,12 @@ describe('reserved v5 dispatchers — score equality with v4', () => {
   it('new: dispatcher result equals v4 with flag on or off', () => {
     const inp: NewInputs = { ...fyBase, candCreatedAtMs: Date.now(), verified: true, completeness: 0.8 };
     const expected = scoreNewV4(inp).score;
+    // `new` scorer reads Date.now() internally for age decay; tolerate sub-ms drift.
     withFlag('ALGO_V5_NEW_ENABLED', false, () => {
-      expect(scoreNewDispatch(inp).score).toBe(expected);
+      expect(scoreNewDispatch(inp).score).toBeCloseTo(expected, 4);
     });
     withFlag('ALGO_V5_NEW_ENABLED', true, () => {
-      expect(scoreNewDispatch(inp).score).toBe(expected);
+      expect(scoreNewDispatch(inp).score).toBeCloseTo(expected, 4);
     });
   });
 

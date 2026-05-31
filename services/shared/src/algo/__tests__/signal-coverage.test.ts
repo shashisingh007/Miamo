@@ -27,6 +27,8 @@ import '../../algo/searchAugment';
 import '../../algo/feedAugment';
 import '../../algo/postImpressionRerank';
 import '../../algo/aiMatch';
+// v6 algorithm registrations (claim a subset of the v6 events; the rest stay OPERATIONAL until further v6 algos ship).
+import '../../algo/forYouV6';
 
 import * as fs from 'fs';
 import * as path from 'path';
@@ -80,6 +82,17 @@ const OPERATIONAL_EVENTS = new Set<string>([
   'error.slow_api',           // operational
   'error.sse_disconnect',     // operational
   'error.sse_reconnect',      // operational
+  // ─── v6 additions — total-state tracking ─────────────────────────
+  // Claimed operationally until v6 algorithm dispatchers wire them up
+  // (see MASTER_UPGRADE_PROMPT_V2 §2 collectors and §5 discoverPolicy).
+  // NOTE: forYouV6 (Phase 3) claims attention.idle.enter/exit, nav.route,
+  // session.summary, profile.self_view_dwell, intent.dwell — those moved
+  // into the algo registry and are removed from OPERATIONAL_EVENTS.
+  'focus.element',            // v6 reserved: feedAugmentV6 (focusAffinityByKind)
+  'filter.hesitation',        // v6 reserved: feedAugmentV6 (filterHesitationDamping)
+  'msg.voice_rerecord',       // v6 reserved: messageSuggestV6 (composure signal)
+  'notif.look_no_act',        // v6 reserved: notifyTimingV6 (silent-dismiss back-off)
+  'dtm.partial_abandon',      // v6 reserved: dtmV6 (question-order reranker)
 ]);
 
 function readTrackedEventNames(): string[] {

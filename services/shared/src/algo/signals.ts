@@ -64,6 +64,37 @@ export type PairBehavior = {
   maxDwellMs: number;
 };
 
+/** v6: derived session-level rollup produced by tracking-worker at session.end. */
+export type SessionSummaryRow = {
+  uidHash: string;
+  sessionId: string;
+  startedAt: Date;
+  endedAt: Date;
+  durationMs: number;
+  idleMs: number;
+  routesVisited: string[];
+  cardsViewed: number;
+  swipesLeft: number;
+  swipesRight: number;
+  msgsSent: number;
+  msgsRead: number;
+  /** session was foreground >30s with zero swipes/msgs/clicks. */
+  zeroActionSession: boolean;
+  /** session opened, scrolled, closed without committing any swipe. */
+  windowShopping: boolean;
+  /** session opened with unread msgs, closed without sending. */
+  ghostedSelf: boolean;
+};
+
+/** v6: per-(route, elementId) focus/dwell affinity for a user, last N days. */
+export type FocusAffinityRow = {
+  route: string;
+  elementId: string;
+  focusCount: number;
+  dwellSumMs: number;
+  lastSeenAt: Date;
+};
+
 export interface SignalReader {
   hashOf(userId: string): string;
   features(uidHash: string): Promise<FeatureRow | null>;
@@ -79,6 +110,10 @@ export interface SignalReader {
   dailyMatch(uidHash: string): Promise<{ bHash: string; score: number; computedAt: string } | null>;
   /** v4: per-pair behaviour signals (regrets, repeat-passes, returns, dwell). */
   pairBehavior(aHash: string, bHashes: string[], days: number): Promise<Map<string, PairBehavior>>;
+  /** v6: recent session rollups for a user (most-recent first). */
+  sessionSummaries?(uidHash: string, days: number): Promise<SessionSummaryRow[]>;
+  /** v6: per-element focus/dwell affinity for a user, last N days. */
+  focusAffinity?(uidHash: string, days: number): Promise<FocusAffinityRow[]>;
 }
 
 const FEATURES_TTL_MS = 60_000;
