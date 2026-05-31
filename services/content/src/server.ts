@@ -6,7 +6,7 @@ import { scoreFeedItem, scoreDtm, scoreDtmEnhanced, type FeedItem, type FeedUser
 import { logger } from '../../shared/src/logger';
 import { errorHandler } from '../../shared/src/errorHandler';
 import { validate } from '../../shared/src/validate';
-import { feedPostBodySchema, feedPostUpdateBodySchema, reactionBodySchema, commentBodySchema, storyBodySchema, storyReactBodySchema, videoBodySchema, showcaseCreateBodySchema, showcaseUpdateBodySchema, SHOWCASE_LINK_ALLOWLIST } from '../../shared/src/schemas';
+import { feedPostBodySchema, feedPostUpdateBodySchema, reactionBodySchema, commentBodySchema, storyBodySchema, storyReactBodySchema, videoBodySchema, showcaseCreateBodySchema, showcaseUpdateBodySchema, SHOWCASE_LINK_ALLOWLIST, deferCreateBodySchema, deferListQuerySchema, deferResolveBodySchema, DEFER_PILE_CAP } from '../../shared/src/schemas';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
 import { createPrisma, applyBaseMiddleware, installHealthRoutes, createInternalAuthMiddleware } from '../../shared/src/service';
@@ -16,6 +16,7 @@ import { PrismaSignalReader } from '../../shared/src/algo/signals';
 import { rankForYou } from '../../shared/src/algo/forYou';
 import { rerankFeed } from '../../shared/src/algo/feedAugment';
 import { v4RankEnabled } from '../../shared/src/algo/flags';
+import { hashUid } from '../../shared/src/track/hash';
 
 const prisma = createPrisma(15);
 export const app = express();
@@ -1732,6 +1733,78 @@ app.delete('/api/v1/showcase/:id', authMiddleware, async (req: AuthRequest, res:
     await prisma.showcaseItem.delete({ where: { id: req.params.id } });
     auditLog(prisma, req.userId!, 'showcase_delete', { id: req.params.id });
     res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
+
+// ═══ DEFERRED ITEMS (v6.6 see-later pile) ════════════════════════════
+// Persistent "see later" pile for Discover and DTM. Rows are scoped by
+// HMAC(uidHash) so the table is join-able with the rest of the v6 tracking
+// stack (FeatureSnapshot, PairCompatCache, EventAggDaily). Resolution is
+// idempotent: re-resolving with the same action is a no-op; re-resolving
+// with a different action overwrites. Pruning of rows older than 30 days
+// is handled by tracking-worker on a separate cadence.
+
+// POST /api/v1/defer — add an item to the see-later pile (idempotent on (uidHash, surface, targetId)).
+app.post('/api/v1/defer', authMiddleware, validate({ body: deferCreateBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const uidHash = hashUid(req.userId!);
+    const { surface, targetId, topic, batchId, reason } = req.body as { surface: string; targetId: string; topic?: string; batchId?: string; reason?: string };
+    const row = await prisma.deferredItem.upsert({
+      where: { uidHash_surface_targetId: { uidHash, surface, targetId } },
+      create: { uidHash, surface, targetId, topic, batchId, reason },
+      // re-deferring resets the resolution state but keeps original deferredAt
+      update: { topic, batchId, reason, viewedAt: null, resolvedAt: null, resolvedAction: null },
+    });
+    res.json({ data: { id: row.id, deferredAt: row.deferredAt } });
+  } catch (e) { next(e); }
+});
+
+// GET /api/v1/defer?surface=discover&kind=pending — list the pile.
+app.get('/api/v1/defer', authMiddleware, validate({ query: deferListQuerySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const uidHash = hashUid(req.userId!);
+    const q = req.query as unknown as { surface: string; kind: 'pending' | 'resolved' | 'all'; limit: number };
+    const where: { uidHash: string; surface: string; resolvedAt?: null | { not: null } } = { uidHash, surface: q.surface };
+    if (q.kind === 'pending') where.resolvedAt = null;
+    else if (q.kind === 'resolved') where.resolvedAt = { not: null };
+    const items = await prisma.deferredItem.findMany({
+      where,
+      orderBy: { deferredAt: 'desc' },
+      take: q.limit ?? DEFER_PILE_CAP,
+    });
+    res.json({ data: { items, count: items.length } });
+  } catch (e) { next(e); }
+});
+
+// POST /api/v1/defer/:id/view — mark first re-view of a deferred item.
+app.post('/api/v1/defer/:id/view', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const uidHash = hashUid(req.userId!);
+    const existing = await prisma.deferredItem.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.uidHash !== uidHash) return res.status(404).json({ error: { message: 'Not found', code: 'NOT_FOUND' } });
+    if (existing.viewedAt) return res.json({ data: { id: existing.id, viewedAt: existing.viewedAt } });
+    const updated = await prisma.deferredItem.update({
+      where: { id: existing.id },
+      data: { viewedAt: new Date() },
+      select: { id: true, viewedAt: true },
+    });
+    res.json({ data: updated });
+  } catch (e) { next(e); }
+});
+
+// POST /api/v1/defer/:id/resolve — close out a deferred item with the final action.
+app.post('/api/v1/defer/:id/resolve', authMiddleware, validate({ body: deferResolveBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const uidHash = hashUid(req.userId!);
+    const existing = await prisma.deferredItem.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.uidHash !== uidHash) return res.status(404).json({ error: { message: 'Not found', code: 'NOT_FOUND' } });
+    const { action } = req.body as { action: string };
+    const updated = await prisma.deferredItem.update({
+      where: { id: existing.id },
+      data: { resolvedAt: new Date(), resolvedAction: action },
+      select: { id: true, resolvedAt: true, resolvedAction: true },
+    });
+    res.json({ data: updated });
   } catch (e) { next(e); }
 });
 

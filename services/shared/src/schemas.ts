@@ -435,3 +435,27 @@ export const dtmProfileUpdateBodySchema = z.object({
   expectedTimeline:   z.enum(['6mo', '1yr', '2yr+']).optional().nullable(),
   kundliUrl:          z.string().trim().max(2048).optional().nullable(),
 }).passthrough();
+
+// ─── v6.6 Deferred Items (see-later pile) ───────────────
+export const DEFER_SURFACES = ['discover', 'dtm'] as const;
+export const DEFER_ACTIONS = ['like', 'pass', 'super_like', 'see_later', 'answered', 'skipped'] as const;
+export const DEFER_REASONS = ['not_now', 'thinking', 'unsure', 'other'] as const;
+export const DEFER_PILE_CAP = 100;
+
+export const deferCreateBodySchema = z.object({
+  surface:  z.enum(DEFER_SURFACES),
+  targetId: z.string().min(1).max(128),
+  topic:    z.string().min(1).max(64).optional(),
+  batchId:  z.string().min(1).max(64).optional(),
+  reason:   z.enum(DEFER_REASONS).optional(),
+});
+
+export const deferListQuerySchema = z.object({
+  surface: z.enum(DEFER_SURFACES),
+  kind:    z.enum(['pending', 'resolved', 'all']).optional().default('pending'),
+  limit:   z.coerce.number().int().min(1).max(DEFER_PILE_CAP).optional().default(DEFER_PILE_CAP),
+});
+
+export const deferResolveBodySchema = z.object({
+  action: z.enum(DEFER_ACTIONS),
+});
