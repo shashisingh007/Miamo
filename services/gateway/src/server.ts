@@ -519,6 +519,8 @@ app.use('/api/v1/videos', requireAuth, feedLimiter, createProxyMiddleware(proxyT
 app.use('/api/v1/creativity', requireAuth, feedLimiter, createProxyMiddleware(proxyTo(SERVICES.content)));
 app.use('/api/v1/showcase', requireAuth, feedLimiter, createProxyMiddleware(proxyTo(SERVICES.content)));
 app.use('/api/v1/matrimonial', requireAuth, createProxyMiddleware(proxyTo(SERVICES.content)));
+// v6.6 — see-later pile (Discover + DTM)
+app.use('/api/v1/defer', requireAuth, requireOnboarded, createProxyMiddleware(proxyTo(SERVICES.content)));
 
 // Notification routes (protected)
 app.use('/api/v1/notifications', requireAuth, createProxyMiddleware(proxyTo(SERVICES.notifications)));

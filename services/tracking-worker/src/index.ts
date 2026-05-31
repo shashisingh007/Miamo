@@ -23,6 +23,7 @@ import { FirstMoveOutcomeWorker } from './firstMoveOutcome';
 import { SessionSummaryWorker } from './sessionSummary';
 import { FocusAffinityWorker } from './focusAffinity';
 import { LearnerLoop } from './learnerLoop';
+import { DeferPrune } from './deferPrune';
 import { getRegistry } from '../../shared/src/algo/registry';
 import { v4FlagSnapshot } from '../../shared/src/algo/flags';
 // Register every algo so getRegistry() returns the full inventory.
@@ -60,6 +61,7 @@ const firstMoveOutcome = new FirstMoveOutcomeWorker(prisma);
 const sessionSummary = new SessionSummaryWorker(prisma);
 const focusAffinity = new FocusAffinityWorker(prisma);
 const learnerLoop = new LearnerLoop(prisma);
+const deferPrune = new DeferPrune(prisma);
 
 const app = express();
 app.get('/healthz', (_req, res) => res.json({
@@ -91,6 +93,8 @@ async function main(): Promise<void> {
     sessionSummary.start();
     focusAffinity.start();
     learnerLoop.start();
+    // v6.6 — default-OFF; runs every 6h to drop stale see-later rows.
+    deferPrune.start();
   } else {
     // eslint-disable-next-line no-console
     console.warn('[worker] TRACKING_KILL=1 — loops disabled, only /healthz live');
@@ -101,6 +105,7 @@ async function main(): Promise<void> {
   });
   const shutdown = async (): Promise<void> => {
     server.close();
+    deferPrune.stop();
     learnerLoop.stop();
     focusAffinity.stop();
     sessionSummary.stop();

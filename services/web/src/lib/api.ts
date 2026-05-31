@@ -143,6 +143,24 @@ class ApiClient {
  async getDiscoverFilters() { return this.request<ApiResponse<DiscoverFilters>>('/api/v1/discover/filters'); }
  async saveDiscoverFilters(filters: Partial<DiscoverFilters>) { return this.request<ApiResponse<DiscoverFilters>>('/api/v1/discover/filters', { method: 'PUT', body: JSON.stringify(filters) }); }
 
+ // ─── v6.6 See-later pile (Discover + DTM) ──────────
+ // Persistent deferral pile. `surface` is 'discover' | 'dtm'; `targetId`
+ // is the profile id (discover) or question id (dtm). Resolution is
+ // idempotent and replaces any prior resolvedAction.
+ async deferItem(args: { surface: 'discover' | 'dtm'; targetId: string; topic?: string; batchId?: string; reason?: 'not_now' | 'thinking' | 'unsure' | 'other' }) {
+ return this.request<ApiResponse<{ id: string; deferredAt: string }>>('/api/v1/defer', { method: 'POST', body: JSON.stringify(args) });
+ }
+ async listDeferred(args: { surface: 'discover' | 'dtm'; kind?: 'pending' | 'resolved' | 'all'; limit?: number }) {
+ const qs = new URLSearchParams({ surface: args.surface, ...(args.kind ? { kind: args.kind } : {}), ...(args.limit ? { limit: String(args.limit) } : {}) }).toString();
+ return this.request<ApiResponse<{ items: Array<{ id: string; surface: string; targetId: string; topic: string | null; deferredAt: string; viewedAt: string | null; resolvedAt: string | null; resolvedAction: string | null }>; count: number }>>(`/api/v1/defer?${qs}`);
+ }
+ async viewDeferred(id: string) {
+ return this.request<ApiResponse<{ id: string; viewedAt: string }>>(`/api/v1/defer/${id}/view`, { method: 'POST' });
+ }
+ async resolveDeferred(id: string, action: 'like' | 'pass' | 'super_like' | 'see_later' | 'answered' | 'skipped') {
+ return this.request<ApiResponse<{ id: string; resolvedAt: string; resolvedAction: string }>>(`/api/v1/defer/${id}/resolve`, { method: 'POST', body: JSON.stringify({ action }) });
+ }
+
  // Matches
  async getMatches(params?: Record<string, string>) {
  const qs = params ? '?' + new URLSearchParams(params).toString() : '';

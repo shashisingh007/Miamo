@@ -6,6 +6,7 @@ export default defineConfig({
       'services/shared/**/*.{test,spec}.ts',
       'services/ingest/**/*.{test,spec}.ts',
       'services/tracking-worker/**/*.{test,spec}.ts',
+      'services/content/**/*.{test,spec}.ts',
       'tests/**/*.{test,spec}.ts',
     ],
     exclude: [
