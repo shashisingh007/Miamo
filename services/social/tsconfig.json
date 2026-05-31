@@ -24,6 +24,11 @@
     "dist",
     "**/*.test.ts",
     "**/*.spec.ts",
-    "**/*.integration.test.ts"
+    "**/*.integration.test.ts",
+    "../shared/**/__tests__/**",
+    "../shared/**/*.test.ts",
+    "../shared/**/*.spec.ts",
+    "../shared/experiments/**",
+    "../shared/prisma/**"
   ]
 }

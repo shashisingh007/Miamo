@@ -2,33 +2,29 @@
   "compilerOptions": {
     "target": "ES2022",
     "module": "commonjs",
-    "lib": [
-      "ES2022"
-    ],
+    "lib": ["ES2022"],
     "outDir": "./dist",
-    "rootDir": "..",
+    "rootDir": ".",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "declaration": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "noEmit": true
   },
-  "include": [
-    "src/**/*",
-    "../shared/**/*.ts"
-  ],
+  "include": ["src/**/*", "*.ts"],
   "exclude": [
     "node_modules",
     "dist",
+    "prisma",
     "**/*.test.ts",
     "**/*.spec.ts",
     "**/*.integration.test.ts",
-    "../shared/**/__tests__/**",
-    "../shared/**/*.test.ts",
-    "../shared/**/*.spec.ts",
-    "../shared/experiments/**",
-    "../shared/prisma/**"
+    "src/__tests__/**",
+    "src/algo/__tests__/**",
+    "src/track/__tests__/**",
+    "src/experiments/**"
   ]
 }

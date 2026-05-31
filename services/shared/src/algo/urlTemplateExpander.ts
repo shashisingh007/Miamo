@@ -49,7 +49,7 @@ function pctEncode(s: string, allowReserved: boolean): string {
   return out;
 }
 
-function isDefined(v: UriTemplateValue): boolean {
+function isDefined(v: UriTemplateValue): v is NonNullable<UriTemplateValue> {
   if (v === undefined || v === null) return false;
   if (Array.isArray(v)) return v.length > 0;
   if (typeof v === 'object') return Object.keys(v).length > 0;

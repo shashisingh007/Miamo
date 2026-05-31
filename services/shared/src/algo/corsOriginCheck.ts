@@ -36,7 +36,7 @@ function originMatchesPattern(origin: string, pattern: string): boolean {
 }
 
 export function checkCorsOrigin(origin: string | null | undefined, policy: CorsOriginPolicy): CorsOriginDecision {
-  if (origin === undefined || origin === '') return { allowed: false, reflect: null, reason: 'no_origin' };
+  if (origin == null || origin === '') return { allowed: false, reflect: null, reason: 'no_origin' };
   if (origin === 'null') {
     return policy.allowNullOrigin
       ? { allowed: true, reflect: 'null' }

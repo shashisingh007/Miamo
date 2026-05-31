@@ -42,7 +42,7 @@ export function rankDtmCandidatesByLift(
   }
 
   const scored = candidates.map((c) => {
-    const topics = (c.topics ?? []).filter((t) => INDEX.has(t));
+    const topics = (c.topics ?? ([] as ReadonlyArray<DtmTopicKey>)).filter((t: DtmTopicKey) => INDEX.has(t));
     if (topics.length === 0) return { ...c, lift: 0 };
     let sum = 0;
     for (const t of topics) sum += 1 / (counts[INDEX.get(t)!] + 1);

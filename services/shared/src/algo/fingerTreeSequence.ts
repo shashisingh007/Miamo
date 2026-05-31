@@ -29,9 +29,10 @@ function cons<T>(x: T, t: Tree<T>): Tree<T> {
     const newPrefix = [x, ...p] as Digit<T>;
     return deep(newPrefix, t.deeper, t.suffix);
   }
-  // overflow: push 3 elements down as a node
-  const node: Node<T> = { kind: 'n3', a: p[1], b: p[2], c: p[3] };
-  return deep([x, p[0]], cons(node, t.deeper), t.suffix);
+  // overflow: push 3 elements down as a node (length === 4 here)
+  const [p0, p1, p2, p3] = p as [T, T, T, T];
+  const node: Node<T> = { kind: 'n3', a: p1, b: p2, c: p3 };
+  return deep([x, p0], cons(node, t.deeper), t.suffix);
 }
 
 function snoc<T>(t: Tree<T>, x: T): Tree<T> {
@@ -42,8 +43,9 @@ function snoc<T>(t: Tree<T>, x: T): Tree<T> {
     const newSuffix = [...s, x] as Digit<T>;
     return deep(t.prefix, t.deeper, newSuffix);
   }
-  const node: Node<T> = { kind: 'n3', a: s[0], b: s[1], c: s[2] };
-  return deep(t.prefix, snoc(t.deeper, node), [s[3], x]);
+  const [s0, s1, s2, s3] = s as [T, T, T, T];
+  const node: Node<T> = { kind: 'n3', a: s0, b: s1, c: s2 };
+  return deep(t.prefix, snoc(t.deeper, node), [s3, x]);
 }
 
 function head<T>(t: Tree<T>): T | undefined {

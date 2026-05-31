@@ -12,6 +12,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:python": "python3 scripts/test-all.py",
+    "typecheck": "for s in shared auth content gateway ingest messaging notifications social tracking-worker users web; do echo \"=== $s ===\" && (cd services/$s && npx tsc --noEmit -p tsconfig.json) || exit 1; done",
+    "typecheck:shared": "cd services/shared && npx tsc --noEmit -p tsconfig.json",
     "logs": "bash scripts/start-services.sh local logs",
     "docker:up": "bash scripts/start-services.sh docker up",
     "docker:down": "bash scripts/start-services.sh docker down",

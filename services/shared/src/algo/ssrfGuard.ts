@@ -53,7 +53,8 @@ function isPrivateV4(ip: string): boolean {
   if (n === null) return false;
   for (const [a, b, c, d, bits] of PRIVATE_V4) {
     const base = ((a << 24) + (b << 16) + (c << 8) + d) >>> 0;
-    const mask = bits === 0 ? 0 : (0xffffffff << (32 - bits)) >>> 0;
+    // bits is constrained to {8, 10, 12, 16} so 32-bits in [16,24] — shift is well-defined.
+    const mask = (0xffffffff << (32 - bits)) >>> 0;
     if ((n & mask) === (base & mask)) return true;
   }
   return false;
