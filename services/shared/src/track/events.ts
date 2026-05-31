@@ -132,6 +132,28 @@ export type TrackEventName =
   | 'error.slow_api'
   | 'error.sse_disconnect'
   | 'error.sse_reconnect'
+  // ─── v6 additions — total-state tracking ───────────────────────────
+  // explicit idle lifecycle (paired enter/exit so downstream can join)
+  | 'attention.idle.enter'
+  | 'attention.idle.exit'
+  // richer navigation: from/to/mode/intent in payload
+  | 'nav.route'
+  // element-level focus (debounced 250ms, payload: route, elementId)
+  | 'focus.element'
+  // element-level dwell (payload: route, elementId, dwellMs, scrollY)
+  | 'intent.dwell'
+  // derived session-end rollup (produced by tracking-worker, not client)
+  | 'session.summary'
+  // user exits own profile after dwelling (payload: dwellMs)
+  | 'profile.self_view_dwell'
+  // user hovers/pauses on a filter chip before applying (payload: chipId, hesitationMs)
+  | 'filter.hesitation'
+  // user re-records a voice note (payload: takeCount)
+  | 'msg.voice_rerecord'
+  // user opens notifications, dismisses all, opens none
+  | 'notif.look_no_act'
+  // user quits DTM mid-session (payload: answered, remaining)
+  | 'dtm.partial_abandon'
   // generic
   | 'custom';
 

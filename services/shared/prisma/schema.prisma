@@ -1078,10 +1078,94 @@ model PairCompatCache {
   cadenceOverlap        Float    @default(0)
   priorInteractionScore Float    @default(0)
   finalScore            Float    @default(0)
+  // v6 parallel score; populated by v6 PairCompatComputer behind ALGO_V6_PAIR_COMPAT_ENABLED.
+  v6Score               Float?
+  v6BreakdownJson       Json?    @default("{}")
 
   @@id([aHash, bHash])
   @@index([aHash, finalScore])
+  @@index([aHash, v6Score])
   @@index([computedAt])
+}
+
+// ─── v6 — Total-state tracking ─────────────────────────
+// Produced by tracking-worker at session.end. Drives Phase 5 discoverPolicy
+// (window-shopping defence, zero-action recovery) and Phase 16 learner.
+model SessionSummary {
+  id                String   @id @default(uuid())
+  uidHash           String
+  sessionId         String
+  startedAt         DateTime
+  endedAt           DateTime
+  durationMs        Int
+  idleMs            Int      @default(0)
+  routesVisited     Json     @default("[]")
+  cardsViewed       Int      @default(0)
+  swipesLeft        Int      @default(0)
+  swipesRight       Int      @default(0)
+  msgsSent          Int      @default(0)
+  msgsRead          Int      @default(0)
+  zeroActionSession Boolean  @default(false)
+  windowShopping    Boolean  @default(false)
+  ghostedSelf       Boolean  @default(false)
+  meta              Json     @default("{}")
+  createdAt         DateTime @default(now())
+
+  @@unique([uidHash, sessionId])
+  @@index([uidHash, endedAt])
+  @@index([endedAt])
+  @@index([uidHash, zeroActionSession])
+  @@index([uidHash, windowShopping])
+}
+
+// ─── v6 — Element-level focus/dwell affinity ──────────
+// Hourly rollup of (uidHash, route, elementId) -> focusCount, dwellSumMs.
+// Consumed by Phase 5 feed personalisation by focusAffinityByKind.
+model FocusAffinityHourly {
+  uidHash    String
+  route      String
+  elementId  String
+  bucket     DateTime
+  focusCount Int      @default(0)
+  dwellSumMs Int      @default(0)
+
+  @@id([uidHash, route, elementId, bucket])
+  @@index([uidHash, bucket])
+  @@index([bucket])
+}
+
+// ─── v6 — Online user-learning weight profile ─────────
+// One row per active user. Updated incrementally on every refresh / reopen.
+// See Phase 16 (Thompson-sampling bandit) for the update rules.
+model UserWeightProfile {
+  uidHash         String   @id
+  weights         Json     @default("{}") // { interestsOverlap: 0.18, vibeAlignment: 0.15, ... }
+  noveltyBoost    Float    @default(0.0)
+  diversityBoost  Float    @default(0.0)
+  explorationRate Float    @default(0.05)
+  banditAlpha     Json     @default("{}")
+  banditBeta      Json     @default("{}")
+  lastUpdatedAt   DateTime @updatedAt
+  schemaVersion   Int      @default(1)
+
+  @@index([lastUpdatedAt])
+}
+
+// ─── v6 — Miamo Move v3 archetype profile ─────────────
+// One row per user. Computed by KMeans (4 archetypes) on send/reply patterns.
+model UserMoveProfile {
+  uidHash         String   @id
+  archetype       String   // wordsmith | voice_first | visual | fast_replier
+  archetypeProbs  Json     @default("{}") // soft cluster probabilities
+  avgMoveLenChars Int?
+  voiceShare      Float?   // fraction of moves that are voice notes
+  mediaShare      Float?   // fraction of moves that include media
+  p50ReplyMinutes Int?
+  lastComputedAt  DateTime @default(now())
+  schemaVersion   Int      @default(1)
+
+  @@index([archetype])
+  @@index([lastComputedAt])
 }
 
 // ─── User Data (generic feature persistence) ────────
