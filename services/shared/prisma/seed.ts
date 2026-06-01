@@ -25,6 +25,12 @@ function randInt(min: number, max: number) { return Math.floor(rng() * (max - mi
 // Password = username for easy testing (e.g. miamo1/miamo1)
 function getPassword(username: string) { return username; }
 
+// surface: which onboarding flow the user is in.
+//   'discover' → swipe / Discover only (no DTM matrimonial profile)
+//   'dtm'      → Date-to-Marry only (no Discover filter, has matrimonial profile)
+//   'both'     → active in both surfaces
+type Surface = 'discover' | 'dtm' | 'both';
+
 interface UserSeed {
   num: number; displayName: string; username: string; age: number; gender: string;
   city: string; profession: string; bio: string; intent: string; seriousMode: boolean;
@@ -36,6 +42,10 @@ interface UserSeed {
   smoking: string; drinking: string; exercise: string;
   education: string; religion: string; zodiac: string;
   languages: string; pets: string; children: string;
+  // v3.3 — onboarding surface + profile completion (optional; defaults inferred for legacy 1..20)
+  surface?: Surface;
+  completionScore?: number; // 0..100
+  completionMissing?: string[];
 }
 
 const USERS: UserSeed[] = [
@@ -60,6 +70,160 @@ const USERS: UserSeed[] = [
   { num: 19, displayName: 'Aaliya Khan (miamo19)', username: 'miamo19', age: 27, gender: 'female', city: 'Toronto', profession: 'Actress & Voice Artist', bio: 'Playing characters on screen, being myself everywhere else. Voice of three animated shows.', intent: 'Long-term relationship', seriousMode: true, profileScore: 89, verified: true, online: true, interests: ['Acting', 'Music', 'Yoga', 'Reading', 'Comedy'], prompts: [{ q: 'My hidden talent…', a: 'I can do 15 different accents. Try me.' }, { q: 'Best role I\'ve played…', a: 'A detective in a web series. I got way too into it.' }, { q: 'I want someone who…', a: 'Can handle my dramatic readings at dinner.' }], creativity: ['Acting', 'Voice Art'], category: 'actress', avatarGradient: 'from-violet-300 to-purple-500', height: 168, sexuality: 'straight', lookingFor: 'long-term', smoking: 'never', drinking: 'socially', exercise: 'active', education: 'bachelors', religion: 'Muslim', zodiac: 'Pisces', languages: 'English,Hindi,Urdu,French', pets: 'cat', children: 'want' },
   { num: 20, displayName: 'Leo Santos (miamo20)', username: 'miamo20', age: 30, gender: 'male', city: 'São Paulo', profession: 'Sports Coach & Athlete', bio: 'Former pro soccer player turned coach. Teaching the beautiful game and living it.', intent: 'Marriage open', seriousMode: true, profileScore: 81, verified: true, online: false, interests: ['Sports', 'Fitness', 'Travel', 'Music', 'Cooking'], prompts: [{ q: 'My biggest lesson…', a: 'Sports taught me that losing well matters more than winning badly.' }, { q: 'Dream date…', a: 'Beach soccer, açaí, sunset, live samba.' }, { q: 'I\'m passionate about…', a: 'Coaching kids who have the same fire I had at their age.' }], creativity: ['Sports', 'Fitness Content'], category: 'sports enthusiast', avatarGradient: 'from-yellow-400 to-orange-500', height: 181, sexuality: 'straight', lookingFor: 'long-term', smoking: 'never', drinking: 'socially', exercise: 'very-active', education: 'bachelors', religion: 'Catholic', zodiac: 'Leo', languages: 'Portuguese,English,Spanish', pets: 'dog', children: 'want' },
 ];
+
+// ─── Procedurally generated users 21–50 ──────────────────────────────────
+// Buckets:
+//   21–30 (10): Discover-only, completion 100%
+//   31–35 ( 5): Discover-only, completion partial
+//   36–40 ( 5): DTM-only,      completion 100%
+//   41–45 ( 5): DTM-only,      completion partial
+//   46–50 ( 5): Both surfaces, completion 100%
+//
+// Names / cities / professions are deterministic (driven by index, not rng()).
+const EXTRA_NAMES: Array<{ first: string; last: string; gender: 'female' | 'male' }> = [
+  { first: 'Ava',       last: 'Reyes',     gender: 'female' },
+  { first: 'Ethan',     last: 'Walker',    gender: 'male'   },
+  { first: 'Mia',       last: 'Bennett',   gender: 'female' },
+  { first: 'Hiroshi',   last: 'Sato',      gender: 'male'   },
+  { first: 'Olivia',    last: 'Carter',    gender: 'female' },
+  { first: 'Rafael',    last: 'Diaz',      gender: 'male'   },
+  { first: 'Anika',     last: 'Verma',     gender: 'female' },
+  { first: 'Daniel',    last: 'Cohen',     gender: 'male'   },
+  { first: 'Camille',   last: 'Laurent',   gender: 'female' },
+  { first: 'Mateo',     last: 'Rossi',     gender: 'male'   },
+  { first: 'Hannah',    last: 'Lewis',     gender: 'female' },
+  { first: 'Aarav',     last: 'Mehta',     gender: 'male'   },
+  { first: 'Ines',      last: 'Costa',     gender: 'female' },
+  { first: 'Mikael',    last: 'Larsen',    gender: 'male'   },
+  { first: 'Beatriz',   last: 'Silva',     gender: 'female' },
+  { first: 'Rohan',     last: 'Iyer',      gender: 'male'   },
+  { first: 'Saanvi',    last: 'Reddy',     gender: 'female' },
+  { first: 'Tomas',     last: 'Novak',     gender: 'male'   },
+  { first: 'Lakshmi',   last: 'Nair',      gender: 'female' },
+  { first: 'Gabriel',   last: 'Souza',     gender: 'male'   },
+  { first: 'Ishita',    last: 'Banerjee',  gender: 'female' },
+  { first: 'Vikram',    last: 'Kapoor',    gender: 'male'   },
+  { first: 'Naomi',     last: 'Goldberg',  gender: 'female' },
+  { first: 'Sebastian', last: 'Müller',    gender: 'male'   },
+  { first: 'Diya',      last: 'Joshi',     gender: 'female' },
+  { first: 'Karthik',   last: 'Subramaniam', gender: 'male' },
+  { first: 'Meera',     last: 'Gupta',     gender: 'female' },
+  { first: 'Yusuf',     last: 'Demir',     gender: 'male'   },
+  { first: 'Sienna',    last: 'Park',      gender: 'female' },
+  { first: 'Harsh',     last: 'Agarwal',   gender: 'male'   },
+];
+
+const EXTRA_CITIES = [
+  'Mumbai', 'Delhi', 'Pune', 'Hyderabad', 'Chennai', 'Kolkata',
+  'Singapore', 'Dubai', 'Toronto', 'Berlin', 'Madrid', 'Lisbon',
+  'Austin', 'Chicago', 'Vancouver', 'Melbourne', 'Auckland', 'Bangkok',
+  'Bali', 'Stockholm', 'Amsterdam', 'Prague', 'Cape Town', 'Nairobi',
+  'Mexico City', 'Buenos Aires', 'Tel Aviv', 'Istanbul', 'Manila', 'Jakarta',
+];
+
+const EXTRA_PROFESSIONS = [
+  'Data Scientist', 'Yoga Instructor', 'Investment Banker', 'Teacher', 'Civil Engineer',
+  'Pharmacist', 'Architect', 'Lawyer', 'Doctor', 'Marketing Manager',
+  'Producer', 'Researcher', 'Therapist', 'Veterinarian', 'Pilot',
+  'Chef de Cuisine', 'Journalist', 'Diplomat', 'Cinematographer', 'Game Designer',
+  'Civil Servant', 'Financial Analyst', 'NGO Lead', 'Product Manager', 'Wedding Planner',
+  'Public Health Officer', 'Climate Researcher', 'Fashion Buyer', 'Robotics Engineer', 'Artisan Baker',
+];
+
+const EXTRA_INTERESTS = [
+  ['Yoga', 'Reading', 'Coffee', 'Travel', 'Cooking'],
+  ['Football', 'Cars', 'Hiking', 'Cinema', 'Tech'],
+  ['Painting', 'Tea', 'Books', 'Birdwatching', 'Slow Living'],
+  ['Anime', 'Gaming', 'Coding', 'Ramen', 'Concerts'],
+  ['Wine', 'Galleries', 'Travel', 'Languages', 'Theatre'],
+  ['Salsa', 'Food', 'Beaches', 'Family', 'Football'],
+  ['Bharatanatyam', 'Books', 'Festivals', 'Family', 'Vegetarian Cooking'],
+  ['Cycling', 'Jazz', 'Whisky', 'History', 'Hiking'],
+  ['Couture', 'Wine', 'Photography', 'Travel', 'Brunch'],
+  ['Football', 'Espresso', 'Vintage Cars', 'Cooking', 'Music'],
+];
+
+function surfaceFor(num: number): Surface {
+  if (num <= 35) return 'discover';
+  if (num <= 45) return 'dtm';
+  return 'both';
+}
+function completionFor(num: number): { score: number; missing: string[] } {
+  // 21–30 + 36–40 + 46–50: full (100, [])
+  // 31–35: partial Discover
+  // 41–45: partial DTM
+  if (num >= 31 && num <= 35) {
+    const missingPool = ['photos', 'bio', 'prompts', 'interests', 'lifestyle'];
+    const missing = missingPool.slice(0, ((num - 31) % missingPool.length) + 1);
+    const score = 90 - (num - 31) * 10; // 90, 80, 70, 60, 50
+    return { score, missing };
+  }
+  if (num >= 41 && num <= 45) {
+    const missingPool = ['familyBackground', 'employer', 'incomeBand', 'expectedTimeline', 'kundliUrl'];
+    const missing = missingPool.slice(0, ((num - 41) % missingPool.length) + 2);
+    const score = 85 - (num - 41) * 5; // 85, 80, 75, 70, 65
+    return { score, missing };
+  }
+  return { score: 100, missing: [] };
+}
+
+for (let i = 0; i < 30; i++) {
+  const num = 21 + i;
+  const name = EXTRA_NAMES[i];
+  const city = EXTRA_CITIES[i];
+  const profession = EXTRA_PROFESSIONS[i];
+  const interests = EXTRA_INTERESTS[i % EXTRA_INTERESTS.length];
+  const surface = surfaceFor(num);
+  const seriousMode = surface !== 'discover'; // dtm or both
+  const { score, missing } = completionFor(num);
+  const age = 22 + (i % 12); // 22–33
+  const gradients = [
+    'from-pink-300 to-rose-500', 'from-sky-300 to-indigo-500', 'from-emerald-300 to-teal-500',
+    'from-amber-300 to-orange-500', 'from-violet-300 to-fuchsia-500', 'from-lime-300 to-green-500',
+  ];
+  USERS.push({
+    num,
+    displayName: `${name.first} ${name.last} (miamo${num})`,
+    username: `miamo${num}`,
+    age,
+    gender: name.gender,
+    city,
+    profession,
+    bio: missing.includes('bio')
+      ? ''
+      : `${profession} based in ${city}. ${interests.slice(0, 2).join(' and ')} keep me grounded.`,
+    intent: seriousMode ? (surface === 'dtm' ? 'Marriage open' : 'Long-term relationship') : 'Casual dating',
+    seriousMode,
+    profileScore: score,
+    verified: i % 3 === 0,
+    online: i % 4 === 0,
+    interests: missing.includes('interests') ? interests.slice(0, 1) : interests,
+    prompts: missing.includes('prompts')
+      ? []
+      : [
+          { q: 'A perfect Sunday looks like…', a: `${interests[0]} in the morning, friends in the evening.` },
+          { q: 'I geek out about…',         a: `${interests[1] ?? interests[0]}.` },
+        ],
+    creativity: [interests[0]],
+    category: surface === 'dtm' ? 'serious / matrimonial' : surface === 'both' ? 'serious + creative' : 'discover regular',
+    avatarGradient: gradients[i % gradients.length],
+    height: 158 + (i % 30), // 158–187
+    sexuality: i % 7 === 0 ? 'bisexual' : 'straight',
+    lookingFor: seriousMode ? 'long-term' : (i % 2 === 0 ? 'casual' : 'open'),
+    smoking: i % 5 === 0 ? 'sometimes' : 'never',
+    drinking: i % 3 === 0 ? 'never' : 'socially',
+    exercise: ['active', 'sometimes', 'very-active'][i % 3],
+    education: ['bachelors', 'masters', 'phd', 'bachelors'][i % 4],
+    religion: ['', 'Hindu', 'Muslim', 'Christian', 'Buddhist', ''][i % 6],
+    zodiac: ['Aries', 'Taurus', 'Gemini', 'Cancer', 'Leo', 'Virgo', 'Libra', 'Scorpio', 'Sagittarius', 'Capricorn', 'Aquarius', 'Pisces'][i % 12],
+    languages: i % 4 === 0 ? 'English,Hindi' : i % 4 === 1 ? 'English,Spanish' : i % 4 === 2 ? 'English' : 'English,French',
+    pets: ['none', 'cat', 'dog', 'none'][i % 4],
+    children: seriousMode ? 'want' : ['maybe', 'none', 'want'][i % 3],
+    surface,
+    completionScore: score,
+    completionMissing: missing,
+  });
+}
 
 const CREATIVITY_CATEGORIES = [
   { name: 'Singing', icon: 'mic', color: '#EC4899' },
@@ -147,6 +311,23 @@ async function main() {
   const userRecords: any[] = [];
   for (const u of USERS) {
     const passwordHash = await bcrypt.hash(getPassword(u.username), 12);
+    const surface: Surface = u.surface ?? (u.seriousMode ? 'both' : 'discover');
+    const completionScore = u.completionScore ?? (u.profileScore >= 85 ? 100 : u.profileScore);
+    const completionMissing = u.completionMissing ?? [];
+    // DTM extended fields are only meaningful for surface='dtm' or 'both'.
+    const wantsDtm = surface === 'dtm' || surface === 'both';
+    const dtmFields = wantsDtm ? {
+      familyBackground: completionMissing.includes('familyBackground') ? null : `${u.city}-rooted family. Values education and warmth.`,
+      educationLevel: u.education || 'bachelors',
+      educationInstitution: completionMissing.includes('employer') ? null : 'Top-tier university',
+      employer: completionMissing.includes('employer') ? null : u.profession.split(' at ')[1] || 'Independent',
+      incomeBand: completionMissing.includes('incomeBand') ? null : ['10-15 LPA', '15-25 LPA', '25-40 LPA', '40+ LPA'][u.num % 4],
+      maritalStatus: 'Never Married',
+      willingToRelocate: u.num % 2 === 0,
+      familyInvolved: u.num % 3 !== 0,
+      expectedTimeline: completionMissing.includes('expectedTimeline') ? null : ['6-12 months', '1-2 years', '2+ years'][u.num % 3],
+      kundliUrl: completionMissing.includes('kundliUrl') ? null : null,
+    } : {};
     const user = await prisma.user.create({
       data: {
         email: `miamo${u.num}@miamo.test`,
@@ -181,6 +362,9 @@ async function main() {
             languages: u.languages,
             pets: u.pets,
             children: u.children,
+            completionScore,
+            completionMissing,
+            ...dtmFields,
           },
         },
         settings: {
@@ -203,7 +387,9 @@ async function main() {
     });
 
     // Photos (gradient avatars)
-    for (let p = 0; p < 3; p++) {
+    // Partial profiles miss some photos.
+    const photoCount = completionMissing.includes('photos') ? 1 : 3;
+    for (let p = 0; p < photoCount; p++) {
       await prisma.profilePhoto.create({
         data: {
           userId: user.id,
@@ -229,7 +415,7 @@ async function main() {
 
     userRecords.push({ ...user, _seed: u });
   }
-  console.log('  ✓ Created 20 users with profiles');
+  console.log(`  ✓ Created ${USERS.length} users with profiles`);
 
   // Create matches (15 matches)
   const matchPairs = [
@@ -771,9 +957,14 @@ async function main() {
   }
   console.log('  ✓ Created match feedback');
 
-  // ── Discover Filters (one per user) ──
-  for (let dfi = 0; dfi < 20; dfi++) {
+  // ── Discover Filters ──
+  // Created for users on the Discover or Both surface. DTM-only users skip this
+  // (they live in the matrimonial surface and don't appear in swipe queues).
+  let discoverFilterCount = 0;
+  for (let dfi = 0; dfi < USERS.length; dfi++) {
     const u = USERS[dfi];
+    const surface: Surface = u.surface ?? (u.seriousMode ? 'both' : 'discover');
+    if (surface === 'dtm') continue;
     const oppositeGender = u.gender === 'female' ? 'male' : u.gender === 'male' ? 'female' : 'male,female';
     await prisma.discoverFilter.create({
       data: {
@@ -790,8 +981,9 @@ async function main() {
         newHere: dfi % 5 === 0,
       },
     });
+    discoverFilterCount++;
   }
-  console.log('  ✓ Created discover filters for all 20 users');
+  console.log(`  ✓ Created ${discoverFilterCount} discover filters (skipped DTM-only users)`);
 
   // ── Search Logs ──
   const searchQueries = [
@@ -899,6 +1091,56 @@ async function main() {
     });
   }
   console.log('  ✓ Created 20 matrimonial profiles');
+
+  // ── Matrimonial profiles for new DTM/Both users (num 36–50) ──
+  // Programmatically generated. Partial users (num 41–45) leave optional
+  // matri fields blank to mirror an in-progress DTM onboarding.
+  let extraMatriCount = 0;
+  for (let i = 0; i < USERS.length; i++) {
+    const u = USERS[i];
+    if (u.num <= 20) continue; // existing matri loop already covered these
+    const surface: Surface = u.surface ?? (u.seriousMode ? 'both' : 'discover');
+    if (surface === 'discover') continue;
+    const partial = (u.completionMissing ?? []).length > 0;
+    const dobYear = 2026 - u.age;
+    const heightStr = u.height ? `${Math.floor(u.height / 30.48)}'${Math.round((u.height % 30.48) / 2.54)}"` : '';
+    await prisma.matrimonialProfile.create({
+      data: {
+        userId: userRecords[i].id,
+        fullName: u.displayName.replace(/ \(miamo\d+\)$/, ''),
+        dateOfBirth: new Date(`${dobYear}-06-15`),
+        religion: u.religion,
+        caste: '',
+        education: u.education || 'bachelors',
+        occupation: u.profession,
+        company: partial ? '' : u.profession.includes(' at ') ? u.profession.split(' at ')[1] : 'Independent',
+        annualIncome: partial ? '' : ['10-15 LPA', '15-25 LPA', '25-40 LPA', '40+ LPA'][u.num % 4],
+        workingCity: u.city,
+        workingCountry: '',
+        motherName: '',
+        fatherName: '',
+        fatherOccupation: '',
+        motherOccupation: '',
+        brothers: u.num % 3,
+        sisters: (u.num + 1) % 3,
+        familyType: u.num % 2 === 0 ? 'Nuclear' : 'Joint',
+        diet: u.num % 4 === 0 ? 'Vegetarian' : 'Non-Vegetarian',
+        maritalStatus: 'Never Married',
+        aboutMe: u.bio || `${u.profession} from ${u.city}.`,
+        aboutFamily: partial ? '' : `Warm, supportive family in ${u.city}.`,
+        bioDataGenerated: !partial,
+        bioDataTemplate: ['royal-rajasthani', 'modern-minimal', 'elegant-floral', 'classic-gold'][u.num % 4],
+        motherTongue: (u.languages || 'English').split(',')[0],
+        height: heightStr,
+        smoking: u.smoking === 'never' ? 'No' : 'Occasionally',
+        drinking: u.drinking === 'never' ? 'No' : u.drinking === 'socially' ? 'Socially' : 'Yes',
+        idVerified: u.verified,
+        photoVerified: u.verified,
+      },
+    });
+    extraMatriCount++;
+  }
+  console.log(`  ✓ Created ${extraMatriCount} additional matrimonial profiles for DTM/Both users`);
 
   // ── Bio Data Access Requests ──
   const matriProfiles = await prisma.matrimonialProfile.findMany();
@@ -1109,15 +1351,21 @@ async function main() {
 
   console.log('');
   console.log('✅ Seeding complete!');
-  console.log('   20 users: miamo1@miamo.test to miamo20@miamo.test');
-  console.log('   Password = username (e.g. miamo1/miamo1, miamo2/miamo2, etc.)');
+  console.log(`   ${USERS.length} users: miamo1@miamo.test … miamo${USERS.length}@miamo.test`);
+  console.log('   Password = username (e.g. miamo1/miamo1, miamo50/miamo50)');
+  console.log('   Buckets:');
+  console.log('     1–20  : original mix (Discover + Both)');
+  console.log('     21–30 : Discover-only, profile 100%');
+  console.log('     31–35 : Discover-only, profile partial');
+  console.log('     36–40 : DTM-only,      profile 100%');
+  console.log('     41–45 : DTM-only,      profile partial');
+  console.log('     46–50 : Both surfaces, profile 100%');
   console.log('   15 matches, 50 posts, 40 stories, 40 videos, 120 creativity items');
   console.log('   Story views/comments/likes, video comments/reactions');
   console.log('   Creativity comments/reactions/views, 54 profile likes');
   console.log('   15 match requests, 20 Miamo Moves, match feedback');
-  console.log('   20 discover filters, 30 search logs, 60 audit logs');
-  console.log('   20 matrimonial profiles, 10 bio data access requests');
-  console.log('   60 notifications, 3 reports, 2 blocks');
+  console.log('   Discover filters (Discover + Both), matrimonial profiles (DTM + Both)');
+  console.log('   30 search logs, 60 audit logs, 60 notifications, 3 reports, 2 blocks');
   console.log('   Dummy items: "dummy_Sports", "dummy_Music", etc. (3 per category)');
 }
 
