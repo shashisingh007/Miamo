@@ -38,7 +38,9 @@ It's India-first (built for how Indians date, with Indian rupees, Indian time zo
 | **notifications** | Smart push notifications (the bell) | 3206 | `services/notifications/README.md` |
 | **ingest** | Where your clicks land (very fast: <15ms) | 3260 | `services/ingest/README.md` |
 | **tracking-worker** | Reads your clicks and learns what you like | 3261 | `services/tracking-worker/README.md` |
-| **shared** | Shared library: database schema + 17 algorithms | (no port) | `services/shared/README.md` |
+| **shared** | Shared library: database schema + 53 algorithm modules (17 ranked, the rest are V6/V7 helpers like `dtmFeedV7`, `batchLadder`, `moveVoice`, `rightNow`, `surfaceLearner`) | (no port) | `services/shared/README.md` |
+
+> **Owner-friendly walkthrough:** if you want one document that explains everything Miamo records, learns, and decides — including how a *Miamo Move* is chosen — read [docs/OWNER_GUIDE.md](docs/OWNER_GUIDE.md).
 
 ---
 

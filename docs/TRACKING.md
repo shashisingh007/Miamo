@@ -634,5 +634,77 @@ redeploying it.
 
 Read next:
 - [docs/ALGORITHMS.md](docs/ALGORITHMS.md) — what the algorithms do with these features.
+- [docs/OWNER_GUIDE.md](OWNER_GUIDE.md) — non-technical walkthrough of the whole pipeline.
 - [services/tracking-worker/README.md](services/tracking-worker/README.md) — the worker service in detail.
 - [services/ingest/README.md](services/ingest/README.md) — the edge ingest service.
+
+---
+
+## v7 additions (June 2026)
+
+V7 added **24 new event schemas** to the boundary validator (`V6_VALIDATORS` map in [services/shared/src/track/v6Validators.ts](../services/shared/src/track/v6Validators.ts)). Adding to that map auto-extends `isV6Event()` and `validateV6Payload()` — every new event is rejected at `ingest` if its payload doesn't match the Zod schema. No untyped events reach the stream.
+
+### New / formalized v7 schemas
+
+| Event | Schema | Why we added it |
+|---|---|---|
+| `discover.swipe` | `DiscoverSwipeSchema` | Headline swipe envelope (direction + targetId) |
+| `swipe.commit` | `SwipeCommitSchema` | Commit with `{dir, velocity, hesitationMs}` — feeds `hesitationFit` |
+| `swipe.undo` | `SwipeUndoSchema` | Soft undo (>3s) — distinct from regret |
+| `swipe.regret` | `SwipeRegretSchema` | Undo within 3s — strong negative signal (−8 in `forYou v5`) |
+| `swipe.repeat_pass` | `SwipeRepeatPassSchema` | Same target shown ≥ 2× and passed — −15 hard cap |
+| `card.impression.50` | `CardImpressionSchema` | 50% pixel-visible threshold |
+| `card.impression.100` | `CardImpression100Schema` | 100% pixel-visible + dwell ms — fills `dwellHistogram` |
+| `card.hover` | `CardHoverSchema` | Cursor / finger hover above swipe threshold |
+| `card.bio.expand` | `CardBioExpandSchema` | User opened the long bio — positive intent signal |
+| `card.bio.collapse` | `CardBioCollapseSchema` | Bio re-collapsed (with read time) |
+| `card.photo.swipe` | `CardPhotoSwipeSchema` | Photo carousel index change |
+| `dtm.answer` | `DtmAnswerSchema` | One DTM question answered (topic, value, latencyMs) |
+| `dtm.question_view` | `DtmQuestionViewSchema` | Question shown — denominator for skip rate |
+| `dtm.complete` | `DtmCompleteSchema` | Batch finished — feeds `dtmFeedV7` cohort metrics |
+| `msg.send` | `MsgSendSchema` | Outbound message (no body, just length + chatId hash) |
+| `msg.read` | `MsgReadSchema` | Read receipt — closes the loop on delivery latency |
+| `msg.reaction` | `MsgReactionSchema` | Emoji reaction id |
+| `notification.shown` | `NotificationShownSchema` | Push delivered & rendered |
+| `notification.opened` | `NotificationOpenedSchema` | User opened it — `notifyTiming` reward |
+| `notification.dismissed` | `NotificationDismissedSchema` | User swiped away — feeds dismiss back-off |
+| `search.query` | `SearchQuerySchema` | `{qLen, hashPrefix}` only — never raw text |
+| `search.result_click` | `SearchResultClickSchema` | Click index + targetId → search ranker reward |
+| `search.no_results` | `SearchNoResultsSchema` | `searchAugment` boost trigger |
+
+### Privacy contract
+
+Every v7 event still respects:
+
+- `analytics` consent gate at the SDK transport — withdraw consent → no emission
+- `MAX_EVENTS_PER_BATCH = 50`, `MAX_ENVELOPE_BYTES = 32 KB` envelope caps
+- HMAC-SHA256 user-id hashing at `ingest` (raw `userId` never reaches Postgres)
+- Search bodies are **hashed client-side** (`SearchQuerySchema` has `qLen` + prefix only — the raw query string is never accepted)
+- Cursor coordinates remain bucketed to 0.1% of viewport
+
+### How V7 events flow into ranking
+
+```mermaid
+flowchart LR
+    SDK[web SDK collectors] -->|24 v7 schemas| Ingest[ingest /v1/track]
+    Ingest -->|Zod validate| Stream[(events:raw)]
+    Stream --> Worker[tracking-worker rollup]
+    Worker -->|UPSERT| Daily[(EventAggDaily)]
+    Worker -->|UPSERT| Snap[(FeatureSnapshot.raw)]
+    Daily --> SR[SignalReader.pairBehavior]
+    Snap --> SR
+    SR --> ForYou[forYou v5/v6]
+    SR --> DtmFeed[dtmFeedV7]
+    SR --> Notify[notifyTiming]
+    SR --> Move[moveVoice]
+```
+
+### Adding a new event
+
+1. Add a Zod schema in [services/shared/src/track/v6Validators.ts](../services/shared/src/track/v6Validators.ts).
+2. Append it to the `V6_VALIDATORS` map. `isV6Event()` and the type union extend automatically.
+3. Update / add a collector in [services/web/src/lib/track/collectors/](../services/web/src/lib/track/collectors/).
+4. Add a rollup in [services/tracking-worker/src/rollup.ts](../services/tracking-worker/src/rollup.ts) if it should feed `EventAggDaily.meta.targets` or `FeatureSnapshot.raw`.
+5. Tests: schema unit test + a tracking-worker rollup test.
+
+**Gotcha:** any test that asserts `isV6Event('foo.bar') === false` breaks the moment you add `'foo.bar'` to the map. Update those expectations in the same PR.

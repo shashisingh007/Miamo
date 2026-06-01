@@ -838,5 +838,83 @@ to enforce consent.
 
 Read next:
 - [docs/TRACKING.md](docs/TRACKING.md) — the events that feed these signals.
+- [docs/OWNER_GUIDE.md](OWNER_GUIDE.md) — non-technical, owner-friendly walkthrough of the whole system.
+- [docs/MIAMO_MOVE.md](MIAMO_MOVE.md) — how the Miamo Move suggestion line is rendered.
 - [services/shared/README.md](services/shared/README.md) — how the shared library is structured.
 - [services/social/README.md](services/social/README.md) — the service that calls most of these algos.
+
+---
+
+## v7 additions (June 2026)
+
+V7 ships **5 new pure modules** that compose with the existing 17 ranked recipes. Each module has a feature flag, returns deterministic outputs, and is unit-tested in isolation. The 17 ranked recipes are unchanged.
+
+| Module | Surface | Recipe | Flag |
+|---|---|---|---|
+| `dtmFeedV7` | DTM steady-state | 0.30 coverage + 0.20 affinity + 0.15 freshness + 0.15 reciprocity + 0.10 cohort + 0.10 emotional arc; penalties −0.40 abandoned / −0.25 skipped / −0.50 saturated | `ALGO_V7_DTM_FEED_ENABLED` |
+| `batchLadder` | Discover pagination | Slice next K, compute `breatheMs ∈ [1800, 3200]` biased by momentum | `ALGO_V7_BATCH_LADDER_ENABLED` |
+| `rightNow` | Any feed surface | 0.35 hourBias + 0.30 surfaceMomentum + 0.20 recencyHeat + 0.15 moodGuess (rage-click damp) | `ALGO_V7_RIGHT_NOW_ENABLED` |
+| `moveVoice` | Miamo Move composer | 4 tones × 4 templates; `MAX_LEN=90`; 16 forbidden phrases; 1000-render linter contract | `ALGO_V7_MOVE_VOICE_ENABLED` |
+| `surfaceLearner` | Learner state split | Tags `UserWeightProfile` with `surface ∈ {discover, dtm}`; half-lives 14d / 30d | (always on; reads `UserWeightProfile.surface`) |
+
+### `dtmFeedV7` worked example (Priya)
+
+Priya has answered 12 of 16 canonical topics. Candidate `family_values`: importance 0.9, last asked 5d ago, cohort popularity 0.6, reciprocity lift 0.7, no recent abandon/skip, tone bucket `reflective`, batch already has 2 reflective items.
+
+```
+0.30 × coverageGap (1 - 12/16 = 0.25)   → 0.075
+0.20 × affinity (importance 0.9)         → 0.180
+0.15 × freshness (5/14 days normalised)  → 0.054
+0.15 × reciprocity (0.7)                 → 0.105
+0.10 × cohort (0.6)                      → 0.060
+0.10 × arc (this tone underused = 0.8)   → 0.080
+                                           ─────
+                              raw score = 0.554
+                              penalties = 0
+                              final     = 0.554  → top of batch
+```
+
+A topic Priya answered 6 times (≥ 5 saturation cap) drops by 0.50 and lands behind everything fresh.
+
+### `batchLadder` momentum example
+
+Priya has flicked 9 cards in 30 seconds. `computeMomentum` returns ~0.85. `breatheMs` shrinks to ~2000 ms (1800 + (1 − 0.85) × 1400). When she pauses for 5 s on a card, the next call sees momentum drop to ~0.4 → `breatheMs` ~2960 ms.
+
+### `rightNow` worked example
+
+9:02 p.m., Priya's lifetime hour distribution peaks at 21:00 (`hourTotals[21] = max`). Surface activity last 90 s: `{clicks:6, scrolls:8, dwellsOver800:3, rageClicks:0}`.
+
+```
+hourBias        = 1.00            × 0.35 = 0.350
+surfaceMomentum ≈ 0.85            × 0.30 = 0.255
+recencyHeat     ≈ 1.00            × 0.20 = 0.200
+moodGuess       = 1.00 (no rage)  × 0.15 = 0.150
+                                          ─────
+                            score = 0.955
+```
+
+Priya is at her peak attention. The feed builder uses this as a *sub-millisecond* multiplier on the next batch.
+
+### `moveVoice` — see [docs/MIAMO_MOVE.md](MIAMO_MOVE.md) for the full Move guide.
+
+### `surfaceLearner` rationale
+
+The **same** `UserWeightProfile` row used to serve both Discover and DTM. They are different problems: Discover signals are cheap and frequent (swipe in 2 s); DTM signals are deliberate (a 30 s answer). One half-life cannot be right for both. V7 adds a `surface` discriminator at the schema level (`@@id([uidHash, surface])`) and per-surface decay constants (`HALF_LIFE_DAYS = { discover: 14, dtm: 30 }`).
+
+The pure module ([services/shared/src/algo/surfaceLearner.ts](../services/shared/src/algo/surfaceLearner.ts)) provides `withSurface()`, `splitBySurface()` for sample partitioning, and `HALF_LIFE_DAYS`. The schema split (`Profile.compatVersion` migration on `UserWeightProfile`) shipped in commit c1f82ff.
+
+### Rollback
+
+Every V7 flag is independent. Setting `ALGO_V7_*_ENABLED=0` reverts that surface to its v6 path. `surfaceLearner` is read-only at the algo layer; rolling it back means ignoring the `surface` column (the column stays in the DB, no migration needed).
+
+### Code
+
+- [services/shared/src/algo/dtmFeedV7.ts](../services/shared/src/algo/dtmFeedV7.ts) — `buildDtmFeed`
+- [services/shared/src/algo/batchLadder.ts](../services/shared/src/algo/batchLadder.ts) — `nextBatch`, `computeMomentum`, `skipBreathe`
+- [services/shared/src/algo/rightNow.ts](../services/shared/src/algo/rightNow.ts) — `rightNow`
+- [services/shared/src/algo/moveVoice.ts](../services/shared/src/algo/moveVoice.ts) — `renderMove`, `lintMove`
+- [services/shared/src/algo/surfaceLearner.ts](../services/shared/src/algo/surfaceLearner.ts) — `withSurface`, `splitBySurface`, `HALF_LIFE_DAYS`
+
+### Algo-fleet hygiene
+
+Commits c8e841d (Phase J) and c885e7f (Phase K) deleted **864 unused pure-algo modules + their sibling tests** (530 + 1198 files). The shared package now ships **53 algo source files**: the 17 ranked recipes + V6/V7 helpers + ~14 math primitives. Every remaining file is reachable from at least one orchestrator or surface.

@@ -2,6 +2,23 @@
 
 All notable changes are documented here. Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [SemVer](https://semver.org/).
 
+## [3.3.0] — Unreleased
+
+### Added
+- **shared/algo (V7)** 5 new pure modules: `dtmFeedV7` (steady-state DTM batch builder, 6-term recipe + 3-tier penalties), `batchLadder` ("show 10, breathe, next 10" pagination with momentum-aware breatheMs ∈ [1800, 3200]), `rightNow` (sub-millisecond mood / momentum blend: 0.35 hourBias + 0.30 surfaceMomentum + 0.20 recencyHeat + 0.15 moodGuess), `moveVoice` (4-tone × 4-template Move renderer with 16-phrase forbidden-tone linter, `MAX_LEN=90`, 1000-render contract test), `surfaceLearner` (per-surface learner-state discriminator with half-lives `{discover:14d, dtm:30d}`).
+- **shared/track (V7)** 24 new Zod schemas in `V6_VALIDATORS` map: `discover.swipe`, `swipe.commit/undo/regret/repeat_pass`, `card.impression.50/100`, `card.hover`, `card.bio.expand/collapse`, `card.photo.swipe`, `dtm.answer/question_view/complete`, `msg.send/read/reaction`, `notification.shown/opened/dismissed`, `search.query/result_click/no_results`. All boundary-validated; envelope (v=1) unchanged.
+- **db** `UserWeightProfile.surface String @default("discover")` + `@@id([uidHash, surface])` — splits learner state per surface without code changes to the 17 ranked recipes.
+- **docs** `docs/OWNER_GUIDE.md` — owner-friendly single-page walkthrough of tracking → learning → ranking → Move with mermaid diagrams and worked examples. `docs/MIAMO_MOVE.md` — deep dive on the Move composer (tones, linter, decision flow, why no LLM). `docs/ALGORITHMS.md` and `docs/TRACKING.md` extended with V7 sections.
+
+### Removed
+- **shared/algo (Phase J, c8e841d)** 530 unused dtmTopic*.ts feature scorers + their sibling tests. Canonical `dtmTopics.ts` retained.
+- **shared/algo (Phase K, c885e7f)** 1,198 more files (599 unused pure-algorithm modules + 599 sibling tests where the only importer was the test file itself). Preserved V7 deliverables (`batchLadder`, `dtmFeedV7`, `moveVoice`, `rightNow`, `surfaceLearner`) and the 53 actively-used modules. **Net result:** algo source tree shrank from ~917 files to 53; tests from ~8869 to 892; full-suite `vitest run` finishes in 4.7 s.
+
+### Validation
+- typecheck: 11/11 packages clean
+- `vitest run`: 90 files / 892 tests pass
+- `npm audit --omit=dev`: 0 production vulnerabilities
+
 ## [3.2.0] — Unreleased
 
 ### Added
