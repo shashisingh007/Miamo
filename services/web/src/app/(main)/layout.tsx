@@ -164,21 +164,17 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  />
  {/* ═══ PREMIUM SIDEBAR ═══ */}
  <aside className="hidden lg:flex flex-col w-[270px] glass-sidebar relative z-10">
- {/* Brand header */}
- <div className="flex items-center h-[72px] relative" style={{ paddingLeft: 28, paddingRight: 16 }}>
- <div className="relative flex items-center miamo-sidebar-logo" style={{ width: 100, height: 50, overflow: 'visible' }}>
- <MiamoWordmark height={18} animated={false} className="!min-h-0 !h-[50px] !w-[100px]" />
- </div>
- <div className="ml-auto flex flex-col items-center gap-0.5">
- <Link href="/premium" className="relative group" aria-label="Premium">
- <div className="w-8 h-8 rounded-full flex items-center justify-center bg-rose-soft border border-rose-main/20 group-hover:border-rose-main/40 group-hover:bg-rose-main/15 transition-all">
- <Crown className="w-4 h-4 text-rose group-hover:text-rose-main transition-colors" />
- </div>
- </Link>
- <span className="text-[8px] font-semibold uppercase tracking-[0.18em] text-rose">Premium</span>
- </div>
- </div>
-
+          {/* Brand header — wordmark and Premium badge share the same vertical centre */}
+          <div className="flex items-center justify-between h-[72px] px-6">
+            <div className="flex items-center miamo-sidebar-logo h-11">
+              <MiamoWordmark height={20} animated={false} className="!min-h-0 !h-11 !w-[110px]" />
+            </div>
+            <Link href="/premium" className="group flex flex-col items-center gap-1" aria-label="Premium">
+              <div className="w-9 h-9 rounded-full flex items-center justify-center bg-rose-soft border border-rose-main/25 group-hover:border-rose-main/50 group-hover:bg-rose-main/15 transition-all shadow-[0_4px_14px_rgba(232,93,117,0.18)]">
+                <Crown className="w-4 h-4 text-rose group-hover:text-rose-main transition-colors" />
+              </div>
+              <span className="text-[8px] font-semibold uppercase tracking-[0.18em] text-rose leading-none">Premium</span>
+            </Link>
  {/* Divider */}
  <div className="divider-premium mx-4" />
 

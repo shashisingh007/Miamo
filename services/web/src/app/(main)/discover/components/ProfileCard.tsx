@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
  Heart, X, MapPin, Briefcase, Shield, Star, ChevronDown, Sparkles,
- Send, Check, Clock,
+ Send, Check, Clock, Bookmark,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ProfileAttributeStrip } from '@/components/ProfileAttributeStrip';
@@ -14,12 +14,13 @@ import { useReadingTime } from '@/lib/track/react/useReadingTime';
 import { type DiscoverProfile, type AiData } from './constants';
 
 export function ProfileCard({
- user, aiData, onPass, onMove, onSuperLike, onSeeLater, isActive,
+ user, aiData, onPass, onMove, onLike, onSuperLike, onSeeLater, isActive,
 }: {
  user: DiscoverProfile;
  aiData: AiData | null;
  onPass: () => void;
  onMove: (message: string, targetType: string, targetId?: string) => void;
+ onLike?: () => void;
  onSuperLike?: () => void;
  onSeeLater?: () => void;
  isActive: boolean;
@@ -240,52 +241,59 @@ export function ProfileCard({
  </div>
  )}
 
- {/* ─── Lifestyle Grid (v3.2 — iconified, registry-driven) ─── */}
+  {/* ─── Lifestyle Grid (v3.3 — colourful, registry-driven) ─── */}
  <div className="px-6 pb-5">
  <h4 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.15em] mb-3">Lifestyle &amp; details</h4>
  <ProfileAttributeStrip
  kind="casual"
  profile={profile}
  max={16}
- chipClassName="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-miamo-surface border border-border text-[12px] text-text-secondary font-medium"
  className="flex flex-wrap gap-2"
  />
  </div>
 
- {/* ─── Pass & Super Like Buttons ─── */}
+ {/* ─── Decision Cluster — No / Maybe / Yes / Super (v3.3) ─── */}
  <div className="px-6 py-5 border-t border-border">
- <div className="flex items-center gap-4">
- <motion.button
- whileHover={{ scale: 1.05 }}
- whileTap={{ scale: 0.9 }}
+ <div className="grid grid-cols-4 gap-3">
+ <ActionButton
+ label="No"
+ hint="Pass"
+ icon={<X className="w-6 h-6" />}
  onClick={onPass}
- className="haptic-pass w-14 h-14 rounded-full bg-miamo-surface border border-border flex items-center justify-center hover:bg-red-500/10 hover:border-red-500/20 transition-all group"
- >
- <X className="w-6 h-6 text-text-muted group-hover:text-red-400 transition-colors" />
- </motion.button>
- {onSeeLater && (
- <motion.button
- whileHover={{ scale: 1.05 }}
- whileTap={{ scale: 0.9 }}
+ tone="rose-neg"
+ testid="action-no"
+ />
+ <ActionButton
+ label="Maybe"
+ hint="Save for later"
+ icon={<Bookmark className="w-5 h-5" />}
  onClick={onSeeLater}
- title="Save for later"
- className="w-14 h-14 rounded-full bg-miamo-surface border border-border flex items-center justify-center hover:bg-rose-soft hover:border-rose-main/30 transition-all group"
- >
- <Clock className="w-6 h-6 text-text-muted group-hover:text-rose transition-colors" />
- </motion.button>
- )}
- {onSuperLike && (
- <motion.button
- whileHover={{ scale: 1.05 }}
- whileTap={{ scale: 0.9 }}
+ disabled={!onSeeLater}
+ tone="amber"
+ testid="action-maybe"
+ />
+ <ActionButton
+ label="Yes"
+ hint="Send a like"
+ icon={<Heart className="w-5 h-5" fill="currentColor" />}
+ onClick={onLike}
+ disabled={!onLike}
+ tone="rose-pos"
+ testid="action-yes"
+ />
+ <ActionButton
+ label="Super"
+ hint="Stand out"
+ icon={<Star className="w-5 h-5" fill="currentColor" />}
  onClick={onSuperLike}
- className="haptic-super w-14 h-14 rounded-full bg-rose-soft border border-rose-light flex items-center justify-center hover:bg-rose-soft hover:border-rose-light transition-all group"
- >
- <Star className="w-6 h-6 text-rose-alt group-hover:text-rose-main transition-colors" />
- </motion.button>
- )}
- <p className="text-[12px] text-text-muted leading-relaxed">Like any photo or prompt to send a Miamo Move</p>
+ disabled={!onSuperLike}
+ tone="indigo"
+ testid="action-super"
+ />
  </div>
+ <p className="text-[11px] text-text-muted text-center mt-3 leading-relaxed">
+ Or like any photo / prompt above to send a personalised <span className="text-rose font-semibold">Miamo Move</span>.
+ </p>
  </div>
  </div>
 
@@ -362,4 +370,44 @@ export function ProfileCard({
  </AnimatePresence>
  </div>
  );
+}
+
+// ─── Decision-cluster button (v3.3) ─────────────────────────────────
+// Rendered as a vertical stack: tinted icon pill + label + hint. Each
+// tone has its own colour ramp so the four actions read at a glance.
+const ACTION_TONES: Record<string, { ring: string; bg: string; icon: string; label: string; hover: string }> = {
+  'rose-neg': { ring: 'ring-rose-200',    bg: 'bg-white',         icon: 'text-rose-500',    label: 'text-rose-700',    hover: 'hover:bg-rose-50 hover:ring-rose-300' },
+  'amber':    { ring: 'ring-amber-200',   bg: 'bg-amber-50/60',   icon: 'text-amber-600',   label: 'text-amber-800',   hover: 'hover:bg-amber-50 hover:ring-amber-300' },
+  'rose-pos': { ring: 'ring-rose-300',    bg: 'bg-rose-50',       icon: 'text-rose-600',    label: 'text-rose-700',    hover: 'hover:bg-rose-100 hover:ring-rose-400' },
+  'indigo':   { ring: 'ring-indigo-200',  bg: 'bg-indigo-50/70',  icon: 'text-indigo-600',  label: 'text-indigo-700',  hover: 'hover:bg-indigo-50 hover:ring-indigo-300' },
+};
+
+function ActionButton({
+  label, hint, icon, onClick, disabled, tone, testid,
+}: {
+  label: string; hint: string; icon: React.ReactNode;
+  onClick?: () => void; disabled?: boolean; tone: keyof typeof ACTION_TONES; testid?: string;
+}) {
+  const t = ACTION_TONES[tone];
+  return (
+    <motion.button
+      whileHover={disabled ? undefined : { y: -2 }}
+      whileTap={disabled ? undefined : { scale: 0.96 }}
+      onClick={onClick}
+      disabled={disabled}
+      data-testid={testid}
+      className={cn(
+        'group flex flex-col items-center justify-center gap-1.5 py-3 px-2 rounded-2xl ring-1 transition-all',
+        t.bg, t.ring,
+        disabled ? 'opacity-40 cursor-not-allowed' : `${t.hover} shadow-[0_2px_10px_rgba(0,0,0,0.04)] hover:shadow-[0_6px_18px_rgba(0,0,0,0.07)]`,
+      )}
+      title={hint}
+    >
+      <span className={cn('w-11 h-11 rounded-full bg-white/90 ring-1 flex items-center justify-center', t.ring, t.icon)}>
+        {icon}
+      </span>
+      <span className={cn('text-[12px] font-bold leading-none', t.label)}>{label}</span>
+      <span className="text-[10px] text-text-muted/80 leading-none">{hint}</span>
+    </motion.button>
+  );
 }

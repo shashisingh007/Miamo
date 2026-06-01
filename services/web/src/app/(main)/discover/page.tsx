@@ -161,6 +161,17 @@ export default function DiscoverPage() {
  else setProfiles([]);
  };
 
+ const handleLike = async () => {
+ if (!currentUser) return;
+ trackActivity('like', 'profile', currentUser.id);
+ track('discover.swipe', { dir: 'right', tt: 'profile', tid: currentUser.id, hasMessage: false });
+ swipeTracker.onSwipeCommit('right', 0, 0);
+ setBatchActed((n) => n + 1);
+ try { await api.sendLike(currentUser.id); toast.love('Liked!', `${currentUser.displayName} will see your like`); } catch { toast.error('Like failed'); }
+ if (currentIndex < profiles.length - 1) setCurrentIndex(i => i + 1);
+ else setProfiles([]);
+ };
+
  const handleSuperLike = async () => {
  if (!currentUser) return;
  trackActivity('super_like', 'profile', currentUser.id);
@@ -352,6 +363,7 @@ export default function DiscoverPage() {
  aiData={aiData[currentUser.id] || null}
  onPass={handlePass}
  onMove={handleMove}
+ onLike={handleLike}
  onSuperLike={handleSuperLike}
  onSeeLater={handleSeeLater}
  isActive={true}
