@@ -218,29 +218,27 @@ export default function DiscoverPage() {
 
  // v3.4 — Undo last action. Pops the history stack, rewinds the index,
  // and (best-effort) re-inserts the profile if the queue was emptied.
- const handleUndo = () => {
- setActionHistory((h) => {
- if (h.length === 0) return h;
- const last = h[h.length - 1];
- setProfiles((curr) => {
- // If the queue was cleared (last card decided), re-insert this one.
- if (curr.length === 0) return [last.profile];
- // If this profile is no longer at prevIndex (rare), still rewind
- // by inserting it at the head of the remaining queue.
- if (curr[last.prevIndex]?.id !== last.profile.id) {
- const filtered = curr.filter(p => p.id !== last.profile.id);
- return [last.profile, ...filtered];
- }
- return curr;
- });
- setCurrentIndex(last.prevIndex);
- if (last.type === 'maybe') setDeferredCount((n) => Math.max(0, n - 1));
- if (['pass', 'like', 'super', 'move'].includes(last.type)) setBatchActed((n) => Math.max(0, n - 1));
- if (last.type === 'maybe') setBatchDeferred((n) => Math.max(0, n - 1));
-
- });
- };
-
+  // All side-effects done outside the updater so StrictMode's double-invoke
+  // doesn't fire them twice.
+  const handleUndo = () => {
+    if (actionHistory.length === 0) return;
+    const last = actionHistory[actionHistory.length - 1];
+    setProfiles((curr) => {
+      if (curr.length === 0) return [last.profile];
+      if (curr[last.prevIndex]?.id !== last.profile.id) {
+        const filtered = curr.filter((p) => p.id !== last.profile.id);
+        return [last.profile, ...filtered];
+      }
+      return curr;
+    });
+    setCurrentIndex(last.prevIndex);
+    if (last.type === 'maybe') {
+      setDeferredCount((n) => Math.max(0, n - 1));
+      setBatchDeferred((n) => Math.max(0, n - 1));
+    } else {
+      setBatchActed((n) => Math.max(0, n - 1));
+    }
+    setActionHistory((h) => h.slice(0, -1));
  const handleApplyFilters = async (newFilters: Filters) => {
  setFilters(newFilters);
  try { await api.saveDiscoverFilters(newFilters); } catch {}
