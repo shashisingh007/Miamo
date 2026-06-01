@@ -175,6 +175,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
               </div>
               <span className="text-[8px] font-semibold uppercase tracking-[0.18em] text-rose leading-none">Premium</span>
             </Link>
+          </div>
+
  {/* Divider */}
  <div className="divider-premium mx-4" />
 
