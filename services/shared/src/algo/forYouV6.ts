@@ -1,7 +1,7 @@
 /**
  * v6 Discover — `forYouV6` deep behavioural model.
  *
- * Implements the 12-ingredient recipe from MASTER_UPGRADE_PROMPT_V2 §3.
+ * Implements the 12-ingredient recipe (see docs/ALGORITHMS.md).
  * Additive over v5: same SignalReader, same caches, same Explain shape.
  * Reads optional v6 signals (sessionSummaries, focusAffinity, UserMoveProfile)
  * but degrades gracefully (returns 0.5 neutral) when they are absent.

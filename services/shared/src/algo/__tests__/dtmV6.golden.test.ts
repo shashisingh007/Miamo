@@ -11,7 +11,7 @@
  *   - No per-topic weight profile (uniform fallback).
  *
  * Update the expected numbers ONLY when an intentional v6 algo change has
- * been signed off in `docs/PROMPTS/IN_FLIGHT_V2.md`.
+ * been signed off in the V6 release notes (see CHANGELOG).
  */
 import { describe, it, expect } from 'vitest';
 import { dtmAffinityV6 } from '../dtmV6';

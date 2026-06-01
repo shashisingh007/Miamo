@@ -84,7 +84,7 @@ const OPERATIONAL_EVENTS = new Set<string>([
   'error.sse_reconnect',      // operational
   // ─── v6 additions — total-state tracking ─────────────────────────
   // Claimed operationally until v6 algorithm dispatchers wire them up
-  // (see MASTER_UPGRADE_PROMPT_V2 §2 collectors and §5 discoverPolicy).
+  // (see docs/TRACKING.md collectors and docs/ALGORITHMS.md discoverPolicy).
   // NOTE: forYouV6 (Phase 3) claims attention.idle.enter/exit, nav.route,
   // session.summary, profile.self_view_dwell, intent.dwell — those moved
   // into the algo registry and are removed from OPERATIONAL_EVENTS.

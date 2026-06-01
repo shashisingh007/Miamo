@@ -127,9 +127,11 @@ Miamo/
 ├── docker/                             ← 8 Dockerfiles
 │   └── migrate-and-seed.sh
 ├── docs/                               ← deep dives
+│   ├── OWNER_GUIDE.md                  ← owner-friendly walkthrough
 │   ├── ARCHITECTURE.md
-│   ├── ALGORITHMS.md                   ← the 17 ranking algorithms
+│   ├── ALGORITHMS.md                   ← ranking algorithms (17 ranked + V7)
 │   ├── TRACKING.md                     ← how clicks become signals
+│   ├── MIAMO_MOVE.md                   ← Move composer deep dive
 │   ├── FRONTEND.md
 │   ├── DEVOPS.md
 │   ├── SECURITY.md
