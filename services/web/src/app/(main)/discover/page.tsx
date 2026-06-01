@@ -239,6 +239,8 @@ export default function DiscoverPage() {
       setBatchActed((n) => Math.max(0, n - 1));
     }
     setActionHistory((h) => h.slice(0, -1));
+  };
+
  const handleApplyFilters = async (newFilters: Filters) => {
  setFilters(newFilters);
  try { await api.saveDiscoverFilters(newFilters); } catch {}
