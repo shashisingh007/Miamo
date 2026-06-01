@@ -237,9 +237,7 @@ export default function DiscoverPage() {
  if (last.type === 'maybe') setDeferredCount((n) => Math.max(0, n - 1));
  if (['pass', 'like', 'super', 'move'].includes(last.type)) setBatchActed((n) => Math.max(0, n - 1));
  if (last.type === 'maybe') setBatchDeferred((n) => Math.max(0, n - 1));
- const labels: Record<string, string> = { pass: 'Pass', like: 'Like', super: 'Super Like', maybe: 'Save for later', move: 'Miamo Move' };
- toast.success('Undone', `${labels[last.type] || 'Action'} reverted — review again`);
- return h.slice(0, -1);
+
  });
  };
 
