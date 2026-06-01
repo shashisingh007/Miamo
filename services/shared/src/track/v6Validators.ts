@@ -192,6 +192,141 @@ export const DtmBatchExhaustedSchema = z.object({
   durationMs: positiveMs.optional(),
 });
 
+// ─── v7: payload schemas for pre-v6 events that emit but lacked validation ──
+// Adding these closes the boundary-validation gap without renaming the map.
+export const DiscoverSwipeSchema = z.object({
+  tid: tid.optional(),
+  dir: z.enum(['left', 'right', 'super', 'up', 'down']),
+  velocity: z.number().min(-10000).max(10000).optional(),
+  distance: z.number().min(0).max(10000).optional(),
+  hesitationMs: positiveMs.optional(),
+  source: z.enum(['gesture', 'button', 'keyboard']).optional(),
+});
+
+export const SwipeCommitSchema = z.object({
+  tid: tid.optional(),
+  dir: z.enum(['left', 'right', 'super', 'up', 'down']),
+  velocity: z.number().min(-10000).max(10000).optional(),
+  hesitationMs: positiveMs.optional(),
+});
+
+export const SwipeUndoSchema = z.object({
+  tid: tid.optional(),
+  withinMs: positiveMs.optional(),
+});
+
+export const SwipeRegretSchema = z.object({
+  tid: tid.optional(),
+  withinMs: positiveMs,
+  originalDir: z.enum(['left', 'right', 'super', 'up', 'down']),
+});
+
+export const SwipeRepeatPassSchema = z.object({
+  tid,
+  count: z.number().int().min(2).max(50),
+});
+
+export const CardImpressionSchema = z.object({
+  tid,
+  ratio: z.number().min(0).max(1).optional(),
+  pos: z.number().int().min(0).max(1000).optional(),
+  surface: surface.optional(),
+});
+
+export const CardImpression100Schema = CardImpressionSchema.extend({
+  dwellMs: positiveMs,
+});
+
+export const CardHoverSchema = z.object({
+  tid,
+  dwellMs: positiveMs,
+  surface: surface.optional(),
+});
+
+export const CardBioExpandSchema = z.object({
+  tid,
+  surface: surface.optional(),
+});
+
+export const CardBioCollapseSchema = z.object({
+  tid,
+  dwellMs: positiveMs,
+  surface: surface.optional(),
+});
+
+export const CardPhotoSwipeSchema = z.object({
+  tid,
+  fromIndex: z.number().int().nonnegative(),
+  toIndex: z.number().int().nonnegative(),
+});
+
+export const DtmAnswerSchema = z.object({
+  topic: z.string().min(1).max(64),
+  qid: z.string().min(1).max(128),
+  // Numeric scale answers map to a normalised 0..1; categorical to short string.
+  value: z.union([z.number().min(0).max(1), z.string().max(64)]),
+  responseMs: positiveMs.optional(),
+});
+
+export const DtmQuestionViewSchema = z.object({
+  topic: z.string().min(1).max(64),
+  qid: z.string().min(1).max(128),
+});
+
+export const DtmCompleteSchema = z.object({
+  topic: z.string().min(1).max(64),
+  total: z.number().int().positive(),
+  durationMs: positiveMs.optional(),
+});
+
+export const MsgSendSchema = z.object({
+  threadId: z.string().min(1).max(128),
+  kind: z.enum(['text', 'voice', 'photo', 'gif', 'sticker', 'beat', 'move']),
+  firstMove: z.boolean().optional(),
+  charLen: z.number().int().nonnegative().max(10000).optional(),
+  voiceMs: positiveMs.optional(),
+});
+
+export const MsgReadSchema = z.object({
+  threadId: z.string().min(1).max(128),
+  msgId: z.string().min(1).max(128).optional(),
+});
+
+export const MsgReactionSchema = z.object({
+  threadId: z.string().min(1).max(128),
+  msgId: z.string().min(1).max(128).optional(),
+  emoji: z.string().min(1).max(8),
+});
+
+export const NotificationShownSchema = z.object({
+  notifId: z.string().min(1).max(128),
+  channel: z.enum(['push', 'inapp', 'email']).optional(),
+  kind: z.string().min(1).max(64).optional(),
+});
+
+export const NotificationOpenedSchema = NotificationShownSchema;
+
+export const NotificationDismissedSchema = z.object({
+  notifId: z.string().min(1).max(128),
+  withinMs: positiveMs.optional(),
+});
+
+export const SearchQuerySchema = z.object({
+  // No raw query text — only stats. Length / token count is enough signal.
+  qLen: z.number().int().nonnegative().max(512),
+  tokens: z.number().int().nonnegative().max(64).optional(),
+  filtersActive: z.number().int().nonnegative().max(64).optional(),
+});
+
+export const SearchResultClickSchema = z.object({
+  pos: z.number().int().nonnegative().max(1000),
+  tid: tid.optional(),
+});
+
+export const SearchNoResultsSchema = z.object({
+  qLen: z.number().int().nonnegative().max(512),
+});
+
 export const V6_VALIDATORS = {
   'attention.idle.enter':    AttentionIdleEnterSchema,
   'attention.idle.exit':     AttentionIdleExitSchema,
@@ -221,6 +356,30 @@ export const V6_VALIDATORS = {
   'dtm.see_later':              DtmSeeLaterSchema,
   'dtm.see_later.view':         DtmSeeLaterViewSchema,
   'dtm.batch.exhausted':        DtmBatchExhaustedSchema,
+  // v7: pre-v6 event payload validation
+  'discover.swipe':             DiscoverSwipeSchema,
+  'swipe.commit':               SwipeCommitSchema,
+  'swipe.undo':                 SwipeUndoSchema,
+  'swipe.regret':               SwipeRegretSchema,
+  'swipe.repeat_pass':          SwipeRepeatPassSchema,
+  'card.impression.50':         CardImpressionSchema,
+  'card.impression.100':        CardImpression100Schema,
+  'card.hover':                 CardHoverSchema,
+  'card.bio.expand':            CardBioExpandSchema,
+  'card.bio.collapse':          CardBioCollapseSchema,
+  'card.photo.swipe':           CardPhotoSwipeSchema,
+  'dtm.answer':                 DtmAnswerSchema,
+  'dtm.question_view':          DtmQuestionViewSchema,
+  'dtm.complete':               DtmCompleteSchema,
+  'msg.send':                   MsgSendSchema,
+  'msg.read':                   MsgReadSchema,
+  'msg.reaction':               MsgReactionSchema,
+  'notification.shown':         NotificationShownSchema,
+  'notification.opened':        NotificationOpenedSchema,
+  'notification.dismissed':     NotificationDismissedSchema,
+  'search.query':               SearchQuerySchema,
+  'search.result_click':        SearchResultClickSchema,
+  'search.no_results':          SearchNoResultsSchema,
 } as const satisfies Record<string, z.ZodTypeAny>;
 
 export type V6EventName = keyof typeof V6_VALIDATORS;

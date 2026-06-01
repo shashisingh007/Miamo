@@ -21,8 +21,13 @@ describe('isV6Event', () => {
   });
   it('rejects unknown / v4 / v5 events', () => {
     expect(isV6Event('page.view')).toBe(false);
-    expect(isV6Event('discover.swipe')).toBe(false);
     expect(isV6Event('made.up')).toBe(false);
+  });
+  it('recognises v7-added pre-v6 events', () => {
+    expect(isV6Event('discover.swipe')).toBe(true);
+    expect(isV6Event('card.impression.50')).toBe(true);
+    expect(isV6Event('msg.send')).toBe(true);
+    expect(isV6Event('dtm.answer')).toBe(true);
   });
 });
 
@@ -298,5 +303,58 @@ describe('validateV6Payload — v6.6 events', () => {
     expect(validateV6Payload('dtm.batch.exhausted', {
       topic: 't', shown: 10, answered: 7, skipped: 2, deferred: 1,
     }).ok).toBe(true);
+  });
+});
+
+describe('v7 pre-v6 schemas', () => {
+  it('discover.swipe accepts a basic gesture', () => {
+    expect(validateV6Payload('discover.swipe', { dir: 'right', velocity: 1.2, hesitationMs: 400 }).ok).toBe(true);
+  });
+  it('discover.swipe rejects bad direction', () => {
+    expect(validateV6Payload('discover.swipe', { dir: 'sideways' }).ok).toBe(false);
+  });
+  it('swipe.commit / swipe.undo / swipe.regret', () => {
+    expect(validateV6Payload('swipe.commit', { dir: 'left' }).ok).toBe(true);
+    expect(validateV6Payload('swipe.undo', { withinMs: 1200 }).ok).toBe(true);
+    expect(validateV6Payload('swipe.regret', { withinMs: 1200, originalDir: 'left' }).ok).toBe(true);
+  });
+  it('swipe.repeat_pass needs count >= 2', () => {
+    expect(validateV6Payload('swipe.repeat_pass', { tid: 't1', count: 1 }).ok).toBe(false);
+    expect(validateV6Payload('swipe.repeat_pass', { tid: 't1', count: 3 }).ok).toBe(true);
+  });
+  it('card.impression.50 / .100 / .hover', () => {
+    expect(validateV6Payload('card.impression.50', { tid: 't1', surface: 'discover' }).ok).toBe(true);
+    expect(validateV6Payload('card.impression.100', { tid: 't1', dwellMs: 1500 }).ok).toBe(true);
+    expect(validateV6Payload('card.hover', { tid: 't1', dwellMs: 800 }).ok).toBe(true);
+  });
+  it('card.bio.expand / collapse', () => {
+    expect(validateV6Payload('card.bio.expand', { tid: 't1' }).ok).toBe(true);
+    expect(validateV6Payload('card.bio.collapse', { tid: 't1', dwellMs: 1500 }).ok).toBe(true);
+  });
+  it('dtm.answer accepts numeric or string value', () => {
+    expect(validateV6Payload('dtm.answer', { topic: 't', qid: 'q', value: 0.5 }).ok).toBe(true);
+    expect(validateV6Payload('dtm.answer', { topic: 't', qid: 'q', value: 'always' }).ok).toBe(true);
+    expect(validateV6Payload('dtm.answer', { topic: 't', qid: 'q', value: 1.5 }).ok).toBe(false);
+  });
+  it('dtm.question_view / dtm.complete', () => {
+    expect(validateV6Payload('dtm.question_view', { topic: 't', qid: 'q' }).ok).toBe(true);
+    expect(validateV6Payload('dtm.complete', { topic: 't', total: 5 }).ok).toBe(true);
+    expect(validateV6Payload('dtm.complete', { topic: 't', total: 0 }).ok).toBe(false);
+  });
+  it('msg.send / msg.read / msg.reaction', () => {
+    expect(validateV6Payload('msg.send', { threadId: 't1', kind: 'voice', voiceMs: 4000 }).ok).toBe(true);
+    expect(validateV6Payload('msg.send', { threadId: 't1', kind: 'banana' }).ok).toBe(false);
+    expect(validateV6Payload('msg.read', { threadId: 't1' }).ok).toBe(true);
+    expect(validateV6Payload('msg.reaction', { threadId: 't1', emoji: '🔥' }).ok).toBe(true);
+  });
+  it('notification.* round-trip', () => {
+    expect(validateV6Payload('notification.shown', { notifId: 'n1', channel: 'push' }).ok).toBe(true);
+    expect(validateV6Payload('notification.opened', { notifId: 'n1' }).ok).toBe(true);
+    expect(validateV6Payload('notification.dismissed', { notifId: 'n1', withinMs: 5000 }).ok).toBe(true);
+  });
+  it('search.* never carries raw text', () => {
+    expect(validateV6Payload('search.query', { qLen: 12 }).ok).toBe(true);
+    expect(validateV6Payload('search.result_click', { pos: 3, tid: 't1' }).ok).toBe(true);
+    expect(validateV6Payload('search.no_results', { qLen: 12 }).ok).toBe(true);
   });
 });
