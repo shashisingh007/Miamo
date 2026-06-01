@@ -25,6 +25,10 @@ const ContextSchema = z
     dpr: z.number().min(0).max(8).optional(),
     ua: z.string().max(128).optional(),
     cs: z.array(z.string().max(32)).max(8).optional(),
+    lh: z.number().int().min(0).max(23).optional(),
+    wd: z.number().int().min(0).max(6).optional(),
+    sn: z.number().int().min(0).max(1_000_000).optional(),
+    sf: z.string().max(32).optional(),
   })
   .strict();
 

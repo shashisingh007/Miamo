@@ -28,4 +28,22 @@ describe('ingest /v1/track', () => {
     expect(res.status).toBe(200);
     expect(res.body.ok).toBe(true);
   });
+
+  it('accepts envelope with v6.7 ctx fields (lh, wd, sn, sf)', async () => {
+    const env = {
+      ctx: { v: 1, did: 'dev-aaaa-bbbb', sid: 'ses-aaaa-bbbb', lh: 22, wd: 3, sn: 7, sf: 'discover' },
+      evts: [{ e: 'page.view', t: Date.now(), n: 0, p: { path: '/discover' } }],
+    };
+    const res = await request(app).post('/v1/track').send(env);
+    expect(res.status).toBe(204);
+  });
+
+  it('still rejects out-of-range hour silently', async () => {
+    const env = {
+      ctx: { v: 1, did: 'dev-aaaa-bbbb', sid: 'ses-aaaa-bbbb', lh: 99 },
+      evts: [{ e: 'page.view', t: Date.now(), n: 0, p: { path: '/' } }],
+    };
+    const res = await request(app).post('/v1/track').send(env);
+    expect(res.status).toBe(204);
+  });
 });
