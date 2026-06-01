@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
  Heart, Shield, Brain, SlidersHorizontal, Sparkles, Zap, Eye,
  ThumbsDown, Ghost, MapPin, Camera, Users as UsersIcon, X, Check,
+ Bookmark, Undo2,
 } from 'lucide-react';
 import { ProfileCardSkeleton } from '@/components/ui/skeleton';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
@@ -40,6 +41,19 @@ export default function DiscoverPage() {
  const [passCount, setPassCount] = useState(0);
  const [showDeferred, setShowDeferred] = useState(false);
  const [deferredCount, setDeferredCount] = useState(0);
+ // v3.4 — action history for undo. Stores at most the last 5 client-side
+ // decisions so the user can rewind a mistaken pass / like / super-like.
+ // Server-side records remain (de-dup on re-decide), but the user gets the
+ // card back on screen to review.
+ type ActionEntry = {
+ type: 'pass' | 'like' | 'super' | 'maybe' | 'move';
+ profile: DiscoverProfile;
+ prevIndex: number;
+ };
+ const [actionHistory, setActionHistory] = useState<ActionEntry[]>([]);
+ const pushAction = useCallback((entry: ActionEntry) => {
+ setActionHistory((h) => [...h.slice(-4), entry]);
+ }, []);
  // Track per-batch counters so we can emit discover.batch.exhausted with
  // accurate `acted` / `deferred` numbers when the queue empties.
  const [batchId, setBatchId] = useState<string>(() => `b_${Date.now()}`);
@@ -129,6 +143,7 @@ export default function DiscoverPage() {
  const handlePass = () => {
  const passedUser = profiles[currentIndex];
  if (passedUser) {
+ pushAction({ type: 'pass', profile: passedUser, prevIndex: currentIndex });
  trackActivity('pass', 'profile', passedUser.id);
  track('discover.swipe', { dir: 'left', tt: 'profile', tid: passedUser.id });
  swipeTracker.onSwipeCommit('left', 0, 0);
@@ -147,6 +162,7 @@ export default function DiscoverPage() {
 
  const handleMove = async (message: string, targetType: string, targetId?: string) => {
  if (!currentUser) return;
+ pushAction({ type: 'move', profile: currentUser, prevIndex: currentIndex });
  trackActivity('like', 'profile', currentUser.id);
  track('discover.swipe', { dir: 'right', tt: 'profile', tid: currentUser.id, hasMessage: !!message });
  swipeTracker.onSwipeCommit('right', 0, 0);
@@ -163,6 +179,7 @@ export default function DiscoverPage() {
 
  const handleLike = async () => {
  if (!currentUser) return;
+ pushAction({ type: 'like', profile: currentUser, prevIndex: currentIndex });
  trackActivity('like', 'profile', currentUser.id);
  track('discover.swipe', { dir: 'right', tt: 'profile', tid: currentUser.id, hasMessage: false });
  swipeTracker.onSwipeCommit('right', 0, 0);
@@ -174,6 +191,7 @@ export default function DiscoverPage() {
 
  const handleSuperLike = async () => {
  if (!currentUser) return;
+ pushAction({ type: 'super', profile: currentUser, prevIndex: currentIndex });
  trackActivity('super_like', 'profile', currentUser.id);
  track('discover.swipe', { dir: 'super', tt: 'profile', tid: currentUser.id });
  swipeTracker.onSwipeCommit('up', 0, 0);
@@ -186,6 +204,7 @@ export default function DiscoverPage() {
  const handleSeeLater = async () => {
  if (!currentUser) return;
  const tid = currentUser.id;
+ pushAction({ type: 'maybe', profile: currentUser, prevIndex: currentIndex });
  trackDiscoverSeeLater({ tid, batchId, reason: 'not_now' });
  setBatchDeferred((n) => n + 1);
  setDeferredCount((n) => n + 1);
@@ -195,6 +214,33 @@ export default function DiscoverPage() {
  } catch { /* still advance even if persistence fails */ }
  if (currentIndex < profiles.length - 1) setCurrentIndex(i => i + 1);
  else setProfiles([]);
+ };
+
+ // v3.4 — Undo last action. Pops the history stack, rewinds the index,
+ // and (best-effort) re-inserts the profile if the queue was emptied.
+ const handleUndo = () => {
+ setActionHistory((h) => {
+ if (h.length === 0) return h;
+ const last = h[h.length - 1];
+ setProfiles((curr) => {
+ // If the queue was cleared (last card decided), re-insert this one.
+ if (curr.length === 0) return [last.profile];
+ // If this profile is no longer at prevIndex (rare), still rewind
+ // by inserting it at the head of the remaining queue.
+ if (curr[last.prevIndex]?.id !== last.profile.id) {
+ const filtered = curr.filter(p => p.id !== last.profile.id);
+ return [last.profile, ...filtered];
+ }
+ return curr;
+ });
+ setCurrentIndex(last.prevIndex);
+ if (last.type === 'maybe') setDeferredCount((n) => Math.max(0, n - 1));
+ if (['pass', 'like', 'super', 'move'].includes(last.type)) setBatchActed((n) => Math.max(0, n - 1));
+ if (last.type === 'maybe') setBatchDeferred((n) => Math.max(0, n - 1));
+ const labels: Record<string, string> = { pass: 'Pass', like: 'Like', super: 'Super Like', maybe: 'Save for later', move: 'Miamo Move' };
+ toast.success('Undone', `${labels[last.type] || 'Action'} reverted — review again`);
+ return h.slice(0, -1);
+ });
  };
 
  const handleApplyFilters = async (newFilters: Filters) => {
@@ -310,6 +356,38 @@ export default function DiscoverPage() {
  );
  })}
  </div>
+
+ {/* v3.4 — Undo + Saved buttons */}
+ <motion.button
+ whileHover={actionHistory.length ? { scale: 1.03 } : undefined}
+ whileTap={actionHistory.length ? { scale: 0.97 } : undefined}
+ onClick={handleUndo}
+ disabled={actionHistory.length === 0}
+ title={actionHistory.length ? 'Undo last action' : 'No actions to undo'}
+ className={cn(
+ 'flex items-center gap-1.5 h-10 px-3 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all border',
+ actionHistory.length
+ ? 'bg-white border-[#C97856]/20 text-[#C97856] hover:border-[#C97856]/40 shadow-[0_2px_8px_rgba(201,120,86,0.08)]'
+ : 'bg-stone-50 border-stone-200 text-stone-300 cursor-not-allowed',
+ )}
+ >
+ <Undo2 className="w-3.5 h-3.5" /> Undo
+ </motion.button>
+
+ <motion.button
+ whileHover={{ scale: 1.03 }}
+ whileTap={{ scale: 0.97 }}
+ onClick={() => setShowDeferred(true)}
+ title="View profiles you saved for later"
+ className="flex items-center gap-1.5 h-10 px-3 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all border bg-white border-amber-200 text-amber-700 hover:border-amber-300 shadow-[0_2px_8px_rgba(180,140,40,0.08)]"
+ >
+ <Bookmark className="w-3.5 h-3.5" /> Saved
+ {deferredCount > 0 && (
+ <span className="ml-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-amber-500 text-white text-[10px] font-bold flex items-center justify-center">
+ {deferredCount}
+ </span>
+ )}
+ </motion.button>
  </div>
 
  {/* ─── Profile Counter & Score ─── */}

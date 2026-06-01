@@ -241,14 +241,18 @@ export function ProfileCard({
  </div>
  )}
 
-  {/* ─── Lifestyle Grid (v3.3 — colourful, registry-driven) ─── */}
+  {/* ─── Lifestyle Spec Sheet (v3.4 — classy royal palette) ─── */}
  <div className="px-6 pb-5">
- <h4 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.15em] mb-3">Lifestyle &amp; details</h4>
+ <div className="flex items-center gap-2 mb-3">
+ <span className="h-px flex-1 bg-gradient-to-r from-transparent via-[#E9DCC9] to-transparent" />
+ <h4 className="text-[10px] font-bold text-stone-500 uppercase tracking-[0.22em]">Lifestyle &amp; Details</h4>
+ <span className="h-px flex-1 bg-gradient-to-r from-[#E9DCC9] via-[#E9DCC9] to-transparent" />
+ </div>
  <ProfileAttributeStrip
  kind="casual"
  profile={profile}
  max={16}
- className="flex flex-wrap gap-2"
+ variant="rows"
  />
  </div>
 
