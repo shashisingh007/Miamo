@@ -168,6 +168,8 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           <div className="flex items-center justify-between h-[80px] px-6">
             <div className="miamo-sidebar-logo flex items-center pt-1.5">
               <AnimatedMiamoLogo size={44} animated={true} />
+            </div>
+            <Link href="/premium" className="group flex flex-col items-center gap-1">
               <div className="w-9 h-9 rounded-full flex items-center justify-center bg-rose-soft border border-rose-main/25 group-hover:border-rose-main/50 group-hover:bg-rose-main/15 transition-all shadow-[0_4px_14px_rgba(232,93,117,0.18)]">
                 <Crown className="w-4 h-4 text-rose group-hover:text-rose-main transition-colors" />
               </div>
