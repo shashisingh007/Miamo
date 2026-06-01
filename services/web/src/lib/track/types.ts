@@ -20,6 +20,14 @@ export type ContextHeader = {
   dpr?: number;
   ua?: string;
   cs?: string[];
+  /** local hour 0-23 at envelope build time */
+  lh?: number;
+  /** local weekday 0-6 (Sun=0) at envelope build time */
+  wd?: number;
+  /** monotonic per-device session counter (+1 per fresh sid) */
+  sn?: number;
+  /** parsed surface from path ("discover" | "dtm" | "matches" | ...) */
+  sf?: string;
 };
 
 export type TrackEvent = {

@@ -136,6 +136,28 @@ function clamp(x: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, x));
 }
 
+/**
+ * Temporal decay: shrink accumulated bandit evidence toward the prior
+ * (alpha=1, beta=1) by the amount of time elapsed. Half-life H means after
+ * H days the *excess over prior* is halved, so old "likes" stop dominating
+ * recent behaviour. Pure: returns a new profile.
+ */
+export function decayProfile(
+  prev: UserWeightProfile,
+  daysElapsed: number,
+  halfLifeDays: number = 14,
+): UserWeightProfile {
+  if (!(daysElapsed > 0) || !(halfLifeDays > 0)) return prev;
+  const factor = Math.pow(0.5, daysElapsed / halfLifeDays);
+  const alpha = { ...prev.banditAlpha };
+  const beta = { ...prev.banditBeta };
+  for (const k of Object.keys(alpha) as WeightKey[]) {
+    alpha[k] = 1 + (alpha[k] - 1) * factor;
+    beta[k] = 1 + (beta[k] - 1) * factor;
+  }
+  return { ...prev, banditAlpha: alpha, banditBeta: beta };
+}
+
 /** Thompson sample: returns the weight set to actually use for a given
  *  impression (epsilon-greedy mix of current profile and a random draw). */
 export function sampleWeights(

@@ -3,7 +3,7 @@
  * Strips PII from path and ref. Caller is responsible for consent gating.
  */
 import { SCHEMA_VERSION, type ContextHeader, type TrackEnvelope, type TrackEvent } from './types';
-import { getDeviceId, getSessionId, safePath } from './device';
+import { getDeviceId, getSessionId, getSessionNumber, parseSurface, safePath } from './device';
 
 let cachedUid: string | undefined;
 export function setUid(uid: string | undefined): void {
@@ -52,6 +52,15 @@ export function buildContext(consentScopes: string[]): ContextHeader {
     try {
       ctx.loc = navigator.language;
       ctx.tzo = -new Date().getTimezoneOffset();
+    } catch {
+      // ignore
+    }
+    try {
+      const now = new Date();
+      ctx.lh = now.getHours();
+      ctx.wd = now.getDay();
+      ctx.sn = getSessionNumber();
+      ctx.sf = parseSurface(ctx.path);
     } catch {
       // ignore
     }

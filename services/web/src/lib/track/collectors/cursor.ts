@@ -18,6 +18,22 @@ const RAGE_WINDOW_MS = 800;
 const RAGE_RADIUS = 40;
 const RAGE_COUNT = 3;
 const DEAD_DELAY_MS = 200;
+const GRID = 32; // bin coords to a 32x32 grid for privacy
+
+function isSensitiveTarget(t: EventTarget | null): boolean {
+  let el = t as HTMLElement | null;
+  while (el && el.nodeType === 1) {
+    const tag = el.tagName;
+    if (tag === 'INPUT') {
+      const type = (el as HTMLInputElement).type;
+      if (type === 'password' || type === 'email' || type === 'tel') return true;
+    }
+    if (tag === 'TEXTAREA') return true;
+    if (el.isContentEditable) return true;
+    el = el.parentElement;
+  }
+  return false;
+}
 
 export function installCursor(emit: Emit): () => void {
   if (typeof window === 'undefined') return () => undefined;
@@ -29,14 +45,11 @@ export function installCursor(emit: Emit): () => void {
   const onMove = (ev: MouseEvent): void => {
     const now = performance.now();
     if (now - lastSample < SAMPLE_MS) return;
+    if (isSensitiveTarget(ev.target)) return;
     lastSample = now;
-    emit({
-      e: 'cursor.sample',
-      p: {
-        x: Math.round((ev.clientX / window.innerWidth) * 1000) / 10,
-        y: Math.round((ev.clientY / window.innerHeight) * 1000) / 10,
-      },
-    });
+    const gx = Math.min(GRID - 1, Math.max(0, Math.floor((ev.clientX / window.innerWidth) * GRID)));
+    const gy = Math.min(GRID - 1, Math.max(0, Math.floor((ev.clientY / window.innerHeight) * GRID)));
+    emit({ e: 'cursor.sample', p: { gx, gy, g: GRID } });
   };
 
   const targetSelector = (el: Element | null): string => {

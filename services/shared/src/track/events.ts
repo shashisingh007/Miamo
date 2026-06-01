@@ -212,6 +212,14 @@ export type ContextHeader = {
   ua?: string;
   /** consent scopes granted at emit time */
   cs?: string[];
+  /** local hour 0-23 (for temporal preference modeling) */
+  lh?: number;
+  /** local weekday 0-6 (Sun=0) */
+  wd?: number;
+  /** monotonic per-device session counter */
+  sn?: number;
+  /** parsed surface ("discover" | "dtm" | "matches" | ...) */
+  sf?: string;
 };
 
 export type TrackEvent<N extends TrackEventName = TrackEventName> = {

@@ -10,6 +10,27 @@ import { buildEnvelope } from '../envelope';
 import { EventQueue } from './queue';
 import { persistBatch, deleteBatch, loadOutbox, prune } from './idb';
 
+/**
+ * Volume control: drop a fraction of low-signal events before they enter the
+ * queue. Keys here match the event names emitted by the collectors. Anything
+ * not listed is kept at 100%. Tune values here, never in collectors.
+ */
+const SAMPLE_RATE: Record<string, number> = {
+  'cursor.sample':         0.1,
+  'click':                 0.3,
+  'scroll.depth':          0.5,
+  'attention.idle':        0.2,
+  'attention.long_heartbeat': 0.5,
+  'card.impression.50':    0.5,
+  'card.hover':            0.5,
+};
+
+function shouldKeep(name: string): boolean {
+  const r = SAMPLE_RATE[name];
+  if (r === undefined) return true;
+  return Math.random() < r;
+}
+
 export type BatcherOptions = {
   endpoint: string;
   /** ms between scheduled flushes */
@@ -64,6 +85,7 @@ export class Batcher {
 
   enqueue(evt: TrackEvent): void {
     if (!this.opts.isEnabled()) return;
+    if (!shouldKeep(evt.e)) return;
     this.queue.push(evt);
     if (this.queue.size >= this.opts.maxBatch) this.flush('count');
   }

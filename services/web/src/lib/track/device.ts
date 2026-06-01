@@ -9,9 +9,37 @@ import { ulid } from './ulid';
 
 const DID_COOKIE = 'mio_did_v1';
 const SID_KEY = 'mio_sid_v1';
+const SN_KEY = 'mio_sn_v1';
+const SN_SID_KEY = 'mio_sn_sid_v1';
 
 function isBrowser(): boolean {
   return typeof window !== 'undefined' && typeof document !== 'undefined';
+}
+
+/** Monotonic per-device session counter. Bumps once per fresh sid. */
+export function getSessionNumber(): number {
+  if (!isBrowser()) return 0;
+  try {
+    const sid = getSessionId();
+    const lastSid = localStorage.getItem(SN_SID_KEY);
+    let n = parseInt(localStorage.getItem(SN_KEY) || '0', 10) || 0;
+    if (lastSid !== sid) {
+      n += 1;
+      localStorage.setItem(SN_KEY, String(n));
+      localStorage.setItem(SN_SID_KEY, sid);
+    }
+    return n;
+  } catch {
+    return 0;
+  }
+}
+
+/** Parse surface (first non-group route segment) from a path. */
+export function parseSurface(path?: string): string | undefined {
+  if (!isBrowser() && !path) return undefined;
+  const raw = path || window.location.pathname || '/';
+  const parts = raw.split('/').filter((s) => s && !s.startsWith('('));
+  return parts[0] || 'root';
 }
 
 export function getDeviceId(): string {
