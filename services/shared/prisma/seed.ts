@@ -72,14 +72,18 @@ const USERS: UserSeed[] = [
 ];
 
 // ─── Procedurally generated users 21–50 ──────────────────────────────────
-// Buckets:
-//   21–30 (10): Discover-only, completion 100%
-//   31–35 ( 5): Discover-only, completion partial
-//   36–40 ( 5): DTM-only,      completion 100%
-//   41–45 ( 5): DTM-only,      completion partial
-//   46–50 ( 5): Both surfaces, completion 100%
 //
-// Names / cities / professions are deterministic (driven by index, not rng()).
+// MEMORABLE PATTERN (applies to ALL 50 users, including 1–20):
+//   • Every profile is 100 % complete — no missing fields anywhere.
+//   • Every profile has Discover enabled (DiscoverFilter row).
+//   • Every multiple of 5 (5, 10, 15, 20, 25, 30, 35, 40, 45, 50) ALSO
+//     has DTM enabled (matrimonial profile).
+//   • Every multiple of 10 (10, 20, 30, 40, 50) is the "both" power-user
+//     bucket: extra polish (verified + online), full DTM + Discover.
+//
+// Mnemonic: ends in 0 → Both / power user.
+//           ends in 5 → DTM + Discover.
+//           anything else → Discover only.
 const EXTRA_NAMES: Array<{ first: string; last: string; gender: 'female' | 'male' }> = [
   { first: 'Ava',       last: 'Reyes',     gender: 'female' },
   { first: 'Ethan',     last: 'Walker',    gender: 'male'   },
@@ -144,27 +148,11 @@ const EXTRA_INTERESTS = [
 ];
 
 function surfaceFor(num: number): Surface {
-  if (num <= 35) return 'discover';
-  if (num <= 45) return 'dtm';
-  return 'both';
+  // Multiples of 5 (and 10) get DTM + Discover. Everyone else: Discover only.
+  return num % 5 === 0 ? 'both' : 'discover';
 }
-function completionFor(num: number): { score: number; missing: string[] } {
-  // 21–30 + 36–40 + 46–50: full (100, [])
-  // 31–35: partial Discover
-  // 41–45: partial DTM
-  if (num >= 31 && num <= 35) {
-    const missingPool = ['photos', 'bio', 'prompts', 'interests', 'lifestyle'];
-    const missing = missingPool.slice(0, ((num - 31) % missingPool.length) + 1);
-    const score = 90 - (num - 31) * 10; // 90, 80, 70, 60, 50
-    return { score, missing };
-  }
-  if (num >= 41 && num <= 45) {
-    const missingPool = ['familyBackground', 'employer', 'incomeBand', 'expectedTimeline', 'kundliUrl'];
-    const missing = missingPool.slice(0, ((num - 41) % missingPool.length) + 2);
-    const score = 85 - (num - 41) * 5; // 85, 80, 75, 70, 65
-    return { score, missing };
-  }
-  return { score: 100, missing: [] };
+function isSeriousFor(num: number): boolean {
+  return num % 5 === 0;
 }
 
 for (let i = 0; i < 30; i++) {
@@ -174,8 +162,8 @@ for (let i = 0; i < 30; i++) {
   const profession = EXTRA_PROFESSIONS[i];
   const interests = EXTRA_INTERESTS[i % EXTRA_INTERESTS.length];
   const surface = surfaceFor(num);
-  const seriousMode = surface !== 'discover'; // dtm or both
-  const { score, missing } = completionFor(num);
+  const seriousMode = isSeriousFor(num);
+  const isPower = num % 10 === 0; // power-user marker
   const age = 22 + (i % 12); // 22–33
   const gradients = [
     'from-pink-300 to-rose-500', 'from-sky-300 to-indigo-500', 'from-emerald-300 to-teal-500',
@@ -189,23 +177,20 @@ for (let i = 0; i < 30; i++) {
     gender: name.gender,
     city,
     profession,
-    bio: missing.includes('bio')
-      ? ''
-      : `${profession} based in ${city}. ${interests.slice(0, 2).join(' and ')} keep me grounded.`,
-    intent: seriousMode ? (surface === 'dtm' ? 'Marriage open' : 'Long-term relationship') : 'Casual dating',
+    bio: `${profession} based in ${city}. ${interests.slice(0, 2).join(' and ')} keep me grounded.`,
+    intent: seriousMode ? 'Long-term relationship' : 'Casual dating',
     seriousMode,
-    profileScore: score,
-    verified: i % 3 === 0,
-    online: i % 4 === 0,
-    interests: missing.includes('interests') ? interests.slice(0, 1) : interests,
-    prompts: missing.includes('prompts')
-      ? []
-      : [
-          { q: 'A perfect Sunday looks like…', a: `${interests[0]} in the morning, friends in the evening.` },
-          { q: 'I geek out about…',         a: `${interests[1] ?? interests[0]}.` },
-        ],
+    profileScore: 100,
+    verified: isPower || i % 3 === 0,
+    online: isPower || i % 4 === 0,
+    interests,
+    prompts: [
+      { q: 'A perfect Sunday looks like…', a: `${interests[0]} in the morning, friends in the evening.` },
+      { q: 'I geek out about…',         a: `${interests[1] ?? interests[0]}.` },
+      { q: 'My love language is…',      a: 'Quality time and laughing at the same memes.' },
+    ],
     creativity: [interests[0]],
-    category: surface === 'dtm' ? 'serious / matrimonial' : surface === 'both' ? 'serious + creative' : 'discover regular',
+    category: isPower ? 'power user (both surfaces)' : seriousMode ? 'serious + discover' : 'discover regular',
     avatarGradient: gradients[i % gradients.length],
     height: 158 + (i % 30), // 158–187
     sexuality: i % 7 === 0 ? 'bisexual' : 'straight',
@@ -220,8 +205,8 @@ for (let i = 0; i < 30; i++) {
     pets: ['none', 'cat', 'dog', 'none'][i % 4],
     children: seriousMode ? 'want' : ['maybe', 'none', 'want'][i % 3],
     surface,
-    completionScore: score,
-    completionMissing: missing,
+    completionScore: 100,
+    completionMissing: [],
   });
 }
 
@@ -311,22 +296,27 @@ async function main() {
   const userRecords: any[] = [];
   for (const u of USERS) {
     const passwordHash = await bcrypt.hash(getPassword(u.username), 12);
-    const surface: Surface = u.surface ?? (u.seriousMode ? 'both' : 'discover');
-    const completionScore = u.completionScore ?? (u.profileScore >= 85 ? 100 : u.profileScore);
-    const completionMissing = u.completionMissing ?? [];
-    // DTM extended fields are only meaningful for surface='dtm' or 'both'.
-    const wantsDtm = surface === 'dtm' || surface === 'both';
+    // ALL users follow the num-based pattern (overrides any hand-coded
+    // seriousMode in the literal entries 1–20 so the rule is universal):
+    //   num % 10 === 0 → power-user, both surfaces
+    //   num %  5 === 0 → DTM enabled (in addition to Discover)
+    //   else          → Discover only
+    const surface: Surface = u.num % 5 === 0 ? 'both' : 'discover';
+    const seriousMode = u.num % 5 === 0;
+    const completionScore = 100;
+    const completionMissing: string[] = [];
+    const wantsDtm = surface === 'both';
     const dtmFields = wantsDtm ? {
-      familyBackground: completionMissing.includes('familyBackground') ? null : `${u.city}-rooted family. Values education and warmth.`,
+      familyBackground: `${u.city}-rooted family. Values education and warmth.`,
       educationLevel: u.education || 'bachelors',
-      educationInstitution: completionMissing.includes('employer') ? null : 'Top-tier university',
-      employer: completionMissing.includes('employer') ? null : u.profession.split(' at ')[1] || 'Independent',
-      incomeBand: completionMissing.includes('incomeBand') ? null : ['10-15 LPA', '15-25 LPA', '25-40 LPA', '40+ LPA'][u.num % 4],
+      educationInstitution: 'Top-tier university',
+      employer: u.profession.split(' at ')[1] || 'Independent',
+      incomeBand: ['10-15 LPA', '15-25 LPA', '25-40 LPA', '40+ LPA'][u.num % 4],
       maritalStatus: 'Never Married',
       willingToRelocate: u.num % 2 === 0,
       familyInvolved: u.num % 3 !== 0,
-      expectedTimeline: completionMissing.includes('expectedTimeline') ? null : ['6-12 months', '1-2 years', '2+ years'][u.num % 3],
-      kundliUrl: completionMissing.includes('kundliUrl') ? null : null,
+      expectedTimeline: ['6-12 months', '1-2 years', '2+ years'][u.num % 3],
+      kundliUrl: null,
     } : {};
     const user = await prisma.user.create({
       data: {
@@ -345,8 +335,8 @@ async function main() {
             profession: u.profession,
             bio: u.bio,
             datingIntent: u.intent,
-            seriousMode: u.seriousMode,
-            profileScore: u.profileScore,
+            seriousMode,
+            profileScore: 100,
             online: u.online,
             lastActive: new Date(SEED_DATE),
             avatarGradient: u.avatarGradient,
@@ -370,7 +360,7 @@ async function main() {
         settings: {
           create: {
             theme: 'dark',
-            seriousModeEnabled: u.seriousMode,
+            seriousModeEnabled: seriousMode,
           },
         },
         privacySettings: {
@@ -380,16 +370,14 @@ async function main() {
             miamoIdSearchable: true,
             nameSearchable: true,
             citySearchable: true,
-            disableSearch: u.num === 20, // user 20 has search disabled for testing
+            disableSearch: false,
           },
         },
       },
     });
 
-    // Photos (gradient avatars)
-    // Partial profiles miss some photos.
-    const photoCount = completionMissing.includes('photos') ? 1 : 3;
-    for (let p = 0; p < photoCount; p++) {
+    // Photos (gradient avatars) — always 3 per user
+    for (let p = 0; p < 3; p++) {
       await prisma.profilePhoto.create({
         data: {
           userId: user.id,
@@ -958,13 +946,10 @@ async function main() {
   console.log('  ✓ Created match feedback');
 
   // ── Discover Filters ──
-  // Created for users on the Discover or Both surface. DTM-only users skip this
-  // (they live in the matrimonial surface and don't appear in swipe queues).
-  let discoverFilterCount = 0;
+  // Every user gets one. Discover is enabled for ALL profiles per the
+  // "at least Discover for everyone" rule.
   for (let dfi = 0; dfi < USERS.length; dfi++) {
     const u = USERS[dfi];
-    const surface: Surface = u.surface ?? (u.seriousMode ? 'both' : 'discover');
-    if (surface === 'dtm') continue;
     const oppositeGender = u.gender === 'female' ? 'male' : u.gender === 'male' ? 'female' : 'male,female';
     await prisma.discoverFilter.create({
       data: {
@@ -981,9 +966,8 @@ async function main() {
         newHere: dfi % 5 === 0,
       },
     });
-    discoverFilterCount++;
   }
-  console.log(`  ✓ Created ${discoverFilterCount} discover filters (skipped DTM-only users)`);
+  console.log(`  ✓ Created ${USERS.length} discover filters (all users on Discover)`);
 
   // ── Search Logs ──
   const searchQueries = [
@@ -1054,7 +1038,12 @@ async function main() {
     { num: 18, fullName: 'Aaliya Khan', dob: '1999-03-12', religion: 'Muslim', caste: '', education: 'B.A. Theater Arts', occupation: 'Actress & Voice Artist', company: 'CBC / Independent', income: '20-30 LPA', city: 'Toronto', country: 'Canada', mother: 'Nadia Khan', father: 'Imran Khan', fOcc: 'Surgeon', mOcc: 'University Professor', brothers: 0, sisters: 2, familyType: 'Nuclear', diet: 'Halal', maritalStatus: 'Never Married', about: 'Playing characters on screen, being myself everywhere else.', aboutFamily: 'Supportive Pakistani-Canadian family that champions arts and education.' },
     { num: 19, fullName: 'Leo Santos', dob: '1996-08-01', religion: 'Catholic', caste: '', education: 'B.Sc. Physical Education', occupation: 'Sports Coach & Athlete', company: 'São Paulo FC Academy', income: '15-25 LPA', city: 'São Paulo', country: 'Brazil', mother: 'Ana Santos', father: 'Roberto Santos', fOcc: 'Football Coach', mOcc: 'School Teacher', brothers: 1, sisters: 1, familyType: 'Nuclear', diet: 'Non-Vegetarian', maritalStatus: 'Never Married', about: 'Former pro soccer player turned coach. Teaching the beautiful game.', aboutFamily: 'Brazilian family that lives and breathes football and samba.' },
   ];
+  let matriHandCount = 0;
   for (const md of matriData) {
+    // Only create matri profiles for users where num % 5 === 0
+    // (the new universal pattern — "DTM enabled" only on multiples of 5).
+    const u = USERS[md.num];
+    if (u.num % 5 !== 0) continue;
     await prisma.matrimonialProfile.create({
       data: {
         userId: userRecords[md.num].id,
@@ -1089,19 +1078,17 @@ async function main() {
         photoVerified: USERS[md.num].verified,
       },
     });
+    matriHandCount++;
   }
-  console.log('  ✓ Created 20 matrimonial profiles');
+  console.log(`  ✓ Created ${matriHandCount} matrimonial profiles (users 1–20 where num % 5 === 0)`);
 
-  // ── Matrimonial profiles for new DTM/Both users (num 36–50) ──
-  // Programmatically generated. Partial users (num 41–45) leave optional
-  // matri fields blank to mirror an in-progress DTM onboarding.
+  // ── Matrimonial profiles for new DTM users (num 21–50) ──
+  // Universal rule: matri profile exists only when num % 5 === 0.
   let extraMatriCount = 0;
   for (let i = 0; i < USERS.length; i++) {
     const u = USERS[i];
     if (u.num <= 20) continue; // existing matri loop already covered these
-    const surface: Surface = u.surface ?? (u.seriousMode ? 'both' : 'discover');
-    if (surface === 'discover') continue;
-    const partial = (u.completionMissing ?? []).length > 0;
+    if (u.num % 5 !== 0) continue;
     const dobYear = 2026 - u.age;
     const heightStr = u.height ? `${Math.floor(u.height / 30.48)}'${Math.round((u.height % 30.48) / 2.54)}"` : '';
     await prisma.matrimonialProfile.create({
@@ -1113,8 +1100,8 @@ async function main() {
         caste: '',
         education: u.education || 'bachelors',
         occupation: u.profession,
-        company: partial ? '' : u.profession.includes(' at ') ? u.profession.split(' at ')[1] : 'Independent',
-        annualIncome: partial ? '' : ['10-15 LPA', '15-25 LPA', '25-40 LPA', '40+ LPA'][u.num % 4],
+        company: u.profession.includes(' at ') ? u.profession.split(' at ')[1] : 'Independent',
+        annualIncome: ['10-15 LPA', '15-25 LPA', '25-40 LPA', '40+ LPA'][u.num % 4],
         workingCity: u.city,
         workingCountry: '',
         motherName: '',
@@ -1127,8 +1114,8 @@ async function main() {
         diet: u.num % 4 === 0 ? 'Vegetarian' : 'Non-Vegetarian',
         maritalStatus: 'Never Married',
         aboutMe: u.bio || `${u.profession} from ${u.city}.`,
-        aboutFamily: partial ? '' : `Warm, supportive family in ${u.city}.`,
-        bioDataGenerated: !partial,
+        aboutFamily: `Warm, supportive family in ${u.city}.`,
+        bioDataGenerated: true,
         bioDataTemplate: ['royal-rajasthani', 'modern-minimal', 'elegant-floral', 'classic-gold'][u.num % 4],
         motherTongue: (u.languages || 'English').split(',')[0],
         height: heightStr,
@@ -1140,7 +1127,7 @@ async function main() {
     });
     extraMatriCount++;
   }
-  console.log(`  ✓ Created ${extraMatriCount} additional matrimonial profiles for DTM/Both users`);
+  console.log(`  ✓ Created ${extraMatriCount} additional matrimonial profiles (users 21–50 where num % 5 === 0)`);
 
   // ── Bio Data Access Requests ──
   const matriProfiles = await prisma.matrimonialProfile.findMany();
@@ -1352,14 +1339,12 @@ async function main() {
   console.log('');
   console.log('✅ Seeding complete!');
   console.log(`   ${USERS.length} users: miamo1@miamo.test … miamo${USERS.length}@miamo.test`);
-  console.log('   Password = username (e.g. miamo1/miamo1, miamo50/miamo50)');
-  console.log('   Buckets:');
-  console.log('     1–20  : original mix (Discover + Both)');
-  console.log('     21–30 : Discover-only, profile 100%');
-  console.log('     31–35 : Discover-only, profile partial');
-  console.log('     36–40 : DTM-only,      profile 100%');
-  console.log('     41–45 : DTM-only,      profile partial');
-  console.log('     46–50 : Both surfaces, profile 100%');
+  console.log('   Password = username (miamo1/miamo1, miamo50/miamo50, …)');
+  console.log('   Pattern (memorise this):');
+  console.log('     • EVERY profile has Discover enabled and is 100% complete');
+  console.log('     • num %  5 === 0 → DTM enabled too (5,10,15,20,25,30,35,40,45,50)');
+  console.log('     • num % 10 === 0 → "power user" both surfaces (10,20,30,40,50)');
+  console.log('   So: ends in 0 → power both, ends in 5 → DTM+Discover, else Discover only.');
   console.log('   15 matches, 50 posts, 40 stories, 40 videos, 120 creativity items');
   console.log('   Story views/comments/likes, video comments/reactions');
   console.log('   Creativity comments/reactions/views, 54 profile likes');
