@@ -1,14 +1,14 @@
 # docker/messaging.Dockerfile — Miamo Messaging Service
 # See docker/auth.Dockerfile for layout/NODE_PATH notes.
 
-FROM node:20-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 COPY services/messaging/package.json services/messaging/package-lock.json* services/messaging/
 COPY services/shared/package.json    services/shared/package-lock.json*    services/shared/
 RUN cd services/shared    && (npm ci --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund)
 RUN cd services/messaging && (npm ci --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund)
 
-FROM node:20-alpine AS build
+FROM node:26-alpine AS build
 RUN apk add --no-cache openssl
 WORKDIR /app
 COPY --from=deps /app/services/shared/node_modules    services/shared/node_modules
@@ -18,7 +18,7 @@ COPY services/messaging services/messaging
 RUN cd services/shared    && npx prisma generate
 RUN cd services/messaging && npx tsc --removeComments
 
-FROM node:20-alpine AS runner
+FROM node:26-alpine AS runner
 RUN apk add --no-cache openssl curl
 WORKDIR /app/services/messaging
 ENV NODE_ENV=production \

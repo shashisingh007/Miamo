@@ -2,7 +2,7 @@
 # Build: docker build -f docker/web.Dockerfile -t miamo-web .
 
 # ─── Stage 1: Dependencies ───────────────────────────────────────────────────
-FROM node:20-alpine AS deps
+FROM node:26-alpine AS deps
 
 WORKDIR /app
 
@@ -11,7 +11,7 @@ COPY services/web/package.json services/web/package-lock.json* ./
 RUN npm ci --prefer-offline --no-audit --no-fund || npm install --no-audit --no-fund
 
 # ─── Stage 2: Build ──────────────────────────────────────────────────────────
-FROM node:20-alpine AS build
+FROM node:26-alpine AS build
 
 WORKDIR /app
 
@@ -27,7 +27,7 @@ COPY services/web/public ./public
 RUN npm run build
 
 # ─── Stage 3: Runner ─────────────────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:26-alpine AS runner
 
 RUN apk add --no-cache curl
 

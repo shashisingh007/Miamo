@@ -1,14 +1,14 @@
 # docker/gateway.Dockerfile — Miamo Gateway Service
 # See docker/auth.Dockerfile for layout/NODE_PATH notes. Gateway has no Prisma.
 
-FROM node:20-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 COPY services/gateway/package.json services/gateway/package-lock.json* services/gateway/
 COPY services/shared/package.json  services/shared/package-lock.json*  services/shared/
 RUN cd services/shared  && (npm ci --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund)
 RUN cd services/gateway && (npm ci --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund)
 
-FROM node:20-alpine AS build
+FROM node:26-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/services/shared/node_modules  services/shared/node_modules
 COPY --from=deps /app/services/gateway/node_modules services/gateway/node_modules
@@ -16,7 +16,7 @@ COPY services/shared  services/shared
 COPY services/gateway services/gateway
 RUN cd services/gateway && npx tsc --removeComments
 
-FROM node:20-alpine AS runner
+FROM node:26-alpine AS runner
 RUN apk add --no-cache curl
 WORKDIR /app/services/gateway
 ENV NODE_ENV=production \

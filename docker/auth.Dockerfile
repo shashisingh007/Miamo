@@ -8,7 +8,7 @@
 # google-auth-library, …) declared in services/shared resolve at runtime.
 
 # ─── Stage 1: deps ───────────────────────────────────────────────────────
-FROM node:20-alpine AS deps
+FROM node:26-alpine AS deps
 WORKDIR /app
 COPY services/auth/package.json   services/auth/package-lock.json*   services/auth/
 COPY services/shared/package.json services/shared/package-lock.json* services/shared/
@@ -16,7 +16,7 @@ RUN cd services/shared && (npm ci --no-audit --no-fund 2>/dev/null || npm instal
 RUN cd services/auth   && (npm ci --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund)
 
 # ─── Stage 2: build (prisma generate + tsc) ──────────────────────────────
-FROM node:20-alpine AS build
+FROM node:26-alpine AS build
 RUN apk add --no-cache openssl
 WORKDIR /app
 COPY --from=deps /app/services/shared/node_modules services/shared/node_modules
@@ -27,7 +27,7 @@ RUN cd services/shared && npx prisma generate
 RUN cd services/auth   && npx tsc --removeComments
 
 # ─── Stage 3: runner ─────────────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:26-alpine AS runner
 RUN apk add --no-cache openssl curl
 WORKDIR /app/services/auth
 ENV NODE_ENV=production \
