@@ -13,6 +13,7 @@ import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useTrackPageView, useTrackActivity, useTrackScrollDepth, useTrackPhotoViews } from '@/hooks/useTrackActivity';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { track } from '@/lib/track';
 import {
  trackDiscoverSeeLater,
@@ -21,8 +22,10 @@ import {
 import { swipeTracker } from '@/lib/track/collectors/swipe';
 import { DeferredPileModal } from '@/components/deferred/DeferredPileModal';
 import { AllCaughtUpScreen } from '@/components/deferred/AllCaughtUpScreen';
+import { Portal } from '@/components/ui/portal';
 import { type DiscoverProfile, type AiData, type Filters, DEFAULT_FILTERS } from './components/constants';
 import { FilterPanel } from './components/FilterPanel';
+import { ShortcutBar } from './components/ShortcutBar';
 import { ProfileCard } from './components/ProfileCard';
 import { AiSidePanel } from './components/AiSidePanel';
 
@@ -33,10 +36,18 @@ export default function DiscoverPage() {
  const [profiles, setProfiles] = useState<DiscoverProfile[]>([]);
  const [currentIndex, setCurrentIndex] = useState(0);
  const [loading, setLoading] = useState(true);
- const [filters, setFilters] = useState<Filters>(DEFAULT_FILTERS);
+ // v6.7: cursor for the rolling top-10 contract. After the user has consumed
+ // (acted on / deferred) all 10 cards in the current batch, we silently
+ // fetch the next batch using this cursor. Each request re-runs the full
+ // ranking pipeline with freshly-aggregated tracking signals, so the next
+ // 10 reflect what the user just did.
+ const [cursor, setCursor] = useState<string | null>(null);
+ const [exhausted, setExhausted] = useState(false); // server returned <10 → no more pages
+ const [refreshing, setRefreshing] = useState(false);
+ const [filters, setFilters] = usePersistentState<Filters>('discover:filters', DEFAULT_FILTERS);
  const [showFilters, setShowFilters] = useState(false);
  const [aiData, setAiData] = useState<Record<string, AiData>>({});
- const [activeQuickFilter, setActiveQuickFilter] = useState('all');
+ const [activeQuickFilter, setActiveQuickFilter] = usePersistentState<string>('discover:quickFilter', 'all');
  const [passFeedback, setPassFeedback] = useState<{ userId: string; name: string } | null>(null);
  const [passCount, setPassCount] = useState(0);
  const [showDeferred, setShowDeferred] = useState(false);
@@ -85,6 +96,13 @@ export default function DiscoverPage() {
  if (f.zodiac) p.zodiac = f.zodiac;
  if (f.pets) p.pets = f.pets;
  if (f.children) p.children = f.children;
+ if (f.diet) p.diet = f.diet;
+ if (f.politics) p.politics = f.politics;
+ if (f.languages) p.languages = f.languages;
+ if (f.maritalStatus) p.maritalStatus = f.maritalStatus;
+ if (f.incomeBand) p.incomeBand = f.incomeBand;
+ if (f.willingToRelocate) p.willingToRelocate = 'true';
+ if (f.distance && f.distance > 0) p.distance = String(f.distance);
  if (f.activeToday) p.activeToday = 'true';
  if (f.newHere) p.newHere = 'true';
  if (f.verified) p.verifiedOnly = 'true';
@@ -101,10 +119,13 @@ export default function DiscoverPage() {
  setLoading(true);
  try {
  const params = buildParams(filters, activeQuickFilter);
+ params.limit = '10';
  const res = await api.getDiscover(params);
  const data = res.data || [];
  setProfiles(data);
  setCurrentIndex(0);
+ setCursor(res.cursor || null);
+ setExhausted(data.length < 10);
  setBatchId(`b_${Date.now()}`);
  setBatchActed(0);
  setBatchDeferred(0);
@@ -117,6 +138,52 @@ export default function DiscoverPage() {
  }
  finally { setLoading(false); }
  }, [filters, activeQuickFilter, buildParams]);
+
+ // v6.7: silently swap in the next 10 best-ranked profiles. Triggered when
+ // the user reaches the end of the current batch. Each call re-runs the
+ // backend ranking pipeline with freshly-aggregated tracking signals.
+ const refreshTopTen = useCallback(async () => {
+ if (refreshing || exhausted) return;
+ setRefreshing(true);
+ try {
+ trackDiscoverBatchExhausted({ batchId, shown: profiles.length, acted: batchActed, deferred: batchDeferred });
+ const params = buildParams(filters, activeQuickFilter);
+ params.limit = '10';
+ if (cursor) params.cursor = cursor;
+ const res = await api.getDiscover(params);
+ const data = res.data || [];
+ if (data.length === 0) {
+ setExhausted(true);
+ setProfiles([]);
+ return;
+ }
+ setProfiles(data);
+ setCurrentIndex(0);
+ setCursor(res.cursor || null);
+ setExhausted(data.length < 10);
+ setBatchId(`b_${Date.now()}`);
+ setBatchActed(0);
+ setBatchDeferred(0);
+ setBatchExhaustedFired(false);
+ track('discover.batch.refreshed', { count: data.length });
+ if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('mio:feedrefresh', { detail: { surface: '/discover' } }));
+ } catch (err) {
+ if (typeof window !== 'undefined') console.error('[Discover] refresh failed:', err);
+ } finally {
+ setRefreshing(false);
+ }
+ }, [refreshing, exhausted, batchId, profiles.length, batchActed, batchDeferred, buildParams, filters, activeQuickFilter, cursor]);
+
+ // Advance to next card; when end reached, fetch next batch of 10 instead
+ // of dropping to the All-Caught-Up screen.
+ const advanceCard = useCallback(() => {
+ setCurrentIndex((i) => {
+ if (i < profiles.length - 1) return i + 1;
+ // Last card just acted on — trigger refresh; UI will show loading.
+ void refreshTopTen();
+ return i + 1; // beyond array → currentUser becomes undefined briefly
+ });
+ }, [profiles.length, refreshTopTen]);
 
  useEffect(() => { loadProfiles(); }, [loadProfiles]);
 
@@ -156,8 +223,7 @@ export default function DiscoverPage() {
  setPassFeedback({ userId: passedUser.id, name: passedUser.displayName || 'this person' });
  }
  }
- if (currentIndex < profiles.length - 1) setCurrentIndex(i => i + 1);
- else setProfiles([]);
+ advanceCard();
  };
 
  const handleMove = async (message: string, targetType: string, targetId?: string) => {
@@ -173,8 +239,7 @@ export default function DiscoverPage() {
  } catch {
  try { await api.sendLike(currentUser.id, targetType, targetId); toast.success('Like sent!'); } catch { toast.error('Failed to send'); }
  }
- if (currentIndex < profiles.length - 1) setCurrentIndex(i => i + 1);
- else setProfiles([]);
+ advanceCard();
  };
 
  const handleLike = async () => {
@@ -185,8 +250,7 @@ export default function DiscoverPage() {
  swipeTracker.onSwipeCommit('right', 0, 0);
  setBatchActed((n) => n + 1);
  try { await api.sendLike(currentUser.id); toast.love('Liked!', `${currentUser.displayName} will see your like`); } catch { toast.error('Like failed'); }
- if (currentIndex < profiles.length - 1) setCurrentIndex(i => i + 1);
- else setProfiles([]);
+ advanceCard();
  };
 
  const handleSuperLike = async () => {
@@ -197,8 +261,7 @@ export default function DiscoverPage() {
  swipeTracker.onSwipeCommit('up', 0, 0);
  setBatchActed((n) => n + 1);
  try { await api.superLikeUser(currentUser.id); toast.love('Super Like!', `${currentUser.displayName} will see your Super Like`); } catch { toast.error('Super Like failed'); }
- if (currentIndex < profiles.length - 1) setCurrentIndex(i => i + 1);
- else setProfiles([]);
+ advanceCard();
  };
 
  const handleSeeLater = async () => {
@@ -212,8 +275,7 @@ export default function DiscoverPage() {
  await api.deferItem({ surface: 'discover', targetId: tid, batchId, reason: 'not_now' });
  toast.success('Saved for later');
  } catch { /* still advance even if persistence fails */ }
- if (currentIndex < profiles.length - 1) setCurrentIndex(i => i + 1);
- else setProfiles([]);
+ advanceCard();
  };
 
  // v3.4 — Undo last action. Pops the history stack, rewinds the index,
@@ -242,7 +304,11 @@ export default function DiscoverPage() {
   };
 
  const handleApplyFilters = async (newFilters: Filters) => {
+ const before = JSON.stringify(filters);
  setFilters(newFilters);
+ if (JSON.stringify(newFilters) !== before) {
+ track('filter.changed', { surface: 'discover', kind: 'advanced', count: Object.keys(newFilters).length });
+ }
  try { await api.saveDiscoverFilters(newFilters); } catch {}
  };
 
@@ -254,6 +320,7 @@ export default function DiscoverPage() {
  { id: 'serious', label: 'Serious', icon: Eye },
  { id: 'ai', label: 'AI Picks', icon: Brain },
  ];
+ void quickFilters;
 
  const activeFilterCount = useMemo(() => Object.entries(filters).filter(([k, v]) => {
  if (k === 'minAge' && v === 18) return false;
@@ -263,12 +330,12 @@ export default function DiscoverPage() {
  }).length, [filters]);
 
  /* ─── Loading State ─── */
- if (loading) {
+ if (loading || refreshing) {
  return <ProfileCardSkeleton />;
  }
 
 /* ─── All Caught Up Terminal (v6.6) ─── */
- if (!currentUser) {
+ if (!currentUser && exhausted) {
  // Fire batch.exhausted exactly once per batch when the queue empties.
  if (!batchExhaustedFired) {
  trackDiscoverBatchExhausted({
@@ -305,19 +372,22 @@ export default function DiscoverPage() {
  );
  }
 
+ // Defensive: queue advanced past the end but next batch hasn't arrived yet.
+ if (!currentUser) return <ProfileCardSkeleton />;
+
  return (
  <ErrorBoundary>
  <div className="h-full overflow-y-auto">
- <div className="max-w-[1080px] mx-auto px-6 py-6">
+ <div className="max-w-[1080px] mx-auto px-6 pb-6">
 
- {/* ─── Top Bar ─── */}
- <div className="flex items-center gap-3 mb-6">
+ {/* ─── Top Bar (sticky so shortcuts stay visible while scrolling) ─── */}
+ <div className="sticky top-0 z-30 -mx-6 px-6 pt-4 pb-3 mb-4 bg-miamo-bg/85 backdrop-blur-xl border-b border-[#C97856]/8 flex items-center gap-3">
  <motion.button
  whileHover={{ scale: 1.02 }}
  whileTap={{ scale: 0.98 }}
  onClick={() => setShowFilters(true)}
  className={cn(
- 'flex items-center gap-2 h-10 px-4 rounded-xl border text-[13px] font-semibold transition-all duration-300',
+ 'shrink-0 flex items-center gap-2 h-10 px-4 rounded-xl border text-[13px] font-semibold transition-all duration-300',
  activeFilterCount > 0
  ? 'bg-white text-[#C97856] border-[#C97856]/20 shadow-[0_4px_16px_rgba(201,120,86,0.08)]'
  : 'bg-white border-[#C97856]/8 text-text-muted hover:border-[#C97856]/20 hover:text-[#C97856]',
@@ -332,28 +402,19 @@ export default function DiscoverPage() {
  )}
  </motion.button>
 
- <div className="flex gap-2 overflow-x-auto no-scrollbar flex-1">
- {quickFilters.map(f => {
- const Icon = f.icon;
- const isActive = activeQuickFilter === f.id;
- return (
- <motion.button
- key={f.id}
- whileHover={{ scale: 1.03 }}
- whileTap={{ scale: 0.97 }}
- onClick={() => setActiveQuickFilter(f.id)}
- className={cn(
- 'flex items-center gap-1.5 h-10 px-4 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all border',
- isActive
- ? 'chip-glass-active'
- : 'chip-glass text-text-muted',
- )}
- >
- <Icon className="w-3.5 h-3.5" /> {f.label}
- </motion.button>
- );
- })}
- </div>
+ <ShortcutBar
+ filters={filters}
+ onChangeFilters={(f) => handleApplyFilters(f)}
+ activeMode={activeQuickFilter}
+ onChangeMode={(id) => {
+ const prev = activeQuickFilter;
+ setActiveQuickFilter(id);
+ if (prev !== id) {
+ track('filter.changed', { surface: 'discover', from: prev, to: id });
+ if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('mio:filterchange', { detail: { surface: 'discover', from: prev, to: id } }));
+ }
+ }}
+ />
 
  {/* v3.4 — Undo + Saved buttons */}
  <motion.button
@@ -363,7 +424,7 @@ export default function DiscoverPage() {
  disabled={actionHistory.length === 0}
  title={actionHistory.length ? 'Undo last action' : 'No actions to undo'}
  className={cn(
- 'flex items-center gap-1.5 h-10 px-3 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all border',
+ 'shrink-0 flex items-center gap-1.5 h-10 px-3 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all border',
  actionHistory.length
  ? 'bg-white border-[#C97856]/20 text-[#C97856] hover:border-[#C97856]/40 shadow-[0_2px_8px_rgba(201,120,86,0.08)]'
  : 'bg-stone-50 border-stone-200 text-stone-300 cursor-not-allowed',
@@ -377,7 +438,7 @@ export default function DiscoverPage() {
  whileTap={{ scale: 0.97 }}
  onClick={() => setShowDeferred(true)}
  title="View profiles you saved for later"
- className="flex items-center gap-1.5 h-10 px-3 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all border bg-white border-amber-200 text-amber-700 hover:border-amber-300 shadow-[0_2px_8px_rgba(180,140,40,0.08)]"
+ className="shrink-0 flex items-center gap-1.5 h-10 px-3 rounded-xl text-[12px] font-semibold whitespace-nowrap transition-all border bg-white border-amber-200 text-amber-700 hover:border-amber-300 shadow-[0_2px_8px_rgba(180,140,40,0.08)]"
  >
  <Bookmark className="w-3.5 h-3.5" /> Saved
  {deferredCount > 0 && (
@@ -433,6 +494,7 @@ export default function DiscoverPage() {
  exit={{ opacity: 0, y: -30, scale: 0.95 }}
  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
  className="tilt-3d"
+ data-mio-profile-id={currentUser.id}
  >
  <ProfileCard
  user={currentUser}
@@ -523,7 +585,7 @@ function PassFeedbackModal({ userName, onSubmit, onSkip }: {
  const [details, setDetails] = useState('');
 
  return (
- <>
+ <Portal>
  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
  className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60]" onClick={onSkip} />
  <motion.div
@@ -575,6 +637,6 @@ function PassFeedbackModal({ userName, onSubmit, onSkip }: {
  </button>
  </div>
  </motion.div>
- </>
+ </Portal>
  );
 }

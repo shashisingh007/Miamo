@@ -154,13 +154,16 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
-// Auth-specific stricter rate limit
+// Auth-specific stricter rate limit. Strict in prod (brute-force defense),
+// generous in dev/test so iterative login/register cycles don't trip it.
+const IS_PROD = process.env.NODE_ENV === 'production';
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: IS_PROD ? 30 : 500,
   message: { error: { message: 'Too many auth attempts. Please try again later.', code: 'RATE_LIMITED' } },
   store: authRedisStore,
   keyGenerator: (req) => req.ip || 'unknown',
+  skipSuccessfulRequests: !IS_PROD,
 });
 
 // Sensitive-action limiter: forgot-password, /auth/refresh abuse, report spam.
@@ -176,7 +179,7 @@ const forgotPasswordLimiter = rateLimit({
 });
 const refreshLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 60, // 4/min — generous for legit page reloads, blocks token-pumping abuse
+  max: IS_PROD ? 60 : 1000,
   message: { error: { message: 'Too many refresh attempts.', code: 'RATE_LIMITED' } },
   store: sensitiveRedisStore,
   keyGenerator: (req) => req.ip || 'unknown',
@@ -484,12 +487,33 @@ function proxyTo(target: string, extra?: Partial<Options> & { pathRewrite?: Reco
 if (process.env.TRACKING_KILL === '1') {
   app.use('/api/v1/track', (_req, res) => res.status(204).end());
 } else {
-  app.use('/api/v1/track', createProxyMiddleware(proxyTo(SERVICES.ingest, { pathRewrite: { '^/api/v1/track': '/v1/track' } })));
+  // Express strips the `/api/v1/track` mount, so req.url arrives as `/` (or
+  // sub-paths). Force the upstream path to `/v1/track` regardless.
+  app.use('/api/v1/track', createProxyMiddleware({
+    target: SERVICES.ingest,
+    changeOrigin: true,
+    pathRewrite: () => '/v1/track',
+    on: {
+      proxyReq: (proxyReq, req: any) => {
+        if (req.headers['x-request-id']) proxyReq.setHeader('x-request-id', req.headers['x-request-id']);
+      },
+      error: (err, _req, res: any) => {
+        logger.error('Tracking proxy error:', err.message);
+        if (res.writeHead) {
+          res.writeHead(204);
+          res.end();
+        }
+      },
+    },
+  }));
 }
 
 app.use('/api/v1/auth/forgot-password', forgotPasswordLimiter);
 app.use('/api/v1/auth/refresh', refreshLimiter);
 app.use('/api/v1/auth', authLimiter, createProxyMiddleware(proxyTo(SERVICES.auth)));
+
+// Public city autocomplete (no auth — used during onboarding before login).
+app.use('/api/v1/cities', createProxyMiddleware(proxyTo(SERVICES.users)));
 
 // User routes (protected)
 app.use('/api/v1/users', requireAuth, createProxyMiddleware(proxyTo(SERVICES.users)));

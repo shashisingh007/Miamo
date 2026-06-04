@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useAuthStore } from '@/stores';
+import { usePersistentState } from '@/hooks/usePersistentState';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3200';
 
@@ -11,7 +13,7 @@ const CATEGORIES = [
 
 function getToken() {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('miamo_token');
+  return useAuthStore.getState().token;
 }
 
 interface Item {
@@ -31,7 +33,7 @@ interface Item {
 
 export default function ShowcasePage() {
   const [items, setItems] = useState<Item[]>([]);
-  const [category, setCategory] = useState<string>('');
+  const [category, setCategory] = usePersistentState<string>('showcase:category', '');
   const [loading, setLoading] = useState(true);
 
   async function load(cat: string) {

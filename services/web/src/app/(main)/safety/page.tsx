@@ -9,6 +9,7 @@ import { logError } from '@/lib/logError';
 import { useRouter } from 'next/navigation';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { Portal } from '@/components/ui/portal';
 
 export default function SafetyPage() {
  const router = useRouter();
@@ -130,7 +131,7 @@ export default function SafetyPage() {
  </Card>
 
  {showDialerConfirm && (
- <>
+ <Portal>
  <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" onClick={() => setShowDialerConfirm(false)} />
  <div className="fixed inset-x-4 top-[30%] max-w-sm mx-auto bg-miamo-card border border-border rounded-2xl shadow-2xl z-50 p-6 text-center">
  <Phone className="w-8 h-8 text-rose-alt mx-auto mb-3" />
@@ -141,7 +142,7 @@ export default function SafetyPage() {
  <Button size="sm" className="flex-1" onClick={() => { setShowDialerConfirm(false); window.open('tel:112'); }}>Call 112</Button>
  </div>
  </div>
- </>
+ </Portal>
  )}
  </div>
  </ErrorBoundary>

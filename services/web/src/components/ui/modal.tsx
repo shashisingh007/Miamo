@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X } from 'lucide-react';
 import { Button } from './button';
+import { Portal } from './portal';
 
 /* ─── Modal Dialog ─── */
 interface ModalProps {
@@ -29,6 +30,7 @@ export function Modal({ open, onClose, title, children, className = '' }: ModalP
  return (
  <AnimatePresence>
  {open && (
+ <Portal>
  <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
  <motion.div
  initial={{ opacity: 0 }}
@@ -53,6 +55,7 @@ export function Modal({ open, onClose, title, children, className = '' }: ModalP
  <div className="p-4">{children}</div>
  </motion.div>
  </div>
+ </Portal>
  )}
  </AnimatePresence>
  );

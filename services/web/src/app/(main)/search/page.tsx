@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useTrackPageView, useTrackActivity, useTrackScrollDepth } from '@/hooks/useTrackActivity';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { useToast } from '@/components/ui/toast';
 import { useDebounce } from '@/hooks/usePerformance';
@@ -16,8 +17,8 @@ import { useDebounce } from '@/hooks/usePerformance';
 export default function SearchPage() {
  const router = useRouter();
  const toast = useToast();
- const [query, setQuery] = useState('');
- const [searchType, setSearchType] = useState<'name' | 'id' | 'city'>('name');
+ const [query, setQuery] = usePersistentState<string>('search:query', '');
+ const [searchType, setSearchType] = usePersistentState<'name' | 'id' | 'city'>('search:type', 'name');
  const [results, setResults] = useState<any[]>([]);
  const [searched, setSearched] = useState(false);
  const [liking, setLiking] = useState<string | null>(null);

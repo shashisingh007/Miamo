@@ -16,6 +16,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Heart, Star, Clock, Bookmark } from 'lucide-react';
 import { api } from '@/lib/api';
+import { Portal } from '@/components/ui/portal';
 import {
   trackDiscoverSeeLaterView,
   trackDiscoverSkippedOpen,
@@ -96,7 +97,7 @@ export function DeferredPileModal({
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
+        <Portal>
           <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[60]"
@@ -178,7 +179,7 @@ export function DeferredPileModal({
               )}
             </div>
           </motion.div>
-        </>
+        </Portal>
       )}
     </AnimatePresence>
   );

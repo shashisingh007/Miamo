@@ -14,6 +14,11 @@
     --deep-indigo: #180066;
     --surface: #FFFFFF;
     --bg: #FAF8F5;
+    --elevated: #F7F5F2;
+    --text-primary: #111111;
+    --text-secondary: #5F5A55;
+    --text-muted: #8B8680;
+    --border-default: #E8E4DF;
     --spring: cubic-bezier(0.16, 1, 0.3, 1);
     --bounce: cubic-bezier(0.68, -0.55, 0.27, 1.55);
 
@@ -22,6 +27,33 @@
     --miamo-dtm-hairline: #E3CFA8;
     --miamo-dtm-bg: #FBF7EE;
   }
+
+  /* Dark theme — applied via class="dark" on <html> by ThemeSync */
+  .dark {
+    --surface: #181A1F;
+    --bg: #0E0F12;
+    --elevated: #1F2229;
+    --text-primary: #F4F1EC;
+    --text-secondary: #B8B3AC;
+    --text-muted: #7A746D;
+    --border-default: #2A2D34;
+    --rose-soft: #2A2018;
+    --rose-blush: #3A2A20;
+  }
+
+  /* User preferences — set by LocalPrefsSync on <html> as data-attributes. */
+  html[data-font-size="small"]  { font-size: 14px; }
+  html[data-font-size="medium"] { font-size: 16px; }
+  html[data-font-size="large"]  { font-size: 18px; }
+  html[data-reduce-motion="true"] *,
+  html[data-reduce-motion="true"] *::before,
+  html[data-reduce-motion="true"] *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+  html[data-density="compact"] .nav-item { padding-top: 0.4rem; padding-bottom: 0.4rem; }
 
   /* v3.2 — DTM mode overrides (applied via [data-mode="dtm"] on body) */
   [data-mode="dtm"] {
@@ -33,12 +65,12 @@
   [data-mode="dtm"] .dtm-hairline { border-color: var(--miamo-dtm-hairline); }
 
   * {
-    border-color: #E8E4DF;
+    border-color: var(--border-default);
   }
 
   body {
-    background: #FAF8F5;
-    color: #111111;
+    background: var(--bg);
+    color: var(--text-primary);
     font-family: 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;

@@ -9,17 +9,31 @@ import {
 import { Avatar } from '@/components/ui';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
+import { Portal } from '@/components/ui/portal';
 
 export function ChatListItem({ chat, active, onClick, onAction, selectMode, selected, onSelect }: { chat: any; active: boolean; onClick: () => void; onAction: (action: string, data?: any) => void; selectMode?: boolean; selected?: boolean; onSelect?: () => void }) {
  const other = chat.otherUser || chat.user1 || {};
  const name = other.displayName || 'User';
  const photo = other.photos?.[0]?.url || other.photos?.[0];
  const [showMenu, setShowMenu] = useState(false);
+ const [menuPos, setMenuPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
  const router = useRouter();
 
  const handleAction = (action: string, data?: any) => {
  setShowMenu(false);
  onAction(action, data);
+ };
+
+ const openMenu = (e: React.MouseEvent) => {
+ e.stopPropagation();
+ const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+ const MENU_W = 208; // w-52
+ const MENU_H = 360;
+ const spaceBelow = window.innerHeight - rect.bottom;
+ const y = spaceBelow >= MENU_H + 8 ? rect.bottom + 4 : Math.max(8, rect.top - MENU_H - 4);
+ const x = Math.max(8, Math.min(rect.right - MENU_W, window.innerWidth - MENU_W - 8));
+ setMenuPos({ x, y });
+ setShowMenu(true);
  };
 
  return (
@@ -55,7 +69,7 @@ export function ChatListItem({ chat, active, onClick, onAction, selectMode, sele
  </div>
  {/* 3-dot vertical menu trigger */}
  {!selectMode && (
- <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={e => { e.stopPropagation(); setShowMenu(true); }}>
+ <div className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity" onClick={openMenu}>
  <MoreVertical className="w-4 h-4 text-text-muted hover:text-text-primary" />
  </div>
  )}
@@ -64,10 +78,11 @@ export function ChatListItem({ chat, active, onClick, onAction, selectMode, sele
  {/* Chat list item context menu */}
  <AnimatePresence>
  {showMenu && (
- <>
+ <Portal>
  <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
  <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
- className="absolute right-2 top-full mt-1 z-50 bg-miamo-card border border-border rounded-xl shadow-2xl py-1 w-52">
+ style={{ position: 'fixed', top: menuPos.y, left: menuPos.x }}
+ className="z-50 bg-miamo-card border border-border rounded-xl shadow-2xl py-1 w-52">
  <button onClick={() => handleAction('pin')} className="w-full text-left px-3 py-2 text-xs text-text-secondary hover:bg-miamo-elevated flex items-center gap-2">
  <Pin className="w-3 h-3" /> {chat.pinned ? 'Unpin chat' : 'Pin chat'}
  </button>
@@ -97,7 +112,7 @@ export function ChatListItem({ chat, active, onClick, onAction, selectMode, sele
  <UserMinus className="w-3 h-3" /> Unmatch
  </button>
  </motion.div>
- </>
+ </Portal>
  )}
  </AnimatePresence>
  </div>

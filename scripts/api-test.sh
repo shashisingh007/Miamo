@@ -33,7 +33,7 @@ test_endpoint GET "/api/v1/auth/me" "" "GET /auth/me"
 
 echo "═══ PROFILES ═══"
 test_endpoint GET "/api/v1/profiles/me" "" "GET /profiles/me"
-test_endpoint GET "/api/v1/profiles/me/score" "" "GET /profiles/me/score"
+test_endpoint GET "/api/v1/profiles/me/completion" "" "GET /profiles/me/completion"
 
 echo "═══ DISCOVER ═══"
 test_endpoint GET "/api/v1/discover" "" "GET /discover"
@@ -90,9 +90,9 @@ test_endpoint GET "/api/v1/matrimonial/templates" "" "GET /matrimonial/templates
 test_endpoint GET "/api/v1/matrimonial/numerology" "" "GET /matrimonial/numerology"
 test_endpoint GET "/api/v1/matrimonial/browse/advanced" "" "GET /matrimonial/browse/advanced"
 test_endpoint GET "/api/v1/matrimonial/matches" "" "GET /matrimonial/matches"
-test_endpoint GET "/api/v1/matrimonial/access-requests/incoming" "" "GET /matrimonial/access-requests/incoming"
-test_endpoint GET "/api/v1/matrimonial/access-requests/sent" "" "GET /matrimonial/access-requests/sent"
-test_endpoint GET "/api/v1/matrimonial/chats" "" "GET /matrimonial/chats"
+test_endpoint GET "/api/v1/matrimonial/access/incoming" "" "GET /matrimonial/access/incoming"
+test_endpoint GET "/api/v1/matrimonial/access/sent" "" "GET /matrimonial/access/sent"
+test_endpoint GET "/api/v1/matrimonial/chat" "" "GET /matrimonial/chat"
 
 echo ""
 echo "═══════════════════════════════════════"

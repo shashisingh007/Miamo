@@ -16,6 +16,10 @@ import { installAutotrack } from './collectors/autotrack';
 import { installForms } from './collectors/forms';
 import { installPerf } from './collectors/perf';
 import { installAttention } from './collectors/attention';
+import { installClipboard } from './collectors/clipboard';
+import { installGallery } from './collectors/gallery';
+import { installProfileDepth } from './collectors/profileDepth';
+import { installInactivity } from './collectors/inactivity';
 import { hasConsent, readConsent, writeConsent, type ConsentScope, type ConsentState } from './consent';
 import { setUid } from './envelope';
 import type { TrackEvent } from './types';
@@ -113,6 +117,10 @@ export function mount(): void {
   state.uninstallers.push(installPerf(emit));
   state.uninstallers.push(installErrors(emit));
   state.uninstallers.push(installAttention(emit));
+  state.uninstallers.push(installClipboard(emit));
+  state.uninstallers.push(installGallery(emit));
+  state.uninstallers.push(installProfileDepth(emit));
+  state.uninstallers.push(installInactivity(emit));
 
   state.mounted = true;
 }

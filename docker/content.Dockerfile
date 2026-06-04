@@ -1,63 +1,42 @@
 # docker/content.Dockerfile — Miamo Content Service
-# Build: docker build -f docker/content.Dockerfile -t miamo-content .
+# See docker/auth.Dockerfile for layout/NODE_PATH notes.
 
-# ─── Stage 1: Dependencies ───────────────────────────────────────────────────
 FROM node:20-alpine AS deps
-
 WORKDIR /app
+COPY services/content/package.json services/content/package-lock.json* services/content/
+COPY services/shared/package.json  services/shared/package-lock.json*  services/shared/
+RUN cd services/shared  && (npm ci --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund)
+RUN cd services/content && (npm ci --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund)
 
-COPY services/content/package.json services/content/package-lock.json* ./
-
-RUN npm ci --prefer-offline --no-audit --no-fund || npm install --no-audit --no-fund
-
-# ─── Stage 2: Prisma ─────────────────────────────────────────────────────────
-FROM node:20-alpine AS prisma
-
-RUN apk add --no-cache openssl
-
-WORKDIR /app
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY services/content/package.json ./
-COPY services/shared/prisma ./prisma
-
-RUN npx prisma generate
-
-# ─── Stage 3: Build ──────────────────────────────────────────────────────────
 FROM node:20-alpine AS build
-
+RUN apk add --no-cache openssl
 WORKDIR /app
+COPY --from=deps /app/services/shared/node_modules  services/shared/node_modules
+COPY --from=deps /app/services/content/node_modules services/content/node_modules
+COPY services/shared  services/shared
+COPY services/content services/content
+RUN cd services/shared  && npx prisma generate
+RUN cd services/content && npx tsc --removeComments
 
-COPY --from=prisma /app/node_modules ./node_modules
-COPY services/content/package.json services/content/tsconfig.json ./
-COPY services/content/src ./src
-
-RUN npx tsc --removeComments
-
-# ─── Stage 4: Runner ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
-
 RUN apk add --no-cache openssl curl
-
-WORKDIR /app
-
-ENV NODE_ENV=production
-ENV PORT=3205
+WORKDIR /app/services/content
+ENV NODE_ENV=production \
+    PORT=3205 \
+    NODE_PATH=/app/services/shared/node_modules
 
 RUN addgroup -g 1001 -S miamo && adduser -u 1001 -S miamo -G miamo
 
-COPY --from=build /app/dist ./dist
-COPY --from=prisma /app/node_modules ./node_modules
-COPY --from=prisma /app/prisma ./prisma
-COPY services/content/package.json ./
+COPY --from=build /app/services/content/dist          ./dist
+COPY --from=build /app/services/content/node_modules  ./node_modules
+COPY --from=build /app/services/content/package.json  ./package.json
+COPY --from=build /app/services/shared                ../shared
 
 RUN chown -R miamo:miamo /app
-
 USER miamo
 
 EXPOSE 3205
-
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3205/health || exit 1
 
-CMD ["node", "dist/server.js"]
+CMD ["node", "dist/content/src/server.js"]

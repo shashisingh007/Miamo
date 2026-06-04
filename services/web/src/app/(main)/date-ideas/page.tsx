@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 
 /* ═══ Categories ═══ */
@@ -85,7 +86,7 @@ function FloatingSparkles() {
 }
 
 export default function DateIdeasPage() {
- const [cat, setCat] = useState('all');
+ const [cat, setCat] = usePersistentState<string>('dateIdeas:cat', 'all');
  const [ideas, setIdeas] = useState(DATE_IDEAS);
  const [expanded, setExpanded] = useState<number | null>(null);
  const [spotlight, setSpotlight] = useState<DateIdea | null>(null);

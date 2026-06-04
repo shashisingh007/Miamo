@@ -74,6 +74,18 @@ services:
       MESSAGING_SERVICE_URL: http://messaging:3204
       CONTENT_SERVICE_URL: http://content:3205
       NOTIFICATION_SERVICE_URL: http://notifications:3206
+      # ─── Verification / OAuth / OTP (v6.9 + signup phase) ────
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
+      OTP_PROVIDER_EMAIL: ${OTP_PROVIDER_EMAIL:-}
+      OTP_PROVIDER_SMS: ${OTP_PROVIDER_SMS:-}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+      AUTO_APPROVE_VERIFY: ${AUTO_APPROVE_VERIFY:-}
+      ALLOW_DEV_OTP_PEEK: ${ALLOW_DEV_OTP_PEEK:-}
+      DEVICE_FP_SALT: ${DEVICE_FP_SALT:-}
     depends_on:
       - auth
       - users

@@ -11,6 +11,7 @@ import { cursorOpt } from '../../shared/src/coerce';
 import { PrismaSignalReader } from '../../shared/src/algo/signals';
 import { nextNotifyAt } from '../../shared/src/algo/notifyTiming';
 import { v4RankEnabled } from '../../shared/src/algo/flags';
+import { loadPersonalizationCtx } from '../../shared/personalize';
 
 const prisma = createPrisma(5);
 export const app = express();
@@ -21,6 +22,22 @@ interface AuthRequest extends Request { userId?: string }
 const authMiddleware = createInternalAuthMiddleware();
 installHealthRoutes(app, 'notifications', prisma);
 const pushToUser = createPushToUser();
+
+// Per-intent relevance weights for notification types. Different intents
+// care about different things: a serious user values match/profile-view
+// notifications; a casual user values likes/messages; DTM seekers value
+// access requests/family-info notifications.
+const NOTIF_RELEVANCE: Record<string, Record<string, number>> = {
+  serious:   { match: 1.4, profile_view: 1.3, access_request: 1.2, message: 1.0, like: 0.7, super_like: 1.1, system: 0.5, marketing: 0.2 },
+  dtm:       { access_request: 1.6, match: 1.3, profile_view: 1.2, message: 0.9, like: 0.6, super_like: 0.8, system: 0.5, marketing: 0.1 },
+  casual:    { like: 1.3, message: 1.3, super_like: 1.4, match: 1.1, profile_view: 0.7, access_request: 0.5, system: 0.5, marketing: 0.4 },
+  exploring: { like: 1.0, message: 1.1, match: 1.1, profile_view: 0.9, super_like: 1.0, access_request: 0.8, system: 0.5, marketing: 0.3 },
+};
+
+function notifRelevance(intent: 'serious' | 'dtm' | 'casual' | 'exploring', type: string): number {
+  const w = NOTIF_RELEVANCE[intent] || NOTIF_RELEVANCE.exploring;
+  return w[type] ?? 0.8;
+}
 
 // Routes
 app.get('/api/v1/notifications', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
@@ -35,7 +52,29 @@ app.get('/api/v1/notifications', authMiddleware, async (req: AuthRequest, res: R
       ...cursorOpt(cursor),
     });
     const nextCursor = notifications.length === 50 ? notifications[notifications.length - 1].id : null;
-    res.json({ data: notifications, nextCursor });
+
+    // v6.8 personalization: rerank by intent-aware type relevance + recency
+    // − read penalty. Unread urgent items float; old read marketing sinks.
+    let pMeta: any = null;
+    let ordered: any[] = notifications;
+    try {
+      if (notifications.length > 1) {
+        const ctx = await loadPersonalizationCtx(prisma, req.userId!, { surface: 'notifications', prevWindowMin: 1440 });
+        const scored = notifications.map((n: any) => {
+          const ageH = (Date.now() - new Date(n.createdAt).getTime()) / 3600_000;
+          const recency = Math.exp(-ageH / 48); // 48h half-life
+          const rel = notifRelevance(ctx.intent.revealed, n.type || 'system');
+          const readPenalty = n.read ? 0.3 : 1.0;
+          const score = recency * rel * readPenalty;
+          return { n, score };
+        });
+        scored.sort((a, b) => b.score - a.score);
+        ordered = scored.map(s => s.n);
+        pMeta = { intent: { revealed: ctx.intent.revealed, confidence: ctx.intent.confidence }, reranked: true };
+      }
+    } catch { /* fallback to chronological */ }
+
+    res.json({ data: ordered, nextCursor, meta: pMeta || undefined });
   } catch (e) { next(e); }
 });
 

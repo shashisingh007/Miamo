@@ -13,20 +13,22 @@ import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { useToast } from '@/components/ui/toast';
 import { useRouter } from 'next/navigation';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { safetyTracker } from '@/lib/track/collectors/safety';
 import { mainTabs, matchFilters } from './components/constants';
 import { ProfileModal } from './components/ProfileModal';
 import { FeedbackModal } from './components/FeedbackModal';
 import { IncomingCard, MatchCard, ContextMenu, HeldItemMenu } from './components/MatchCard';
+import { StoriesRail } from './components/StoriesRail';
 
 /* ═══════════════════════════════════════════════════════
  MAIN MATCHES PAGE
  ═══════════════════════════════════════════════════════ */
 export default function MatchesPage() {
  const router = useRouter();
- const [activeTab, setActiveTab] = useState('incoming');
- const [matchFilter, setMatchFilter] = useState('all');
- const [searchQuery, setSearchQuery] = useState('');
+ const [activeTab, setActiveTab] = usePersistentState<string>('matches:activeTab', 'incoming');
+ const [matchFilter, setMatchFilter] = usePersistentState<string>('matches:filter', 'all');
+ const [searchQuery, setSearchQuery] = usePersistentState<string>('matches:search', '');
  const [incoming, setIncoming] = useState<any[]>([]);
  const [matches, setMatches] = useState<any[]>([]);
  const [heldItems, setHeldItems] = useState<any[]>([]);
@@ -306,10 +308,18 @@ export default function MatchesPage() {
  const openMenu = (matchId: string, event: React.MouseEvent) => {
  event.stopPropagation();
  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
- // Clamp to viewport bounds
- const y = Math.min(rect.bottom + 4, window.innerHeight - 300);
- const x = Math.min(rect.right - 192, window.innerWidth - 210);
- setMenuPosition({ x: Math.max(8, x), y: Math.max(8, y) });
+ // Menu has ~7 rows (40px each) + 1 divider + padding ≈ 320px. Reserve 360px
+ // so the popup never gets cut off at the bottom edge.
+ const MENU_H = 360;
+ const MENU_W = 192; // matches w-48 in ContextMenu
+ // Open above the trigger if there isn't room below.
+ const spaceBelow = window.innerHeight - rect.bottom;
+ const y = spaceBelow >= MENU_H + 8
+ ? rect.bottom + 4
+ : Math.max(8, rect.top - MENU_H - 4);
+ // Right-align menu's right edge with the trigger's right edge (native pattern).
+ const x = Math.max(8, Math.min(rect.right - MENU_W, window.innerWidth - MENU_W - 8));
+ setMenuPosition({ x, y });
  setMenuOpen(matchId);
  };
 
@@ -342,6 +352,9 @@ export default function MatchesPage() {
  </p>
  </div>
  </div>
+
+ {/* ─── Stories Rail ─── */}
+ <StoriesRail />
 
 
 

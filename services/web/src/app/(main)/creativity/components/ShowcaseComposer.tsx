@@ -1,14 +1,13 @@
 'use client';
-// v3.2 — Showcase composer. Text-first (title + body + category multi-select
-// + optional external image/link URL). No video uploads → minimal storage.
-// Each post can be tagged in up to 3 categories (server creates multiple
-// CreativityItem rows, one per category, sharing the same title/body) so the
-// same piece shows in every relevant feed.
-import { useState } from 'react';
+// v3.3 — Showcase composer. Supports local file upload (image/video) with
+// compression, or external URL. Each post can be tagged in up to 3 categories.
+import { useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Image as ImageIcon, Link2, Tag, Sparkles, Loader2 } from 'lucide-react';
+import { X, Image as ImageIcon, Link2, Tag, Sparkles, Loader2, ImagePlus, Film } from 'lucide-react';
 import { api } from '@/lib/api';
 import { CATEGORIES } from './constants';
+import { Portal } from '@/components/ui/portal';
+import { loadImageFromFile, compressImage, compressVideo, videoNeedsCompression } from '@/lib/media-utils';
 
 const MAX_TITLE = 80;
 const MAX_BODY = 500;
@@ -21,9 +20,12 @@ export function ShowcaseComposer({ open, onClose, onCreated }: {
   const [body, setBody] = useState('');
   const [cats, setCats] = useState<string[]>([]);
   const [mediaUrl, setMediaUrl] = useState('');
+  const [mediaFile, setMediaFile] = useState<{ file: File; preview: string } | null>(null);
+  const [mediaSource, setMediaSource] = useState<'upload' | 'url'>('upload');
   const [externalUrl, setExternalUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (!open) return null;
 
@@ -32,24 +34,39 @@ export function ShowcaseComposer({ open, onClose, onCreated }: {
     else if (cats.length < MAX_CATS) setCats([...cats, c]);
   };
 
-  const canSubmit = title.trim().length > 2 && (body.trim().length > 5 || mediaUrl.trim().length > 5) && cats.length >= 1;
+  const canSubmit = title.trim().length > 2 && (body.trim().length > 5 || mediaUrl.trim().length > 5 || !!mediaFile) && cats.length >= 1;
 
   const submit = async () => {
     if (!canSubmit) return;
     setBusy(true); setErr(null);
     try {
-      const type = mediaUrl ? 'image' : externalUrl ? 'link' : 'text';
-      // One item per category — backend dedupes by (authorId, categoryId, title)
-      // on its end if needed; we just fire in parallel.
+      let finalMediaUrl: string | undefined;
+      if (mediaSource === 'upload' && mediaFile) {
+        if (mediaFile.file.type.startsWith('image/')) {
+          const img = await loadImageFromFile(mediaFile.file);
+          finalMediaUrl = await compressImage({ img, maxDim: 1080 });
+        } else if (mediaFile.file.type.startsWith('video/')) {
+          if (videoNeedsCompression(mediaFile.file)) {
+            const result = await compressVideo({ file: mediaFile.file });
+            finalMediaUrl = result.dataUrl;
+          } else {
+            const reader = new FileReader();
+            finalMediaUrl = await new Promise<string>((r) => { reader.onload = () => r(reader.result as string); reader.readAsDataURL(mediaFile.file); });
+          }
+        }
+      } else if (mediaSource === 'url' && mediaUrl.trim()) {
+        finalMediaUrl = mediaUrl.trim();
+      }
+      const type = finalMediaUrl?.startsWith('data:video') ? 'video' : finalMediaUrl ? 'image' : externalUrl ? 'link' : 'text';
       const created = await Promise.all(cats.map(category =>
         api.createCreativityItem({
           category, title: title.trim(),
           content: body.trim() + (externalUrl ? `\n\n${externalUrl}` : ''),
-          mediaUrl: mediaUrl || undefined, type,
+          mediaUrl: finalMediaUrl || undefined, type,
         })
       ));
       onCreated(created.map(r => r.data).filter(Boolean));
-      setTitle(''); setBody(''); setCats([]); setMediaUrl(''); setExternalUrl('');
+      setTitle(''); setBody(''); setCats([]); setMediaUrl(''); setMediaFile(null); setExternalUrl('');
       onClose();
     } catch (e: any) {
       setErr(e?.message || 'Could not publish — try again.');
@@ -57,20 +74,21 @@ export function ShowcaseComposer({ open, onClose, onCreated }: {
   };
 
   return (
-    <AnimatePresence>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <motion.div
-        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 30, stiffness: 280 }}
-        className="fixed inset-x-0 bottom-0 z-50 max-h-[92vh] overflow-y-auto rounded-t-3xl bg-miamo-card pb-[max(2rem,env(safe-area-inset-bottom))] shadow-2xl"
-      >
+    <Portal>
+      <AnimatePresence>
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+        <motion.div
+          initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
+          transition={{ type: 'spring', damping: 30, stiffness: 280 }}
+          className="fixed inset-x-0 bottom-0 z-50 max-h-[92vh] overflow-y-auto rounded-t-3xl bg-miamo-card pb-[max(2rem,env(safe-area-inset-bottom))] shadow-2xl"
+        >
         <div className="mx-auto h-1 w-10 rounded-full bg-black/10 my-3" />
         <div className="mx-auto max-w-xl px-5">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold">Showcase your talent</h2>
-              <p className="text-xs text-text-muted">Text-first, low-bandwidth. Add an image URL if you like — no video uploads.</p>
+              <p className="text-xs text-text-muted">Upload photos or videos — auto-compressed for fast loading.</p>
             </div>
             <button onClick={onClose} className="rounded-full p-2 hover:bg-black/[0.05]"><X className="h-4 w-4" /></button>
           </div>
@@ -119,20 +137,60 @@ export function ShowcaseComposer({ open, onClose, onCreated }: {
             <div className="mt-0.5 text-[10px] tabular-nums text-text-muted text-right">{body.length}/{MAX_BODY}</div>
           </div>
 
-          {/* Image URL */}
-          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-              <ImageIcon className="inline h-3 w-3 -mt-0.5 mr-1" /> Image URL (optional)
-              <input value={mediaUrl} onChange={e => setMediaUrl(e.target.value)}
-                placeholder="https://… (host on imgur, drive, etc.)"
-                className="mt-1 w-full rounded-xl border border-token bg-miamo-card px-3 py-2.5 text-[13px] normal-case font-normal" />
-            </label>
-            <label className="block text-[11px] font-semibold uppercase tracking-wider text-text-muted">
-              <Link2 className="inline h-3 w-3 -mt-0.5 mr-1" /> External link (optional)
-              <input value={externalUrl} onChange={e => setExternalUrl(e.target.value)}
-                placeholder="https://your-portfolio.com/piece"
-                className="mt-1 w-full rounded-xl border border-token bg-miamo-card px-3 py-2.5 text-[13px] normal-case font-normal" />
-            </label>
+          {/* Media (upload or URL) */}
+          <div className="mt-3 space-y-2">
+            <div className="flex gap-2 text-[11px] font-semibold">
+              <button onClick={() => setMediaSource('upload')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full border transition ${mediaSource === 'upload' ? 'border-rose-main text-rose-main bg-rose-main/10' : 'border-token text-text-muted'}`}>
+                <ImagePlus className="h-3 w-3" /> Upload
+              </button>
+              <button onClick={() => setMediaSource('url')}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded-full border transition ${mediaSource === 'url' ? 'border-rose-main text-rose-main bg-rose-main/10' : 'border-token text-text-muted'}`}>
+                <Link2 className="h-3 w-3" /> Paste URL
+              </button>
+            </div>
+            {mediaSource === 'upload' ? (
+              <div>
+                {!mediaFile ? (
+                  <button onClick={() => fileInputRef.current?.click()}
+                    className="w-full rounded-xl border-2 border-dashed border-token px-4 py-5 text-center hover:bg-black/[0.02] transition">
+                    <div className="flex items-center justify-center gap-2 text-text-muted">
+                      <ImagePlus className="h-5 w-5" /><Film className="h-5 w-5" />
+                    </div>
+                    <p className="text-xs text-text-muted mt-1">Drop or click · image/video · auto-compressed</p>
+                  </button>
+                ) : (
+                  <div className="relative inline-block">
+                    {mediaFile.file.type.startsWith('image/') ? (
+                      <img src={mediaFile.preview} alt="Preview" className="max-h-32 rounded-xl object-cover" />
+                    ) : (
+                      <video src={mediaFile.preview} className="max-h-32 rounded-xl" muted playsInline controls />
+                    )}
+                    <button onClick={() => { URL.revokeObjectURL(mediaFile.preview); setMediaFile(null); }}
+                      className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center">
+                      <X className="w-3 h-3 text-white" />
+                    </button>
+                  </div>
+                )}
+                <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden"
+                  onChange={(e) => { const f = e.target.files?.[0]; if (f) { if (mediaFile?.preview) URL.revokeObjectURL(mediaFile.preview); setMediaFile({ file: f, preview: URL.createObjectURL(f) }); } e.target.value = ''; }} />
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                  <ImageIcon className="inline h-3 w-3 -mt-0.5 mr-1" /> Image URL
+                  <input value={mediaUrl} onChange={e => setMediaUrl(e.target.value)}
+                    placeholder="https://… (imgur, drive, etc.)"
+                    className="mt-1 w-full rounded-xl border border-token bg-miamo-card px-3 py-2.5 text-[13px] normal-case font-normal" />
+                </label>
+                <label className="block text-[11px] font-semibold uppercase tracking-wider text-text-muted">
+                  <Link2 className="inline h-3 w-3 -mt-0.5 mr-1" /> External link
+                  <input value={externalUrl} onChange={e => setExternalUrl(e.target.value)}
+                    placeholder="https://your-portfolio.com/piece"
+                    className="mt-1 w-full rounded-xl border border-token bg-miamo-card px-3 py-2.5 text-[13px] normal-case font-normal" />
+                </label>
+              </div>
+            )}
           </div>
 
           {err && <div className="mt-3 rounded-xl bg-rose-main/10 px-3 py-2 text-xs text-rose-main">{err}</div>}
@@ -148,6 +206,7 @@ export function ShowcaseComposer({ open, onClose, onCreated }: {
           </p>
         </div>
       </motion.div>
-    </AnimatePresence>
+      </AnimatePresence>
+    </Portal>
   );
 }

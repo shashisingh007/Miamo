@@ -5,8 +5,10 @@ import { persist } from 'zustand/middleware';
 interface AuthState {
  user: any | null;
  token: string | null;
+ refreshToken: string | null;
  isAuthenticated: boolean;
- setAuth: (user: any, token: string) => void;
+ setAuth: (user: any, token: string, refreshToken?: string | null) => void;
+ setTokens: (token: string, refreshToken?: string | null) => void;
  updateUser: (data: Partial<any>) => void;
  clearAuth: () => void;
 }
@@ -21,19 +23,36 @@ export const useAuthStore = create<AuthState>()(
  (set) => ({
  user: null,
  token: null,
+ refreshToken: null,
  isAuthenticated: false,
- setAuth: (user, token) => {
- if (typeof window !== 'undefined') localStorage.setItem('miamo_token', token);
- set({ user, token, isAuthenticated: true });
+ setAuth: (user, token, _refreshToken) => {
+ // Access token is held in memory only (XSS hardening). Refresh token
+ // lives in an httpOnly cookie set server-side. Nothing token-related
+ // is written to JS-readable storage.
+ if (typeof window !== 'undefined') {
+ localStorage.removeItem('miamo_token');
+ localStorage.removeItem('miamo_refresh_token');
+ }
+ set({ user, token, refreshToken: null, isAuthenticated: true });
+ },
+ setTokens: (token, _refreshToken) => {
+ if (typeof window !== 'undefined') {
+ localStorage.removeItem('miamo_token');
+ localStorage.removeItem('miamo_refresh_token');
+ }
+ set({ token, refreshToken: null });
  },
  updateUser: (data) =>
  set((state) => ({ user: state.user ? { ...state.user, ...data } : null })),
  clearAuth: () => {
- if (typeof window !== 'undefined') localStorage.removeItem('miamo_token');
- set({ user: null, token: null, isAuthenticated: false });
+ if (typeof window !== 'undefined') {
+ localStorage.removeItem('miamo_token');
+ localStorage.removeItem('miamo_refresh_token');
+ }
+ set({ user: null, token: null, refreshToken: null, isAuthenticated: false });
  },
  }),
- { name: 'miamo-auth', partialize: (s) => ({ user: s.user, token: s.token, isAuthenticated: s.isAuthenticated }) }
+ { name: 'miamo-auth', partialize: (s) => ({ user: s.user, isAuthenticated: s.isAuthenticated }) }
  )
 );
 

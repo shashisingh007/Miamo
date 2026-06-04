@@ -1,11 +1,11 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, Component } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Component, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
  Zap, Clock, Trophy, Flame, AlertTriangle, Send,
  ChevronDown, ArrowUp, ArrowDown, Users, Crown,
- Check, CheckCheck, Lightbulb, X,
+ Check, CheckCheck, Lightbulb, X, Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, Badge, Card, EmptyState } from '@/components/ui';
@@ -16,14 +16,18 @@ import { track } from '@/lib/track';
 import { BEAT_STATES } from '@/lib/constants';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import { loadImageFromFile, compressImage, compressVideo, validateMediaFile } from '@/lib/media-utils';
 
 import { BeatMatch, BeatEntry, BEAT_TYPES, MILESTONE_EMOJIS, getStreakDeadline } from './components/constants';
+import { Portal } from '@/components/ui/portal';
 import {
  BeatsIcon, StreakFlame, StreakCountdown, BeatDayStatus,
  MilestoneCelebration, ConfirmPopup, BeatMenu, BeatListView,
  IceBreakerPanel, NudgeBar, StatCard, BeatTypeButton,
 } from './components/BeatWidgets';
 import { MatchBeatsChatView } from './components/MatchBeatsChatView';
+import { useSSE } from '@/hooks/useSSE';
 
 /* ═══════════════════════════════════════════════════════════
  ERROR BOUNDARY — prevents full page crash
@@ -78,10 +82,10 @@ export default function BeatsPage() {
 function BeatsPageInner() {
  const [beats, setBeats] = useState<BeatMatch[]>([]);
  const [loading, setLoading] = useState(true);
- const [activeView, setActiveView] = useState<'dashboard' | 'sent' | 'received'>('dashboard');
+ const [activeView, setActiveView] = usePersistentState<'dashboard' | 'sent' | 'received' | 'active' | 'longest'>('beats:activeView', 'dashboard');
  const [selectedBeat, setSelectedBeat] = useState<BeatMatch | null>(null);
  const [beatEntries, setBeatEntries] = useState<BeatEntry[]>([]);
- const [chatFilter, setChatFilter] = useState<'all' | 'sent' | 'received'>('all');
+ const [chatFilter, setChatFilter] = usePersistentState<'all' | 'sent' | 'received'>('beats:chatFilter', 'all');
  const [showIceBreakers, setShowIceBreakers] = useState(false);
  const [confirmAction, setConfirmAction] = useState<{ type: 'remove' | 'block' | 'delete' | 'report'; beatId: string; entryId?: string } | null>(null);
  const [celebration, setCelebration] = useState<number | null>(null);
@@ -89,6 +93,10 @@ function BeatsPageInner() {
  const [quickBeatType, setQuickBeatType] = useState<string | null>(null); // match selection modal
  const [pendingBeatType, setPendingBeatType] = useState<string | null>(null); // pre-fill chat view type
  const [pendingIceBreaker, setPendingIceBreaker] = useState<string | null>(null); // pre-fill ice breaker text
+ const [mediaPick, setMediaPick] = useState<{ beatId: string; type: string } | null>(null); // direct gallery flow
+ const [mediaUploading, setMediaUploading] = useState(false);
+ const [mediaToast, setMediaToast] = useState<string | null>(null);
+ const mediaInputRef = useRef<HTMLInputElement>(null);
 
  useTrackPageView('beats');
  useTrackScrollDepth('beats');
@@ -100,8 +108,8 @@ function BeatsPageInner() {
  return () => clearInterval(iv);
  }, []);
 
- const loadBeats = useCallback(() => {
- setLoading(true);
+ const loadBeats = useCallback((opts?: { silent?: boolean }) => {
+ if (!opts?.silent) setLoading(true);
  api.getBeats().then(res => {
  const raw = res.data || [];
  // Map API response format to our BeatMatch interface
@@ -152,6 +160,49 @@ function BeatsPageInner() {
 
  useEffect(() => { loadBeats(); }, [loadBeats]);
 
+ // Realtime: refetch silently when the server pushes any beat-related event,
+ // so users see save/unsave/screenshot/download/view updates without refresh.
+ const refetchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+ const silentRefetch = useCallback(() => {
+ if (refetchTimer.current) clearTimeout(refetchTimer.current);
+ refetchTimer.current = setTimeout(() => loadBeats({ silent: true }), 250);
+ }, [loadBeats]);
+ useSSE('beat-update', silentRefetch);
+ useSSE('beat-viewed', silentRefetch);
+ useSSE('beat-saved', silentRefetch);
+ useSSE('beat-unsaved', silentRefetch);
+ useSSE('beat-screenshot', silentRefetch);
+ useSSE('beat-downloaded', silentRefetch);
+
+ // Keep the open chat view's entries in sync when `beats` is silently
+ // refetched (e.g. via SSE). Otherwise the chat panel would keep stale
+ // events until the user navigates away and back.
+ useEffect(() => {
+ if (!selectedBeat) return;
+ const rawBeat = (beats as any).find((b: any) => b.id === selectedBeat.id);
+ const events = rawBeat?._events;
+ if (!events) return;
+ const entries: BeatEntry[] = events.map((e: any) => ({
+ id: e.id,
+ beatId: selectedBeat.id,
+ type: (e.type || 'text') as any,
+ content: e.content || '',
+ sender: e.userId === selectedBeat.matchedUser.id ? 'them' as const : 'me' as const,
+ sentAt: e.createdAt || new Date().toISOString(),
+ seen: true,
+ showInChat: false,
+ ephemeralLocked: !!e._ephemeralLocked,
+ viewCount: e.viewCount || 0,
+ mediaSaved: !!e.mediaSaved,
+ mediaCleared: !!e.mediaCleared,
+ }));
+ setBeatEntries(prev => {
+ // Preserve any optimistic local-only entries (id starts with 'new-')
+ const optimistic = prev.filter(e => typeof e.id === 'string' && e.id.startsWith('new-'));
+ return [...entries, ...optimistic];
+ });
+ }, [beats, selectedBeat]);
+
  // Stats
  const activeCount = beats.length;
  const { totalSent, totalReceived, longest, completedToday } = useMemo(() => ({
@@ -160,6 +211,18 @@ function BeatsPageInner() {
  longest: beats.reduce((max, b) => Math.max(max, b.longestStreak || b.count || 0), 0),
  completedToday: beats.filter(b => b.todayCompleted).length,
  }), [beats]);
+
+ const MEDIA_BEAT_TYPES = useMemo(() => new Set(['photo','video','voice','music','gif']), []);
+ const acceptForBeatType = (type: string | null) => {
+ switch (type) {
+ case 'photo': return 'image/*';
+ case 'video': return 'video/*';
+ case 'voice': return 'audio/*';
+ case 'music': return 'audio/*';
+ case 'gif': return 'image/gif,image/*';
+ default: return '';
+ }
+ };
 
  const handleSendBeat = async (beatId: string, type: string, content?: string) => {
  if (completing) return; // Prevent concurrent sends
@@ -217,6 +280,61 @@ function BeatsPageInner() {
  setCompleting(null);
  };
 
+ const startMediaSend = (beat: BeatMatch, type: string) => {
+ if (beat.iSentToday) {
+ setMediaToast('You already sent today\u2019s beat to this match');
+ setTimeout(() => setMediaToast(null), 2200);
+ return;
+ }
+ setMediaPick({ beatId: beat.id, type });
+ setQuickBeatType(null);
+ setTimeout(() => mediaInputRef.current?.click(), 60);
+ };
+
+ const handleMediaFileChosen = async (file: File) => {
+ if (!mediaPick) return;
+ const err = validateMediaFile(file);
+ if (err) {
+ setMediaToast(err);
+ setTimeout(() => setMediaToast(null), 2500);
+ setMediaPick(null);
+ return;
+ }
+ setMediaUploading(true);
+ try {
+ let dataUrl = '';
+ if (file.type.startsWith('image/')) {
+ const img = await loadImageFromFile(file);
+ dataUrl = await compressImage({ img, maxDim: 1080 });
+ } else if (file.type.startsWith('video/')) {
+ const r = await compressVideo({ file });
+ dataUrl = r.dataUrl;
+ } else if (file.type.startsWith('audio/')) {
+ dataUrl = await new Promise<string>((res, rej) => {
+ const fr = new FileReader();
+ fr.onload = () => res(String(fr.result));
+ fr.onerror = () => rej(fr.error);
+ fr.readAsDataURL(file);
+ });
+ } else {
+ throw new Error('Unsupported file type');
+ }
+ const beat = beats.find(b => b.id === mediaPick.beatId);
+ await handleSendBeat(mediaPick.beatId, mediaPick.type, dataUrl);
+ setMediaToast('Beat sent!');
+ setTimeout(() => setMediaToast(null), 1800);
+ // Open chat after sending so user can see the conversation
+ if (beat) {
+ setTimeout(() => handleSelectMatch(beat, null, null), 250);
+ }
+ } catch (e: any) {
+ setMediaToast(e?.message || 'Failed to send beat');
+ setTimeout(() => setMediaToast(null), 2800);
+ }
+ setMediaPick(null);
+ setMediaUploading(false);
+ };
+
  const handleSelectMatch = useCallback((beat: BeatMatch, beatType?: string | null, iceText?: string | null) => {
  setSelectedBeat(beat);
  if (beatType) setPendingBeatType(beatType);
@@ -233,6 +351,10 @@ function BeatsPageInner() {
  sentAt: e.createdAt || new Date().toISOString(),
  seen: true,
  showInChat: false,
+ ephemeralLocked: !!e._ephemeralLocked,
+ viewCount: e.viewCount || 0,
+ mediaSaved: !!e.mediaSaved,
+ mediaCleared: !!e.mediaCleared,
  }));
  setBeatEntries(entries);
  setChatFilter('all');
@@ -286,6 +408,30 @@ function BeatsPageInner() {
 
  return (
  <div style={{ height: '100%', overflow: 'auto' }}>
+ <input
+ ref={mediaInputRef}
+ type="file"
+ accept={acceptForBeatType(mediaPick?.type ?? null)}
+ hidden
+ onChange={(e) => {
+ const f = e.target.files?.[0];
+ if (f) handleMediaFileChosen(f);
+ e.target.value = '';
+ }}
+ />
+ <AnimatePresence>
+ {(mediaUploading || mediaToast) && (
+ <Portal>
+ <motion.div
+ initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
+ className="fixed bottom-24 left-1/2 -translate-x-1/2 z-[60] px-4 py-2.5 rounded-xl bg-black/80 text-white text-sm font-medium flex items-center gap-2 shadow-lg backdrop-blur-sm"
+ >
+ {mediaUploading && <Loader2 className="w-4 h-4 animate-spin" />}
+ <span>{mediaUploading ? 'Sending beat\u2026' : mediaToast}</span>
+ </motion.div>
+ </Portal>
+ )}
+ </AnimatePresence>
  <div className="max-w-3xl mx-auto p-6 space-y-5 pb-24">
  {/* HEADER */}
  <div className="flex items-center justify-between">
@@ -307,9 +453,13 @@ function BeatsPageInner() {
  {/* STATS GRID */}
  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
  <StatCard label="Active Beats" value={activeCount} color="from-rose to-rose-dark"
- icon={<BeatsIcon size={18} />} />
+ icon={<BeatsIcon size={18} />} clickable
+ subtitle={activeView === 'active' ? '\u2190 Back' : 'Tap to view \u2192'}
+ onClick={() => setActiveView(activeView === 'active' ? 'dashboard' : 'active')} />
  <StatCard label="Longest Streak" value={longest} color="from-rose-alt to-rose-main"
- icon={<Trophy className="w-5 h-5 text-text-primary" />} />
+ icon={<Trophy className="w-5 h-5 text-text-primary" />} clickable
+ subtitle={activeView === 'longest' ? '\u2190 Back' : 'Tap to view \u2192'}
+ onClick={() => setActiveView(activeView === 'longest' ? 'dashboard' : 'longest')} />
  <StatCard label="Total Sent" value={totalSent} color="from-rose-alt to-rose-main"
  icon={<ArrowUp className="w-5 h-5 text-text-primary" />} clickable
  subtitle={activeView === 'sent' ? '\u2190 Back' : 'Tap to view \u2192'}
@@ -345,8 +495,10 @@ function BeatsPageInner() {
  {BEAT_TYPES.map(bt => (
  <BeatTypeButton key={bt.type} bt={bt} onClick={() => {
  if (beats.length === 0) return;
+ const isMedia = MEDIA_BEAT_TYPES.has(bt.type);
  if (beats.length === 1) {
- handleSelectMatch(beats[0], bt.type);
+ if (isMedia) startMediaSend(beats[0], bt.type);
+ else handleSelectMatch(beats[0], bt.type);
  } else {
  setQuickBeatType(bt.type);
  }
@@ -358,6 +510,7 @@ function BeatsPageInner() {
  {/* MATCH SELECTION MODAL for Quick Beat */}
  <AnimatePresence>
  {quickBeatType && (
+ <Portal>
  <motion.div
  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
  className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={() => setQuickBeatType(null)}
@@ -384,7 +537,15 @@ function BeatsPageInner() {
  <motion.button
  key={beat.id}
  whileHover={{ x: 3 }}
- onClick={() => { handleSelectMatch(beat, quickBeatType); setQuickBeatType(null); }}
+ onClick={() => {
+ if (!quickBeatType) return;
+ if (MEDIA_BEAT_TYPES.has(quickBeatType)) {
+ startMediaSend(beat, quickBeatType);
+ } else {
+ handleSelectMatch(beat, quickBeatType);
+ setQuickBeatType(null);
+ }
+ }}
  disabled={beat.iSentToday}
  className={cn("flex items-center gap-3 w-full p-3 rounded-xl hover:bg-miamo-surface/40 transition-all text-left", beat.iSentToday && "opacity-50")}
  >
@@ -413,6 +574,7 @@ function BeatsPageInner() {
  </div>
  </motion.div>
  </motion.div>
+ </Portal>
  )}
  </AnimatePresence>
 

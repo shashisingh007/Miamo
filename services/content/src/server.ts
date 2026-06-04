@@ -3,6 +3,7 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { LRUCache, MinHeap, TTL, feedCache, activityCache } from '../../shared/cache';
 import { scoreFeedItem, scoreDtm, scoreDtmEnhanced, type FeedItem, type FeedUserProfile, type DtmUser, type DtmCandidate } from '../../shared/algorithms';
+import { loadPersonalizationCtx, applyPersonalization } from '../../shared/personalize';
 import { logger } from '../../shared/src/logger';
 import { errorHandler } from '../../shared/src/errorHandler';
 import { validate } from '../../shared/src/validate';
@@ -17,6 +18,8 @@ import { rankForYou } from '../../shared/src/algo/forYou';
 import { rerankFeed } from '../../shared/src/algo/feedAugment';
 import { v4RankEnabled } from '../../shared/src/algo/flags';
 import { hashUid } from '../../shared/src/track/hash';
+import { buildNegativeProfile, negativePenalty, ageBucket as agBucket, type NegativeEvent, type TraitSnapshot } from '../../shared/negative-signal-engine';
+import { diversify } from '../../shared/refresh-diversifier';
 
 const prisma = createPrisma(15);
 export const app = express();
@@ -338,8 +341,27 @@ app.get('/api/v1/stories/:id/viewers', authMiddleware, async (req: AuthRequest, 
     const story = await prisma.story.findUnique({ where: { id: req.params.id } });
     if (!story) return res.status(404).json({ error: { message: 'Story not found' } });
     if (story.authorId !== req.userId) return res.status(403).json({ error: { message: 'Access denied — only the author can view story viewers', code: 'FORBIDDEN' } });
-    const views = await prisma.storyView.findMany({ where: { storyId: req.params.id }, include: { viewer: { select: { id: true, displayName: true, username: true } } } });
+    const views = await prisma.storyView.findMany({
+      where: { storyId: req.params.id },
+      include: { viewer: { select: { id: true, displayName: true, username: true, photos: { take: 1, orderBy: { position: 'asc' } } } } },
+      orderBy: { createdAt: 'desc' },
+    });
     res.json({ data: views });
+  } catch (e) { next(e); }
+});
+
+// GET /api/v1/stories/:id/likes — Likers list (story author only)
+app.get('/api/v1/stories/:id/likes', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const story = await prisma.story.findUnique({ where: { id: req.params.id } });
+    if (!story) return res.status(404).json({ error: { message: 'Story not found' } });
+    if (story.authorId !== req.userId) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
+    const likes = await prisma.storyLike.findMany({
+      where: { storyId: req.params.id },
+      include: { user: { select: { id: true, displayName: true, username: true, photos: { take: 1, orderBy: { position: 'asc' } } } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ data: likes });
   } catch (e) { next(e); }
 });
 
@@ -614,13 +636,40 @@ app.get('/api/v1/creativity/feed', authMiddleware, async (req: AuthRequest, res:
 
     // Return top 20
     const result = diversified.slice(0, 20);
+
+    // v6.8 overlay: drop items whose authors share traits with users the
+    // viewer has previously blocked/reported, and shuffle by intent.
+    let pMeta: any = null;
+    let finalResult: any[] = result;
+    try {
+      if (result.length > 1) {
+        const ctx = await loadPersonalizationCtx(prisma, req.userId!, { surface: 'feed', prevWindowMin: 1440 });
+        // Hydrate author traits in one batch
+        const authorIds = Array.from(new Set(result.map((r: any) => r.authorId)));
+        const authorProfiles = await prisma.profile.findMany({ where: { userId: { in: authorIds } }, select: { userId: true, city: true, religion: true, datingIntent: true, smoking: true, drinking: true } }).catch(() => []);
+        const profByUser = new Map(authorProfiles.map((p: any) => [p.userId, p]));
+        const items = result.map((r: any) => ({
+          id: r.id,
+          baseScore: r._aiScore * 100,
+          city: profByUser.get(r.authorId)?.city,
+          traits: { city: profByUser.get(r.authorId)?.city, datingIntent: profByUser.get(r.authorId)?.datingIntent, religion: profByUser.get(r.authorId)?.religion, smoking: profByUser.get(r.authorId)?.smoking, drinking: profByUser.get(r.authorId)?.drinking },
+          _row: r,
+        }));
+        const { ranked, diversifier } = applyPersonalization(ctx, items, { topN: items.length });
+        const byId = new Map(items.map((it: any) => [it.id, it._row]));
+        finalResult = ranked.map((it: any) => byId.get(it.id)).filter(Boolean);
+        pMeta = { intent: { revealed: ctx.intent.revealed }, diversifier: { mood: ctx.sessionMood, reasoning: diversifier.reasoning }, negativeSignals: { totalEvents: ctx.negProfile.totalEvents } };
+      }
+    } catch { /* fallback to author-diversified */ }
+
     res.json({
-      data: result,
-      cursor: result[result.length - 1]?.id,
+      data: finalResult,
+      cursor: finalResult[finalResult.length - 1]?.id,
       meta: {
         total: candidates.length,
         category: isGeneral ? 'general' : category,
         algorithm: 'collaborative-filtering-v1',
+        ...(pMeta || {}),
       },
     });
   } catch (e) { next(e); }
@@ -916,6 +965,11 @@ app.get('/api/v1/matrimonial/browse', authMiddleware, async (req: AuthRequest, r
     // Require at least fullName or religion to be set (i.e. profile filled)
     where.fullName = { not: '' };
 
+    // v6.7: page in batches of 10 so each request re-runs scoreDtm +
+    // scoreDtmEnhanced with fresh behavioral signals (recent views,
+    // response rate, completeness). Over-fetch so we can rank.
+    const requestedLimit = Math.max(1, Math.min(50, parseInt((req.query.limit as string) || '10', 10) || 10));
+    const fetchPool = Math.max(30, requestedLimit * 3);
     const profiles = await prisma.matrimonialProfile.findMany({
       where,
       include: {
@@ -928,7 +982,7 @@ app.get('/api/v1/matrimonial/browse', authMiddleware, async (req: AuthRequest, r
         },
       },
       orderBy: { updatedAt: 'desc' },
-      take: 20,
+      take: fetchPool,
       ...cursorOpt(cursor),
     });
 
@@ -1005,17 +1059,108 @@ app.get('/api/v1/matrimonial/browse', authMiddleware, async (req: AuthRequest, r
       };
     }));
 
-    // Sort by DTM score if available
+    // Sort by DTM score if available, then trim to requested batch size.
     if (myProfile) {
       result.sort((a, b) => (b.dtmScore || 0) - (a.dtmScore || 0));
     }
 
-    // Track DTM browse activity for behavioral scoring
-    for (const p of result.slice(0, 5)) {
+    // ── v6.8: negative-signal penalty + refresh diversifier ──
+    // DTM is high-stakes — apply the user's blocks/reports/unmatches as
+    // a trait-penalty per candidate, then diversify so each refresh shows
+    // a different mix (varying religion/city spread within the page).
+    let negProfile = buildNegativeProfile([]);
+    const prevShownIds = new Set<string>();
+    try {
+      const since90d = new Date(Date.now() - 90 * 86400000);
+      const myBlocks = await prisma.block.findMany({
+        where: { blockerId: req.userId!, createdAt: { gte: since90d } },
+        select: { blockedId: true, reason: true, createdAt: true },
+      }).catch(() => []);
+      const myReports = await prisma.report.findMany({
+        where: { reporterId: req.userId!, createdAt: { gte: since90d } },
+        select: { reportedId: true, reason: true, createdAt: true },
+      }).catch(() => []);
+      const offIds = new Set<string>();
+      myBlocks.forEach((b: any) => offIds.add(b.blockedId));
+      myReports.forEach((r: any) => offIds.add(r.reportedId));
+      let traitsByUser = new Map<string, TraitSnapshot>();
+      if (offIds.size > 0) {
+        const offUsers = await prisma.user.findMany({
+          where: { id: { in: Array.from(offIds) } },
+          select: { id: true, verified: true, profile: { select: { city: true, age: true, smoking: true, drinking: true, religion: true, datingIntent: true, education: true } } },
+        }).catch(() => []);
+        for (const u of offUsers as any[]) {
+          traitsByUser.set(u.id, {
+            city: u.profile?.city ?? null, ageBucket: agBucket(u.profile?.age),
+            smoking: u.profile?.smoking ?? null, drinking: u.profile?.drinking ?? null,
+            religion: u.profile?.religion ?? null, datingIntent: u.profile?.datingIntent ?? null,
+            education: u.profile?.education ?? null, verified: u.verified ?? null,
+          });
+        }
+      }
+      const negEvents: NegativeEvent[] = [];
+      const dAgo = (d: Date) => (Date.now() - new Date(d).getTime()) / 86400000;
+      myBlocks.forEach((b: any) => { const t = traitsByUser.get(b.blockedId); if (t) negEvents.push({ kind: 'block', targetTraits: t, daysAgo: dAgo(b.createdAt), reason: b.reason }); });
+      myReports.forEach((r: any) => { const t = traitsByUser.get(r.reportedId); if (t) negEvents.push({ kind: 'report', targetTraits: t, daysAgo: dAgo(r.createdAt), reason: r.reason }); });
+      negProfile = buildNegativeProfile(negEvents);
+
+      // last 60min DTM interactions — no-repeat window. Same as discover:
+      // exclude 'view' (written for every candidate at score-time) and only
+      // dedupe against actual user actions on DTM profiles.
+      const recent = await prisma.userActivity.findMany({
+        where: { userId: req.userId!, action: { in: ['like', 'pass', 'access_request', 'view_full'] }, targetType: 'dtm_profile', createdAt: { gte: new Date(Date.now() - 3600_000) } },
+        select: { targetId: true }, take: 200,
+      }).catch(() => []);
+      recent.forEach((r: any) => r.targetId && prevShownIds.add(r.targetId));
+    } catch {}
+
+    const penalized = result.map(p => {
+      const tr: TraitSnapshot = {
+        city: (p as any).workingCity || null,
+        religion: (p as any).religion || null,
+        education: (p as any).education || null,
+        ageBucket: agBucket((p as any).user?.profile?.age),
+      };
+      const { penalty } = negativePenalty(negProfile, tr);
+      return { ...p, dtmScore: Math.max(0, ((p as any).dtmScore || 0) - penalty), negPenalty: penalty };
+    });
+
+    const div = diversify(
+      penalized.map(p => ({
+        user: p,
+        score: (p as any).dtmScore || 0,
+        isNew: (p as any).updatedAt ? (Date.now() - new Date((p as any).updatedAt).getTime()) < 7 * 86400000 : false,
+        ageBucket: agBucket((p as any).user?.profile?.age) || undefined,
+        city: (p as any).workingCity || undefined,
+      })),
+      {
+        refreshIndex: cursor ? 1 : 0,
+        prevShownIds,
+        noveltyAffinity: 0.4, // DTM users are more selective by default
+        sessionMood: 'normal',
+        topN: requestedLimit,
+        intent: 'dtm',
+      },
+    );
+    const ranked = div.ranked.map(r => r.user);
+
+    // Track DTM browse activity for behavioral scoring (top of returned batch)
+    for (const p of ranked.slice(0, 5)) {
       trackActivity(prisma, req.userId!, 'view', 'dtm_profile', p.userId, { dtmScore: p.dtmScore });
     }
 
-    res.json({ data: result, cursor: profiles[profiles.length - 1]?.id });
+    // Cursor advances against the DB-row order (not the ranked order) so
+    // the next request pulls a fresh slice and re-runs the scorer with
+    // freshly-aggregated behavioral signals.
+    res.json({
+      data: ranked,
+      cursor: profiles[profiles.length - 1]?.id,
+      batchSize: ranked.length,
+      meta: {
+        diversifier: { reasoning: div.reasoning, injected: div.injected },
+        negativeSignals: { totalEvents: negProfile.totalEvents, hardBlockedTraits: Array.from(negProfile.hardBlockedTraits) },
+      },
+    });
   } catch (e) { next(e); }
 });
 
@@ -1072,6 +1217,9 @@ app.get('/api/v1/matrimonial/profile/:userId', authMiddleware, async (req: AuthR
 app.post('/api/v1/matrimonial/access/request', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { targetUserId, accessType, message: rawAccessMessage } = req.body;
+    if (!targetUserId || !accessType) {
+      return res.status(400).json({ error: { message: 'targetUserId and accessType are required', code: 'VALIDATION_ERROR' } });
+    }
     const message = rawAccessMessage ? sanitize(rawAccessMessage) : '';
     const myProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
     const targetProfile = await prisma.matrimonialProfile.findUnique({ where: { userId: targetUserId } });
@@ -1083,6 +1231,20 @@ app.post('/api/v1/matrimonial/access/request', authMiddleware, async (req: AuthR
       create: { ownerId: targetProfile.id, requesterId: myProfile.id, accessType, message: message || '', status: 'pending' },
       update: { status: 'pending', message: message || '' },
     });
+
+    // Mirror the request as a system DtmMessage so it shows up in the chat thread.
+    // The recipient can grant/deny inline from the chat as well as the access page.
+    try {
+      await prisma.dtmMessage.create({
+        data: {
+          senderId: req.userId!,
+          recipientId: targetUserId,
+          type: 'access_request',
+          message: JSON.stringify({ requestId: request.id, accessType, note: message || '', kind: accessType === 'full' ? 'proposal' : 'request' }),
+        },
+      });
+    } catch {}
+
     res.json({ data: request });
   } catch (e) { next(e); }
 });
@@ -1145,7 +1307,10 @@ app.post('/api/v1/matrimonial/access/:id/:action', authMiddleware, async (req: A
     const { id, action } = req.params;
     if (!['grant', 'deny', 'revoke'].includes(action)) return res.status(400).json({ error: { message: 'Invalid action' } });
 
-    const request = await prisma.bioDataAccessRequest.findUnique({ where: { id }, include: { owner: true } });
+    const request = await prisma.bioDataAccessRequest.findUnique({
+      where: { id },
+      include: { owner: true, requester: true },
+    });
     if (!request) return res.status(404).json({ error: { message: 'Request not found' } });
     if (request.owner.userId !== req.userId) return res.status(403).json({ error: { message: 'Not authorized' } });
 
@@ -1154,6 +1319,19 @@ app.post('/api/v1/matrimonial/access/:id/:action', authMiddleware, async (req: A
       where: { id },
       data: { status: statusMap[action], ...(action === 'grant' ? { grantedAt: new Date() } : {}) },
     });
+
+    // Mirror the decision as a system DtmMessage in the chat thread.
+    try {
+      await prisma.dtmMessage.create({
+        data: {
+          senderId: req.userId!,
+          recipientId: request.requester.userId,
+          type: 'access_decision',
+          message: JSON.stringify({ requestId: request.id, accessType: request.accessType, action, status: statusMap[action] }),
+        },
+      });
+    } catch {}
+
     res.json({ data: updated });
   } catch (e) { next(e); }
 });

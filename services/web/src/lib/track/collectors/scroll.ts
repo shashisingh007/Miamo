@@ -17,6 +17,10 @@ export function installScroll(emit: Emit): () => void {
   let settleTimer: ReturnType<typeof setTimeout> | null = null;
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
   let lastBurst = performance.now();
+  // Track which 25/50/75/100% milestones have already been reported on this
+  // route so we emit each granular bucket exactly once per page-view.
+  const fired = new Set<number>();
+  const BUCKETS = [0.25, 0.5, 0.75, 1.0] as const;
 
   const compute = (): number => {
     const scrollable = Math.max(1, document.documentElement.scrollHeight - window.innerHeight);
@@ -30,7 +34,16 @@ export function installScroll(emit: Emit): () => void {
 
   const onScroll = (): void => {
     const d = compute();
-    if (d > maxDepth) maxDepth = d;
+    if (d > maxDepth) {
+      maxDepth = d;
+      // Granular bucket events — fired once per route per threshold crossed.
+      for (const b of BUCKETS) {
+        if (maxDepth >= b && !fired.has(b)) {
+          fired.add(b);
+          emit({ e: 'scroll.depth_bucket', p: { bucket: b } });
+        }
+      }
+    }
     lastBurst = performance.now();
     if (settleTimer) clearTimeout(settleTimer);
     settleTimer = setTimeout(reportDepth, SETTLE_MS);
@@ -48,6 +61,7 @@ export function installScroll(emit: Emit): () => void {
   document.addEventListener('visibilitychange', onHide);
   window.addEventListener('mio:routechange', (() => {
     maxDepth = 0;
+    fired.clear();
   }) as EventListener);
 
   return () => {

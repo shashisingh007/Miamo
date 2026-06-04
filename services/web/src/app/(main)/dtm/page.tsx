@@ -22,6 +22,7 @@ import { useToast } from '@/components/ui/toast';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useTrackPageView, useTrackActivity } from '@/hooks/useTrackActivity';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import {
   trackDtmSeeLater,
   trackDtmBatchExhausted,
@@ -55,9 +56,9 @@ const STUB_QUESTIONS: DtmQuestion[] = [
 
 export default function DtmPage() {
   const [questions, setQuestions] = useState<DtmQuestion[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = usePersistentState<number>('dtmQuestions:currentIndex', 0);
   const [loading, setLoading] = useState(true);
-  const [answer, setAnswer] = useState('');
+  const [answer, setAnswer] = usePersistentState<string>('dtmQuestions:answerDraft', '');
   const [showDeferred, setShowDeferred] = useState(false);
   const [deferredCount, setDeferredCount] = useState(0);
   const [batchId, setBatchId] = useState<string>(() => `dtm_${Date.now()}`);

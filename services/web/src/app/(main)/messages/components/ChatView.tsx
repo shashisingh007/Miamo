@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
- Search, Phone, Video, MoreVertical, Pin, Archive, Image, Mic, Send, Smile, Paperclip,
+  Search, Phone, Video, MoreVertical, Pin, Archive, Image as ImageIcon, Mic, Send, Smile, Paperclip,
  MessageCircle, ChevronLeft, Trash2, VolumeX, X, Lock, AlertTriangle, Sparkles,
  Palette, EyeOff, Flag, Ban, Clock, Zap, Music, Gamepad2, User as UserIcon, Film,
  PauseCircle, PlayCircle, Check, UserMinus,
@@ -16,8 +16,10 @@ import { cn } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/stores';
 import { useSSE } from '@/hooks/useSSE';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { MessageBubble } from './MessageBubble';
 import { SUGGESTION_CATEGORIES, ENTERTAINMENT_ITEMS, EMOJI_CATEGORIES } from './constants';
+import { loadImageFromFile, compressImage, compressVideo, validateMediaFile, videoNeedsCompression } from '@/lib/media-utils';
 
 // ═══════════════════════════════════════════════════════════
 // BACKGROUND PICKER
@@ -158,7 +160,7 @@ function CallOverlay({ type, user, onEnd }: { type: 'voice' | 'video'; user: any
 // CHAT VIEW
 // ═══════════════════════════════════════════════════════════
 export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, onBlock }: { chat: any; onBack: () => void; onRefreshChats: () => void; onReport: () => void; onUnmatch: () => void; onBlock: () => void }) {
- const [message, setMessage] = useState('');
+ const [message, setMessage] = usePersistentState<string>(`messages:draft:${chat.id}`, '');
  const [messages, setMessages] = useState<any[]>([]);
  const [loading, setLoading] = useState(true);
  const [showMenu, setShowMenu] = useState(false);
@@ -312,13 +314,12 @@ export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, on
  }
  };
 
- const handleFileSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+ const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
  const file = e.target.files?.[0];
  if (!file) return;
  const mediaType = e.target.dataset?.mediaType || 'file';
  const preview = file.type.startsWith('image/') || file.type.startsWith('video/') ? URL.createObjectURL(file) : '';
  setAttachedFile({ file, preview, type: mediaType });
- // Reset input
  e.target.value = '';
  };
 
@@ -326,7 +327,21 @@ export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, on
  if (!attachedFile) { handleSend(); return; }
  const content = message.trim() || `${attachedFile.type === 'photo' ? '📷' : attachedFile.type === 'video' ? '🎥' : attachedFile.type === 'audio' ? '🎵' : '📄'} ${attachedFile.file.name}`;
  try {
- const res = await api.sendMessage(chat.id, content, attachedFile.type === 'photo' ? 'image' : attachedFile.type, replyTo?.id);
+ // Compress media before sending
+ let mediaDataUrl: string | undefined;
+ if (attachedFile.file.type.startsWith('image/')) {
+ const img = await loadImageFromFile(attachedFile.file);
+ mediaDataUrl = await compressImage({ img, maxDim: 1080 });
+ } else if (attachedFile.file.type.startsWith('video/') && videoNeedsCompression(attachedFile.file)) {
+ const result = await compressVideo({ file: attachedFile.file });
+ mediaDataUrl = result.dataUrl;
+ } else if (attachedFile.file.type.startsWith('video/')) {
+ // Small video — send as data URL directly
+ const reader = new FileReader();
+ mediaDataUrl = await new Promise<string>((resolve) => { reader.onload = () => resolve(reader.result as string); reader.readAsDataURL(attachedFile.file); });
+ }
+ const msgType = attachedFile.type === 'photo' ? 'image' : attachedFile.type;
+ const res = await api.sendMessage(chat.id, mediaDataUrl || content, msgType, replyTo?.id);
  if (res.data) setMessages(prev => [...prev, { ...res.data, attachmentPreview: attachedFile.preview, attachmentName: attachedFile.file.name }]);
  try { track('message.send', { cid: chat.id, kind: attachedFile.type, len: content.length, reply: !!replyTo, attach: true }); } catch {}
  setMessage('');
@@ -635,7 +650,7 @@ export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, on
  <div className="grid grid-cols-4 gap-2">
  {[
  { type: 'text', icon: MessageCircle, label: 'Text', color: 'text-rose-light', bg: 'bg-miamo-surface0/10' },
- { type: 'photo', icon: Image, label: 'Photo', color: 'text-rose-alt', bg: 'bg-rose-main/10' },
+ { type: 'photo', icon: ImageIcon, label: 'Photo', color: 'text-rose-alt', bg: 'bg-rose-main/10' },
  { type: 'voice', icon: Mic, label: 'Voice', color: 'text-rose-alt', bg: 'bg-rose-main/10' },
  { type: 'video', icon: Film, label: 'Video', color: 'text-rose-alt', bg: 'bg-rose-main/10' },
  ].map(bt => (
@@ -709,7 +724,7 @@ export function ChatView({ chat, onBack, onRefreshChats, onReport, onUnmatch, on
  <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
  className="absolute bottom-full mb-2 left-0 z-40 bg-miamo-card border border-border rounded-xl shadow-xl p-2 space-y-1 w-40">
  <button onClick={() => handleFilePick('image/*', 'photo')} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-text-secondary hover:bg-miamo-elevated">
- <div className="w-7 h-7 rounded-full bg-rose-main/20 flex items-center justify-center"><Image className="w-3.5 h-3.5 text-rose-alt" /></div> Photo
+ <div className="w-7 h-7 rounded-full bg-rose-main/20 flex items-center justify-center"><ImageIcon className="w-3.5 h-3.5 text-rose-alt" /></div> Photo
  </button>
  <button onClick={() => handleFilePick('video/*', 'video')} className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs text-text-secondary hover:bg-miamo-elevated">
  <div className="w-7 h-7 rounded-full bg-miamo-surface0/20 flex items-center justify-center"><Film className="w-3.5 h-3.5 text-rose-light" /></div> Video

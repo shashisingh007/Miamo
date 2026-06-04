@@ -7,7 +7,8 @@ import {
  Send, Check, Clock, Bookmark,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { ProfileAttributeStrip } from '@/components/ProfileAttributeStrip';
+import { attributeListFor } from '../../../../../../shared/src/fieldMeta';
+import { FieldIcon } from '@/components/FieldIcon';
 import { cardTracker } from '@/lib/track/collectors/cards';
 import { swipeTracker } from '@/lib/track/collectors/swipe';
 import { useReadingTime } from '@/lib/track/react/useReadingTime';
@@ -108,6 +109,9 @@ export function ProfileCard({
  {profile.city && (
  <span className="flex items-center gap-1">
  <MapPin className="w-3 h-3" />{profile.city}
+ {typeof (user as any)._distanceKm === 'number' && (
+ <span className="ml-1 text-text-primary/60">· {(user as any)._distanceKm} km</span>
+ )}
  </span>
  )}
  {profile.profession && (
@@ -139,122 +143,109 @@ export function ProfileCard({
  )}
  </div>
 
- {/* ─── Tags Row ─── */}
- <div className="px-6 pt-5 pb-1">
- <div className="flex flex-wrap gap-2">
- {profile.lookingFor && profile.lookingFor !== 'open' && (
- <span className="px-3 py-1.5 rounded-full text-[11px] font-bold bg-miamo-card text-text-primary shadow-md">
- {profile.lookingFor.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
- </span>
- )}
- {profile.datingIntent && (
- <span className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-rose-main/15 text-rose-light border border-rose-main/20">
- {profile.datingIntent}
- </span>
- )}
- {profile.online && (
- <span className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-rose-alt/15 text-rose-light border border-rose-alt/20 flex items-center gap-1">
- <span className="w-1.5 h-1.5 rounded-full bg-rose-alt animate-pulse" /> Online
- </span>
- )}
- {profile.height && (
- <span className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-miamo-surface text-text-secondary border border-border">
- {profile.height} cm
- </span>
- )}
- </div>
- </div>
+{/* ─── Quick Tags Row ─── */}
+        <div className="px-6 pt-5 pb-1">
+          <div className="flex flex-wrap gap-2">
+            {profile.lookingFor && profile.lookingFor !== 'open' && (
+              <span className="px-3 py-1.5 rounded-full text-[11px] font-bold bg-miamo-card text-text-primary shadow-md">
+                {profile.lookingFor.split('-').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+              </span>
+            )}
+            {profile.datingIntent && (
+              <span className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-rose-main/15 text-rose-light border border-rose-main/20">
+                {profile.datingIntent}
+              </span>
+            )}
+            {profile.online && (
+              <span className="px-3 py-1.5 rounded-full text-[11px] font-semibold bg-rose-alt/15 text-rose-light border border-rose-alt/20 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-alt animate-pulse" /> Online
+              </span>
+            )}
+          </div>
+        </div>
 
- {/* ─── Bio ─── */}
- {profile.bio && (
- <div className="px-6 py-4">
- <p ref={bioRef} className="text-[14px] text-text-primary leading-[1.7] font-light">{profile.bio}</p>
- </div>
- )}
+        {/* ─── Slot 1: First prompt (or bio if no prompts) — Hinge-style anchor card ─── */}
+        {prompts[0] ? (
+          <PromptCard prompt={prompts[0]} index={0} onLike={handleLikeContent} />
+        ) : profile.bio ? (
+          <div className="mx-6 my-3">
+            <div className="rounded-2xl card-premium p-5">
+              <p className="text-[10px] font-bold text-text-muted uppercase tracking-[0.15em] mb-2">A little about me</p>
+              <p ref={bioRef} className="text-[15px] text-text-primary leading-[1.65] font-medium">{profile.bio}</p>
+            </div>
+          </div>
+        ) : null}
 
- {/* ─── Second Photo ─── */}
- {photos[1] && (
- <div className="mx-6 my-2 rounded-2xl overflow-hidden relative group">
- <img loading="lazy" src={photos[1].url || photos[1]} alt="" className="w-full aspect-[4/3] object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
- <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
- onClick={() => handleLikeContent('photo', photos[1]?.id)}
- className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-miamo-surface backdrop-blur-xl border border-border flex items-center justify-center hover:bg-miamo-surface transition-all"
- >
- <Heart className="w-4 h-4 text-rose" />
- </motion.button>
- </div>
- )}
+        {/* ─── Slot 2: Vitals scroller — horizontal swipe of detail tiles ─── */}
+        <VitalsScroller profile={profile} />
 
- {/* ─── Prompts ─── */}
- {prompts.map((prompt: any, i: number) => (
- <div key={i} className="mx-6 my-3">
- <div className="relative rounded-2xl card-premium p-5 group hover:border-border transition-all">
- <p className="text-[10px] font-bold text-text-muted uppercase tracking-[0.15em] mb-2">
- {prompt.question}
- </p>
- <p className="text-[15px] text-text-primary leading-[1.65] font-medium">
- {prompt.answer}
- </p>
- <motion.button whileHover={{ scale: 1.15 }} whileTap={{ scale: 0.9 }}
- onClick={() => handleLikeContent('prompt', prompt.id || `prompt-${i}`)}
- className="absolute -bottom-3 right-5 w-9 h-9 rounded-full bg-miamo-card border-2 border-border flex items-center justify-center hover:border-border shadow-lg transition-all"
- >
- <Heart className="w-4 h-4 text-text-secondary hover:text-rose" />
- </motion.button>
- </div>
- </div>
- ))}
+        {/* ─── Slot 3: Key details — Hinge-style vertical list ─── */}
+        <KeyDetailsList profile={profile} />
 
- {/* ─── Third Photo ─── */}
- {photos[2] && (
- <div className="mx-6 my-2 rounded-2xl overflow-hidden relative group">
- <img loading="lazy" src={photos[2].url || photos[2]} alt="" className="w-full aspect-[4/3] object-cover transition-transform duration-500 group-hover:scale-[1.02]" />
- <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
- onClick={() => handleLikeContent('photo', photos[2]?.id)}
- className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-miamo-surface backdrop-blur-xl border border-border flex items-center justify-center hover:bg-miamo-surface transition-all"
- >
- <Heart className="w-4 h-4 text-rose" />
- </motion.button>
- </div>
- )}
+        {/* ─── Slot 4: Second photo ─── */}
+        {photos[1] && (
+          <div className="mx-6 my-2 rounded-2xl overflow-hidden relative group">
+            <img loading="lazy" src={photos[1].url || photos[1]} alt="" className="w-full aspect-[3/4] max-h-[520px] object-cover object-top transition-transform duration-500 group-hover:scale-[1.02]" />
+            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+              onClick={() => handleLikeContent('photo', photos[1]?.id)}
+              className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-miamo-surface backdrop-blur-xl border border-border flex items-center justify-center hover:bg-miamo-surface transition-all"
+            >
+              <Heart className="w-4 h-4 text-rose" />
+            </motion.button>
+          </div>
+        )}
 
- {/* ─── Interests ─── */}
- {interests.length > 0 && (
- <div className="px-6 py-5">
- <h4 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.15em] mb-3">Interests</h4>
- <div className="flex flex-wrap gap-2">
- {interests.map((int: any) => {
- const name = int.name || int;
- const isCommon = commonInterests.includes(name);
- return (
- <span key={name} className={cn(
- 'px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all',
- isCommon
- ? 'bg-miamo-card text-text-primary shadow-lg'
- : 'bg-miamo-surface text-text-muted border border-border',
- )}>
- {isCommon && <Star className="w-3 h-3 inline mr-1 -mt-0.5" />}{name}
- </span>
- );
- })}
- </div>
- </div>
- )}
+        {/* ─── Slot 5: Second prompt ─── */}
+        {prompts[1] && <PromptCard prompt={prompts[1]} index={1} onLike={handleLikeContent} />}
 
-  {/* ─── Lifestyle Spec Sheet (v3.4 — classy royal palette) ─── */}
- <div className="px-6 pb-5">
- <div className="flex items-center gap-2 mb-3">
- <span className="h-px flex-1 bg-gradient-to-r from-transparent via-[#E9DCC9] to-transparent" />
- <h4 className="text-[10px] font-bold text-stone-500 uppercase tracking-[0.22em]">Lifestyle &amp; Details</h4>
- <span className="h-px flex-1 bg-gradient-to-r from-[#E9DCC9] via-[#E9DCC9] to-transparent" />
- </div>
- <ProfileAttributeStrip
- kind="casual"
- profile={profile}
- max={16}
- variant="rows"
- />
- </div>
+        {/* ─── Slot 6: Third photo ─── */}
+        {photos[2] && (
+          <div className="mx-6 my-2 rounded-2xl overflow-hidden relative group">
+            <img loading="lazy" src={photos[2].url || photos[2]} alt="" className="w-full aspect-[3/4] max-h-[520px] object-cover object-top transition-transform duration-500 group-hover:scale-[1.02]" />
+            <motion.button whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.9 }}
+              onClick={() => handleLikeContent('photo', photos[2]?.id)}
+              className="absolute bottom-3 right-3 w-10 h-10 rounded-full bg-miamo-surface backdrop-blur-xl border border-border flex items-center justify-center hover:bg-miamo-surface transition-all"
+            >
+              <Heart className="w-4 h-4 text-rose" />
+            </motion.button>
+          </div>
+        )}
+
+        {/* ─── Slot 7: Remaining prompts ─── */}
+        {prompts.slice(2).map((prompt: any, i: number) => (
+          <PromptCard key={i + 2} prompt={prompt} index={i + 2} onLike={handleLikeContent} />
+        ))}
+
+        {/* ─── Slot 8: Interests ─── */}
+        {interests.length > 0 && (
+          <div className="px-6 py-5">
+            <h4 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.15em] mb-3">Interests</h4>
+            <div className="flex flex-wrap gap-2">
+              {interests.map((int: any) => {
+                const name = int.name || int;
+                const isCommon = commonInterests.includes(name);
+                return (
+                  <span key={name} className={cn(
+                    'px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all',
+                    isCommon
+                      ? 'bg-miamo-card text-text-primary shadow-lg'
+                      : 'bg-miamo-surface text-text-muted border border-border',
+                  )}>
+                    {isCommon && <Star className="w-3 h-3 inline mr-1 -mt-0.5" />}{name}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* ─── Slot 9: Full bio at end (only if first slot used a prompt) ─── */}
+        {prompts[0] && profile.bio && (
+          <div className="px-6 pb-5">
+            <h4 className="text-[10px] font-bold text-text-muted uppercase tracking-[0.15em] mb-2">About</h4>
+            <p ref={bioRef} className="text-[14px] text-text-primary leading-[1.7] font-light">{profile.bio}</p>
+          </div>
+        )}
 
  {/* ─── Decision Cluster — No / Maybe / Yes / Super (v3.3) ─── */}
  <div className="px-6 py-5 border-t border-border">
@@ -413,5 +404,124 @@ function ActionButton({
       <span className={cn('text-[12px] font-bold leading-none', t.label)}>{label}</span>
       <span className="text-[10px] text-text-muted/80 leading-none">{hint}</span>
     </motion.button>
+  );
+}
+
+// ─── PromptCard ─── reusable prompt card with corner heart
+function PromptCard({ prompt, index, onLike }: {
+  prompt: any; index: number; onLike: (type: 'photo' | 'prompt' | 'profile', id?: string) => void;
+}) {
+  return (
+    <div className="mx-6 my-3">
+      <div className="relative rounded-2xl card-premium p-5 group hover:border-border transition-all">
+        <p className="text-[10px] font-bold text-text-muted uppercase tracking-[0.15em] mb-2">
+          {prompt.question}
+        </p>
+        <p className="text-[16px] text-text-primary leading-[1.55] font-medium">
+          {prompt.answer}
+        </p>
+        <motion.button
+          whileHover={{ scale: 1.15 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => onLike('prompt', prompt.id || `prompt-${index}`)}
+          className="absolute -bottom-3 right-5 w-9 h-9 rounded-full bg-miamo-card border-2 border-border flex items-center justify-center hover:border-border shadow-lg transition-all"
+        >
+          <Heart className="w-4 h-4 text-text-secondary hover:text-rose" />
+        </motion.button>
+      </div>
+    </div>
+  );
+}
+
+// ─── VitalsScroller ─── horizontal swipe of attribute tiles (Hinge-style)
+const VITALS_KEYS = [
+  'age', 'gender', 'sexuality', 'height', 'zodiac', 'religion',
+  'drinking', 'smoking', 'exercise', 'diet', 'pets', 'children',
+  'languages', 'politicalViews',
+];
+
+function VitalsScroller({ profile }: { profile: Record<string, any> }) {
+  const all = attributeListFor('casual', profile);
+  const items = VITALS_KEYS
+    .map(k => all.find(i => i.meta.key === k))
+    .filter(Boolean) as typeof all;
+  if (items.length < 3) return null;
+  return (
+    <div className="mt-2 mb-1">
+      <div className="flex items-center gap-2 px-6 mb-3">
+        <span className="h-px flex-1 bg-gradient-to-r from-transparent via-[#E9DCC9] to-transparent" />
+        <h4 className="text-[10px] font-bold text-stone-500 uppercase tracking-[0.22em]">Vitals</h4>
+        <span className="h-px flex-1 bg-gradient-to-r from-[#E9DCC9] via-[#E9DCC9] to-transparent" />
+      </div>
+      <div
+        className="mx-6 flex overflow-x-auto snap-x snap-mandatory gap-2.5 pb-2 [&::-webkit-scrollbar]:hidden"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
+        {items.map(({ meta, value }) => (
+          <div
+            key={meta.key}
+            className="snap-start shrink-0 w-[180px] rounded-2xl bg-gradient-to-br from-[#FBF7F2] to-[#F6EFE7] ring-1 ring-[#E9DCC9]/70 px-3.5 py-2.5 flex items-center gap-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]"
+            title={meta.label}
+          >
+            <span className="w-9 h-9 rounded-full bg-white/85 ring-1 ring-[#E9DCC9] flex items-center justify-center shrink-0">
+              <FieldIcon name={meta.icon} className="h-4 w-4 text-[#B86A4A]" />
+            </span>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-stone-500 leading-none">
+                {meta.label}
+              </span>
+              <span className="text-[14px] font-semibold text-stone-800 leading-snug truncate mt-0.5">
+                {value}
+              </span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── KeyDetailsList ─── Hinge-style vertical list of the 4 most important fields
+const KEY_DETAILS = [
+  { key: 'city',       icon: 'MapPin',         label: 'Lives in' },
+  { key: 'profession', icon: 'Briefcase',      label: 'Works as' },
+  { key: 'education',  icon: 'GraduationCap',  label: 'Studied at' },
+  { key: 'lookingFor', icon: 'HeartHandshake', label: 'Looking for' },
+];
+
+function KeyDetailsList({ profile }: { profile: Record<string, any> }) {
+  const all = attributeListFor('casual', profile);
+  const rows = KEY_DETAILS
+    .map(d => {
+      const found = all.find(i => i.meta.key === d.key);
+      return found ? { ...d, value: found.value } : null;
+    })
+    .filter(Boolean) as Array<{ key: string; icon: string; label: string; value: string }>;
+  if (rows.length === 0) return null;
+  return (
+    <div className="mx-6 my-3 rounded-2xl bg-gradient-to-br from-[#FBF7F2] to-[#F6EFE7] ring-1 ring-[#E9DCC9]/70 px-5 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+      {rows.map((r, idx) => (
+        <div
+          key={r.key}
+          className={cn(
+            'flex items-center gap-3.5 py-3',
+            idx < rows.length - 1 && 'border-b border-[#E9DCC9]/55',
+          )}
+          title={r.label}
+        >
+          <span className="w-8 h-8 rounded-full bg-white/85 ring-1 ring-[#E9DCC9] flex items-center justify-center shrink-0">
+            <FieldIcon name={r.icon} className="h-4 w-4 text-[#B86A4A]" />
+          </span>
+          <div className="flex flex-col min-w-0">
+            <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-stone-500 leading-none">
+              {r.label}
+            </span>
+            <span className="text-[14px] font-semibold text-stone-800 leading-snug truncate mt-0.5">
+              {r.value}
+            </span>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }

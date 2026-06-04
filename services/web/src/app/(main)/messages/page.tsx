@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useSSE } from '@/hooks/useSSE';
 import { useTrackPageView, useTrackActivity, useTrackScrollDepth } from '@/hooks/useTrackActivity';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { ChatListItem } from './components/ChatListItem';
 import { ChatView } from './components/ChatView';
 import { MessagesFeedbackModal } from './components/MessagesFeedbackModal';
@@ -98,10 +99,10 @@ export default function MessagesPage() {
 
 function MessagesPageInner() {
  const [chats, setChats] = useState<any[]>([]);
- const [activeChat, setActiveChat] = useState<string | null>(null);
+ const [activeChat, setActiveChat] = usePersistentState<string | null>('messages:activeChat', null);
  const [loading, setLoading] = useState(true);
- const [searchQuery, setSearchQuery] = useState('');
- const [tab, setTab] = useState<'all' | 'archived' | 'hidden' | 'held'>('all');
+ const [searchQuery, setSearchQuery] = usePersistentState<string>('messages:search', '');
+ const [tab, setTab] = usePersistentState<'all' | 'archived' | 'hidden' | 'held'>('messages:tab', 'all');
  const [totalMsgCount, setTotalMsgCount] = useState(0);
  const [selectMode, setSelectMode] = useState(false);
  const [selectedChats, setSelectedChats] = useState<Set<string>>(new Set());

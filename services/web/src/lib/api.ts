@@ -36,15 +36,85 @@ class ApiError extends Error {
  */
 class ApiClient {
  private baseUrl: string;
+ // Singleton in-flight refresh promise — coalesces parallel /auth/refresh
+ // calls when many requests 401 simultaneously after a hard nav.
+ private refreshInFlight: Promise<string | null> | null = null;
  /** @param baseUrl - Root URL of the API gateway (e.g. 'http://localhost:3200') */
  constructor(baseUrl: string) { this.baseUrl = baseUrl; }
 
  private getToken(): string | null {
  if (typeof window === 'undefined') return null;
- return localStorage.getItem('miamo_token');
+ // Source of truth: in-memory Zustand store. We deliberately do NOT
+ // persist the access token in localStorage (XSS hardening). On a fresh
+ // page load the store has no token → first 401 triggers tryRefresh()
+ // via the httpOnly refresh cookie and primes the in-memory token.
+ try {
+ const { useAuthStore } = require('@/stores');
+ const t = useAuthStore.getState().token as string | null;
+ if (t) return t;
+ } catch {}
+ // One-time migration fallback: if a legacy access token is still in
+ // localStorage (pre-cookie deploy), use it once and clear it.
+ const legacy = localStorage.getItem('miamo_token');
+ if (legacy) {
+ try { localStorage.removeItem('miamo_token'); } catch {}
+ try {
+ const { useAuthStore } = require('@/stores');
+ useAuthStore.getState().setTokens(legacy, null);
+ } catch {}
+ return legacy;
+ }
+ return null;
  }
 
- private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+ private getRefreshToken(): string | null {
+ if (typeof window === 'undefined') return null;
+ // Refresh token now lives in an httpOnly cookie (sent automatically).
+ // This getter only returns a legacy localStorage value used as a one-time
+ // body fallback for users who logged in before the cookie deploy.
+ return localStorage.getItem('miamo_refresh_token');
+ }
+
+ /**
+  * Exchange a refresh token for a new access token. Bypasses the normal
+  * `request()` pipeline so a 401 here doesn't recursively clear auth.
+  * Refresh token is normally read from the httpOnly `miamo_rt` cookie
+  * (XSS-safe) — sent automatically via `credentials: 'include'`. The body
+  * is a fallback for legacy clients that still hold a token in localStorage.
+  * Returns the new access token on success, or null on failure.
+  */
+ private async tryRefresh(): Promise<string | null> {
+ if (this.refreshInFlight) return this.refreshInFlight;
+ const legacyRt = this.getRefreshToken();
+ this.refreshInFlight = (async () => {
+ try {
+ const res = await fetch(`${this.baseUrl}/api/v1/auth/refresh`, {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ credentials: 'include',
+ body: JSON.stringify(legacyRt ? { refreshToken: legacyRt } : {}),
+ });
+ if (!res.ok) return null;
+ const json = await res.json();
+ const accessToken = json?.data?.accessToken;
+ if (!accessToken) return null;
+ if (typeof window !== 'undefined') {
+ // Cookie now holds the refresh token; nuke any legacy copies.
+ localStorage.removeItem('miamo_token');
+ localStorage.removeItem('miamo_refresh_token');
+ try {
+ const { useAuthStore } = require('@/stores');
+ useAuthStore.getState().setTokens(accessToken, null);
+ } catch {}
+ }
+ return accessToken;
+ } catch { return null; }
+ })();
+ try { return await this.refreshInFlight; }
+ finally { this.refreshInFlight = null; }
+ }
+
+ private async request<T>(path: string, options: RequestInit = {}, _retried = false): Promise<T> {
  const token = this.getToken();
  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(options.headers as Record<string, string> || {}) };
  if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -53,9 +123,16 @@ class ApiClient {
  if (!res.ok) {
  const err = await res.json().catch(() => ({ error: { message: 'Network error' } }));
  const apiErr = new ApiError(err.error?.message || 'Request failed', res.status, err.error?.code, err.data);
- // On 401, clear the stale token and auth state entirely
+ // 401 → try refreshing once before giving up. Skip auth-flow paths.
+ const isAuthFlowPath = path.includes('/auth/login') || path.includes('/auth/register') || path.includes('/auth/refresh') || path.includes('/auth/logout');
+ if (typeof window !== 'undefined' && res.status === 401 && !_retried && !isAuthFlowPath) {
+ const newToken = await this.tryRefresh();
+ if (newToken) return this.request<T>(path, options, true);
+ }
+ // On 401 (after refresh attempt) or stale /auth/me, clear auth.
  if (typeof window !== 'undefined' && (res.status === 401 || (res.status === 404 && path.includes('/auth/me')))) {
  localStorage.removeItem('miamo_token');
+ localStorage.removeItem('miamo_refresh_token');
  try { localStorage.removeItem('miamo-auth'); } catch {}
  // Clear Zustand auth store to sync isAuthenticated state
  try {
@@ -82,8 +159,62 @@ class ApiClient {
  async register(data: { email: string; password: string; displayName: string }) {
  return this.request<any>('/api/v1/auth/register', { method: 'POST', body: JSON.stringify(data) });
  }
+ async signupStart(data: { identifier: string }) {
+ return this.request<any>('/api/v1/auth/signup/start', { method: 'POST', body: JSON.stringify(data) });
+ }
+ async signupVerify(data: { signupToken: string; code: string }) {
+ return this.request<any>('/api/v1/auth/signup/verify', { method: 'POST', body: JSON.stringify(data) });
+ }
+ async signupComplete(data: { verifiedToken: string; password: string; displayName: string }) {
+ return this.request<any>('/api/v1/auth/signup/complete', { method: 'POST', body: JSON.stringify(data) });
+ }
+ async loginGoogle(idToken: string) {
+ return this.request<any>('/api/v1/auth/google', { method: 'POST', body: JSON.stringify({ idToken }) });
+ }
+ async loginApple(idToken: string, user?: { name?: { firstName?: string; lastName?: string }; email?: string }) {
+ return this.request<any>('/api/v1/auth/apple', { method: 'POST', body: JSON.stringify({ idToken, user }) });
+ }
+ async otpStart(identifier: string) {
+ return this.request<any>('/api/v1/auth/otp/start', { method: 'POST', body: JSON.stringify({ identifier }) });
+ }
+ async otpVerify(data: { otpToken: string; code: string }) {
+ return this.request<any>('/api/v1/auth/otp/verify', { method: 'POST', body: JSON.stringify(data) });
+ }
  async login(data: { email: string; password: string }) {
  return this.request<any>('/api/v1/auth/login', { method: 'POST', body: JSON.stringify(data) });
+ }
+ async login2fa(data: { challengeToken: string; code: string }) {
+ return this.request<any>('/api/v1/auth/login/2fa', { method: 'POST', body: JSON.stringify(data) });
+ }
+ async sendEmailOtp() {
+ return this.request<any>('/api/v1/auth/email/send-otp', { method: 'POST' });
+ }
+ async verifyEmailOtp(code: string) {
+ return this.request<any>('/api/v1/auth/email/verify-otp', { method: 'POST', body: JSON.stringify({ code }) });
+ }
+ async sendPhoneOtp(phone: string) {
+ return this.request<any>('/api/v1/auth/phone/send-otp', { method: 'POST', body: JSON.stringify({ phone }) });
+ }
+ async verifyPhoneOtp(code: string) {
+ return this.request<any>('/api/v1/auth/phone/verify-otp', { method: 'POST', body: JSON.stringify({ code }) });
+ }
+ async listTrustedDevices() {
+ return this.request<any>('/api/v1/auth/devices');
+ }
+ async revokeTrustedDevice(id: string) {
+ return this.request<any>(`/api/v1/auth/devices/${id}`, { method: 'DELETE' });
+ }
+ async searchCities(q: string, limit = 12) {
+ return this.request<{ data: Array<{ name: string; region: string; country: string; display: string; lat: number; lng: number; population: number }> }>(`/api/v1/cities/search?q=${encodeURIComponent(q)}&limit=${limit}`);
+ }
+ async nearestCity(lat: number, lng: number) {
+ return this.request<{ data: { name: string; region: string; country: string; display: string; lat: number; lng: number; population: number } }>(`/api/v1/cities/nearest?lat=${lat}&lng=${lng}`);
+ }
+ async submitVerification(data: { kind: 'selfie' | 'id_document' | 'video_liveness'; photoUrl: string }) {
+ return this.request<any>('/api/v1/profiles/me/verify/submit', { method: 'POST', body: JSON.stringify(data) });
+ }
+ async getVerificationStatus() {
+ return this.request<any>('/api/v1/profiles/me/verify/status');
  }
  async logout() {
  return this.request<any>('/api/v1/auth/logout', { method: 'POST' });
@@ -134,6 +265,9 @@ class ApiClient {
  // Miamo Move
  async sendMiamoMove(toUserId: string, message?: string, targetType?: string, targetId?: string) {
  return this.request<any>('/api/v1/discover/move', { method: 'POST', body: JSON.stringify({ toUserId, message, targetType, targetId }) });
+ }
+ async getMoveSuggestions(targetId: string) {
+ return this.request<{ data: { text: string; reasoning?: string; matchBackProbability?: number }[] }>(`/api/v1/discover/move-suggestions/${targetId}`);
  }
  async getReceivedMoves() { return this.request<any>('/api/v1/discover/moves/received'); }
  async acceptMove(id: string) { return this.request<any>(`/api/v1/discover/moves/${id}/accept`, { method: 'POST' }); }
@@ -232,6 +366,12 @@ class ApiClient {
  async expireBeat(id: string) { return this.request<any>(`/api/v1/beats/${id}/expire`, { method: 'POST' }); }
  async restoreBeat(id: string) { return this.request<any>(`/api/v1/beats/${id}/restore`, { method: 'POST' }); }
  async archiveBeat(id: string) { return this.request<any>(`/api/v1/beats/${id}/archive`, { method: 'POST' }); }
+ async viewBeatEvent(eventId: string) { return this.request<any>(`/api/v1/beats/events/${eventId}/view`, { method: 'POST' }); }
+ async replayBeatEvent(eventId: string) { return this.request<any>(`/api/v1/beats/events/${eventId}/view?mode=replay`, { method: 'POST' }); }
+ async saveBeatEvent(eventId: string) { return this.request<any>(`/api/v1/beats/events/${eventId}/save`, { method: 'POST' }); }
+ async unsaveBeatEvent(eventId: string) { return this.request<any>(`/api/v1/beats/events/${eventId}/unsave`, { method: 'POST' }); }
+ async screenshotBeatEvent(eventId: string) { return this.request<any>(`/api/v1/beats/events/${eventId}/screenshot`, { method: 'POST' }); }
+ async downloadBeatEvent(eventId: string) { return this.request<any>(`/api/v1/beats/events/${eventId}/download`, { method: 'POST' }); }
 
  // Feed
  async getFeed(params?: Record<string, string>) {
@@ -325,10 +465,10 @@ class ApiClient {
  async updatePrompts(prompts: Array<{ question: string; answer: string; position: number }>) { return this.request<ApiResponse<unknown>>('/api/v1/profiles/me/prompts', { method: 'PUT', body: JSON.stringify({ prompts }) }); }
  async updateInterests(interests: string[]) { return this.request<ApiResponse<unknown>>('/api/v1/profiles/me/interests', { method: 'PUT', body: JSON.stringify({ interests }) }); }
  async uploadPhoto(formData: FormData) {
- const token = typeof window !== 'undefined' ? localStorage.getItem('miamo_token') : null;
+ const token = this.getToken();
  const headers: Record<string, string> = {};
  if (token) headers['Authorization'] = `Bearer ${token}`;
- const res = await fetch(`${this.baseUrl}/api/v1/profiles/me/photos`, { method: 'POST', headers, body: formData });
+ const res = await fetch(`${this.baseUrl}/api/v1/profiles/me/photos`, { method: 'POST', headers, body: formData, credentials: 'include' });
  if (!res.ok) throw new ApiError('Upload failed', res.status, 'UPLOAD_ERROR');
  return res.json();
  }
@@ -418,6 +558,8 @@ class ApiClient {
  async viewVideo(id: string) { return this.request<any>(`/api/v1/videos/${id}/view`, { method: 'POST' }); }
  async getVideoComments(id: string) { return this.request<any>(`/api/v1/videos/${id}/comments`); }
  async getStoryViewers(id: string) { return this.request<any>(`/api/v1/stories/${id}/viewers`); }
+ async getStoryLikes(id: string) { return this.request<any>(`/api/v1/stories/${id}/likes`); }
+ async openChatWith(userId: string) { return this.request<any>(`/api/v1/messages/chats/with/${userId}`, { method: 'POST' }); }
  async getUserById(id: string) { return this.request<any>(`/api/v1/users/${id}`); }
 }
 

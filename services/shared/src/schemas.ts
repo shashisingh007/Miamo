@@ -36,7 +36,7 @@ export const loginBodySchema = z.object({
 });
 
 export const refreshBodySchema = z.object({
-  refreshToken: z.string().min(20).max(2048),
+  refreshToken: z.string().min(20).max(2048).optional(),
 });
 
 export const forgotPasswordBodySchema = z.object({
@@ -78,6 +78,8 @@ export const updateProfileBodySchema = z
     age: optInt(18, 120),
     gender: optStr(40),
     city: optStr(120),
+    cityLat: z.number().min(-90).max(90).nullable().optional(),
+    cityLng: z.number().min(-180).max(180).nullable().optional(),
     profession: optStr(120),
     bio: optStr(2000),
     datingIntent: optStr(80),
@@ -203,8 +205,10 @@ export const discoverFiltersBodySchema = z
   .passthrough();
 
 // Messaging -------------------------------------------
+// Content max raised to ~5MB to allow base64 image/video data URLs (text
+// messages are still tiny). type='image'/'video'/'voice' indicates media.
 export const sendMessageBodySchema = z.object({
-  content: z.string().trim().min(1).max(5000),
+  content: z.string().trim().min(1).max(5_000_000),
   type: z.enum(['text', 'image', 'voice', 'video', 'sticker', 'system']).optional(),
   replyToId: z.string().max(64).optional().nullable(),
 });
@@ -227,7 +231,8 @@ export const chatPinBodySchema = z.object({ pinned: z.boolean().optional() });
 export const chatMuteBodySchema = z.object({ muted: z.boolean().optional() });
 export const chatArchiveBodySchema = z.object({ archived: z.boolean().optional() });
 
-// Edit a message (sender only; route enforces ownership)
+// Edit a message (sender only; route enforces ownership). Text-only — media
+// messages aren't editable, so a 5k cap is sufficient and prevents abuse.
 export const messageEditBodySchema = z.object({
   content: z.string().trim().min(1).max(5000),
 });
@@ -237,8 +242,8 @@ export const beatStartBodySchema = z.object({
   matchedUserId: z.string().min(1).max(64),
 });
 export const beatCompleteBodySchema = z.object({
-  type: z.enum(['snap', 'text', 'photo', 'voice', 'video']).optional(),
-  content: z.string().trim().max(1000).optional(),
+  type: z.enum(['snap', 'text', 'photo', 'voice', 'video', 'creative', 'mood', 'music', 'gif']).optional(),
+  content: z.string().max(5_000_000).optional(),
 });
 
 // Settings (lenient — server still hand-filters fields, but we cap obvious abuse)
@@ -306,10 +311,12 @@ export const privacyUpdateBodySchema = z
   .passthrough();
 
 // Content ---------------------------------------------
+// mediaUrl raised to ~5MB to support base64 image/video data URLs from the
+// client-side compression pipeline (compressed JPEG/WebM).
 export const feedPostBodySchema = z.object({
   type: z.string().max(40).optional(),
   content: z.string().trim().max(5000).optional(),
-  mediaUrl: z.string().trim().max(2048).optional().nullable(),
+  mediaUrl: z.string().trim().max(5_000_000).optional().nullable(),
   visibility: z.enum(['everyone', 'matches', 'private']).optional(),
 });
 
@@ -331,7 +338,11 @@ export const commentBodySchema = z.object({
 export const storyBodySchema = z.object({
   type: z.string().max(40).optional(),
   content: z.string().trim().max(5000).optional(),
-  mediaUrl: z.string().trim().max(2048).optional().nullable(),
+  // Allow either a normal URL or a base64 data URL up to ~5 MB so the web
+  // client can ship locally-edited (filtered + captioned) JPEGs without
+  // requiring object storage. Plain URLs stay tiny; data URLs are bounded
+  // by the canvas pipeline (max 1080x1920 @ q=0.85).
+  mediaUrl: z.string().trim().max(5_000_000).optional().nullable(),
   visibility: z.enum(['everyone', 'matches', 'private']).optional(),
   expiresInHours: z.number().int().min(1).max(168).optional(),
   background: z.union([z.string().max(120), z.record(z.string(), z.unknown())]).optional(),
@@ -344,8 +355,10 @@ export const storyReactBodySchema = z.object({
 export const videoBodySchema = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().trim().max(5000).optional(),
-  url: z.string().trim().min(1).max(2048),
-  thumbnailUrl: z.string().trim().max(2048).optional().nullable(),
+  // url/thumbnailUrl raised to ~5MB to accept base64 data URLs from the
+  // client-side video compression pipeline.
+  url: z.string().trim().min(1).max(5_000_000),
+  thumbnailUrl: z.string().trim().max(5_000_000).optional().nullable(),
   category: z.string().max(80).optional(),
   visibility: z.enum(['everyone', 'matches', 'private']).optional(),
 });

@@ -71,6 +71,13 @@ const perDeviceLimiter = rateLimit({
 app.get('/v1/track/healthz', (_req, res) => {
   res.json({ ok: true, kill: KILL, ts: Date.now() });
 });
+// Convention-compatible aliases (gateway aggregates /health + /readyz across services)
+app.get('/health', (_req, res) => {
+  res.json({ status: 'ok', service: 'ingest', kill: KILL, timestamp: new Date().toISOString() });
+});
+app.get('/readyz', (_req, res) => {
+  res.json({ ready: true, service: 'ingest' });
+});
 
 // ── ingest ────────────────────────────────────────────────────────────────
 app.post('/v1/track', perDeviceLimiter, async (req, res) => {

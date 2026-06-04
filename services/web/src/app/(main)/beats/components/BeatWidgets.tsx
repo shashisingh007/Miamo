@@ -5,12 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
  Hourglass, CheckCheck, Clock, Zap, AlertTriangle,
  MoreVertical, UserMinus, Volume2, Flag, Ban,
- ArrowUp, ArrowDown, ChevronRight, Lightbulb, Send, Activity,
+ ArrowUp, ArrowDown, ChevronRight, Lightbulb, Send, Activity, Trophy,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, Card } from '@/components/ui';
 import { cn, formatRelativeTime } from '@/lib/utils';
 import { BeatMatch, BEAT_TYPES, ICE_BREAKERS, MILESTONE_EMOJIS } from './constants';
+import { Portal } from '@/components/ui/portal';
 
 /* ═══════════════════════════════════════════════════════════
  BEATS ICON — UNIQUE ANIMATED HEARTBEAT PULSE
@@ -145,6 +146,7 @@ export function MilestoneCelebration({ count, onClose }: { count: number; onClos
  if (!milestone) return null;
  const [, data] = milestone;
  return (
+ <Portal>
  <motion.div
  initial={{ opacity: 0, scale: 0.5 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.5 }}
  className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onClose}
@@ -164,6 +166,7 @@ export function MilestoneCelebration({ count, onClose }: { count: number; onClos
  </div>
  </motion.div>
  </motion.div>
+ </Portal>
  );
 }
 
@@ -175,6 +178,7 @@ export function ConfirmPopup({ title, message, confirmText, danger, onConfirm, o
  onConfirm: () => void; onCancel: () => void;
 }) {
  return (
+ <Portal>
  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
  className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm" onClick={onCancel}
  >
@@ -189,6 +193,7 @@ export function ConfirmPopup({ title, message, confirmText, danger, onConfirm, o
  </div>
  </motion.div>
  </motion.div>
+ </Portal>
  );
 }
 
@@ -199,6 +204,7 @@ export function BeatMenu({ onRemove, onBlock, onReport, onMute }: {
  onRemove: () => void; onBlock: () => void; onReport: () => void; onMute: () => void;
 }) {
  const [open, setOpen] = useState(false);
+ const [pos, setPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
  const ref = useRef<HTMLDivElement>(null);
 
  useEffect(() => {
@@ -216,18 +222,32 @@ export function BeatMenu({ onRemove, onBlock, onReport, onMute }: {
  { label: 'Block user', icon: Ban, action: onBlock, danger: true },
  ];
 
+ const handleOpen = (e: React.MouseEvent) => {
+ e.stopPropagation();
+ if (open) { setOpen(false); return; }
+ const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+ const MENU_W = 208; // w-52
+ const MENU_H = 200; // 4 items × ~42 + padding
+ const spaceBelow = window.innerHeight - rect.bottom;
+ const y = spaceBelow >= MENU_H + 8 ? rect.bottom + 4 : Math.max(8, rect.top - MENU_H - 4);
+ const x = Math.max(8, Math.min(rect.right - MENU_W, window.innerWidth - MENU_W - 8));
+ setPos({ x, y });
+ setOpen(true);
+ };
+
  return (
  <div className="relative" ref={ref}>
- <button onClick={(e) => { e.stopPropagation(); setOpen(!open); }}
+ <button onClick={handleOpen}
  className="w-8 h-8 rounded-lg flex items-center justify-center text-text-muted hover:text-text-secondary hover:bg-miamo-surface transition-all">
  <MoreVertical className="w-4 h-4" />
  </button>
  <AnimatePresence>
  {open && (
- <>
+ <Portal>
  <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
  <motion.div initial={{ opacity: 0, scale: 0.95, y: -4 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: -4 }}
- className="absolute right-0 top-full mt-1 w-52 bg-miamo-card rounded-xl shadow-2xl border border-border z-50 py-1 overflow-visible"
+ style={{ position: 'fixed', top: pos.y, left: pos.x }}
+ className="w-52 bg-miamo-card rounded-xl shadow-2xl border border-border z-50 py-1 overflow-visible"
  >
  {items.map(item => {
  const ItemIcon = item.icon;
@@ -241,7 +261,7 @@ export function BeatMenu({ onRemove, onBlock, onReport, onMute }: {
  );
  })}
  </motion.div>
- </>
+ </Portal>
  )}
  </AnimatePresence>
  </div>
@@ -252,24 +272,48 @@ export function BeatMenu({ onRemove, onBlock, onReport, onMute }: {
  SENT / RECEIVED LIST VIEW
  ═══════════════════════════════════════════════════════════ */
 export function BeatListView({ beats, direction, onSelectMatch }: {
- beats: BeatMatch[]; direction: 'sent' | 'received'; onSelectMatch: (b: BeatMatch) => void;
+ beats: BeatMatch[]; direction: 'sent' | 'received' | 'active' | 'longest'; onSelectMatch: (b: BeatMatch) => void;
 }) {
- const total = useMemo(() => beats.reduce((sum, b) => sum + (direction === 'sent' ? (b.totalSent || 0) : (b.totalReceived || 0)), 0), [beats, direction]);
- const filteredBeats = useMemo(() => beats.filter(b => (direction === 'sent' ? (b.totalSent || 0) : (b.totalReceived || 0)) > 0), [beats, direction]);
+ const total = useMemo(() => {
+ if (direction === 'sent') return beats.reduce((s, b) => s + (b.totalSent || 0), 0);
+ if (direction === 'received') return beats.reduce((s, b) => s + (b.totalReceived || 0), 0);
+ if (direction === 'active') return beats.filter(b => b.state !== 'expired').length;
+ return beats.reduce((m, b) => Math.max(m, b.count || 0), 0);
+ }, [beats, direction]);
+ const filteredBeats = useMemo(() => {
+ if (direction === 'sent') return beats.filter(b => (b.totalSent || 0) > 0).sort((a, b) => (b.totalSent || 0) - (a.totalSent || 0));
+ if (direction === 'received') return beats.filter(b => (b.totalReceived || 0) > 0).sort((a, b) => (b.totalReceived || 0) - (a.totalReceived || 0));
+ if (direction === 'active') return beats.filter(b => b.state !== 'expired').sort((a, b) => (b.count || 0) - (a.count || 0));
+ return [...beats].sort((a, b) => (b.count || 0) - (a.count || 0));
+ }, [beats, direction]);
+ const headingLabel = direction === 'sent' ? 'Total Sent'
+ : direction === 'received' ? 'Total Received'
+ : direction === 'active' ? 'Active Beats'
+ : 'Longest Streak';
+ const HeadingIcon = direction === 'sent' ? ArrowUp
+ : direction === 'received' ? ArrowDown
+ : direction === 'active' ? Zap
+ : Trophy;
 
  return (
  <div className="space-y-3">
  <div className="flex items-center justify-between">
  <h3 className="text-sm font-bold text-text-secondary flex items-center gap-2">
- {direction === 'sent' ? <ArrowUp className="w-4 h-4 text-rose" /> : <ArrowDown className="w-4 h-4 text-rose-main" />}
- Total {direction === 'sent' ? 'Sent' : 'Received'}: <span className="text-rose">{total}</span>
+ <HeadingIcon className="w-4 h-4 text-rose" />
+ {headingLabel}: <span className="text-rose">{total}</span>
  </h3>
  </div>
  <div className="space-y-2">
  {filteredBeats.map(beat => {
  const other = beat.matchedUser || { id: '', displayName: 'Unknown', photos: [], online: false, verified: false };
  const photo = other.photos?.[0]?.url || other.photos?.[0] || undefined;
- const count = direction === 'sent' ? (beat.totalSent || 0) : (beat.totalReceived || 0);
+ const count = direction === 'sent' ? (beat.totalSent || 0)
+ : direction === 'received' ? (beat.totalReceived || 0)
+ : (beat.count || 0);
+ const sublabel = direction === 'sent' ? `${count} sent`
+ : direction === 'received' ? `${count} received`
+ : direction === 'active' ? `${count} day streak`
+ : `${count} day streak`;
  return (
  <motion.button key={beat.id} whileHover={{ x: 3 }} onClick={() => onSelectMatch(beat)}
  className="flex items-center gap-3 w-full p-3 rounded-xl hover:bg-miamo-surface/40 transition-all text-left"
@@ -277,7 +321,7 @@ export function BeatListView({ beats, direction, onSelectMatch }: {
  <Avatar src={photo} name={other.displayName} size="sm" online={other.online} verified={other.verified} />
  <div className="flex-1 min-w-0">
  <p className="text-[13px] font-semibold text-text-primary truncate">{other.displayName}</p>
- <p className="text-[11px] text-text-muted">{count} {direction} &bull; Last: {beat.lastBeatAt ? formatRelativeTime(beat.lastBeatAt) : 'Never'}</p>
+ <p className="text-[11px] text-text-muted">{sublabel} &bull; Last: {beat.lastBeatAt ? formatRelativeTime(beat.lastBeatAt) : 'Never'}</p>
  </div>
  <div className="flex items-center gap-2">
  <span className="text-sm font-bold text-text-secondary">{count}</span>

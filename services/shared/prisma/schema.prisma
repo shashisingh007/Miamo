@@ -22,6 +22,13 @@ model User {
   verified     Boolean  @default(false)
   active       Boolean  @default(true)
   deactivated  Boolean  @default(false)
+  emailVerified Boolean @default(false)
+  phone        String?  @unique
+  phoneVerified Boolean @default(false)
+  twoFactorEnabled Boolean @default(true)
+  googleId     String?  @unique
+  appleId      String?  @unique
+  authProvider String   @default("password") // password|google|apple|otp
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -93,9 +100,15 @@ model User {
   accessRequestsSent   AccessRequest[] @relation("AccessRequestFrom")
   accessRequestsRcvd   AccessRequest[] @relation("AccessRequestTo")
 
+  // v6.9 — verification & trusted devices
+  otps                  Otp[]
+  trustedDevices        TrustedDevice[]
+  verificationSubmissions VerificationSubmission[]
+
   @@index([email])
   @@index([username])
   @@index([miamoId])
+  @@index([phone])
 }
 
 model Profile {
@@ -105,6 +118,8 @@ model Profile {
   age            Int
   gender         String
   city           String
+  cityLat        Float?
+  cityLng        Float?
   profession     String
   bio            String   @default("")
   datingIntent   String   @default("casual")
@@ -443,14 +458,18 @@ model Beat {
 }
 
 model BeatEvent {
-  id        String   @id @default(uuid())
-  beatId    String
-  beat      Beat     @relation(fields: [beatId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String   @default("snap")
-  content   String   @default("")
-  createdAt DateTime @default(now())
+  id            String   @id @default(uuid())
+  beatId        String
+  beat          Beat     @relation(fields: [beatId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          String   @default("snap")
+  content       String   @default("")
+  viewCount     Int      @default(0)
+  firstViewedAt DateTime?
+  mediaSaved    Boolean  @default(false)
+  mediaCleared  Boolean  @default(false)
+  createdAt     DateTime @default(now())
 
   @@index([beatId, createdAt])
 }
@@ -1317,4 +1336,66 @@ model AccessRequest {
   @@unique([fromUserId, toUserId, field])
   @@index([toUserId, status])
   @@index([fromUserId, status])
+}
+
+// ─── v6.9: Verification, OTPs & Trusted Devices ──────
+// Generic OTP table for email/phone verification, login 2FA challenge,
+// and password resets. `userId` is nullable so we can issue codes for
+// pre-account flows (signup phone-first, password reset by email).
+model Otp {
+  id          String   @id @default(uuid())
+  userId      String?
+  user        User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  identifier  String   // normalized email or E.164 phone
+  channel     String   // "email" | "phone"
+  purpose     String   // "verify_email" | "verify_phone" | "login_2fa" | "password_reset"
+  codeHash    String   // bcrypt hash of the 6-digit code
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(5)
+  expiresAt   DateTime
+  consumedAt  DateTime?
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([identifier, purpose, createdAt])
+  @@index([userId, purpose])
+  @@index([expiresAt])
+}
+
+// A device the user has confirmed via 2FA. Future logins from the same
+// device skip the OTP challenge until the trust expires (default 30d).
+model TrustedDevice {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  deviceHash  String   // sha256(uaPlatform + browserMajor + os + cookieSalt)
+  label       String   @default("") // "Chrome on macOS · San Francisco"
+  ip          String?
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+  expiresAt   DateTime
+  revoked     Boolean  @default(false)
+
+  @@unique([userId, deviceHash])
+  @@index([userId, revoked])
+  @@index([expiresAt])
+}
+
+// Selfie / ID verification submission. In dev, an internal worker
+// auto-approves after a short delay; in prod, an admin reviews.
+model VerificationSubmission {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind        String   // "selfie" | "id_document" | "video_liveness"
+  photoUrl    String
+  status      String   @default("pending") // pending|approved|rejected
+  reason      String?
+  reviewerId  String?
+  submittedAt DateTime @default(now())
+  reviewedAt  DateTime?
+
+  @@index([userId, kind, status])
+  @@index([status, submittedAt])
 }

@@ -28,6 +28,7 @@ import { PrismaSignalReader } from '../../shared/src/algo/signals';
 import { suggestMessages } from '../../shared/src/algo/messageSuggest';
 import { suggestMoves } from '../../shared/src/algo/moves';
 import { v4RankEnabled } from '../../shared/src/algo/flags';
+import { loadPersonalizationCtx, applyPersonalization } from '../../shared/personalize';
 
 // ─── Chat Suggestion Cache ──────────────────────────
 const suggestionCache = new LRUCache(200);
@@ -68,11 +69,30 @@ function decryptMessage(data: string): string {
   } catch { return '[encrypted message]'; } // Graceful degradation on key mismatch
 }
 
+// Build a human-readable preview from a message body, hiding internal markers
+// (e.g. story-reply payloads encoded as [[STORY_REPLY:{json}]]\n<text>).
+function previewFromContent(content: string | null): string | null {
+  if (!content) return content;
+  if (content.startsWith('[[STORY_REPLY:')) {
+    const end = content.indexOf(']]');
+    if (end > 0) {
+      const body = content.slice(end + 2).replace(/^\n/, '').trim();
+      return body ? `Replied to story: ${body}` : 'Replied to story';
+    }
+  }
+  const legacy = content.match(/^Replying to story:\s*"[^"]*"\s*\n+([\s\S]*)$/);
+  if (legacy) {
+    const body = (legacy[1] || '').trim();
+    return body ? `Replied to story: ${body}` : 'Replied to story';
+  }
+  return content;
+}
+
 const prisma = createPrisma(10);
 export const app = express();
 const PORT = parseInt(process.env.PORT || '3204', 10);
 
-applyBaseMiddleware(app, { jsonLimit: '1mb', serviceName: 'messaging' });
+applyBaseMiddleware(app, { jsonLimit: '10mb', serviceName: 'messaging' });
 interface AuthRequest extends Request { userId?: string }
 const authMiddleware = createInternalAuthMiddleware();
 installHealthRoutes(app, 'messaging', prisma);
@@ -116,12 +136,13 @@ app.get('/api/v1/messages/chats', authMiddleware, async (req: AuthRequest, res: 
       const { passwordHash, ...otherUser } = rawOther;
       const lastMsg = c.messages[0] || null;
       const lastContent = lastMsg ? decryptMessage(lastMsg.content) : null;
+      const previewContent = previewFromContent(lastContent);
       const unreadCount = unreadMap.get(c.id) || 0;
       result.push({
         id: c.id,
         otherUser,
         lastMessage: lastMsg ? { ...lastMsg, content: lastContent } : null,
-        lastMessagePreview: lastContent ? (lastContent.length > 50 ? lastContent.substring(0, 50) + '…' : lastContent) : null,
+        lastMessagePreview: previewContent ? (previewContent.length > 50 ? previewContent.substring(0, 50) + '…' : previewContent) : null,
         lastMessageAt: lastMsg?.createdAt || c.updatedAt,
         pinned: c.user1Id === userId ? c.pinned1 : c.pinned2,
         muted: c.user1Id === userId ? c.muted1 : c.muted2,
@@ -131,7 +152,37 @@ app.get('/api/v1/messages/chats', authMiddleware, async (req: AuthRequest, res: 
       });
     }
     result.sort((a, b) => (a.pinned && !b.pinned ? -1 : !a.pinned && b.pinned ? 1 : 0));
-    res.json({ data: result });
+
+    // v6.8 personalization overlay on chats list. Among non-pinned chats,
+    // re-rank by recency × intent-blend − negative penalty (chat partner
+    // sharing traits with previously-blocked users sinks).
+    let pMeta: any = null;
+    try {
+      const ctx = await loadPersonalizationCtx(prisma, userId, { surface: 'chats', prevWindowMin: 1440 });
+      const items = result.map((c: any) => {
+        const u = c.otherUser;
+        const lastMs = c.lastMessageAt ? new Date(c.lastMessageAt).getTime() : 0;
+        const recencyScore = lastMs ? Math.max(0, 100 - (Date.now() - lastMs) / 86400_000) : 0;
+        const unreadBoost = (c.unreadCount || 0) * 3;
+        return {
+          id: c.id,
+          baseScore: recencyScore + unreadBoost,
+          city: u.profile?.city,
+          ageBucket: u.profile?.age ? (u.profile.age < 26 ? '22-25' : u.profile.age < 31 ? '26-30' : '31+') : undefined,
+          traits: { city: u.profile?.city, datingIntent: u.profile?.datingIntent, smoking: u.profile?.smoking, drinking: u.profile?.drinking, religion: u.profile?.religion },
+          _chat: c,
+        };
+      });
+      const { ranked, diversifier } = applyPersonalization(ctx, items, { topN: items.length });
+      const byId = new Map(items.map((it: any) => [it.id, it._chat]));
+      const personalized = ranked.map((it: any) => byId.get(it.id)).filter(Boolean) as any[];
+      const pinned = personalized.filter((c: any) => c.pinned);
+      const rest = personalized.filter((c: any) => !c.pinned);
+      const reordered = [...pinned, ...rest];
+      result.splice(0, result.length, ...reordered);
+      pMeta = { intent: { stated: ctx.intent.stated, revealed: ctx.intent.revealed, mismatch: ctx.intent.mismatch, confidence: ctx.intent.confidence }, diversifier: { mood: ctx.sessionMood, reasoning: diversifier.reasoning }, negativeSignals: { totalEvents: ctx.negProfile.totalEvents } };
+    } catch { /* fallback to legacy pinned-first sort */ }
+    res.json({ data: result, meta: pMeta || undefined });
   } catch (e) { next(e); }
 });
 
@@ -147,16 +198,42 @@ app.get('/api/v1/messages/chats/archived', authMiddleware, async (req: AuthReque
       const { passwordHash, ...otherUser } = o;
       const lastMsg = c.messages[0] || null;
       const lastContent = lastMsg ? decryptMessage(lastMsg.content) : null;
+      const previewContent = previewFromContent(lastContent);
       return {
         id: c.id,
         otherUser,
         lastMessage: lastMsg,
-        lastMessagePreview: lastContent ? (lastContent.length > 50 ? lastContent.substring(0, 50) + '…' : lastContent) : null,
+        lastMessagePreview: previewContent ? (previewContent.length > 50 ? previewContent.substring(0, 50) + '…' : previewContent) : null,
         lastMessageAt: lastMsg?.createdAt || c.updatedAt,
         unreadCount: 0,
       };
     });
     res.json({ data: result });
+  } catch (e) { next(e); }
+});
+
+// Find-or-create the 1:1 chat between the requesting user and `:userId`.
+// Used by surfaces (story replies, profile actions) that drop into a thread
+// without requiring it to exist already. Both orderings of (user1Id,user2Id)
+// are searched so we don't accidentally create a duplicate.
+app.post('/api/v1/messages/chats/with/:userId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const me = req.userId!;
+    const other = req.params.userId;
+    if (!other || other === me) return res.status(400).json({ error: { message: 'Invalid recipient', code: 'BAD_REQUEST' } });
+    let chat = await prisma.chat.findFirst({
+      where: { OR: [{ user1Id: me, user2Id: other }, { user1Id: other, user2Id: me }] },
+    });
+    if (!chat) {
+      // A chat requires an active match. If the two users aren't matched yet,
+      // we can't create a chat for them.
+      const match = await prisma.match.findFirst({
+        where: { OR: [{ user1Id: me, user2Id: other }, { user1Id: other, user2Id: me }] },
+      });
+      if (!match) return res.status(404).json({ error: { message: 'No match between users', code: 'NOT_FOUND' } });
+      chat = await prisma.chat.create({ data: { matchId: match.id, user1Id: me, user2Id: other } });
+    }
+    res.json({ data: { id: chat.id } });
   } catch (e) { next(e); }
 });
 
@@ -663,6 +740,34 @@ app.get('/api/v1/beats', authMiddleware, async (req: AuthRequest, res: Response,
     const { state } = req.query;
     const where: any = { OR: [{ user1Id: userId }, { user2Id: userId }] };
     if (state) where.state = state;
+
+    // Passive cleanup sweeps (idempotent, cheap).
+    // 1) Ephemeral snaps viewed once but neither replayed nor saved → clear after 1h grace.
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    prisma.beatEvent.updateMany({
+      where: {
+        viewCount: 1,
+        mediaSaved: false,
+        mediaCleared: false,
+        firstViewedAt: { lt: oneHourAgo },
+        content: { not: '' },
+      },
+      data: { content: '', mediaCleared: true },
+    }).catch(() => {});
+    // 2) Active beats where neither side acted in 48h → mark lost (streak broken).
+    const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000);
+    prisma.beat.updateMany({
+      where: {
+        state: 'active',
+        OR: [{ user1Id: userId }, { user2Id: userId }],
+        AND: [
+          { OR: [{ lastUser1: null }, { lastUser1: { lt: twoDaysAgo } }] },
+          { OR: [{ lastUser2: null }, { lastUser2: { lt: twoDaysAgo } }] },
+        ],
+      },
+      data: { state: 'lost', count: 0 },
+    }).catch(() => {});
+
     const beats = await prisma.beat.findMany({
       where,
       include: { user1: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } }, user2: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } }, events: { take: 50, orderBy: { createdAt: 'asc' } } },
@@ -677,13 +782,167 @@ app.get('/api/v1/beats', authMiddleware, async (req: AuthRequest, res: Response,
       const now = Date.now();
       const iSentToday = myLast ? (now - new Date(myLast).getTime()) < 86400000 : false;
       const theyCompletedToday = theirLast ? (now - new Date(theirLast).getTime()) < 86400000 : false;
+      // Scrub ephemeral media content for the receiver until they tap-to-view.
+      // The sender always sees their own content. Saved or already-cleared snaps
+      // pass through as-is (saved → permanent; cleared → empty content + flag).
+      const MEDIA_TYPES = new Set(['photo','video','voice','music','gif','snap']);
+      const scrubbedEvents = b.events.map(ev => {
+        const isMine = ev.userId === userId;
+        const isMedia = MEDIA_TYPES.has(ev.type);
+        if (isMine || ev.mediaSaved || !isMedia) return ev;
+        // Receiver: hide content until /view endpoint is hit
+        return { ...ev, content: '', _ephemeralLocked: !ev.mediaCleared };
+      });
       return {
-        id: b.id, user: other, count: b.count, state: b.state, events: b.events,
+        id: b.id, user: other, count: b.count, state: b.state, events: scrubbedEvents,
         iSentToday, theyCompletedToday, todayCompleted: iSentToday && theyCompletedToday,
         createdAt: b.createdAt, updatedAt: b.updatedAt,
       };
     });
     res.json({ data: result });
+  } catch (e) { next(e); }
+});
+
+// ─── Beat ephemeral viewer endpoints (Snapchat-style) ─────────────────
+// Tap = first view (single, ephemeral). After this view ends, the snap is
+// cleaned up after a 1h grace window unless the receiver replays/saves it.
+// Long-press = replay (second view) which AUTO-SAVES the snap into chat for
+// both parties to keep. Save / screenshot / download also persist into chat.
+const EPHEMERAL_GRACE_MS = 60 * 60 * 1000; // 1h grace before auto-clear
+
+app.post('/api/v1/beats/events/:eventId/view', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const mode = (req.query.mode === 'replay' || req.body?.mode === 'replay') ? 'replay' : 'view';
+    const ev = await prisma.beatEvent.findUnique({ where: { id: req.params.eventId }, include: { beat: true } });
+    if (!ev) return res.status(404).json({ error: { message: 'Event not found' } });
+    if (ev.beat.user1Id !== userId && ev.beat.user2Id !== userId) return res.status(403).json({ error: { message: 'Forbidden' } });
+    if (ev.userId === userId) return res.status(400).json({ error: { message: 'Cannot view your own beat' } });
+    if (ev.mediaSaved) {
+      // Saved snaps are permanent in chat — return as-is regardless of mode.
+      return res.json({ data: { content: ev.content, type: ev.type, viewCount: ev.viewCount, saved: true, cleared: false } });
+    }
+    if (ev.mediaCleared) {
+      return res.status(410).json({ error: { message: 'Beat is no longer available' }, data: { cleared: true, viewCount: ev.viewCount } });
+    }
+
+    if (mode === 'replay') {
+      // Replay only valid after the first view.
+      if ((ev.viewCount || 0) < 1) return res.status(400).json({ error: { message: 'Tap to view first before replaying' } });
+      if ((ev.viewCount || 0) >= 2) return res.status(410).json({ error: { message: 'Already replayed' } });
+      // Concurrency-safe transition 1 → 2; only the winning request creates the audit chip.
+      const upd = await prisma.beatEvent.updateMany({
+        where: { id: ev.id, viewCount: 1, mediaSaved: false },
+        data: { viewCount: 2, mediaSaved: true },
+      });
+      if (upd.count === 0) return res.status(410).json({ error: { message: 'Already replayed' } });
+      await prisma.beatEvent.create({ data: { beatId: ev.beatId, userId, type: 'system', content: `__system:saved:${userId}:${ev.id}` } });
+      pushToUser(ev.userId, 'beat-viewed', { eventId: ev.id, beatId: ev.beatId, viewerId: userId, viewCount: 2, replayed: true });
+      pushToUser(ev.userId, 'beat-saved', { eventId: ev.id, beatId: ev.beatId, byUserId: userId, auto: true });
+      pushToUser(userId, 'beat-saved', { eventId: ev.id, beatId: ev.beatId, byUserId: userId, auto: true });
+      return res.json({ data: { content: ev.content, type: ev.type, viewCount: 2, saved: true, cleared: false, lastView: false } });
+    }
+
+    // First view (tap): single view, with 1h grace before cleanup.
+    if ((ev.viewCount || 0) >= 1) {
+      // Already viewed; tapping again does nothing (must long-press to replay).
+      return res.status(409).json({ error: { message: 'Already viewed. Long-press to replay.' }, data: { viewCount: ev.viewCount, alreadyViewed: true } });
+    }
+    // Concurrency-safe 0 → 1 transition; loser of the race silently no-ops the audit chip.
+    const updFirst = await prisma.beatEvent.updateMany({
+      where: { id: ev.id, viewCount: 0 },
+      data: { viewCount: 1, firstViewedAt: ev.firstViewedAt ?? new Date() },
+    });
+    if (updFirst.count === 0) {
+      return res.status(409).json({ error: { message: 'Already viewed. Long-press to replay.' }, data: { alreadyViewed: true } });
+    }
+    await prisma.beatEvent.create({ data: { beatId: ev.beatId, userId, type: 'system', content: `__system:viewed:${userId}:${ev.id}` } }).catch(() => {});
+    res.json({ data: { content: ev.content, type: ev.type, viewCount: 1, saved: false, cleared: false, replayAvailable: true } });
+    pushToUser(ev.userId, 'beat-viewed', { eventId: ev.id, beatId: ev.beatId, viewerId: userId, viewCount: 1 });
+    pushToUser(userId, 'beat-viewed', { eventId: ev.id, beatId: ev.beatId, viewerId: userId, viewCount: 1 });
+  } catch (e) { next(e); }
+});
+
+// Save a beat into chat history → preserves it permanently for both users.
+app.post('/api/v1/beats/events/:eventId/save', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const ev = await prisma.beatEvent.findUnique({ where: { id: req.params.eventId }, include: { beat: true } });
+    if (!ev) return res.status(404).json({ error: { message: 'Event not found' } });
+    if (ev.beat.user1Id !== userId && ev.beat.user2Id !== userId) return res.status(403).json({ error: { message: 'Forbidden' } });
+    if (ev.mediaCleared) return res.status(410).json({ error: { message: 'Beat is no longer available' } });
+    if (ev.mediaSaved) return res.json({ data: { saved: true, id: ev.id, alreadySaved: true } });
+    const updated = await prisma.beatEvent.update({ where: { id: ev.id }, data: { mediaSaved: true } });
+    await prisma.beatEvent.create({ data: { beatId: ev.beatId, userId, type: 'system', content: `__system:saved:${userId}:${ev.id}` } });
+    const otherId = ev.beat.user1Id === userId ? ev.beat.user2Id : ev.beat.user1Id;
+    pushToUser(otherId, 'beat-saved', { eventId: ev.id, beatId: ev.beatId, byUserId: userId });
+    pushToUser(userId, 'beat-saved', { eventId: ev.id, beatId: ev.beatId, byUserId: userId });
+    res.json({ data: { saved: true, id: updated.id } });
+  } catch (e) { next(e); }
+});
+
+// Unsave (remove a saved snap from chat). Fully deletes the snap for both users.
+app.post('/api/v1/beats/events/:eventId/unsave', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const ev = await prisma.beatEvent.findUnique({ where: { id: req.params.eventId }, include: { beat: true } });
+    if (!ev) return res.json({ data: { unsaved: true, alreadyGone: true } });
+    if (ev.beat.user1Id !== userId && ev.beat.user2Id !== userId) return res.status(403).json({ error: { message: 'Forbidden' } });
+    // Drop only the `saved` markers for this snap; keep screenshot/download/view
+    // markers so the chat still shows a full audit trail of who did what.
+    {
+      const savedRows = await prisma.beatEvent.findMany({
+        where: { beatId: ev.beatId, type: 'system', content: { startsWith: '__system:saved:' } },
+      }).catch(() => [] as any[]);
+      const ids = savedRows.filter((r: any) => (r.content || '').endsWith(`:${ev.id}`)).map((r: any) => r.id);
+      if (ids.length) await prisma.beatEvent.deleteMany({ where: { id: { in: ids } } }).catch(() => {});
+    }
+    await prisma.beatEvent.delete({ where: { id: ev.id } }).catch(() => {});
+    // Add an audit chip so chat clearly shows who unsaved.
+    await prisma.beatEvent.create({ data: { beatId: ev.beatId, userId, type: 'system', content: `__system:unsaved:${userId}:${ev.id}` } }).catch(() => {});
+    const otherId = ev.beat.user1Id === userId ? ev.beat.user2Id : ev.beat.user1Id;
+    pushToUser(otherId, 'beat-unsaved', { eventId: ev.id, beatId: ev.beatId, byUserId: userId });
+    pushToUser(userId, 'beat-unsaved', { eventId: ev.id, beatId: ev.beatId, byUserId: userId });
+    res.json({ data: { unsaved: true, deleted: true } });
+  } catch (e) { next(e); }
+});
+
+// Screenshot detection (best-effort). Persists media into chat AND posts a
+// system event for both parties so the sender knows.
+app.post('/api/v1/beats/events/:eventId/screenshot', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const ev = await prisma.beatEvent.findUnique({ where: { id: req.params.eventId }, include: { beat: true } });
+    if (!ev) return res.status(404).json({ error: { message: 'Event not found' } });
+    if (ev.beat.user1Id !== userId && ev.beat.user2Id !== userId) return res.status(403).json({ error: { message: 'Forbidden' } });
+    if (ev.mediaCleared) return res.status(410).json({ error: { message: 'Beat is no longer available' } });
+    if (!ev.mediaSaved && !ev.mediaCleared) {
+      await prisma.beatEvent.update({ where: { id: ev.id }, data: { mediaSaved: true } }).catch(() => {});
+    }
+    await prisma.beatEvent.create({ data: { beatId: ev.beatId, userId, type: 'system', content: `__system:screenshot:${userId}:${ev.id}` } });
+    const otherId = ev.beat.user1Id === userId ? ev.beat.user2Id : ev.beat.user1Id;
+    pushToUser(otherId, 'beat-screenshot', { eventId: ev.id, beatId: ev.beatId, byUserId: userId });
+    pushToUser(userId, 'beat-screenshot', { eventId: ev.id, beatId: ev.beatId, byUserId: userId });
+    res.json({ data: { ok: true } });
+  } catch (e) { next(e); }
+});
+
+// Download — saves locally on the device AND records in chat for both parties.
+app.post('/api/v1/beats/events/:eventId/download', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const ev = await prisma.beatEvent.findUnique({ where: { id: req.params.eventId }, include: { beat: true } });
+    if (!ev) return res.status(404).json({ error: { message: 'Event not found' } });
+    if (ev.beat.user1Id !== userId && ev.beat.user2Id !== userId) return res.status(403).json({ error: { message: 'Forbidden' } });
+    if (ev.mediaCleared) return res.status(410).json({ error: { message: 'Beat is no longer available' } });
+    if (!ev.mediaSaved) {
+      await prisma.beatEvent.update({ where: { id: ev.id }, data: { mediaSaved: true } }).catch(() => {});
+    }
+    await prisma.beatEvent.create({ data: { beatId: ev.beatId, userId, type: 'system', content: `__system:downloaded:${userId}:${ev.id}` } });
+    const otherId = ev.beat.user1Id === userId ? ev.beat.user2Id : ev.beat.user1Id;
+    pushToUser(otherId, 'beat-downloaded', { eventId: ev.id, beatId: ev.beatId, byUserId: userId });
+    pushToUser(userId, 'beat-downloaded', { eventId: ev.id, beatId: ev.beatId, byUserId: userId });
+    res.json({ data: { ok: true } });
   } catch (e) { next(e); }
 });
 

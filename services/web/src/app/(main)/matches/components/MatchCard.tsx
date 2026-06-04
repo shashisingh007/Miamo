@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
  MessageCircle, MoreHorizontal, Pin, Shield, Heart, Eye,
@@ -243,12 +244,20 @@ export function ContextMenu({
  { label: 'Unmatch', icon: UserMinus, onClick: onUnmatch, color: 'text-red-400' },
  ];
 
- return (
+ if (typeof document === 'undefined') return null;
+ return createPortal(
  <>
  <div className="fixed inset-0 z-40" onClick={onClose} />
  <motion.div ref={ref} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.12 }}
  className="fixed z-50 bg-miamo-card border border-border rounded-xl shadow-[0_8px_40px_rgba(0,0,0,0.5)] py-1.5 w-48"
- style={{ top: position.y, left: Math.min(position.x, typeof window !== 'undefined' ? window.innerWidth - 210 : 200) }}>
+ style={{
+ top: typeof window !== 'undefined'
+ ? Math.max(8, Math.min(position.y, window.innerHeight - 360))
+ : position.y,
+ left: typeof window !== 'undefined'
+ ? Math.max(8, Math.min(position.x, window.innerWidth - 192 - 8))
+ : position.x,
+ }}>
  {menuItems.map((item, i) => {
  if ('divider' in item) return <div key={i} className="my-1.5 h-px bg-miamo-surface" />;
  const Icon = item.icon;
@@ -261,6 +270,7 @@ export function ContextMenu({
  );
  })}
  </motion.div>
- </>
- );
+ </>,
+    document.body,
+  );
 }

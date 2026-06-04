@@ -31,6 +31,11 @@ export interface BeatEntry {
  sentAt: string;
  seen?: boolean;
  showInChat?: boolean;
+ // Snapchat-style ephemeral flags (received media only)
+ ephemeralLocked?: boolean; // not yet viewed; content scrubbed by server
+ viewCount?: number;
+ mediaSaved?: boolean;
+ mediaCleared?: boolean;
 }
 
 /* ═══════════════════════════════════════════════════════════

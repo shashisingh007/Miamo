@@ -11,6 +11,7 @@ import { Card } from '@/components/ui';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { track } from '@/lib/track';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 
@@ -182,10 +183,10 @@ function ResultCard({ primary, secondary, scores }: { primary: typeof LANGUAGES[
 
 /* ═══ Main Page ═══ */
 export default function LoveLanguagePage() {
- const [started, setStarted] = useState(false);
- const [qIdx, setQIdx] = useState(0);
- const [scores, setScores] = useState<Record<string, number>>({ words: 0, acts: 0, time: 0, touch: 0, gifts: 0 });
- const [done, setDone] = useState(false);
+ const [started, setStarted] = usePersistentState<boolean>('loveLang:started', false);
+ const [qIdx, setQIdx] = usePersistentState<number>('loveLang:qIdx', 0);
+ const [scores, setScores] = usePersistentState<Record<string, number>>('loveLang:scores', { words: 0, acts: 0, time: 0, touch: 0, gifts: 0 });
+ const [done, setDone] = usePersistentState<boolean>('loveLang:done', false);
  const toast = useToast();
 
  useTrackPageView('love-language');

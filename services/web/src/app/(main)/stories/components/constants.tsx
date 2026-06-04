@@ -36,14 +36,31 @@ export function FloatingSparkles({ count = 6 }: { count?: number }) {
  );
 }
 
-/* ═══ Parse story content (handles background JSON) ═══ */
-export function parseStoryContent(content: string): { text: string; background?: string } {
+/* ═══ Parse story content (handles background + meta JSON) ═══ */
+export interface StoryMeta {
+ viewOnce?: boolean;
+ targetUserId?: string;
+ closeCircleIds?: string[];
+}
+export function parseStoryContent(content: string): { text: string; background?: string; meta: StoryMeta } {
  try {
  const parsed = JSON.parse(content);
- return { text: parsed.text || '', background: parsed.background };
+ const { text = '', background, viewOnce, targetUserId, closeCircleIds } = parsed || {};
+ return { text, background, meta: { viewOnce, targetUserId, closeCircleIds } };
  } catch {
- return { text: content, background: undefined };
+ return { text: content, background: undefined, meta: {} };
  }
+}
+
+const VO_KEY = 'miamo:viewedOnce';
+export function getViewedOnceSet(): Set<string> {
+ if (typeof window === 'undefined') return new Set();
+ try { return new Set(JSON.parse(localStorage.getItem(VO_KEY) || '[]')); } catch { return new Set(); }
+}
+export function markViewedOnce(id: string) {
+ if (typeof window === 'undefined') return;
+ const s = getViewedOnceSet(); s.add(id);
+ try { localStorage.setItem(VO_KEY, JSON.stringify(Array.from(s))); } catch {}
 }
 
 export function getBackgroundGradient(bgId?: string): string {

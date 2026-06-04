@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useAuthStore } from '@/stores';
+import { usePersistentState } from '@/hooks/usePersistentState';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3200';
 
 function getToken() {
   if (typeof window === 'undefined') return null;
-  return localStorage.getItem('miamo_token');
+  return useAuthStore.getState().token;
 }
 
 interface Req {
@@ -26,7 +28,7 @@ const FIELD_LABEL: Record<string,string> = {
 };
 
 export default function AccessInboxPage() {
-  const [tab, setTab] = useState<'inbox' | 'outbox'>('inbox');
+  const [tab, setTab] = usePersistentState<'inbox' | 'outbox'>('access:tab', 'inbox');
   const [items, setItems] = useState<Req[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);

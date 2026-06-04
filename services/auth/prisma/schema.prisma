@@ -443,14 +443,18 @@ model Beat {
 }
 
 model BeatEvent {
-  id        String   @id @default(uuid())
-  beatId    String
-  beat      Beat     @relation(fields: [beatId], references: [id], onDelete: Cascade)
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  type      String   @default("snap")
-  content   String   @default("")
-  createdAt DateTime @default(now())
+  id            String   @id @default(uuid())
+  beatId        String
+  beat          Beat     @relation(fields: [beatId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          String   @default("snap")
+  content       String   @default("")
+  viewCount     Int      @default(0)
+  firstViewedAt DateTime?
+  mediaSaved    Boolean  @default(false)
+  mediaCleared  Boolean  @default(false)
+  createdAt     DateTime @default(now())
 
   @@index([beatId, createdAt])
 }

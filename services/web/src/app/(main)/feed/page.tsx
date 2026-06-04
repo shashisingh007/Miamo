@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Lightbulb, Image, Video, Smile } from 'lucide-react';
+import { Heart, MessageCircle, Bookmark, Share2, MoreHorizontal, Lightbulb, Image as ImageIcon, Video, Smile, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, Badge, Card, FilterChip } from '@/components/ui';
 import { FeedSkeleton } from '@/components/ui/skeleton';
@@ -11,28 +11,60 @@ import { cn, formatRelativeTime } from '@/lib/utils';
 import { useAuthStore } from '@/stores';
 import { useToast } from '@/components/ui/toast';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { loadImageFromFile, compressImage, compressVideo, videoNeedsCompression } from '@/lib/media-utils';
 
 
 
 function ComposeBox({ onPost }: { onPost: () => void }) {
  const [content, setContent] = useState('');
  const [posting, setPosting] = useState(false);
+ const [mediaFile, setMediaFile] = useState<{ file: File; preview: string } | null>(null);
  const { user } = useAuthStore();
  const toast = useToast();
 
  const handlePost = async () => {
- if (!content.trim()) return;
+ if (!content.trim() && !mediaFile) return;
  setPosting(true);
  try {
- await api.createPost({ content: content.trim() });
+ let mediaUrl: string | undefined;
+ if (mediaFile) {
+ if (mediaFile.file.type.startsWith('image/')) {
+ const img = await loadImageFromFile(mediaFile.file);
+ mediaUrl = await compressImage({ img, maxDim: 1080 });
+ } else if (mediaFile.file.type.startsWith('video/')) {
+ if (videoNeedsCompression(mediaFile.file)) {
+ const result = await compressVideo({ file: mediaFile.file });
+ mediaUrl = result.dataUrl;
+ } else {
+ const reader = new FileReader();
+ mediaUrl = await new Promise<string>((r) => { reader.onload = () => r(reader.result as string); reader.readAsDataURL(mediaFile.file); });
+ }
+ }
+ }
+ await api.createPost({ content: content.trim(), mediaUrl });
  setContent('');
+ if (mediaFile?.preview) URL.revokeObjectURL(mediaFile.preview);
+ setMediaFile(null);
  onPost();
  toast.success('Posted');
  } catch (e: any) {
  toast.error('Could not post', e?.message || 'Please try again');
  }
  setPosting(false);
+ };
+
+ const pickMedia = (accept: string) => {
+ const inp = document.createElement('input');
+ inp.type = 'file'; inp.accept = accept;
+ inp.onchange = (e: any) => {
+ const f = e.target.files?.[0];
+ if (!f) return;
+ if (mediaFile?.preview) URL.revokeObjectURL(mediaFile.preview);
+ setMediaFile({ file: f, preview: URL.createObjectURL(f) });
+ };
+ inp.click();
  };
 
  return (
@@ -42,14 +74,27 @@ function ComposeBox({ onPost }: { onPost: () => void }) {
  <div className="flex-1">
  <textarea value={content} onChange={e => setContent(e.target.value)} placeholder="Share a thought, idea, or date suggestion…"
  className="input-premium w-full resize-none text-sm min-h-[60px]" rows={2} />
+ {mediaFile && (
+ <div className="relative mt-2 inline-block">
+ {mediaFile.file.type.startsWith('image/') ? (
+ <img src={mediaFile.preview} alt="Attached" className="max-h-40 rounded-xl object-cover" />
+ ) : (
+ <video src={mediaFile.preview} className="max-h-40 rounded-xl" muted controls playsInline />
+ )}
+ <button onClick={() => { URL.revokeObjectURL(mediaFile.preview); setMediaFile(null); }}
+ className="absolute top-1 right-1 w-6 h-6 rounded-full bg-black/60 flex items-center justify-center hover:bg-black/80">
+ <X className="w-3 h-3 text-white" />
+ </button>
+ </div>
+ )}
  <div className="flex items-center justify-between mt-3">
  <div className="flex gap-1">
- <Button variant="ghost" size="icon-sm" title="Attach image" onClick={() => toast.info('Coming soon', 'Image uploads land in the next update.')}><Image className="w-4 h-4" /></Button>
- <Button variant="ghost" size="icon-sm" title="Attach video" onClick={() => toast.info('Coming soon', 'Video attachments land in the next update.')}><Video className="w-4 h-4" /></Button>
+        <Button variant="ghost" size="icon-sm" title="Attach image" onClick={() => pickMedia('image/*')}><ImageIcon className="w-4 h-4" /></Button>
+ <Button variant="ghost" size="icon-sm" title="Attach video" onClick={() => pickMedia('video/*')}><Video className="w-4 h-4" /></Button>
  <Button variant="ghost" size="icon-sm" title="Date idea" onClick={() => setContent(c => c + (c ? '\n' : '') + '💡 Date idea: ')}><Lightbulb className="w-4 h-4" /></Button>
  <Button variant="ghost" size="icon-sm" title="Add emoji" onClick={() => setContent(c => c + '❤️')}><Smile className="w-4 h-4" /></Button>
  </div>
- <Button size="sm" onClick={handlePost} disabled={posting || !content.trim()}>{posting ? 'Posting…' : 'Post'}</Button>
+ <Button size="sm" onClick={handlePost} disabled={posting || (!content.trim() && !mediaFile)}>{posting ? 'Posting…' : 'Post'}</Button>
  </div>
  </div>
  </div>
@@ -198,7 +243,7 @@ function FeedPost({ post, onDelete }: { post: any; onDelete?: () => void }) {
 }
 
 export default function FeedPage() {
- const [activeFilter, setActiveFilter] = useState('all');
+ const [activeFilter, setActiveFilter] = usePersistentState<string>('feed:activeFilter', 'all');
  const [posts, setPosts] = useState<any[]>([]);
  const [loading, setLoading] = useState(true);
 

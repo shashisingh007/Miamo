@@ -13,6 +13,15 @@ import { useAuthStore } from '@/stores';
 import { useTrackPageView, useTrackScrollDepth, trackClick } from '@/hooks/useTrackActivity';
 import { useToast } from '@/components/ui/toast';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { StoryCreateModal } from '@/app/(main)/stories/components/StoryCreateModal';
+import { StoryViewer } from '@/app/(main)/stories/components/StoryViewer';
+import { MediaPicker, type MediaPickerResult } from '@/components/MediaPicker';
+import { CityAutocomplete } from '@/components/CityAutocomplete';
+import {
+ LOOKING_FOR_OPTIONS, EDUCATION_OPTIONS, HEIGHT_OPTIONS, LANGUAGE_OPTIONS,
+ DRINKING_OPTIONS, SMOKING_OPTIONS, EXERCISE_OPTIONS, DIET_OPTIONS,
+ PETS_OPTIONS, CHILDREN_OPTIONS, RELIGION_OPTIONS, POLITICS_OPTIONS,
+} from '@/lib/profileOptions';
 
 /* ═══ Animated Score Ring (counts up on mount) ═══ */
 function AnimatedScoreRing({ score, size = 80, strokeWidth = 5 }: { score: number; size?: number; strokeWidth?: number }) {
@@ -91,13 +100,18 @@ export default function ProfilePage() {
  const [profile, setProfile] = useState<any>(null);
  const [loading, setLoading] = useState(true);
  const [editing, setEditing] = useState(false);
- const [editForm, setEditForm] = useState({ bio: '', city: '', profession: '', datingIntent: '', education: '', height: '', languages: '', drinking: '', smoking: '', fitness: '', diet: '', pets: '', children: '', religion: '', politicalViews: '' });
+ const [editForm, setEditForm] = useState<{ bio: string; city: string; cityLat: number | null; cityLng: number | null; profession: string; datingIntent: string; education: string; height: string; languages: string; drinking: string; smoking: string; fitness: string; diet: string; pets: string; children: string; religion: string; politicalViews: string }>({ bio: '', city: '', cityLat: null, cityLng: null, profession: '', datingIntent: '', education: '', height: '', languages: '', drinking: '', smoking: '', fitness: '', diet: '', pets: '', children: '', religion: '', politicalViews: '' });
+ const [detectingLoc, setDetectingLoc] = useState(false);
  const [saving, setSaving] = useState(false);
  const [showAddInterest, setShowAddInterest] = useState(false);
  const [showAddPrompt, setShowAddPrompt] = useState(false);
  const [newPromptQ, setNewPromptQ] = useState('');
  const [newPromptA, setNewPromptA] = useState('');
  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+ const [showStoryCreate, setShowStoryCreate] = useState(false);
+ const [viewingOwnStory, setViewingOwnStory] = useState<any>(null);
+ const [myStoryGroup, setMyStoryGroup] = useState<any>(null);
+ const [showPhotoUploadModal, setShowPhotoUploadModal] = useState(false);
  const { updateUser, user: authUser } = useAuthStore();
  const photoInputRef = useRef<HTMLInputElement>(null);
  const coverInputRef = useRef<HTMLInputElement>(null);
@@ -115,20 +129,30 @@ export default function ProfilePage() {
  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
  const file = e.target.files?.[0];
  if (!file) return;
- const preview = URL.createObjectURL(file);
+ // Open the media picker modal for this file
+ setShowPhotoUploadModal(true);
+ e.target.value = '';
+ };
+
+ const handleMediaPickerResult = async (result: MediaPickerResult) => {
+ // Convert data URL to a Blob for FormData upload
+ const res = await fetch(result.dataUrl);
+ const blob = await res.blob();
+ const preview = result.dataUrl;
  setProfile((prev: any) => ({
  ...prev,
  user: { ...(prev?.user || prev), photos: [{ url: preview }, ...(prev?.user?.photos || prev?.photos || [])] },
  }));
  const formData = new FormData();
- formData.append('photo', file);
+ formData.append('photo', blob, 'photo.jpg');
  api.uploadPhoto(formData).then(() => {
  loadProfile();
  toast.success('Photo uploaded', 'Your new photo is now visible');
  }).catch(() => {
  toast.error('Upload failed', 'Please try again');
+ loadProfile(); // revert optimistic
  });
- e.target.value = '';
+ setShowPhotoUploadModal(false);
  };
 
  const loadProfile = () => {
@@ -136,11 +160,23 @@ export default function ProfilePage() {
  api.getMyProfile().then(res => {
  setProfile(res.data);
  const prof = (res.data as any)?.profile || res.data || {};
- setEditForm({ bio: prof.bio || '', city: prof.city || '', profession: prof.profession || '', datingIntent: prof.datingIntent || prof.intent || '', education: prof.education || '', height: prof.height || '', languages: prof.languages || '', drinking: prof.drinking || '', smoking: prof.smoking || '', fitness: prof.fitness || '', diet: prof.diet || '', pets: prof.pets || '', children: prof.children || '', religion: prof.religion || '', politicalViews: prof.politicalViews || '' });
+ setEditForm({ bio: prof.bio || '', city: prof.city || '', cityLat: prof.cityLat ?? null, cityLng: prof.cityLng ?? null, profession: prof.profession || '', datingIntent: prof.datingIntent || prof.intent || '', education: prof.education || '', height: prof.height || '', languages: prof.languages || '', drinking: prof.drinking || '', smoking: prof.smoking || '', fitness: prof.fitness || '', diet: prof.diet || '', pets: prof.pets || '', children: prof.children || '', religion: prof.religion || '', politicalViews: prof.politicalViews || '' });
  }).catch(() => {}).finally(() => setLoading(false));
  };
 
  useEffect(() => { loadProfile(); }, []);
+
+ const loadOwnStories = () => {
+ api.getMyStories().then(r => {
+ const list = r.data || [];
+ if (list.length > 0) {
+ setMyStoryGroup({ user: authUser, isOwn: true, stories: list, viewed: false });
+ } else {
+ setMyStoryGroup(null);
+ }
+ }).catch(() => setMyStoryGroup(null));
+ };
+ useEffect(() => { loadOwnStories(); }, [authUser?.id]);
 
  if (loading) return <ProfilePageSkeleton />;
 
@@ -195,8 +231,22 @@ export default function ProfilePage() {
  whileHover={{ scale: 1.05 }}
  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
  >
- <Avatar src={photos[0]?.url} name={user.displayName || 'User'} size="xl" className="w-24 h-24 text-2xl border-4 border-miamo-card shadow-xl" />
- <button onClick={() => photoInputRef.current?.click()} className="absolute bottom-0 right-0 w-8 h-8 bg-gradient-rose rounded-full flex items-center justify-center border-2 border-white shadow-lg hover:scale-110 transition-transform">
+ <button
+ onClick={() => myStoryGroup ? setViewingOwnStory(myStoryGroup) : setShowStoryCreate(true)}
+ className={cn(
+ 'rounded-full p-[3px] transition-all',
+ myStoryGroup ? 'bg-gradient-to-br from-rose-alt via-rose-main to-rose-main shadow-[0_4px_14px_rgba(201,120,86,0.3)]' : 'bg-transparent'
+ )}
+ aria-label={myStoryGroup ? 'View your story' : 'Add story'}
+ >
+ <div className="rounded-full bg-white p-[2px]">
+ <Avatar src={photos[0]?.url} name={user.displayName || 'User'} size="xl" className="w-24 h-24 text-2xl shadow-xl" />
+ </div>
+ </button>
+ <button onClick={(e) => { e.stopPropagation(); setShowStoryCreate(true); }} className="absolute -bottom-0.5 left-1 w-8 h-8 bg-gradient-rose rounded-full flex items-center justify-center border-2 border-white shadow-lg hover:scale-110 transition-transform" aria-label="Add story">
+ <Plus className="w-4 h-4 text-white" />
+ </button>
+ <button onClick={() => setShowPhotoUploadModal(true)} className="absolute bottom-0 right-0 w-8 h-8 bg-gradient-rose rounded-full flex items-center justify-center border-2 border-white shadow-lg hover:scale-110 transition-transform">
  <Camera className="w-3.5 h-3.5 text-text-primary" />
  </button>
  {user.verified && (
@@ -222,7 +272,7 @@ export default function ProfilePage() {
  <Button variant="secondary" size="sm" onClick={() => {
  if (editing) {
  setSaving(true);
- api.updateProfile({ ...editForm, height: editForm.height ? parseInt(editForm.height as any) || null : null } as any).then(() => { loadProfile(); updateUser(editForm); setEditing(false); toast.success('Profile saved'); }).catch(() => toast.error('Save failed')).finally(() => setSaving(false));
+ api.updateProfile({ ...editForm, height: editForm.height ? parseInt(editForm.height as any) || null : null, cityLat: editForm.cityLat, cityLng: editForm.cityLng } as any).then(() => { loadProfile(); updateUser(editForm); setEditing(false); toast.success('Profile saved'); }).catch(() => toast.error('Save failed')).finally(() => setSaving(false));
  } else {
  setEditing(true);
  trackClick('edit-profile');
@@ -282,7 +332,7 @@ export default function ProfilePage() {
  <motion.button
  whileHover={{ scale: 1.03 }}
  whileTap={{ scale: 0.97 }}
- onClick={() => photoInputRef.current?.click()}
+ onClick={() => setShowPhotoUploadModal(true)}
  className="aspect-square rounded-2xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1.5 text-rose-light hover:border-rose hover:bg-miamo-surface/50 transition-all"
  >
  <Plus className="w-5 h-5" />
@@ -299,30 +349,36 @@ export default function ProfilePage() {
  <div className="space-y-3">
  <div><label className="text-xs text-text-muted">Bio</label><textarea value={editForm.bio} onChange={e => setEditForm(f => ({...f, bio: e.target.value}))} className="input-premium w-full mt-1 text-sm resize-none" rows={3} /></div>
  <div className="grid grid-cols-2 gap-3">
- <div><label className="text-xs text-text-muted">City</label><input value={editForm.city} onChange={e => setEditForm(f => ({...f, city: e.target.value}))} className="input-premium w-full mt-1 text-sm" /></div>
+ <div><label className="text-xs text-text-muted flex items-center justify-between"><span>City</span><button type="button" disabled={detectingLoc} onClick={() => {
+ if (!('geolocation' in navigator)) { toast.error('Geolocation not supported'); return; }
+ setDetectingLoc(true);
+ navigator.geolocation.getCurrentPosition(async (pos) => {
+ try { const r = await api.nearestCity(pos.coords.latitude, pos.coords.longitude); const c = r.data; setEditForm(f => ({ ...f, city: c.display, cityLat: c.lat, cityLng: c.lng })); toast.success(`Detected: ${c.name}`); } catch { toast.error('Could not resolve city'); } finally { setDetectingLoc(false); }
+ }, () => { toast.error('Location permission denied'); setDetectingLoc(false); }, { enableHighAccuracy: false, timeout: 10000 });
+ }} className="text-[10px] text-rose-main hover:underline disabled:opacity-50">{detectingLoc ? 'Detecting…' : 'Use my location'}</button></label><div className="mt-1"><CityAutocomplete value={editForm.city} onChange={(display, city) => setEditForm(f => ({ ...f, city: display, cityLat: city?.lat ?? null, cityLng: city?.lng ?? null }))} placeholder="Start typing your city…" /></div></div>
  <div><label className="text-xs text-text-muted">Profession</label><input value={editForm.profession} onChange={e => setEditForm(f => ({...f, profession: e.target.value}))} className="input-premium w-full mt-1 text-sm" /></div>
  </div>
- <div><label className="text-xs text-text-muted">Relationship Intent</label><input value={editForm.datingIntent} onChange={e => setEditForm(f => ({...f, datingIntent: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. Long-term relationship" /></div>
+ <div><label className="text-xs text-text-muted">Relationship Intent</label><select value={editForm.datingIntent} onChange={e => setEditForm(f => ({...f, datingIntent: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option>{LOOKING_FOR_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
  <div className="grid grid-cols-2 gap-3">
- <div><label className="text-xs text-text-muted">Education</label><input value={editForm.education} onChange={e => setEditForm(f => ({...f, education: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. Bachelor's" /></div>
- <div><label className="text-xs text-text-muted">Height</label><input value={editForm.height} onChange={e => setEditForm(f => ({...f, height: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. 5'10&quot;" /></div>
+ <div><label className="text-xs text-text-muted">Education</label><select value={editForm.education} onChange={e => setEditForm(f => ({...f, education: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option>{EDUCATION_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+ <div><label className="text-xs text-text-muted">Height</label><select value={editForm.height} onChange={e => setEditForm(f => ({...f, height: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option>{HEIGHT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
  </div>
- <div><label className="text-xs text-text-muted">Languages</label><input value={editForm.languages} onChange={e => setEditForm(f => ({...f, languages: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. English, Spanish" /></div>
+ <div><label className="text-xs text-text-muted">Languages</label><input value={editForm.languages} onChange={e => setEditForm(f => ({...f, languages: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder={`e.g. ${LANGUAGE_OPTIONS.slice(0,3).map(o=>o.label).join(', ')}`} /></div>
  <div className="grid grid-cols-2 gap-3">
- <div><label className="text-xs text-text-muted">Drinking</label><select value={editForm.drinking} onChange={e => setEditForm(f => ({...f, drinking: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Never">Never</option><option value="Socially">Socially</option><option value="Regularly">Regularly</option></select></div>
- <div><label className="text-xs text-text-muted">Smoking</label><select value={editForm.smoking} onChange={e => setEditForm(f => ({...f, smoking: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Never">Never</option><option value="Sometimes">Sometimes</option><option value="Regularly">Regularly</option></select></div>
- </div>
- <div className="grid grid-cols-2 gap-3">
- <div><label className="text-xs text-text-muted">Fitness</label><select value={editForm.fitness} onChange={e => setEditForm(f => ({...f, fitness: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Active">Active</option><option value="Sometimes">Sometimes</option><option value="Rarely">Rarely</option></select></div>
- <div><label className="text-xs text-text-muted">Diet</label><select value={editForm.diet} onChange={e => setEditForm(f => ({...f, diet: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Everything">Everything</option><option value="Vegetarian">Vegetarian</option><option value="Vegan">Vegan</option><option value="Halal">Halal</option><option value="Kosher">Kosher</option></select></div>
+ <div><label className="text-xs text-text-muted">Drinking</label><select value={editForm.drinking} onChange={e => setEditForm(f => ({...f, drinking: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option>{DRINKING_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+ <div><label className="text-xs text-text-muted">Smoking</label><select value={editForm.smoking} onChange={e => setEditForm(f => ({...f, smoking: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option>{SMOKING_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
  </div>
  <div className="grid grid-cols-2 gap-3">
- <div><label className="text-xs text-text-muted">Pets</label><select value={editForm.pets} onChange={e => setEditForm(f => ({...f, pets: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Dog">Dog</option><option value="Cat">Cat</option><option value="Both">Both</option><option value="Other">Other</option><option value="None">None</option></select></div>
- <div><label className="text-xs text-text-muted">Children</label><select value={editForm.children} onChange={e => setEditForm(f => ({...f, children: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option><option value="Want someday">Want someday</option><option value="Don't want">Don't want</option><option value="Have & want more">Have & want more</option><option value="Have & don't want more">Have & don't want more</option></select></div>
+ <div><label className="text-xs text-text-muted">Fitness</label><select value={editForm.fitness} onChange={e => setEditForm(f => ({...f, fitness: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option>{EXERCISE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+ <div><label className="text-xs text-text-muted">Diet</label><select value={editForm.diet} onChange={e => setEditForm(f => ({...f, diet: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option>{DIET_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
  </div>
  <div className="grid grid-cols-2 gap-3">
- <div><label className="text-xs text-text-muted">Religion</label><input value={editForm.religion} onChange={e => setEditForm(f => ({...f, religion: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. Hindu, Christian" /></div>
- <div><label className="text-xs text-text-muted">Political Views</label><input value={editForm.politicalViews} onChange={e => setEditForm(f => ({...f, politicalViews: e.target.value}))} className="input-premium w-full mt-1 text-sm" placeholder="e.g. Liberal" /></div>
+ <div><label className="text-xs text-text-muted">Pets</label><select value={editForm.pets} onChange={e => setEditForm(f => ({...f, pets: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option>{PETS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+ <div><label className="text-xs text-text-muted">Children</label><select value={editForm.children} onChange={e => setEditForm(f => ({...f, children: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option>{CHILDREN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+ </div>
+ <div className="grid grid-cols-2 gap-3">
+ <div><label className="text-xs text-text-muted">Religion</label><select value={editForm.religion} onChange={e => setEditForm(f => ({...f, religion: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option>{RELIGION_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+ <div><label className="text-xs text-text-muted">Political Views</label><select value={editForm.politicalViews} onChange={e => setEditForm(f => ({...f, politicalViews: e.target.value}))} className="input-premium w-full mt-1 text-sm"><option value="">—</option>{POLITICS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
  </div>
  </div>
  ) : (
@@ -478,6 +534,34 @@ export default function ProfilePage() {
  <AnimatePresence>
  {lightboxIndex !== null && (
  <PhotoLightbox photos={photos} initialIndex={lightboxIndex} onClose={() => setLightboxIndex(null)} />
+ )}
+ {showStoryCreate && (
+ <StoryCreateModal onClose={() => setShowStoryCreate(false)} onCreated={() => { setShowStoryCreate(false); loadOwnStories(); toast.success('Story shared'); }} />
+ )}
+ {viewingOwnStory && (
+ <StoryViewer storyGroup={viewingOwnStory} onClose={() => { setViewingOwnStory(null); loadOwnStories(); }} onRefresh={loadOwnStories} />
+ )}
+ </AnimatePresence>
+
+ {/* ═══ PHOTO UPLOAD MODAL (with filters + compression) ═══ */}
+ <AnimatePresence>
+ {showPhotoUploadModal && (
+ <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+ className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+ <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} exit={{ scale: 0.9, y: 20 }}
+ className="bg-miamo-card rounded-3xl w-full max-w-md overflow-hidden shadow-2xl max-h-[80vh] flex flex-col">
+ <div className="flex items-center justify-between p-4 border-b border-border">
+ <h2 className="text-lg font-bold text-text-primary">Upload Photo</h2>
+ <button onClick={() => setShowPhotoUploadModal(false)} className="w-8 h-8 rounded-full bg-miamo-surface flex items-center justify-center hover:bg-miamo-elevated">
+ <X className="w-4 h-4" />
+ </button>
+ </div>
+ <div className="p-4 overflow-y-auto flex-1">
+ <MediaPicker accept={['image']} showFilters={true} showTrim={false}
+ onMedia={handleMediaPickerResult} onClear={() => {}} />
+ </div>
+ </motion.div>
+ </motion.div>
  )}
  </AnimatePresence>
  </div>

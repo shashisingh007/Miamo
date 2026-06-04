@@ -3,6 +3,10 @@
 import express, { Request, Response, NextFunction } from 'express';
 import { LRUCache, MinHeap, BloomFilter, TTL, discoverCache, aiMatchCache, activityCache, profileCache } from '../../shared/cache';
 import { scoreForYou, scoreNew, scoreActive, scoreVerified, scoreSerious, scoreAiPicks, computeDeepCompatibility, computePersonalityArchetype, generateSmartMoves, computeFilterRelevanceBonus, type BehaviorVector, type VibeData, type MatchHistoryInsights, type CandidateUser, type UserProfile, type DeepCompatibilityInput, type SmartMoveInput, type CommStyleVector } from '../../shared/algorithms';
+import { classifyIntent, blendWeights, type DailyEventRow } from '../../shared/intent-classifier';
+import { buildNegativeProfile, negativePenalty, ageBucket, type NegativeEvent, type TraitSnapshot } from '../../shared/negative-signal-engine';
+import { diversify } from '../../shared/refresh-diversifier';
+import { loadPersonalizationCtx, applyPersonalization } from '../../shared/personalize';
 import { logger } from '../../shared/src/logger';
 import { errorHandler } from '../../shared/src/errorHandler';
 import { validate } from '../../shared/src/validate';
@@ -24,6 +28,7 @@ import { idempotency } from '../../shared/src/idempotency';
 import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
 import { auditLog, trackActivity } from '../../shared/src/audit';
 import { hashUid } from '../../shared/src/track/hash';
+import { distanceKm } from '../../shared/src/cities';
 import { PrismaSignalReader } from '../../shared/src/algo/signals';
 import { rankForYou } from '../../shared/src/algo/forYou';
 import { scoreAiPicksV4 } from '../../shared/src/algo/aiPicks';
@@ -297,6 +302,23 @@ async function getUserLastMessages(userId: string, limit = 10): Promise<string[]
   return [];
 }
 
+// ─── Fetch User's Last N Sent Miamo Moves (raw text, for style mirroring) ───
+// The user explicitly opted to send these moves; they're a stronger signal of
+// the writing voice they actually use when courting than chat replies.
+async function getUserLastMoves(userId: string, limit = 10): Promise<string[]> {
+  try {
+    const rows = await prisma.miamoMove.findMany({
+      where: { fromUserId: userId, message: { not: '' } },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: { message: true },
+    });
+    return rows.map(r => r.message).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
 installHealthRoutes(app, 'social', prisma);
 
 // ═══ DISCOVER ════════════════════════════════════════
@@ -348,7 +370,8 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
     const { seriousOnly, verifiedOnly, minAge, maxAge, city, cursor,
       gender, sexuality, lookingFor, smoking, drinking, exercise,
       education, religion, zodiac, pets, children,
-      minHeight, maxHeight, activeToday, newHere, hasPhotos, aiPicks,
+      minHeight, maxHeight, activeToday, newHere, hasPhotos, aiPicks, distance,
+      diet, politics, languages, maritalStatus, incomeBand, willingToRelocate,
     } = req.query;
     const userId = req.userId!;
     const blocks = await prisma.block.findMany({ where: { OR: [{ blockerId: userId }, { blockedId: userId }] } });
@@ -432,6 +455,34 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
       if (vals.length === 1) profileWhere.children = { equals: vals[0], mode: 'insensitive' };
       else if (vals.length > 1) profileWhere.children = { in: vals, mode: 'insensitive' };
     }
+    // ── Diet / Politics / Languages (multi-select chips) ──
+    if (diet) {
+      const vals = (diet as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.diet = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.diet = { in: vals, mode: 'insensitive' };
+    }
+    if (politics) {
+      const vals = (politics as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.politicalViews = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.politicalViews = { in: vals, mode: 'insensitive' };
+    }
+    if (languages) {
+      // Languages is a comma-separated string column on Profile; match if any selected language appears.
+      const vals = (languages as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length > 0) profileWhere.languages = { contains: vals[0], mode: 'insensitive' };
+    }
+    // ── Matrimony fields (DTM) ──
+    if (maritalStatus) {
+      const vals = (maritalStatus as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.maritalStatus = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.maritalStatus = { in: vals, mode: 'insensitive' };
+    }
+    if (incomeBand) {
+      const vals = (incomeBand as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.incomeBand = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.incomeBand = { in: vals, mode: 'insensitive' };
+    }
+    if (willingToRelocate === 'true') profileWhere.willingToRelocate = true;
     // ── Height range ──
     if (minHeight) profileWhere.height = { ...profileWhere.height, gte: parseInt(minHeight as string) };
     if (maxHeight) profileWhere.height = { ...profileWhere.height, lte: parseInt(maxHeight as string) };
@@ -450,14 +501,43 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
     // ── Has photos ──
     if (hasPhotos === 'true') where.photos = { some: {} };
 
+    // v6.7: paginate in batches of 10. The client requests a fresh batch
+    // every time the user has consumed the previous 10 cards, which forces
+    // each request to re-evaluate every signal (freshly-built behavior
+    // vector, ML state, drift, session context, compat cache, impression
+    // fatigue) so the very next 10 cards reflect what the user *just* did.
+    // We over-fetch (3x the page size) so MinHeap has room to rank.
+    const requestedLimit = Math.max(1, Math.min(50, parseInt((req.query.limit as string) || '10', 10) || 10));
+    const fetchPool = Math.max(30, requestedLimit * 3);
     const users = await prisma.user.findMany({
       where, include: { profile: true, photos: { orderBy: { position: 'asc' } }, prompts: { orderBy: { position: 'asc' } }, interests: true },
-      take: 60, ...(cursor ? { cursor: { id: cursor as string }, skip: 1 } : {}),
+      take: fetchPool, ...(cursor ? { cursor: { id: cursor as string }, skip: 1 } : {}),
     });
 
     const myProfile = await prisma.profile.findUnique({ where: { userId } });
     const myInterests = await prisma.profileInterest.findMany({ where: { userId } });
     const myInterestNames = myInterests.map(i => i.name);
+
+    // ── Distance filter (Haversine on cityLat/cityLng) ──
+    // Applies only when both ends have coords AND `distance` query param
+    // is a positive number. Without coords we silently skip — clients
+    // shouldn't see an empty pool just because a profile is missing geo.
+    const distanceKmLimit = distance ? parseFloat(distance as string) : NaN;
+    const myLat = (myProfile as any)?.cityLat as number | null;
+    const myLng = (myProfile as any)?.cityLng as number | null;
+    if (Number.isFinite(distanceKmLimit) && distanceKmLimit > 0 && myLat != null && myLng != null) {
+      const within = users.filter((u) => {
+        const cLat = (u.profile as any)?.cityLat as number | null;
+        const cLng = (u.profile as any)?.cityLng as number | null;
+        if (cLat == null || cLng == null) return false;
+        return distanceKm(myLat, myLng, cLat, cLng) <= distanceKmLimit;
+      });
+      // Splice in place so the rest of the pipeline (which references `users`)
+      // sees the filtered pool. Keeping `users` as the same reference avoids
+      // a sweeping rename of all downstream usages.
+      users.length = 0;
+      users.push(...within);
+    }
 
     // Get my active vibe for vibe-compatibility scoring
     let myVibe: any = null;
@@ -491,6 +571,135 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
       saveMLState(userId, mlState.prefs, mlState.bandit); // fire-and-forget
     }
 
+    // ── v6.8: revealed-intent classifier + negative-signal engine + diversifier ──
+    // (1) Intent: read last 14d of EventAggDaily for this uidHash, classify
+    //     stated vs revealed. Drives weight blending and diversifier knobs.
+    // (2) Negative profile: pull last 90d of Block + Report + MatchFeedback
+    //     (unmatch/block/report) joined back to the offender's profile, build
+    //     a trait-penalty function applied per candidate.
+    // (3) Diversifier: replaces the raw MinHeap drain with a refresh-aware
+    //     ordering that prevents loops, varies per cursor page, and slots
+    //     "new" profiles based on the user's revealed novelty affinity.
+    let intentReport: ReturnType<typeof classifyIntent> = {
+      stated: 'unknown', revealed: 'exploring', weights: { serious: 0.34, dtm: 0.33, casual: 0.33 },
+      confidence: 0, mismatch: 0, signalCount: 0, dominantSignals: [],
+    };
+    let negProfile = buildNegativeProfile([]);
+    let noveltyAffinity = 0.5;
+    const prevShownIds = new Set<string>();
+    try {
+      const myHash = hashUid(userId);
+      const since14d = new Date(Date.now() - 14 * 86400000);
+      const dailyEvents = (await (prisma as any).eventAggDaily.findMany({
+        where: { uidHash: myHash, day: { gte: since14d } },
+        select: { evt: true, day: true, count: true, durSum: true },
+      }).catch(() => [])) as DailyEventRow[];
+
+      // Recent route navigations (last 14d) — reuse from UserActivity
+      // since route.navigate isn't always in the daily aggregate yet.
+      const recentRoutes = (await prisma.userActivity.findMany({
+        where: { userId, action: 'route', createdAt: { gte: since14d } },
+        select: { metadata: true, createdAt: true },
+        take: 200,
+      }).catch(() => [])).map((r: any) => ({
+        path: (r.metadata as any)?.path || '',
+        daysAgo: (Date.now() - new Date(r.createdAt).getTime()) / 86400000,
+      })).filter(r => r.path);
+
+      intentReport = classifyIntent({
+        statedIntent: (myProfile as any)?.datingIntent ?? null,
+        seriousMode: (myProfile as any)?.seriousMode ?? null,
+        dailyEvents,
+        recentRoutes,
+      });
+
+      // novelty affinity: ratio of likes/dwells on users joined in last 7d
+      // proxied by signal count of `card.dwell.long` over `discover.swipe`.
+      const longDwell = dailyEvents.filter(e => e.evt === 'card.dwell.long').reduce((s, e) => s + e.count, 0);
+      const totalSwipes = dailyEvents.filter(e => e.evt === 'discover.swipe').reduce((s, e) => s + e.count, 0);
+      noveltyAffinity = totalSwipes > 0 ? Math.min(1, longDwell / Math.max(1, totalSwipes)) : 0.5;
+
+      // Previously-acted-on in last 60min — no-repeat window. We exclude
+      // plain 'view' (which trackActivity writes for every scored candidate
+      // in the SAME request, so it would self-filter the entire pool) and
+      // only dedupe against actual user interactions (like/pass/match/swipe).
+      const recentViews = await prisma.userActivity.findMany({
+        where: { userId, action: { in: ['like', 'pass', 'match', 'swipe', 'super_like'] }, targetType: 'profile', createdAt: { gte: new Date(Date.now() - 3600_000) } },
+        select: { targetId: true },
+        take: 200,
+      }).catch(() => []);
+      recentViews.forEach((r: any) => r.targetId && prevShownIds.add(r.targetId));
+
+      // ── Negative events: Block + Report + MatchFeedback (last 90d) ──
+      const since90d = new Date(Date.now() - 90 * 86400000);
+      const myBlocks = await prisma.block.findMany({
+        where: { blockerId: userId, createdAt: { gte: since90d } },
+        select: { blockedId: true, reason: true, createdAt: true },
+      }).catch(() => []);
+      const myReports = await prisma.report.findMany({
+        where: { reporterId: userId, createdAt: { gte: since90d } },
+        select: { reportedId: true, reason: true, createdAt: true },
+      }).catch(() => []);
+      const myMfb = await (prisma as any).matchFeedback.findMany({
+        where: { userId, type: { in: ['unmatch', 'block', 'report', 'pass_reason'] }, createdAt: { gte: since90d } },
+        select: { targetUserId: true, type: true, reason: true, createdAt: true },
+      }).catch(() => []);
+
+      const offenderIds = new Set<string>();
+      myBlocks.forEach((b: any) => offenderIds.add(b.blockedId));
+      myReports.forEach((r: any) => offenderIds.add(r.reportedId));
+      myMfb.forEach((f: any) => f.targetUserId && offenderIds.add(f.targetUserId));
+
+      let traitsByUser = new Map<string, TraitSnapshot>();
+      if (offenderIds.size > 0) {
+        const offenderUsers = await prisma.user.findMany({
+          where: { id: { in: Array.from(offenderIds) } },
+          select: { id: true, verified: true, profile: { select: { city: true, age: true, smoking: true, drinking: true, religion: true, datingIntent: true, education: true } } },
+        }).catch(() => []);
+        for (const u of offenderUsers as any[]) {
+          traitsByUser.set(u.id, {
+            city: u.profile?.city ?? null,
+            ageBucket: ageBucket(u.profile?.age),
+            smoking: u.profile?.smoking ?? null,
+            drinking: u.profile?.drinking ?? null,
+            religion: u.profile?.religion ?? null,
+            datingIntent: u.profile?.datingIntent ?? null,
+            education: u.profile?.education ?? null,
+            verified: u.verified ?? null,
+          });
+        }
+      }
+
+      const negEvents: NegativeEvent[] = [];
+      const daysAgo = (d: Date) => (Date.now() - new Date(d).getTime()) / 86400000;
+      myBlocks.forEach((b: any) => {
+        const t = traitsByUser.get(b.blockedId);
+        if (t) negEvents.push({ kind: 'block', targetTraits: t, daysAgo: daysAgo(b.createdAt), reason: b.reason });
+      });
+      myReports.forEach((r: any) => {
+        const t = traitsByUser.get(r.reportedId);
+        if (t) negEvents.push({ kind: 'report', targetTraits: t, daysAgo: daysAgo(r.createdAt), reason: r.reason });
+      });
+      myMfb.forEach((f: any) => {
+        const t = traitsByUser.get(f.targetUserId);
+        if (!t) return;
+        const kind: NegativeEvent['kind'] = f.type === 'unmatch' ? 'unmatch' : f.type === 'pass_reason' ? 'pass_feedback' : (f.type as any);
+        negEvents.push({ kind, targetTraits: t, daysAgo: daysAgo(f.createdAt), reason: f.reason });
+      });
+      negProfile = buildNegativeProfile(negEvents);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[discover] intent/negative pipeline soft-failed:', (e as Error).message);
+    }
+
+    // Derive session mood from sessionCtx already computed.
+    const sessionMood: 'exploring' | 'selective' | 'rush' | 'normal' = (() => {
+      if (sessionCtx.isExploring) return 'exploring';
+      if (sessionCtx.trendingDown && sessionCtx.actionCount > 5) return 'selective';
+      if (sessionCtx.trendingUp && sessionCtx.actionCount > 10) return 'rush';
+      return 'normal';
+    })();
+
     // ── Determine active algorithm from query params ──
     type FilterAlgo = 'forYou' | 'new' | 'active' | 'verified' | 'serious' | 'aiPicks';
     let activeAlgo: FilterAlgo = 'forYou';
@@ -499,6 +708,9 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
     else if (verifiedOnly === 'true') activeAlgo = 'verified';
     else if (newHere === 'true') activeAlgo = 'new';
     else if (activeToday === 'true') activeAlgo = 'active';
+
+    // Weight blender — modulates legacy score by stated/revealed gap.
+    const blend = blendWeights(activeAlgo, intentReport.revealed, intentReport.confidence);
 
     // ── For AI Picks: fetch match history insights ──
     let matchHistoryInsights: MatchHistoryInsights = { avgMatchDuration: 0, commonTraitsInSuccessful: [], unmatchReasons: {} };
@@ -644,9 +856,10 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
     // ── ALGORITHM DISPATCH ──
     // Each discover filter tab uses a completely different scoring algorithm.
     // The algorithm selection is driven by the "filter" query param from the client.
-    // All algorithms return a 0-100 score; the MinHeap retains only the top 20.
+    // All algorithms return a 0-100 score. We score the entire candidate pool
+    // (not just top-N) so the v6.8 diversifier can pull wildcards from the tail.
     // See services/shared/algorithms.ts for full implementation of each scorer.
-    const topK = new MinHeap<any>(20);
+    const scoredAll: Array<{ score: number; user: any; isNew: boolean; ageBucket?: string; city?: string }> = [];
 
     for (const u of users) {
       const { passwordHash, ...userData } = u;
@@ -711,19 +924,96 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
       const candidateFeatures = toFeatureVector(u);
       const { mlScore, breakdown: mlBreakdown } = computeMLScore(candidateFeatures, mlState.prefs, sessionCtx, drift, mlState.bandit);
 
-      const finalScore = v4Scores
-        ? Math.min(100, (v4Scores.get(u.id) ?? discoverScore))
-        : Math.min(100, discoverScore + filterBonus + mlScore + (compatBoost.get(u.id) || 0));
+      // ── v6.8: blend boost (intent-aware) + negative-trait penalty ──
+      // If revealed intent disagrees with the chosen filter, fold a small
+      // dose of an adjacent algorithm so the result reflects what the user
+      // *does*, not what the filter literally says. Capped at 35% influence.
+      let blendBoost = 0;
+      if (blend.seriousBlend > 0) {
+        const sScore = scoreSerious(myProfile as any, candidateUser, myInterestNames);
+        blendBoost += sScore * blend.seriousBlend;
+      }
+      if (blend.noveltyBlend > 0) {
+        const nScore = scoreNew(candidateUser, myInterestNames);
+        blendBoost += nScore * blend.noveltyBlend;
+      }
+      if (blend.activityBlend > 0) {
+        const aScore = scoreActive(myProfile as any, candidateUser, myInterestNames);
+        blendBoost += aScore * blend.activityBlend;
+      }
+      // Negative penalty from this user's prior block/report/unmatch traits.
+      const candTraits: TraitSnapshot = {
+        city: u.profile?.city ?? null,
+        ageBucket: ageBucket(u.profile?.age),
+        smoking: (u.profile as any)?.smoking ?? null,
+        drinking: (u.profile as any)?.drinking ?? null,
+        religion: (u.profile as any)?.religion ?? null,
+        datingIntent: (u.profile as any)?.datingIntent ?? null,
+        education: (u.profile as any)?.education ?? null,
+        verified: u.verified,
+      };
+      const { penalty: negPen } = negativePenalty(negProfile, candTraits);
+
+      const baseScore = v4Scores
+        ? (v4Scores.get(u.id) ?? discoverScore)
+        : (discoverScore * blend.primary + filterBonus + mlScore + (compatBoost.get(u.id) || 0));
+      const finalScore = Math.max(0, Math.min(100, baseScore + blendBoost - negPen));
 
       // Track profile view activity
       trackActivity(prisma, userId, 'view', 'profile', u.id, { city: u.profile?.city, age: u.profile?.age, intent: u.profile?.datingIntent });
 
-      topK.push(finalScore, { ...userData, commonInterests, discoverScore: finalScore, algorithm: activeAlgo, mlBoost: mlScore });
+      const sevenDays = 7 * 86400000;
+      scoredAll.push({
+        score: finalScore,
+        user: { ...userData, commonInterests, discoverScore: finalScore, algorithm: activeAlgo, mlBoost: mlScore, negPenalty: negPen },
+        isNew: (Date.now() - new Date(u.createdAt).getTime()) < sevenDays,
+        ageBucket: ageBucket(u.profile?.age) || undefined,
+        city: u.profile?.city || undefined,
+      });
     }
 
-    // Extract top 20 sorted by score descending via MinHeap drain
-    const result = topK.drain();
-    res.json({ data: result, cursor: result[result.length - 1]?.id });
+    // ── v6.8: refresh-aware diversifier ──
+    // Replaces the raw top-N drain. Inputs:
+    //  - prevShownIds (last 60min impressions) → no-repeat window
+    //  - noveltyAffinity → places fresh users top vs back per user taste
+    //  - sessionMood → 'exploring' adds wildcards, 'selective' suppresses
+    //  - refreshIndex (cursor depth) → varies the mix per page
+    //  - intent → DTM/serious skips wildcards
+    const refreshIndex = cursor ? 1 : 0; // simple: 0 for first batch, 1+ when paging via cursor
+    const div = diversify(
+      scoredAll.map(s => ({ user: { ...s.user }, score: s.score, isNew: s.isNew, ageBucket: s.ageBucket, city: s.city })),
+      {
+        refreshIndex,
+        prevShownIds,
+        noveltyAffinity,
+        sessionMood,
+        topN: requestedLimit,
+        intent: intentReport.revealed,
+      },
+    );
+    const result = div.ranked.map(r => r.user);
+    // Attach distance (km) to each candidate when both ends have coords.
+    if (myLat != null && myLng != null) {
+      for (const u of result as any[]) {
+        const cLat = u?.profile?.cityLat as number | null;
+        const cLng = u?.profile?.cityLng as number | null;
+        if (cLat != null && cLng != null) {
+          u._distanceKm = Math.round(distanceKm(myLat, myLng, cLat, cLng));
+        }
+      }
+    }
+    const dbCursor = users[users.length - 1]?.id ?? result[result.length - 1]?.id;
+    res.json({
+      data: result,
+      cursor: dbCursor,
+      batchSize: result.length,
+      meta: {
+        algorithm: activeAlgo,
+        intent: { stated: intentReport.stated, revealed: intentReport.revealed, mismatch: Number(intentReport.mismatch.toFixed(2)), confidence: Number(intentReport.confidence.toFixed(2)) },
+        diversifier: { reasoning: div.reasoning, injected: div.injected, sessionMood, noveltyAffinity: Number(noveltyAffinity.toFixed(2)) },
+        negativeSignals: { totalEvents: negProfile.totalEvents, hardBlockedTraits: Array.from(negProfile.hardBlockedTraits) },
+      },
+    });
   } catch (e) { next(e); }
 });
 
@@ -935,11 +1225,12 @@ app.get('/api/v1/discover/move-suggestions/:targetId', authMiddleware, async (re
     const userId = req.userId!;
     const targetId = req.params.targetId;
 
-    const [target, myProfile, myInterestsRaw, myMsgs] = await Promise.all([
+    const [target, myProfile, myInterestsRaw, myMsgs, myMoves] = await Promise.all([
       prisma.user.findUnique({ where: { id: targetId }, include: { profile: true, interests: true, prompts: true } }),
       prisma.profile.findUnique({ where: { userId } }),
       prisma.profileInterest.findMany({ where: { userId } }),
       getUserLastMessages(userId, 10),
+      getUserLastMoves(userId, 10),
     ]);
     if (!target) return res.status(404).json({ error: { message: 'User not found' } });
 
@@ -959,7 +1250,7 @@ app.get('/api/v1/discover/move-suggestions/:targetId', authMiddleware, async (re
     const targetRecentTopics = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t]) => t);
 
     const smartInput: SmartMoveInput = {
-      myLastMessages: myMsgs,
+      myLastMessages: [...myMoves, ...myMsgs].slice(0, 20),
       myProfile: myProfile ? { city: myProfile.city, profession: myProfile.profession, bio: myProfile.bio } : null,
       myInterests,
       targetProfile: target.profile ? { city: target.profile.city, profession: target.profile.profession, bio: target.profile.bio, age: target.profile.age } : null,
@@ -1060,14 +1351,51 @@ app.get('/api/v1/matches', authMiddleware, async (req: AuthRequest, res: Respons
     else if (filter === 'active') result = result.filter(m => (m.matchedUser as any).profile?.online);
     else if (filter === 'favorites') result = result.filter(m => m.isFavorite);
     else if (filter === 'serious') result = result.filter(m => (m.matchedUser as any).profile?.seriousMode);
-    result.sort((a, b) => {
-      if (a.isPinned && !b.isPinned) return -1;
-      if (!a.isPinned && b.isPinned) return 1;
-      if (a.isFavorite && !b.isFavorite) return -1;
-      if (!a.isFavorite && b.isFavorite) return 1;
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-    });
-    res.json({ data: result });
+
+    // v6.8 personalization overlay on matches list: pinned/favorite still
+    // win, but among the rest we sort by intent-aware compatibility minus
+    // negative-trait penalties (e.g. matched users sharing traits with
+    // people the user has previously blocked sink to the bottom).
+    let pCtx: any = null;
+    let pMeta: any = null;
+    try {
+      pCtx = await loadPersonalizationCtx(prisma, userId, { surface: 'matches', prevWindowMin: 1440 });
+      const items = result.map((m: any) => {
+        const u = m.matchedUser;
+        const recencyMs = Date.now() - new Date(m.createdAt).getTime();
+        const recencyScore = Math.max(0, 100 - recencyMs / (86400_000)); // ~1pt/day decay
+        const lastMsgBoost = m.lastMessage ? 10 : 0;
+        const onlineBoost = u.profile?.online ? 5 : 0;
+        return {
+          id: m.id,
+          baseScore: recencyScore + lastMsgBoost + onlineBoost,
+          isNew: m.isNew,
+          city: u.profile?.city,
+          ageBucket: u.profile?.age ? (u.profile.age < 26 ? '22-25' : u.profile.age < 31 ? '26-30' : u.profile.age < 36 ? '31-35' : '36+') : undefined,
+          traits: { city: u.profile?.city, datingIntent: u.profile?.datingIntent, religion: u.profile?.religion, smoking: u.profile?.smoking, drinking: u.profile?.drinking, education: u.profile?.education, verified: u.verified },
+          _match: m,
+        };
+      });
+      const { ranked, diversifier } = applyPersonalization(pCtx, items, { topN: items.length });
+      const byId = new Map(items.map((it: any) => [it.id, it._match]));
+      const personalized = ranked.map((it: any) => byId.get(it.id)).filter(Boolean) as any[];
+      // pinned + favorite always win; personalized order otherwise.
+      const pinned = personalized.filter((m: any) => m.isPinned);
+      const fav = personalized.filter((m: any) => !m.isPinned && m.isFavorite);
+      const rest = personalized.filter((m: any) => !m.isPinned && !m.isFavorite);
+      result = [...pinned, ...fav, ...rest];
+      pMeta = { intent: { stated: pCtx.intent.stated, revealed: pCtx.intent.revealed, mismatch: pCtx.intent.mismatch, confidence: pCtx.intent.confidence }, diversifier: { mood: pCtx.sessionMood, novelty: pCtx.noveltyAffinity, reasoning: diversifier.reasoning }, negativeSignals: { totalEvents: pCtx.negProfile.totalEvents, hardBlocked: Array.from(pCtx.negProfile.hardBlockedTraits) } };
+    } catch (e) {
+      // Graceful fallback to legacy sort
+      result.sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        if (a.isFavorite && !b.isFavorite) return -1;
+        if (!a.isFavorite && b.isFavorite) return 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    }
+    res.json({ data: result, meta: pMeta || undefined });
   } catch (e) { next(e); }
 });
 
@@ -1801,11 +2129,12 @@ app.get('/api/v1/ai-match/score/:targetId', authMiddleware, async (req: AuthRequ
     }
 
     // ── Move Recommendations (5 smart suggestions using algorithm) ──
-    const [myMsgs, myCommStyle, targetAnalysis, myAnalysis] = await Promise.all([
+    const [myMsgs, myCommStyle, targetAnalysis, myAnalysis, myMoves] = await Promise.all([
       getUserLastMessages(userId, 10),
       getUserCommStyle(userId),
       getUserAnalysis(req.params.targetId),
       getUserAnalysis(userId),
+      getUserLastMoves(userId, 10),
     ]);
 
     // Extract target's recent topics from their activity
@@ -1820,7 +2149,7 @@ app.get('/api/v1/ai-match/score/:targetId', authMiddleware, async (req: AuthRequ
     const targetRecentTopics = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t]) => t);
 
     const smartInput: SmartMoveInput = {
-      myLastMessages: myMsgs,
+      myLastMessages: [...myMoves, ...myMsgs].slice(0, 20),
       myProfile: myProfile ? { city: myProfile.city, profession: myProfile.profession, bio: myProfile.bio } : null,
       myInterests: myInterestNames,
       targetProfile: cProfile ? { city: cProfile.city, profession: cProfile.profession, bio: cProfile.bio, age: cProfile.age } : null,

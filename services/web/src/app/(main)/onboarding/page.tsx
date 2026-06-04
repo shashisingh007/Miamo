@@ -6,12 +6,15 @@
 // dropdowns / one-line inputs — almost no free-text typing.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { useRouter } from 'next/navigation';
 import { api } from '@/lib/api';
 import { FieldIcon } from '@/components/FieldIcon';
 import { IconOptionGrid } from '@/components/IconOptionGrid';
 import { IconChipMulti } from '@/components/IconChipMulti';
 import { NumberStepper, HeightPickerCm } from '@/components/NumberStepper';
+import { CityAutocomplete } from '@/components/CityAutocomplete';
+import { useToast } from '@/components/ui/toast';
 import type { IconName } from '../../../../../shared/src/fieldMeta';
 import { INTEREST_ICONS, iconForOption, GENDER_OPTIONS } from '../../../../../shared/src/optionIcons';
 
@@ -149,7 +152,7 @@ export default function OnboardingPage() {
   const [interests, setInterests] = useState<string[]>([]);
   const [mp, setMp] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [openKey, setOpenKey] = useState<string | null>(null);
+  const [openKey, setOpenKey] = usePersistentState<string | null>('onboarding:openKey', null);
   const [saving, setSaving] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -352,6 +355,7 @@ function BucketEditor(props: {
   onGoTo: (path: string) => void;
 }) {
   const { bucketKey, profile, photos, prompts, interests, mp, onPatchProfile, onPatchMp, onSavePrompts, onSaveInterests, onGoTo } = props;
+  const toast = useToast();
   // local draft state per bucket
   const [draft, setDraft] = useState<any>(() => ({ ...profile, ...mp, interests, prompts }));
   useEffect(() => { setDraft({ ...profile, ...mp, interests, prompts }); }, [profile, mp, interests, prompts]);
@@ -381,12 +385,20 @@ function BucketEditor(props: {
     );
   }
   if (bucketKey === 'city') {
+    const detectLoc = () => {
+      if (!('geolocation' in navigator)) { toast.error('Geolocation not supported'); return; }
+      navigator.geolocation.getCurrentPosition(async (pos) => {
+        try { const r = await api.nearestCity(pos.coords.latitude, pos.coords.longitude); const c = r.data; setDraft({ ...draft, city: c.display, cityLat: c.lat, cityLng: c.lng }); }
+        catch { toast.error('Could not resolve city'); }
+      }, () => toast.error('Location permission denied'), { enableHighAccuracy: false, timeout: 10000 });
+    };
     return (
       <div className="space-y-3">
         <label className="block text-xs font-medium">City
-          <TextInput value={draft.city ?? ''} placeholder="e.g. Mumbai" onChange={e => setDraft({ ...draft, city: e.target.value })} />
+          <CityAutocomplete value={draft.city ?? ''} onChange={(display, city) => setDraft({ ...draft, city: display, cityLat: city?.lat ?? null, cityLng: city?.lng ?? null })} placeholder="e.g. Mumbai, Maharashtra, India" />
         </label>
-        <SaveRow onSave={() => onPatchProfile({ city: draft.city })} />
+        <button type="button" onClick={detectLoc} className="text-[11px] text-rose-main hover:underline">Use my current location</button>
+        <SaveRow onSave={() => onPatchProfile({ city: draft.city, cityLat: draft.cityLat ?? null, cityLng: draft.cityLng ?? null })} />
       </div>
     );
   }
@@ -602,7 +614,7 @@ function BucketEditor(props: {
           <TextInput value={draft.occupation ?? ''} placeholder="e.g. Software Engineer" onChange={e => setDraft({ ...draft, occupation: e.target.value })} />
         </label>
         <label className="block text-xs font-medium">Working city
-          <TextInput value={draft.workingCity ?? ''} onChange={e => setDraft({ ...draft, workingCity: e.target.value })} />
+          <CityAutocomplete value={draft.workingCity ?? ''} onChange={(v) => setDraft({ ...draft, workingCity: v })} />
         </label>
         <label className="block text-xs font-medium">Company <span className="text-text-muted">(matches only)</span>
           <TextInput value={draft.company ?? ''} onChange={e => setDraft({ ...draft, company: e.target.value })} />

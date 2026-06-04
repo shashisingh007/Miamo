@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
+import { createContext, useContext, useState, useCallback, forwardRef, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, AlertTriangle, Info, X, Heart, Sparkles, Send, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -102,15 +102,16 @@ const toastStyles: Record<ToastType, { bg: string; border: string; iconBg: strin
 // TOAST ITEM
 // ═══════════════════════════════════════════════════════
 
-function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string) => void }) {
+const ToastItem = forwardRef<HTMLDivElement, { toast: Toast; onDismiss: (id: string) => void }>(function ToastItem({ toast, onDismiss }, ref) {
  const style = toastStyles[toast.type];
  return (
  <motion.div
+ ref={ref}
  layout
  initial={{ opacity: 0, y: -20, x: 20, scale: 0.9, filter: 'blur(4px)' }}
  animate={{ opacity: 1, y: 0, x: 0, scale: 1, filter: 'blur(0px)' }}
  exit={{ opacity: 0, x: 40, scale: 0.9, filter: 'blur(4px)' }}
- transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+ transition={{ type: 'spring', damping: 25, stiffness: 300, filter: { type: 'tween', duration: 0.3 } }}
  className={cn(
  'relative max-w-sm w-full rounded-2xl border p-3.5 shadow-xl backdrop-blur-xl cursor-pointer overflow-hidden',
  style.bg, style.border
@@ -146,7 +147,7 @@ function ToastItem({ toast, onDismiss }: { toast: Toast; onDismiss: (id: string)
  </div>
  </motion.div>
  );
-}
+});
 
 // ═══════════════════════════════════════════════════════
 // PROVIDER

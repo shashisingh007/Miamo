@@ -13,6 +13,7 @@ import { Card, Badge, Avatar, EmptyState } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 
 /* ═══ Types ═══ */
@@ -109,7 +110,7 @@ function StepIndicator({ current, total }: { current: number; total: number }) {
 
 /* ═══ Main Page ═══ */
 export default function DatePlannerPage() {
- const [step, setStep] = useState(0);
+ const [step, setStep] = usePersistentState<number>('datePlanner:step', 0);
  const [plans, setPlans] = useState<DatePlan[]>([]);
  const [creating, setCreating] = useState(false);
  const [matches, setMatches] = useState<any[]>([]);
@@ -117,12 +118,12 @@ export default function DatePlannerPage() {
  useTrackPageView('date-planner');
  useTrackScrollDepth('date-planner');
  const [selectedMatch, setSelectedMatch] = useState<any>(null);
- const [selectedVibe, setSelectedVibe] = useState<string>('');
- const [selectedVenue, setSelectedVenue] = useState<string>('');
- const [selectedTime, setSelectedTime] = useState<string>('');
- const [selectedBudget, setSelectedBudget] = useState<string>('');
- const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
- const [notes, setNotes] = useState('');
+ const [selectedVibe, setSelectedVibe] = usePersistentState<string>('datePlanner:vibe', '');
+ const [selectedVenue, setSelectedVenue] = usePersistentState<string>('datePlanner:venue', '');
+ const [selectedTime, setSelectedTime] = usePersistentState<string>('datePlanner:time', '');
+ const [selectedBudget, setSelectedBudget] = usePersistentState<string>('datePlanner:budget', '');
+ const [selectedActivities, setSelectedActivities] = usePersistentState<string[]>('datePlanner:activities', []);
+ const [notes, setNotes] = usePersistentState<string>('datePlanner:notes', '');
  const [showCelebration, setShowCelebration] = useState(false);
 
  useEffect(() => {

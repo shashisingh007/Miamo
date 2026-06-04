@@ -1,63 +1,42 @@
 # docker/notifications.Dockerfile — Miamo Notifications Service
-# Build: docker build -f docker/notifications.Dockerfile -t miamo-notifications .
+# See docker/auth.Dockerfile for layout/NODE_PATH notes.
 
-# ─── Stage 1: Dependencies ───────────────────────────────────────────────────
 FROM node:20-alpine AS deps
-
 WORKDIR /app
+COPY services/notifications/package.json services/notifications/package-lock.json* services/notifications/
+COPY services/shared/package.json        services/shared/package-lock.json*        services/shared/
+RUN cd services/shared        && (npm ci --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund)
+RUN cd services/notifications && (npm ci --no-audit --no-fund 2>/dev/null || npm install --no-audit --no-fund)
 
-COPY services/notifications/package.json services/notifications/package-lock.json* ./
-
-RUN npm ci --prefer-offline --no-audit --no-fund || npm install --no-audit --no-fund
-
-# ─── Stage 2: Prisma ─────────────────────────────────────────────────────────
-FROM node:20-alpine AS prisma
-
-RUN apk add --no-cache openssl
-
-WORKDIR /app
-
-COPY --from=deps /app/node_modules ./node_modules
-COPY services/notifications/package.json ./
-COPY services/shared/prisma ./prisma
-
-RUN npx prisma generate
-
-# ─── Stage 3: Build ──────────────────────────────────────────────────────────
 FROM node:20-alpine AS build
-
+RUN apk add --no-cache openssl
 WORKDIR /app
+COPY --from=deps /app/services/shared/node_modules        services/shared/node_modules
+COPY --from=deps /app/services/notifications/node_modules services/notifications/node_modules
+COPY services/shared        services/shared
+COPY services/notifications services/notifications
+RUN cd services/shared        && npx prisma generate
+RUN cd services/notifications && npx tsc --removeComments
 
-COPY --from=prisma /app/node_modules ./node_modules
-COPY services/notifications/package.json services/notifications/tsconfig.json ./
-COPY services/notifications/src ./src
-
-RUN npx tsc --removeComments
-
-# ─── Stage 4: Runner ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
-
 RUN apk add --no-cache openssl curl
-
-WORKDIR /app
-
-ENV NODE_ENV=production
-ENV PORT=3206
+WORKDIR /app/services/notifications
+ENV NODE_ENV=production \
+    PORT=3206 \
+    NODE_PATH=/app/services/shared/node_modules
 
 RUN addgroup -g 1001 -S miamo && adduser -u 1001 -S miamo -G miamo
 
-COPY --from=build /app/dist ./dist
-COPY --from=prisma /app/node_modules ./node_modules
-COPY --from=prisma /app/prisma ./prisma
-COPY services/notifications/package.json ./
+COPY --from=build /app/services/notifications/dist          ./dist
+COPY --from=build /app/services/notifications/node_modules  ./node_modules
+COPY --from=build /app/services/notifications/package.json  ./package.json
+COPY --from=build /app/services/shared                      ../shared
 
 RUN chown -R miamo:miamo /app
-
 USER miamo
 
 EXPOSE 3206
-
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3206/health || exit 1
 
-CMD ["node", "dist/server.js"]
+CMD ["node", "dist/notifications/src/server.js"]

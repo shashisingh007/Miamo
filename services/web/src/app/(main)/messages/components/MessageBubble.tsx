@@ -55,6 +55,25 @@ export function MessageBubble({
  const canDeleteForAll = isOwn && canEdit;
  const isMedia = msg.type === 'image' || msg.type === 'video' || msg.type === 'audio' || msg.type === 'file' || msg.content?.startsWith('📷') || msg.content?.startsWith('🎥') || msg.content?.startsWith('🎵') || msg.content?.startsWith('📄');
 
+ // Story reply payload: [[STORY_REPLY:{json}]]\n<user text>
+ let storyReply: { meta: any; body: string } | null = null;
+ if (typeof msg.content === 'string' && msg.content.startsWith('[[STORY_REPLY:')) {
+ const end = msg.content.indexOf(']]');
+ if (end > 0) {
+ try {
+ const meta = JSON.parse(msg.content.slice(14, end));
+ const body = msg.content.slice(end + 2).replace(/^\n/, '');
+ storyReply = { meta, body };
+ } catch {}
+ }
+ }
+ // Legacy text format: Replying to story: "<snippet>"\n\n<user text>
+ if (!storyReply && typeof msg.content === 'string') {
+ const m = msg.content.match(/^Replying to story:\s*"([^"]*)"\s*\n+([\s\S]*)$/);
+ if (m) storyReply = { meta: { text: m[1], expiresAt: 0 }, body: m[2] };
+ }
+ const storyExpired = !!(storyReply && storyReply.meta?.expiresAt && Date.now() > Number(storyReply.meta.expiresAt));
+
  if (msg.deletedForAll) {
  return (
  <div className={cn('flex', isOwn ? 'justify-end' : 'justify-start')}>
@@ -101,8 +120,38 @@ export function MessageBubble({
  <div className="w-8 h-8 rounded-full bg-rose-main/20 flex items-center justify-center shrink-0"><Mic className="w-4 h-4 text-rose-main" /></div>
  <div className="flex-1 h-1 bg-text-muted/20 rounded-full"><div className="h-full w-2/3 bg-rose-main rounded-full" /></div>
  <span className="text-[10px] text-text-muted">0:12</span>
+ </div> ) : storyReply ? (
+ <div className="space-y-1.5">
+ <div className={cn(
+ 'flex items-stretch gap-2 rounded-xl overflow-hidden border-l-2 pl-2 pr-2 py-1.5',
+ isOwn ? 'border-rose-main/60 bg-rose-main/10' : 'border-text-muted/40 bg-miamo-card/40'
+ )}>
+ {storyExpired ? (
+ <div className="w-10 h-12 rounded-md bg-miamo-elevated/60 flex items-center justify-center shrink-0">
+ <EyeOff className="w-4 h-4 text-text-muted/60" />
  </div>
+ ) : storyReply.meta?.mediaUrl ? (
+ /^data:video|\.(mp4|webm|mov)(\?|$)/i.test(storyReply.meta.mediaUrl) ? (
+ <video src={storyReply.meta.mediaUrl} className="w-10 h-12 rounded-md object-cover shrink-0" muted playsInline />
  ) : (
+ <img src={storyReply.meta.mediaUrl} alt="" loading="lazy" className="w-10 h-12 rounded-md object-cover shrink-0" />
+ )
+ ) : (
+ <div className="w-10 h-12 rounded-md bg-gradient-to-br from-rose-main/40 to-rose-dark/40 flex items-center justify-center shrink-0">
+ <span className="text-[8px] text-text-primary/80 px-1 text-center line-clamp-2">{storyReply.meta?.text || ''}</span>
+ </div>
+ )}
+ <div className="flex flex-col justify-center min-w-0">
+ <span className="text-[10px] uppercase tracking-wide font-semibold text-text-muted/80">
+ {storyExpired ? 'Story unavailable' : 'Replied to story'}
+ </span>
+ {!storyExpired && storyReply.meta?.text && (
+ <span className="text-[11px] text-text-muted truncate max-w-[180px]">{storyReply.meta.text}</span>
+ )}
+ </div>
+ </div>
+ <p className="whitespace-pre-wrap break-words">{storyReply.body}</p>
+ </div> ) : (
  <p className="whitespace-pre-wrap break-words">{msg.content}</p>
  )}
  <div className={cn('flex items-center gap-1 mt-1', isOwn ? 'justify-end' : 'justify-start')}>

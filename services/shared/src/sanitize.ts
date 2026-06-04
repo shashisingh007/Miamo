@@ -2,22 +2,23 @@
 // Strips HTML tags and dangerous patterns from user input
 
 const HTML_TAG_RE = /<\/?[^>]+(>|$)/g;
-const SCRIPT_RE = /javascript:|data:|vbscript:|on\w+\s*=/gi;
+// Block dangerous URI schemes. We allow `data:image/*`, `data:video/*`, and
+// `data:audio/*` (used by client-side compressed media uploads) but still
+// strip `data:text/html` and `data:application/javascript` style payloads.
+const DANGEROUS_URI_RE = /javascript:|vbscript:|data:(?!image\/|video\/|audio\/)|on\w+\s*=/gi;
 const NULL_BYTE_RE = /\0/g;
 
 /**
  * Strip all HTML tags, script patterns, and null bytes from a string.
  * Used on all user-submitted text to prevent XSS injection.
- *
- * @param input - Raw user input string
- * @returns Sanitized string with tags/scripts removed and trimmed
+ * Allows base64 image/video/audio data URIs (used by media uploads).
  */
 export function sanitize(input: string): string {
   if (typeof input !== 'string') return '';
   return input
     .replace(NULL_BYTE_RE, '')
     .replace(HTML_TAG_RE, '')
-    .replace(SCRIPT_RE, '')
+    .replace(DANGEROUS_URI_RE, '')
     .trim();
 }
 

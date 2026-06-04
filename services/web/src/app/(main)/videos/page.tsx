@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 
 function VideoCard({ video }: { video: any }) {
@@ -83,7 +84,7 @@ function VideoCard({ video }: { video: any }) {
 }
 
 export default function VideosPage() {
- const [filter, setFilter] = useState('all');
+ const [filter, setFilter] = usePersistentState<string>('videos:filter', 'all');
  const [videos, setVideos] = useState<any[]>([]);
  const [loading, setLoading] = useState(true);
 

@@ -1,27 +1,44 @@
 /* ═══════════════════════════════════════════════════════════
  CONSTANTS & DROPDOWN DATA
  ═══════════════════════════════════════════════════════════ */
-export const RELIGIONS = ['Hindu', 'Muslim', 'Christian', 'Sikh', 'Jain', 'Buddhist', 'Parsi', 'Jewish', 'Other'];
+export const RELIGIONS = [
+ 'Hindu',
+ 'Muslim - Sunni','Muslim - Shia','Muslim - Bohra','Muslim - Ahmadiyya','Muslim - Other',
+ 'Christian - Catholic','Christian - Protestant','Christian - Orthodox','Christian - Syrian','Christian - Other',
+ 'Sikh','Jain - Digambar','Jain - Shwetambar','Buddhist','Parsi','Jewish','Bahai','Spiritual','Agnostic','Atheist','Other',
+];
 export const CASTES_BY_RELIGION: Record<string, string[]> = {
- Hindu: ['Brahmin','Rajput','Marwari','Agarwal','Jat','Kayastha','Vaishya','Khatri','Yadav','Gupta','Sharma','Verma','Patel','Nair','Iyer','Iyengar','Reddy','Naidu','Lingayat','Vokkaliga','Kurmi','Baniya','Arora','Thakur','Other'],
- Muslim: ['Syed','Sheikh','Pathan','Mughal','Ansari','Khan','Qureshi','Bohra','Memon','Other'],
- Sikh: ['Jat Sikh','Khatri Sikh','Arora Sikh','Ramgarhia','Saini','Other'],
- Christian: ['Roman Catholic','Syrian Christian','Protestant','CSI','Other'],
- Jain: ['Digambar','Shwetambar','Other'],
- Buddhist: ['Mahayana','Theravada','Neo-Buddhist','Other'],
+ Hindu: ['Brahmin','Brahmin - Saraswat','Brahmin - Iyer','Brahmin - Iyengar','Brahmin - Smartha','Brahmin - Madhwa','Brahmin - Gaur','Brahmin - Kanyakubja','Brahmin - Maithil','Brahmin - Pandit','Rajput','Rajput - Suryavanshi','Rajput - Chandravanshi','Marwari','Agarwal','Oswal','Maheshwari','Jat','Kayastha','Vaishya','Khatri','Yadav','Gupta','Sharma','Verma','Patel - Leuva','Patel - Kadva','Nair','Reddy','Naidu','Lingayat','Vokkaliga','Kurmi','Baniya','Arora','Thakur','Kamma','Kapu','Mudaliar','Chettiar','Pillai','Maratha','96K Maratha','Kunbi','Saraswat','Bhatia','Sindhi','Kashmiri Pandit','Saini','Sonar','Vishwakarma','Kumhar','Lohana','Devanga','Yadav - Ahir','SC/ST','OBC','General','Inter-caste OK','Other'],
+ Muslim: ['Syed','Sheikh','Sheikh-Siddiqui','Pathan','Mughal','Ansari','Khan','Qureshi','Bohra','Memon','Shia-Imami','Sunni-Hanafi','Sunni-Shafii','Ismaili','Khoja','Lebbai','Mappila','Other'],
+ Sikh: ['Jat Sikh','Khatri Sikh','Arora Sikh','Ramgarhia','Saini','Ravidasia','Mazhabi','Lubana','Ahluwalia','Other'],
+ Christian: ['Roman Catholic','Syrian Christian (Knanaya)','Syrian Christian (Jacobite)','Syrian Christian (Marthoma)','Protestant','CSI','CNI','Pentecostal','Baptist','Methodist','Anglican','Goan Catholic','East Indian','Latin Catholic','Other'],
+ Jain: ['Digambar','Shwetambar - Murtipujak','Shwetambar - Sthanakvasi','Shwetambar - Terapanthi','Other'],
+ Buddhist: ['Mahayana','Theravada','Vajrayana','Neo-Buddhist','Other'],
+ Parsi: ['Zoroastrian','Iranian Zoroastrian','Other'],
+ Jewish: ['Bene Israel','Cochin Jews','Baghdadi Jews','Other'],
 };
-export const MOTHER_TONGUES = ['Hindi','Bengali','Telugu','Marathi','Tamil','Urdu','Gujarati','Kannada','Malayalam','Odia','Punjabi','Assamese','Maithili','Sindhi','Konkani','Dogri','Kashmiri','Sanskrit','English','Other'];
+export const MOTHER_TONGUES = ['Hindi','English','Bengali','Telugu','Marathi','Tamil','Urdu','Gujarati','Kannada','Malayalam','Odia','Punjabi','Assamese','Maithili','Sindhi','Konkani','Dogri','Kashmiri','Sanskrit','Bhojpuri','Awadhi','Magahi','Chhattisgarhi','Haryanvi','Rajasthani','Marwari','Mewari','Tulu','Kodava','Kumaoni','Garhwali','Manipuri','Mizo','Khasi','Nagamese','Bodo','Santhali','Nepali','Tibetan','Ladakhi','Sinhala','Spanish','French','German','Italian','Portuguese','Mandarin','Cantonese','Japanese','Korean','Arabic','Persian/Farsi','Turkish','Russian','Dutch','Swahili','Other'];
 export const HEIGHTS = ["4'0\"","4'1\"","4'2\"","4'3\"","4'4\"","4'5\"","4'6\"","4'7\"","4'8\"","4'9\"","4'10\"","4'11\"","5'0\"","5'1\"","5'2\"","5'3\"","5'4\"","5'5\"","5'6\"","5'7\"","5'8\"","5'9\"","5'10\"","5'11\"","6'0\"","6'1\"","6'2\"","6'3\"","6'4\"","6'5\""];
-export const EDUCATION_LEVELS = ['High School','Diploma','B.A.','B.Sc.','B.Com.','B.Tech/B.E.','BBA','BCA','MBBS','BDS','B.Pharm','LLB','B.Ed.','M.A.','M.Sc.','M.Com.','M.Tech/M.E.','MBA','MCA','MD','MS','M.Phil.','Ph.D.','CA','CS','ICWA','IAS/IPS/IFS','Other'];
-export const INCOMES = ['Not specified','Below 2 Lakh','2-4 Lakh','4-6 Lakh','6-8 Lakh','8-10 Lakh','10-15 Lakh','15-20 Lakh','20-30 Lakh','30-50 Lakh','50-75 Lakh','75 Lakh - 1 Cr','1 Cr+','2 Cr+','5 Cr+'];
+export const EDUCATION_LEVELS = [
+ 'High School','Higher Secondary (12th)','Diploma','Polytechnic',
+ 'B.A.','B.Sc.','B.Com.','BBA','BCA','B.Tech / B.E.','B.Arch','B.Des','B.Pharm','B.Ed.','LLB','BHM','BAMS','BHMS','BUMS','BPT','MBBS','BDS','B.V.Sc',
+ 'M.A.','M.Sc.','M.Com.','MBA','PGDM','M.Tech / M.E.','MCA','M.Arch','M.Des','M.Pharm','M.Ed.','LLM','MD','MS','DM','MCh','MDS','M.V.Sc','MPH','M.Phil.',
+ 'Ph.D.','D.Litt','Postdoc',
+ 'CA','CS','ICWA / CMA','CFA','FRM','Actuary',
+ 'IAS / IPS / IFS','PCS / State services',
+ 'IIT alumnus','NIT alumnus','IIIT alumnus','IIM alumnus','ISB alumnus','XLRI alumnus','AIIMS alumnus','Ivy League','Oxbridge',
+ 'Self-taught / Bootcamp','Currently studying',
+ 'Other',
+];
+export const INCOMES = ['Not specified','No Income / Student','Below 2 Lakh','2-4 Lakh','4-6 Lakh','6-8 Lakh','8-10 Lakh','10-15 Lakh','15-20 Lakh','20-30 Lakh','30-50 Lakh','50-75 Lakh','75 Lakh - 1 Cr','1 Cr+','2 Cr+','5 Cr+','10 Cr+','Inherited Wealth'];
 export const FAMILY_TYPES = ['Nuclear','Joint','Extended'];
 export const FAMILY_STATUS = ['Middle Class','Upper Middle Class','Rich','Affluent'];
 export const FAMILY_VALUES = ['Orthodox','Traditional','Moderate','Liberal'];
-export const MARITAL_STATUSES = ['Never Married','Divorced','Widowed','Awaiting Divorce'];
-export const DIETS = ['Vegetarian','Non-Vegetarian','Eggetarian','Jain','Vegan'];
+export const MARITAL_STATUSES = ['Never Married','Engaged','Awaiting Divorce','Divorced','Widowed','Separated','Annulled'];
+export const DIETS = ['Vegetarian','Vegan','Eggetarian','Pescatarian','Flexitarian','Non-Vegetarian','Jain','Sattvic','Halal','Kosher','Keto','Paleo','Gluten-free','Raw vegan'];
 export const MANGLIK_OPTIONS = ['No','Yes','Partial / Anshik',"Doesn't Matter"];
-export const COMPLEXIONS = ['Very Fair','Fair','Wheatish','Wheatish Brown','Dark'];
-export const BODY_TYPES = ['Slim','Average','Athletic','Heavy'];
+export const COMPLEXIONS = ['Very Fair','Fair','Wheatish','Wheatish Brown','Olive','Dusky','Dark','Prefer not to say'];
+export const BODY_TYPES = ['Slim','Lean','Average','Toned','Athletic','Muscular','Curvy','Heavy','Plus-size'];
 export const NAKSHATRAS = ['Ashwini','Bharani','Krittika','Rohini','Mrigashira','Ardra','Punarvasu','Pushya','Ashlesha','Magha','Purva Phalguni','Uttara Phalguni','Hasta','Chitra','Swati','Vishakha','Anuradha','Jyeshtha','Moola','Purva Ashadha','Uttara Ashadha','Shravana','Dhanishta','Shatabhisha','Purva Bhadrapada','Uttara Bhadrapada','Revati'];
 export const RAASHIS = ['Mesha (Aries)','Vrishabha (Taurus)','Mithuna (Gemini)','Karka (Cancer)','Simha (Leo)','Kanya (Virgo)','Tula (Libra)','Vrischika (Scorpio)','Dhanu (Sagittarius)','Makara (Capricorn)','Kumbha (Aquarius)','Meena (Pisces)'];
 

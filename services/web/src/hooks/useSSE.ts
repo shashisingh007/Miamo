@@ -2,6 +2,7 @@
 // ─── Miamo SSE (Server-Sent Events) Hook ─────────────
 // Connects to the gateway SSE stream and dispatches real-time events
 import { useEffect, useRef, useCallback } from 'react';
+import { useAuthStore } from '@/stores';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3200';
 
@@ -14,11 +15,12 @@ type SSEHandler = (data: any) => void;
 let globalSource: EventSource | null = null;
 let globalHandlers = new Map<string, Set<SSEHandler>>();
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let reconnectAttempts = 0;
 let currentToken: string | null = null;
 
 function getToken(): string | null {
  if (typeof window === 'undefined') return null;
- return localStorage.getItem('miamo_token');
+ return useAuthStore.getState().token;
 }
 
 function connectSSE() {
@@ -42,20 +44,28 @@ function connectSSE() {
  globalSource = source;
 
  source.onopen = () => {
- console.log('[SSE] Connected');
+ reconnectAttempts = 0;
+ if (process.env.NODE_ENV !== 'production') console.log('[SSE] Connected');
  };
 
  source.onerror = () => {
- console.log('[SSE] Error/disconnected, reconnecting in 3s...');
  source.close();
  globalSource = null;
  currentToken = null;
  if (reconnectTimer) clearTimeout(reconnectTimer);
- reconnectTimer = setTimeout(connectSSE, 3000);
+ // Exponential backoff with jitter, cap 30s. Prevents reconnect spam when gateway is down.
+ const base = Math.min(30000, 1000 * Math.pow(2, reconnectAttempts));
+ const delay = base / 2 + Math.random() * (base / 2);
+ reconnectAttempts++;
+ if (process.env.NODE_ENV !== 'production') console.log(`[SSE] disconnected, reconnect in ${Math.round(delay)}ms (attempt ${reconnectAttempts})`);
+ reconnectTimer = setTimeout(connectSSE, delay);
  };
 
  // Listen for all custom events we care about
- const events = ['new-message', 'message-sent', 'new-notification', 'beat-update', 'chat-update'];
+ const events = [
+ 'new-message', 'message-sent', 'new-notification', 'beat-update', 'chat-update',
+ 'beat-viewed', 'beat-saved', 'beat-unsaved', 'beat-screenshot', 'beat-downloaded',
+ ];
  for (const eventName of events) {
  source.addEventListener(eventName, (e: MessageEvent) => {
  try {
@@ -124,14 +134,18 @@ export function useSSE(eventName: string, handler: SSEHandler, enabled = true) {
  * Call this once in the main layout
  */
 export function useSSEConnection(isAuthenticated: boolean) {
+ // Token is held in memory and may be null on fresh page load until the
+ // first request triggers a cookie-based refresh. Re-run when it arrives
+ // so SSE actually connects after auth bootstrap.
+ const token = useAuthStore((s) => s.token);
  useEffect(() => {
- if (isAuthenticated) {
+ if (isAuthenticated && token) {
  connectSSE();
- } else {
+ } else if (!isAuthenticated) {
  disconnectSSE();
  }
  return () => {
  // Don't disconnect on unmount — layout stays mounted
  };
- }, [isAuthenticated]);
+ }, [isAuthenticated, token]);
 }

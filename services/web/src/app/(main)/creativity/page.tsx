@@ -12,6 +12,7 @@ import { api } from '@/lib/api';
 import { GridSkeleton } from '@/components/ui/skeleton';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { useTrackPageView, useTrackDwell } from '@/hooks/useTrackActivity';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { CATEGORIES, fmt } from './components/constants';
 import { TalentCard } from './components/TalentCard';
 import { ShowcaseComposer } from './components/ShowcaseComposer';
@@ -20,9 +21,9 @@ import { CommentSheet } from './components/CommentSheet';
 
 export default function CreativityPage() {
   const router = useRouter();
-  const [activeCat, setActiveCat] = useState<string>('general');
-  const [sort, setSort] = useState<'trending' | 'recent' | 'top'>('trending');
-  const [search, setSearch] = useState('');
+  const [activeCat, setActiveCat] = usePersistentState<string>('creativity:activeCat', 'general');
+  const [sort, setSort] = usePersistentState<'trending' | 'recent' | 'top'>('creativity:sort', 'trending');
+  const [search, setSearch] = usePersistentState<string>('creativity:search', '');
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [composerOpen, setComposerOpen] = useState(false);

@@ -10,29 +10,33 @@ export const APP_NAME = 'Miamo';
 export const APP_TAGLINE = 'Where connections become something real';
 export const APP_DESCRIPTION = 'A premium dating and social platform for meaningful connections, thoughtful matching, and authentic relationships.';
 
+// MAIN — primary feature destinations (places users go to do things).
 export const NAV_MAIN = [
  { label: 'Discover', href: '/discover', icon: Compass },
  { label: 'Matches', href: '/matches', icon: Users },
  { label: 'Messages', href: '/messages', icon: MessageCircle },
  { label: 'Beats', href: '/beats', icon: Zap },
- { label: 'Stories', href: '/stories', icon: Camera },
+ { label: 'AI Match', href: '/ai-match', icon: Brain },
+ { label: 'Compatibility', href: '/compatibility', icon: Puzzle },
+ { label: 'Date Planner', href: '/date-planner', icon: CalendarHeart },
+ { label: 'Date Ideas', href: '/date-ideas', icon: Lightbulb },
+ { label: 'Love Language', href: '/love-language', icon: Heart },
+ { label: 'Vibe Check', href: '/vibe-check', icon: AudioLines },
  { label: 'Creativity', href: '/creativity', icon: Sparkles },
  { label: 'Date to Marry', href: '/serious-mode', icon: HeartHandshake },
 ] as const;
 
+// MORE — utility / account / system.
+// Best-practice ordering: action surfaces first, then status, then offers, then
+// safety, then settings, with the user's own profile last (most personal, so
+// it sits closest to the avatar block at the bottom of the rail).
 export const NAV_SECONDARY = [
- { label: 'AI Match', href: '/ai-match', icon: Brain },
- { label: 'Date Planner', href: '/date-planner', icon: CalendarHeart },
- { label: 'Compatibility', href: '/compatibility', icon: Puzzle },
- { label: 'Love Language', href: '/love-language', icon: Heart },
- { label: 'Vibe Check', href: '/vibe-check', icon: AudioLines },
- { label: 'Date Ideas', href: '/date-ideas', icon: Lightbulb },
  { label: 'Search', href: '/search', icon: Search },
- { label: 'Profile', href: '/profile', icon: User },
  { label: 'Notifications', href: '/notifications', icon: Bell },
+ { label: 'Premium', href: '/premium', icon: Crown },
  { label: 'Safety', href: '/safety', icon: Shield },
  { label: 'Settings', href: '/settings', icon: Settings },
- { label: 'Premium', href: '/premium', icon: Crown },
+ { label: 'Profile', href: '/profile', icon: User },
 ] as const;
 
 // ─── Feature Names (replacing old Heart* naming) ────────

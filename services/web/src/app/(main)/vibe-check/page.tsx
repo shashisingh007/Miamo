@@ -12,6 +12,7 @@ import { Card } from '@/components/ui';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 
 /* ═══ Mood Emojis ═══ */
@@ -94,12 +95,12 @@ function Particles({ count = 12 }: { count?: number }) {
 
 /* ═══ Main Page ═══ */
 export default function VibeCheckPage() {
- const [step, setStep] = useState(0);
- const [mood, setMood] = useState<string>('');
- const [energy, setEnergy] = useState(0);
- const [topics, setTopics] = useState<string[]>([]);
- const [intent, setIntent] = useState('');
- const [done, setDone] = useState(false);
+ const [step, setStep] = usePersistentState<number>('vibe:step', 0);
+ const [mood, setMood] = usePersistentState<string>('vibe:mood', '');
+ const [energy, setEnergy] = usePersistentState<number>('vibe:energy', 0);
+ const [topics, setTopics] = usePersistentState<string[]>('vibe:topics', []);
+ const [intent, setIntent] = usePersistentState<string>('vibe:intent', '');
+ const [done, setDone] = usePersistentState<boolean>('vibe:done', false);
  const [saving, setSaving] = useState(false);
  const [vibeMatches, setVibeMatches] = useState<any[]>([]);
  const [vibeHistory, setVibeHistory] = useState<{ mood: string; energy: number; date: string; topics: string[] }[]>([]);

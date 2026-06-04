@@ -11,7 +11,7 @@ import { api } from '@/lib/api';
 import { logError } from '@/lib/logError';
 import { MiamoCompactIcon, MiamoWordmark, AnimatedMiamoLogo } from '@/components/ui/miamo-logo';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
-import { Bell, LogOut, Crown, Sparkles } from 'lucide-react';
+import { Bell, LogOut, Crown, Sparkles, ChevronDown } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSSE, useSSEConnection } from '@/hooks/useSSE';
@@ -25,6 +25,20 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  const [notifCount, setNotifCount] = useState(0);
  const [unreadMsgCount, setUnreadMsgCount] = useState(0);
  const [msgToast, setMsgToast] = useState<{ name: string; content: string } | null>(null);
+ const [moreOpen, setMoreOpen] = useState(true);
+
+ useEffect(() => {
+  if (typeof window === 'undefined') return;
+  const stored = localStorage.getItem('miamo-nav-more-open');
+  if (stored !== null) setMoreOpen(stored === 'true');
+ }, []);
+ const toggleMore = useCallback(() => {
+  setMoreOpen((prev) => {
+   const next = !prev;
+   if (typeof window !== 'undefined') localStorage.setItem('miamo-nav-more-open', String(next));
+   return next;
+  });
+ }, []);
 
  // Wait for Zustand persist to hydrate from localStorage before deciding auth state
  useEffect(() => {
@@ -37,9 +51,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  if (process.env.NODE_ENV === 'development') console.log('[Auth] Already hydrated');
  setHydrated(true);
  }
- // Fallback: also check localStorage directly (in case persist is sluggish)
- if (typeof window !== 'undefined' && localStorage.getItem('miamo_token')) {
- if (process.env.NODE_ENV === 'development') console.log('[Auth] Token found in localStorage, marking hydrated');
+ // Fallback: also check the persisted user state (in case persist is sluggish)
+ if (typeof window !== 'undefined' && useAuthStore.getState().isAuthenticated) {
+ if (process.env.NODE_ENV === 'development') console.log('[Auth] isAuthenticated in store, marking hydrated');
  setHydrated(true);
  }
  return () => unsub();
@@ -220,31 +234,58 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
  })}
 
  <div className="divider-premium my-4 mx-2" />
- <span className="px-4 text-[9px] font-bold uppercase tracking-[0.2em] text-[#C97856]/60 mb-3 block">
- More
- </span>
- {NAV_SECONDARY.map((item) => {
- const isActive = pathname === item.href;
- const Icon = item.icon;
- return (
- <Link key={item.href} href={item.href}>
- <motion.div
- whileHover={{ x: 3 }}
- whileTap={{ scale: 0.97 }}
- className={cn('nav-item', isActive && 'nav-item-active')}
+ <button
+  type="button"
+  onClick={toggleMore}
+  aria-expanded={moreOpen}
+  aria-controls="nav-more-list"
+  className="w-full flex items-center justify-between px-4 mb-3 group"
  >
- <Icon className="w-[18px] h-[18px]" />
- <span className="text-[13px] font-medium">{item.label}</span>
- {isActive && (
- <motion.div
- layoutId="nav-active-dot-2"
- className="ml-auto w-1.5 h-1.5 rounded-full bg-gradient-rose"
- />
- )}
- </motion.div>
- </Link>
- );
- })}
+  <span className="text-[9px] font-bold uppercase tracking-[0.2em] text-[#C97856]/60 group-hover:text-[#C97856] transition-colors">
+   More
+  </span>
+  <ChevronDown
+   className={cn(
+    'w-3.5 h-3.5 text-[#C97856]/60 group-hover:text-[#C97856] transition-all',
+    !moreOpen && '-rotate-90'
+   )}
+  />
+ </button>
+ <AnimatePresence initial={false}>
+  {moreOpen && (
+   <motion.div
+    id="nav-more-list"
+    initial={{ height: 0, opacity: 0 }}
+    animate={{ height: 'auto', opacity: 1 }}
+    exit={{ height: 0, opacity: 0 }}
+    transition={{ duration: 0.22, ease: [0.4, 0, 0.2, 1] }}
+    className="overflow-hidden"
+   >
+    {NAV_SECONDARY.map((item) => {
+     const isActive = pathname === item.href;
+     const Icon = item.icon;
+     return (
+      <Link key={item.href} href={item.href}>
+       <motion.div
+        whileHover={{ x: 3 }}
+        whileTap={{ scale: 0.97 }}
+        className={cn('nav-item', isActive && 'nav-item-active')}
+       >
+        <Icon className="w-[18px] h-[18px]" />
+        <span className="text-[13px] font-medium">{item.label}</span>
+        {isActive && (
+         <motion.div
+          layoutId="nav-active-dot-2"
+          className="ml-auto w-1.5 h-1.5 rounded-full bg-gradient-rose"
+         />
+        )}
+       </motion.div>
+      </Link>
+     );
+    })}
+   </motion.div>
+  )}
+ </AnimatePresence>
  </nav>
 
  {/* User profile section */}

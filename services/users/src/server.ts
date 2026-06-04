@@ -19,6 +19,8 @@ import { computeCompletionScore, recomputeAndPersistCompletion } from '../../sha
 import { PrismaSignalReader } from '../../shared/src/algo/signals';
 import { rerankSearch } from '../../shared/src/algo/searchAugment';
 import { v4RankEnabled } from '../../shared/src/algo/flags';
+import { loadPersonalizationCtx, applyPersonalization } from '../../shared/personalize';
+import { searchCities, findNearestCity } from '../../shared/src/cities';
 
 const prisma = createPrisma(10);
 export const app = express();
@@ -68,13 +70,15 @@ app.get('/api/v1/profiles/me', authMiddleware, async (req: AuthRequest, res: Res
 app.put('/api/v1/profiles/me', authMiddleware, validate({ body: updateProfileBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const sanitizedBody = sanitizeObject(req.body);
-    const { age, gender, city, profession, bio, datingIntent, seriousMode, avatarGradient,
+    const { age, gender, city, cityLat, cityLng, profession, bio, datingIntent, seriousMode, avatarGradient,
       height, sexuality, lookingFor, smoking, drinking, exercise, education,
       religion, zodiac, languages, pets, children, politicalViews, diet } = sanitizedBody;
     const data: any = {};
     if (age !== undefined) data.age = age;
     if (gender !== undefined) data.gender = gender;
     if (city !== undefined) data.city = city;
+    if (cityLat !== undefined) data.cityLat = typeof cityLat === 'string' ? parseFloat(cityLat) : cityLat;
+    if (cityLng !== undefined) data.cityLng = typeof cityLng === 'string' ? parseFloat(cityLng) : cityLng;
     if (profession !== undefined) data.profession = profession;
     if (bio !== undefined) data.bio = bio;
     if (datingIntent !== undefined) data.datingIntent = datingIntent;
@@ -403,7 +407,30 @@ app.get('/api/v1/search', authMiddleware, async (req: AuthRequest, res: Response
     }
 
     await prisma.searchLog.create({ data: { userId, query, type: searchType, results: results.length } });
-    res.json({ data: results });
+
+    // v6.8 universal overlay: apply negative-trait penalty + diversification
+    // to ALL search results regardless of v4 flag. Search must respect a
+    // user's anti-preferences (people sharing traits with blocked users
+    // sink) and shouldn't return three of the same city back-to-back.
+    let pMeta: any = null;
+    try {
+      if (results.length > 1) {
+        const ctx = await loadPersonalizationCtx(prisma, userId, { surface: 'search', prevWindowMin: 60 });
+        const items = results.map((r: any) => ({
+          id: r.id,
+          baseScore: (r.searchScore || 1) * 100,
+          city: r.profile?.city,
+          ageBucket: r.profile?.age ? (r.profile.age < 26 ? '22-25' : r.profile.age < 31 ? '26-30' : '31+') : undefined,
+          traits: { city: r.profile?.city, datingIntent: r.profile?.datingIntent, religion: r.profile?.religion, smoking: r.profile?.smoking, drinking: r.profile?.drinking, education: r.profile?.education, verified: r.verified },
+          _row: r,
+        }));
+        const { ranked, diversifier } = applyPersonalization(ctx, items, { topN: items.length });
+        const byId = new Map(items.map((it: any) => [it.id, it._row]));
+        results = ranked.map((it: any) => byId.get(it.id)).filter(Boolean);
+        pMeta = { intent: { stated: ctx.intent.stated, revealed: ctx.intent.revealed }, diversifier: { reasoning: diversifier.reasoning }, negativeSignals: { totalEvents: ctx.negProfile.totalEvents } };
+      }
+    } catch { /* fallback to lexical/v4 order */ }
+    res.json({ data: results, meta: pMeta || undefined });
   } catch (e) { next(e); }
 });
 
@@ -510,6 +537,131 @@ app.put('/api/v1/user-data/upsert/:type', authMiddleware, async (req: AuthReques
       const created = await prisma.userData.create({ data: { userId: req.userId!, type, data: data || {} } });
       res.status(201).json({ data: created });
     }
+  } catch (e) { next(e); }
+});
+
+// ─── Cities Autocomplete ─────────────────────────────
+// Public endpoint (no auth) so it works during onboarding before
+// the user has a session for the city step. Cached at the edge layer
+// is fine; the in-memory dataset answers in <2ms.
+app.get('/api/v1/cities/search', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const q = String(req.query.q || '').trim();
+    const limit = Math.min(20, Math.max(1, parseInt(String(req.query.limit || '12'), 10) || 12));
+    if (q.length < 1) return res.json({ data: [] });
+    const results = searchCities(q, limit);
+    res.json({ data: results });
+  } catch (e) { next(e); }
+});
+
+// Reverse-geocode: lat/lng -> nearest known city. Used by the "Detect my
+// location" button in onboarding/profile so we can store a clean city name
+// alongside the user's coordinates.
+app.get('/api/v1/cities/nearest', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const lat = parseFloat(String(req.query.lat || ''));
+    const lng = parseFloat(String(req.query.lng || ''));
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+      return res.status(400).json({ error: { message: 'lat and lng required' } });
+    }
+    const city = findNearestCity(lat, lng);
+    if (!city) return res.status(404).json({ error: { message: 'no city found' } });
+    res.json({ data: city });
+  } catch (e) { next(e); }
+});
+
+// ─── Profile Verification (Selfie / ID) ──────────────
+// User submits a selfie or ID document URL (already uploaded to the
+// photo-host endpoint). We store the submission as `pending`. In dev,
+// a 3s simulated review marks it approved; in prod, an admin reviews.
+app.post('/api/v1/profiles/me/verify/submit', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { kind, photoUrl } = req.body || {};
+    if (!kind || !photoUrl) return res.status(400).json({ error: { message: 'kind and photoUrl required' } });
+    if (!['selfie', 'id_document', 'video_liveness'].includes(kind)) return res.status(400).json({ error: { message: 'invalid kind' } });
+    const sub = await prisma.verificationSubmission.create({
+      data: { userId: req.userId!, kind, photoUrl: sanitize(String(photoUrl)), status: 'pending' },
+    });
+    auditLog(prisma, req.userId!, 'verification_submit', { kind, submissionId: sub.id });
+
+    // Dev auto-review: approve after a short delay so flows can be E2E-tested
+    // without a moderator. In prod, only an admin endpoint flips status.
+    if (process.env.NODE_ENV !== 'production' && process.env.AUTO_APPROVE_VERIFY !== '0') {
+      setTimeout(async () => {
+        try {
+          await prisma.verificationSubmission.update({
+            where: { id: sub.id },
+            data: { status: 'approved', reviewedAt: new Date(), reviewerId: 'system:auto' },
+          });
+          // If both selfie + id approved (or selfie alone for casual users),
+          // flip User.verified to true.
+          const approved = await prisma.verificationSubmission.findMany({
+            where: { userId: req.userId!, status: 'approved' },
+            select: { kind: true },
+          });
+          const kinds = new Set(approved.map((s) => s.kind));
+          const fullyVerified = kinds.has('selfie') && (kinds.has('id_document') || kinds.has('video_liveness'));
+          if (fullyVerified || kinds.has('selfie')) {
+            await prisma.user.update({ where: { id: req.userId! }, data: { verified: fullyVerified } });
+          }
+        } catch (e) { logger.warn('auto-approve verification failed', e); }
+      }, 3000);
+    }
+
+    res.status(201).json({ data: { id: sub.id, kind: sub.kind, status: sub.status, submittedAt: sub.submittedAt } });
+  } catch (e) { next(e); }
+});
+
+app.get('/api/v1/profiles/me/verify/status', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const subs = await prisma.verificationSubmission.findMany({
+      where: { userId: req.userId },
+      orderBy: { submittedAt: 'desc' },
+      select: { id: true, kind: true, status: true, reason: true, submittedAt: true, reviewedAt: true },
+    });
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      select: { verified: true, emailVerified: true, phoneVerified: true },
+    });
+    const approvedKinds = new Set(subs.filter((s) => s.status === 'approved').map((s) => s.kind));
+    res.json({
+      data: {
+        user: user || { verified: false, emailVerified: false, phoneVerified: false },
+        submissions: subs,
+        badges: {
+          email: !!user?.emailVerified,
+          phone: !!user?.phoneVerified,
+          selfie: approvedKinds.has('selfie'),
+          id: approvedKinds.has('id_document'),
+          fullyVerified: !!user?.verified,
+        },
+      },
+    });
+  } catch (e) { next(e); }
+});
+
+// Admin approve/reject (internal-only).
+app.post('/api/v1/profiles/verify/:id/decide', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    if (req.headers['x-internal-key'] !== process.env.INTERNAL_SERVICE_KEY) {
+      return res.status(403).json({ error: { message: 'Forbidden' } });
+    }
+    const { status, reason } = req.body || {};
+    if (!['approved', 'rejected'].includes(status)) return res.status(400).json({ error: { message: 'status must be approved|rejected' } });
+    const sub = await prisma.verificationSubmission.update({
+      where: { id: req.params.id },
+      data: { status, reason: reason || null, reviewedAt: new Date(), reviewerId: req.userId || 'admin' },
+    });
+    if (status === 'approved') {
+      const approved = await prisma.verificationSubmission.findMany({
+        where: { userId: sub.userId, status: 'approved' },
+        select: { kind: true },
+      });
+      const kinds = new Set(approved.map((s) => s.kind));
+      const fullyVerified = kinds.has('selfie') && (kinds.has('id_document') || kinds.has('video_liveness'));
+      if (fullyVerified) await prisma.user.update({ where: { id: sub.userId }, data: { verified: true } });
+    }
+    res.json({ data: sub });
   } catch (e) { next(e); }
 });
 

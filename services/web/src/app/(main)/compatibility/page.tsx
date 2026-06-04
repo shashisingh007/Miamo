@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { track } from '@/lib/track';
 import { api } from '@/lib/api';
 import { useTrackPageView, useTrackScrollDepth } from '@/hooks/useTrackActivity';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 
 /* ═══ Quiz Questions ═══ */
@@ -80,10 +81,10 @@ export default function CompatibilityPage() {
 
  useTrackPageView('compatibility');
  useTrackScrollDepth('compatibility');
- const [sectionIdx, setSectionIdx] = useState(0);
- const [questionIdx, setQuestionIdx] = useState(0);
- const [myAnswers, setMyAnswers] = useState<number[]>([]);
- const [partnerAnswers, setPartnerAnswers] = useState<number[]>([]);
+ const [sectionIdx, setSectionIdx] = usePersistentState<number>('compat:sectionIdx', 0);
+ const [questionIdx, setQuestionIdx] = usePersistentState<number>('compat:questionIdx', 0);
+ const [myAnswers, setMyAnswers] = usePersistentState<number[]>('compat:myAnswers', []);
+ const [partnerAnswers, setPartnerAnswers] = usePersistentState<number[]>('compat:partnerAnswers', []);
  const [showResult, setShowResult] = useState(false);
  const [score, setScore] = useState(0);
  const [results, setResults] = useState<{ matchId: string; matchName: string; photo?: string; score: number; date: string }[]>([]);

@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores';
+import { OtpInput } from '@/components/OtpInput';
+import { AuthOptions } from '@/components/AuthOptions';
 
 const loginSchema = z.object({
   email: z.string().email('Please enter a valid email'),
@@ -26,6 +28,11 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  // 2FA challenge state — populated when login response says requiresOtp
+  const [challenge, setChallenge] = useState<{ token: string; channel: string; sentTo: string; devCode?: string } | null>(null);
+  const [otpCode, setOtpCode] = useState('');
+  const [otpError, setOtpError] = useState('');
+  const [otpSubmitting, setOtpSubmitting] = useState(false);
 
   // Redirect if already authenticated
   useEffect(() => {
@@ -36,21 +43,52 @@ export default function LoginPage() {
     resolver: zodResolver(loginSchema),
   });
 
+  const goToApp = async () => {
+    let dest = '/discover';
+    try {
+      const c = await api.getCompletion();
+      if (c?.data && c.data.score < c.data.threshold) dest = '/onboarding';
+    } catch {}
+    router.push(dest);
+  };
+
   const onSubmit = async (data: LoginData) => {
     try {
       setError('');
       const response = await api.login(data);
-      setAuth(response.data.user, response.data.accessToken);
+      // 2FA challenge: server didn't issue a session token.
+      if (response?.data?.requiresOtp) {
+        setChallenge({
+          token: response.data.challengeToken,
+          channel: response.data.channel,
+          sentTo: response.data.sentTo,
+          devCode: response.data._devCode,
+        });
+        return;
+      }
+      setAuth(response.data.user, response.data.accessToken, response.data.refreshToken);
       setSuccess(true);
-      // v3.2 — send to /onboarding when profile is below threshold
-      let dest = '/discover';
-      try {
-        const c = await api.getCompletion();
-        if (c?.data && c.data.score < c.data.threshold) dest = '/onboarding';
-      } catch {}
-      router.push(dest);
+      await goToApp();
     } catch (err: any) {
       setError(err.message || 'Invalid email or password');
+    }
+  };
+
+  const submitOtp = async (codeOverride?: string) => {
+    if (!challenge) return;
+    const code = (codeOverride ?? otpCode).trim();
+    if (code.length !== 6) return;
+    try {
+      setOtpSubmitting(true);
+      setOtpError('');
+      const r = await api.login2fa({ challengeToken: challenge.token, code });
+      setAuth(r.data.user, r.data.accessToken, r.data.refreshToken);
+      setSuccess(true);
+      await goToApp();
+    } catch (err: any) {
+      setOtpError(err.message || 'Invalid or expired code');
+    } finally {
+      setOtpSubmitting(false);
     }
   };
 
@@ -100,6 +138,27 @@ export default function LoginPage() {
         )}
 
         {/* Form */}
+        {challenge ? (
+          <div className="space-y-4">
+            <div className="text-sm text-text-secondary">
+              We sent a 6-digit code to <span className="font-medium text-text-primary">{challenge.sentTo}</span>
+              {' '}({challenge.channel === 'phone' ? 'SMS' : 'email'}). Enter it to finish signing in.
+            </div>
+            {challenge.devCode && (
+              <div className="text-xs text-rose">Dev code: {challenge.devCode}</div>
+            )}
+            <OtpInput value={otpCode} onChange={setOtpCode} onComplete={(c) => submitOtp(c)} />
+            {otpError && (
+              <div className="text-sm text-rose flex items-center gap-2"><AlertCircle className="w-4 h-4" />{otpError}</div>
+            )}
+            <Button onClick={() => submitOtp()} disabled={otpSubmitting || otpCode.length !== 6} className="w-full" size="lg">
+              {otpSubmitting ? 'Verifying…' : 'Verify & sign in'}
+            </Button>
+            <button type="button" className="text-xs text-text-muted underline" onClick={() => { setChallenge(null); setOtpCode(''); setOtpError(''); }}>
+              Use a different account
+            </button>
+          </div>
+        ) : (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <Input
             {...register('email')}
@@ -139,6 +198,18 @@ export default function LoginPage() {
             ) : 'Sign in'}
           </Button>
         </form>
+        )}
+
+        {!challenge && (
+          <>
+            <div className="my-6 flex items-center gap-3 text-[11px] uppercase tracking-[0.2em] text-text-muted">
+              <span className="flex-1 h-px bg-border-light" />
+              <span>or</span>
+              <span className="flex-1 h-px bg-border-light" />
+            </div>
+            <AuthOptions />
+          </>
+        )}
 
         {/* Footer link */}
         <p className="text-center text-sm text-text-secondary mt-7">
