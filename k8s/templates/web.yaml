@@ -1,0 +1,89 @@
+# ═══ Web (Next.js) Template ═══
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  namespace: __NAMESPACE__
+  labels:
+    app: miamo
+    service: web
+spec:
+  type: NodePort
+  selector:
+    app: miamo
+    service: web
+  ports:
+    - port: __SERVICE_PORT__
+      targetPort: __WEB_PORT__
+      nodePort: __WEB_NODEPORT__
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: __NAMESPACE__
+  labels:
+    app: miamo
+    service: web
+spec:
+  replicas: __REPLICAS__
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: miamo
+      service: web
+  template:
+    metadata:
+      labels:
+        app: miamo
+        service: web
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: web
+          image: __IMAGE_PREFIX__miamo-web:__IMAGE_TAG__
+          imagePullPolicy: __PULL_POLICY__
+          ports:
+            - containerPort: __WEB_PORT__
+          envFrom:
+            - configMapRef:
+                name: miamo-config
+          resources:
+            requests:
+              memory: "__REQ_MEM__"
+              cpu: "__REQ_CPU__"
+            limits:
+              memory: "__LIM_MEM__"
+              cpu: "__LIM_CPU__"
+          startupProbe:
+            httpGet:
+              path: /
+              port: __WEB_PORT__
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 12
+          livenessProbe:
+            httpGet:
+              path: /
+              port: __WEB_PORT__
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: __WEB_PORT__
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 5"]

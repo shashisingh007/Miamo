@@ -1,0 +1,1397 @@
+// ─── Miamo Database Schema ─────────────────────────────
+// PostgreSQL + Prisma ORM — Full MVP Schema
+// Shared across all microservices
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Users & Auth ─────────────────────────────────────
+model User {
+  id           String    @id @default(uuid())
+  email        String    @unique
+  passwordHash String
+  displayName  String
+  username     String    @unique
+  miamoId      String    @unique
+  verified     Boolean   @default(false)
+  active       Boolean   @default(true)
+  deactivated  Boolean   @default(false)
+  // v3.6.0 — premium subscription signal (mirror of shared schema).
+  premium      Boolean   @default(false)
+  premiumUntil DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  profile         Profile?
+  settings        Settings?
+  privacySettings PrivacySettings?
+  photos          ProfilePhoto[]
+  prompts         ProfilePrompt[]
+  interests       ProfileInterest[]
+
+  sentLikes        Like[]         @relation("SentLikes")
+  receivedLikes    Like[]         @relation("ReceivedLikes")
+  sentRequests     MatchRequest[] @relation("SentRequests")
+  receivedRequests MatchRequest[] @relation("ReceivedRequests")
+  matchesAsUser1   Match[]        @relation("MatchUser1")
+  matchesAsUser2   Match[]        @relation("MatchUser2")
+  sentMessages     Message[]      @relation("SentMessages")
+  chatsAsUser1     Chat[]         @relation("ChatUser1")
+  chatsAsUser2     Chat[]         @relation("ChatUser2")
+
+  beatsAsUser1 Beat[]      @relation("BeatUser1")
+  beatsAsUser2 Beat[]      @relation("BeatUser2")
+  beatEvents   BeatEvent[]
+
+  feedPosts     FeedPost[]
+  feedComments  FeedComment[]
+  feedReactions FeedReaction[]
+
+  stories       Story[]
+  storyViews    StoryView[]
+  storyComments StoryComment[]
+  storyLikes    StoryLike[]
+
+  matrimonialProfile MatrimonialProfile?
+
+  videos         Video[]
+  videoComments  VideoComment[]
+  videoReactions VideoReaction[]
+
+  creativityItems     CreativityItem[]
+  creativityViews     CreativityView[]
+  creativityReactions CreativityReaction[]
+  creativityComments  CreativityComment[]
+
+  searchLogs      SearchLog[]
+  sentReports     Report[]       @relation("Reporter")
+  receivedReports Report[]       @relation("Reported")
+  sentBlocks      Block[]        @relation("Blocker")
+  receivedBlocks  Block[]        @relation("Blocked")
+  notifications   Notification[]
+  auditLogs       AuditLog[]
+  sessions        Session[]
+  bookmarks       Bookmark[]     @relation("BookmarkOwner")
+  bookmarkedBy    Bookmark[]     @relation("BookmarkTarget")
+
+  sentMoves            MiamoMove[]     @relation("MiamoMoveSent")
+  receivedMoves        MiamoMove[]     @relation("MiamoMoveReceived")
+  discoverFilter       DiscoverFilter?
+  matchFeedback        MatchFeedback[] @relation("MatchFeedbackUser")
+  matchFeedbackTargets MatchFeedback[] @relation("MatchFeedbackTarget")
+  vibeChecks           VibeCheck[]
+  sentDtmMessages      DtmMessage[]    @relation("DtmSender")
+  receivedDtmMessages  DtmMessage[]    @relation("DtmRecipient")
+  activities           UserActivity[]
+  userData             UserData[]
+
+  // v3.2
+  showcaseItems      ShowcaseItem[]  @relation("ShowcaseAuthor")
+  accessRequestsSent AccessRequest[] @relation("AccessRequestFrom")
+  accessRequestsRcvd AccessRequest[] @relation("AccessRequestTo")
+
+  @@index([email])
+  @@index([username])
+  @@index([miamoId])
+  @@index([premium, premiumUntil])
+}
+
+model Profile {
+  id             String   @id @default(uuid())
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  age            Int
+  gender         String
+  city           String
+  profession     String
+  bio            String   @default("")
+  datingIntent   String   @default("casual")
+  seriousMode    Boolean  @default(false)
+  profileScore   Int      @default(30)
+  online         Boolean  @default(false)
+  lastActive     DateTime @default(now())
+  avatarGradient String   @default("from-lavender-400 to-violet-deep")
+
+  // Lifestyle / dating preferences
+  height     Int?
+  sexuality  String @default("straight")
+  lookingFor String @default("open")
+  smoking    String @default("never")
+  drinking   String @default("socially")
+  exercise   String @default("sometimes")
+  education  String @default("")
+  religion   String @default("")
+  zodiac     String @default("")
+  languages  String @default("")
+  pets       String @default("")
+  children   String @default("")
+
+  politicalViews String @default("")
+  diet           String @default("")
+
+  // v3.2 — onboarding completion
+  completionScore   Int      @default(0)
+  completionMissing String[] @default([])
+
+  // v3.2 — Date-to-Marry extended fields (optional; required for DTM 80% gate)
+  familyBackground     String?  @db.VarChar(280)
+  educationLevel       String?
+  educationInstitution String?
+  employer             String?
+  incomeBand           String?
+  subCommunity         String?
+  maritalStatus        String?
+  willingToRelocate    Boolean?
+  familyInvolved       Boolean?
+  expectedTimeline     String?
+  kundliUrl            String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([city])
+  @@index([gender])
+  @@index([datingIntent])
+  @@index([seriousMode])
+  @@index([sexuality])
+  @@index([lookingFor])
+  @@index([height])
+  @@index([gender, city])
+  @@index([age])
+  @@index([online])
+}
+
+model ProfilePhoto {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  url       String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model ProfilePrompt {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  question  String
+  answer    String
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+model ProfileInterest {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([name])
+}
+
+// ─── Settings ─────────────────────────────────────────
+model Settings {
+  id                   String  @id @default(uuid())
+  userId               String  @unique
+  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  theme                String  @default("dark")
+  accentColor          String  @default("#A78BFA")
+  reduceMotion         Boolean @default(false)
+  highContrast         Boolean @default(false)
+  readReceipts         Boolean @default(true)
+  typingIndicator      Boolean @default(true)
+  onlineStatus         Boolean @default(true)
+  lastActiveVisible    Boolean @default(true)
+  whoCanMessage        String  @default("matches")
+  whoCanSendMedia      String  @default("matches")
+  whoCanStartBeat      String  @default("matches")
+  whoCanBroadcast      String  @default("matches")
+  whoCanVoiceCall      String  @default("matches")
+  whoCanVideoCall      String  @default("matches")
+  storyVisibility      String  @default("everyone")
+  feedVisibility       String  @default("everyone")
+  videoVisibility      String  @default("everyone")
+  creativityVisibility String  @default("everyone")
+  notificationsEnabled Boolean @default(true)
+  beatReminders        Boolean @default(true)
+  messageNotifications Boolean @default(true)
+  storyNotifications   Boolean @default(true)
+  privacyMode          Boolean @default(false)
+  invisibleMode        Boolean @default(false)
+  seriousModeEnabled   Boolean @default(false)
+  aiPersonalization    Boolean @default(true)
+
+  // v3.6.0 consent toggles
+  moodInferenceEnabled      Boolean @default(false)
+  behavioralRankingEnabled  Boolean @default(true)
+  crossUserInferenceEnabled Boolean @default(true)
+  algorithmicTransparency   Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model PrivacySettings {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profileVisible    Boolean  @default(true)
+  searchable        Boolean  @default(true)
+  miamoIdSearchable Boolean  @default(true)
+  nameSearchable    Boolean  @default(true)
+  citySearchable    Boolean  @default(true)
+  hideExactCity     Boolean  @default(false)
+  showApproxCity    Boolean  @default(true)
+  disableSearch     Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+// ─── Likes & Matching ────────────────────────────────
+model Like {
+  id         String   @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  fromUser   User     @relation("SentLikes", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("ReceivedLikes", fields: [toUserId], references: [id], onDelete: Cascade)
+  targetType String   @default("profile")
+  targetId   String?
+  createdAt  DateTime @default(now())
+
+  @@unique([fromUserId, toUserId, targetType, targetId])
+  @@index([toUserId])
+  @@index([fromUserId])
+  @@index([fromUserId, createdAt])
+}
+
+model MatchRequest {
+  id         String   @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  fromUser   User     @relation("SentRequests", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("ReceivedRequests", fields: [toUserId], references: [id], onDelete: Cascade)
+  type       String   @default("comment")
+  message    String   @default("")
+  targetType String   @default("profile")
+  targetId   String?
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([fromUserId, toUserId])
+  @@index([toUserId, status])
+}
+
+model Match {
+  id        String   @id @default(uuid())
+  user1Id   String
+  user2Id   String
+  user1     User     @relation("MatchUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2     User     @relation("MatchUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+  active    Boolean  @default(true)
+  favorite1 Boolean  @default(false)
+  favorite2 Boolean  @default(false)
+  pinned1   Boolean  @default(false)
+  pinned2   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  chat     Chat?
+  feedback MatchFeedback[]
+
+  @@unique([user1Id, user2Id])
+  @@index([user1Id])
+  @@index([user2Id])
+  @@index([active, user1Id])
+  @@index([active, user2Id])
+}
+
+model MatchFeedback {
+  id           String   @id @default(uuid())
+  matchId      String
+  match        Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation("MatchFeedbackUser", fields: [userId], references: [id], onDelete: Cascade)
+  targetUserId String
+  targetUser   User     @relation("MatchFeedbackTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+  type         String
+  reason       String
+  details      String   @default("")
+  createdAt    DateTime @default(now())
+
+  @@index([matchId])
+  @@index([userId])
+  @@index([targetUserId])
+  @@index([reason])
+  @@index([type])
+}
+
+model MiamoMove {
+  id         String   @id @default(uuid())
+  fromUserId String
+  toUserId   String
+  fromUser   User     @relation("MiamoMoveSent", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser     User     @relation("MiamoMoveReceived", fields: [toUserId], references: [id], onDelete: Cascade)
+  message    String   @default("")
+  targetType String   @default("profile")
+  targetId   String?
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([fromUserId, toUserId, targetType, targetId])
+  @@index([toUserId, status])
+  @@index([fromUserId, createdAt])
+}
+
+model DiscoverFilter {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  minAge      Int      @default(18)
+  maxAge      Int      @default(99)
+  minHeight   Int?
+  maxHeight   Int?
+  distance    Int      @default(50)
+  city        String   @default("")
+  genders     String   @default("")
+  sexualities String   @default("")
+  lookingFor  String   @default("")
+  smoking     String   @default("")
+  drinking    String   @default("")
+  exercise    String   @default("")
+  education   String   @default("")
+  religion    String   @default("")
+  zodiac      String   @default("")
+  pets        String   @default("")
+  children    String   @default("")
+  activeToday Boolean  @default(false)
+  newHere     Boolean  @default(false)
+  verified    Boolean  @default(false)
+  hasPhotos   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// ─── Messages & Chats ────────────────────────────────
+model Chat {
+  id         String   @id @default(uuid())
+  matchId    String   @unique
+  match      Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user1Id    String
+  user2Id    String
+  user1      User     @relation("ChatUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2      User     @relation("ChatUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+  pinned1    Boolean  @default(false)
+  pinned2    Boolean  @default(false)
+  muted1     Boolean  @default(false)
+  muted2     Boolean  @default(false)
+  archived1  Boolean  @default(false)
+  archived2  Boolean  @default(false)
+  background String   @default("default")
+  theme      String   @default("default")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  messages Message[]
+
+  @@index([user1Id])
+  @@index([user2Id])
+}
+
+model Message {
+  id            String    @id @default(uuid())
+  chatId        String
+  chat          Chat      @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  senderId      String
+  sender        User      @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  content       String
+  type          String    @default("text")
+  replyToId     String?
+  replyTo       Message?  @relation("Replies", fields: [replyToId], references: [id])
+  replies       Message[] @relation("Replies")
+  reactions     String    @default("")
+  read          Boolean   @default(false)
+  deletedForAll Boolean   @default(false)
+  deletedFor    String    @default("")
+  editedAt      DateTime?
+  createdAt     DateTime  @default(now())
+
+  // v3.6.0 voice-note additions
+  audioUrl         String?
+  audioDurationMs  Int?
+  transcript       String? @db.Text // deferred to v3.7; column exists for forward-compat
+  transcriptStatus String? // null | 'pending' | 'ready' | 'failed'
+
+  @@index([chatId, createdAt])
+  @@index([senderId])
+  @@index([senderId, createdAt])
+}
+
+// ─── Beats (Streaks) ─────────────────────────────────
+model Beat {
+  id        String    @id @default(uuid())
+  user1Id   String
+  user2Id   String
+  user1     User      @relation("BeatUser1", fields: [user1Id], references: [id], onDelete: Cascade)
+  user2     User      @relation("BeatUser2", fields: [user2Id], references: [id], onDelete: Cascade)
+  count     Int       @default(0)
+  state     String    @default("active")
+  lastUser1 DateTime?
+  lastUser2 DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  events BeatEvent[]
+
+  @@unique([user1Id, user2Id])
+  @@index([state])
+}
+
+model BeatEvent {
+  id            String    @id @default(uuid())
+  beatId        String
+  beat          Beat      @relation(fields: [beatId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type          String    @default("snap")
+  content       String    @default("")
+  viewCount     Int       @default(0)
+  firstViewedAt DateTime?
+  mediaSaved    Boolean   @default(false)
+  mediaCleared  Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+
+  @@index([beatId, createdAt])
+}
+
+// ─── Feed ────────────────────────────────────────────
+model FeedPost {
+  id         String   @id @default(uuid())
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  type       String   @default("thought")
+  content    String
+  mediaUrl   String?
+  visibility String   @default("everyone")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  comments  FeedComment[]
+  reactions FeedReaction[]
+
+  @@index([authorId, createdAt])
+  @@index([visibility])
+}
+
+model FeedComment {
+  id        String   @id @default(uuid())
+  postId    String
+  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([postId, createdAt])
+}
+
+model FeedReaction {
+  id        String   @id @default(uuid())
+  postId    String
+  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   @default("like")
+  createdAt DateTime @default(now())
+
+  @@unique([postId, userId])
+  @@index([postId])
+}
+
+// ─── Stories ─────────────────────────────────────────
+model Story {
+  id         String   @id @default(uuid())
+  authorId   String
+  author     User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  type       String   @default("photo")
+  content    String   @default("")
+  mediaUrl   String?
+  visibility String   @default("everyone")
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  views    StoryView[]
+  comments StoryComment[]
+  likes    StoryLike[]
+
+  @@index([authorId, createdAt])
+  @@index([expiresAt])
+}
+
+model StoryView {
+  id        String   @id @default(uuid())
+  storyId   String
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  viewerId  String
+  viewer    User     @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  reaction  String?
+  createdAt DateTime @default(now())
+
+  @@unique([storyId, viewerId])
+  @@index([storyId])
+}
+
+model StoryComment {
+  id        String         @id @default(uuid())
+  storyId   String
+  story     Story          @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  parentId  String?
+  parent    StoryComment?  @relation("StoryCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies   StoryComment[] @relation("StoryCommentReplies")
+  createdAt DateTime       @default(now())
+
+  @@index([storyId, createdAt])
+  @@index([parentId])
+}
+
+model StoryLike {
+  id        String   @id @default(uuid())
+  storyId   String
+  story     Story    @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([storyId, userId])
+  @@index([storyId])
+}
+
+// ─── Videos ──────────────────────────────────────────
+model Video {
+  id           String   @id @default(uuid())
+  authorId     String
+  author       User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  title        String
+  description  String   @default("")
+  url          String   @default("")
+  thumbnailUrl String   @default("")
+  category     String   @default("general")
+  visibility   String   @default("everyone")
+  views        Int      @default(0)
+  createdAt    DateTime @default(now())
+
+  comments  VideoComment[]
+  reactions VideoReaction[]
+
+  @@index([authorId])
+  @@index([category])
+  @@index([createdAt])
+}
+
+model VideoComment {
+  id        String   @id @default(uuid())
+  videoId   String
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime @default(now())
+
+  @@index([videoId, createdAt])
+}
+
+model VideoReaction {
+  id        String   @id @default(uuid())
+  videoId   String
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String   @default("like")
+  createdAt DateTime @default(now())
+
+  @@unique([videoId, userId])
+}
+
+// ─── Creativity ──────────────────────────────────────
+model CreativityCategory {
+  id    String           @id @default(uuid())
+  name  String           @unique
+  icon  String           @default("sparkles")
+  color String           @default("#A78BFA")
+  items CreativityItem[]
+}
+
+model CreativityItem {
+  id         String             @id @default(uuid())
+  authorId   String
+  author     User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  categoryId String
+  category   CreativityCategory @relation(fields: [categoryId], references: [id])
+  type       String             @default("text")
+  title      String
+  content    String
+  mediaUrl   String?
+  visibility String             @default("everyone")
+  featured   Boolean            @default(false)
+  views      Int                @default(0)
+  trendScore Float              @default(0)
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
+
+  reactions   CreativityReaction[]
+  comments    CreativityComment[]
+  viewRecords CreativityView[]
+
+  @@index([authorId])
+  @@index([categoryId])
+  @@index([trendScore(sort: Desc)])
+  @@index([createdAt])
+}
+
+model CreativityView {
+  id        String         @id @default(uuid())
+  itemId    String
+  item      CreativityItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  viewerId  String
+  viewer    User           @relation(fields: [viewerId], references: [id], onDelete: Cascade)
+  createdAt DateTime       @default(now())
+
+  @@unique([itemId, viewerId])
+}
+
+model CreativityReaction {
+  id        String         @id @default(uuid())
+  itemId    String
+  item      CreativityItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String         @default("like")
+  createdAt DateTime       @default(now())
+
+  @@unique([itemId, userId])
+}
+
+model CreativityComment {
+  id        String         @id @default(uuid())
+  itemId    String
+  item      CreativityItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  authorId  String
+  author    User           @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  content   String
+  createdAt DateTime       @default(now())
+
+  @@index([itemId, createdAt])
+}
+
+// ─── Trends ──────────────────────────────────────────
+model Trend {
+  id            String   @id @default(uuid())
+  itemId        String
+  itemType      String
+  category      String
+  score         Float    @default(0)
+  views         Int      @default(0)
+  likes         Int      @default(0)
+  comments      Int      @default(0)
+  saves         Int      @default(0)
+  shares        Int      @default(0)
+  matchRequests Int      @default(0)
+  rank          Int      @default(0)
+  categoryRank  Int      @default(0)
+  calculatedAt  DateTime @default(now())
+
+  @@unique([itemId, itemType])
+  @@index([score(sort: Desc)])
+  @@index([category, categoryRank])
+}
+
+// ─── Search ──────────────────────────────────────────
+model SearchLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  query     String
+  type      String   @default("general")
+  results   Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ─── Safety ──────────────────────────────────────────
+model Report {
+  id         String   @id @default(uuid())
+  reporterId String
+  reportedId String
+  reporter   User     @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported   User     @relation("Reported", fields: [reportedId], references: [id], onDelete: Cascade)
+  reason     String
+  details    String   @default("")
+  targetType String   @default("user")
+  targetId   String?
+  status     String   @default("pending")
+  createdAt  DateTime @default(now())
+
+  @@index([reportedId])
+  @@index([status])
+}
+
+model Block {
+  id        String   @id @default(uuid())
+  blockerId String
+  blockedId String
+  blocker   User     @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   User     @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+  reason    String   @default("")
+  details   String   @default("")
+  evidence  String   @default("")
+  createdAt DateTime @default(now())
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
+}
+
+// ─── Notifications ───────────────────────────────────
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String
+  title     String
+  body      String
+  data      String   @default("{}")
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([userId, read, createdAt])
+}
+
+// ─── Audit Log ───────────────────────────────────────
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action    String
+  details   String   @default("{}")
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ─── Sessions (device/IP tracking) ───────────────────
+model Session {
+  id           String    @id @default(uuid())
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token        String    @unique
+  deviceType   String    @default("")
+  deviceName   String    @default("")
+  browser      String    @default("")
+  os           String    @default("")
+  ipAddress    String    @default("")
+  userAgent    String    @default("")
+  location     String    @default("")
+  lastActiveAt DateTime  @default(now())
+  expiresAt    DateTime?
+  revoked      Boolean   @default(false)
+  createdAt    DateTime  @default(now())
+
+  @@index([userId, revoked])
+  @@index([token])
+  @@index([userId, lastActiveAt])
+}
+
+// ─── Bookmarks / Saved Profiles ──────────────────────
+model Bookmark {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation("BookmarkOwner", fields: [userId], references: [id], onDelete: Cascade)
+  targetId   String
+  target     User     @relation("BookmarkTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  targetType String   @default("profile")
+  note       String   @default("")
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, targetId, targetType])
+  @@index([userId, createdAt])
+  @@index([targetId])
+}
+
+// ─── Matrimonial / Serious Mode ──────────────────────
+model MatrimonialProfile {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  fullName       String    @default("")
+  dateOfBirth    DateTime?
+  birthTime      String    @default("")
+  birthPlace     String    @default("")
+  height         String    @default("")
+  weight         String    @default("")
+  complexion     String    @default("")
+  bloodGroup     String    @default("")
+  bodyType       String    @default("")
+  physicalStatus String    @default("Normal")
+
+  religion     String @default("")
+  caste        String @default("")
+  subCaste     String @default("")
+  gotra        String @default("")
+  manglik      String @default("No")
+  star         String @default("")
+  raasi        String @default("")
+  dosham       String @default("No")
+  motherTongue String @default("")
+
+  education       String @default("")
+  educationDetail String @default("")
+  college         String @default("")
+  occupation      String @default("")
+  company         String @default("")
+  annualIncome    String @default("")
+  workingCity     String @default("")
+  workingCountry  String @default("India")
+
+  fatherName       String @default("")
+  fatherOccupation String @default("")
+  motherName       String @default("")
+  motherOccupation String @default("")
+  brothers         Int    @default(0)
+  brothersMarried  Int    @default(0)
+  sisters          Int    @default(0)
+  sistersMarried   Int    @default(0)
+  familyType       String @default("Nuclear")
+  familyStatus     String @default("Middle Class")
+  familyValues     String @default("Moderate")
+  nativePlace      String @default("")
+  familyIncome     String @default("")
+
+  maritalStatus String @default("Never Married")
+  diet          String @default("Vegetarian")
+  drinking      String @default("No")
+  smoking       String @default("No")
+
+  horoscopeMatch   Boolean @default(false)
+  kundliUrl        String  @default("")
+  kundliData       String  @default("")
+  nakshatra        String  @default("")
+  numerologyNumber Int     @default(0)
+  destinyNumber    Int     @default(0)
+  soulNumber       Int     @default(0)
+
+  aboutMe     String @default("")
+  aboutFamily String @default("")
+
+  partnerAgeMin        Int    @default(21)
+  partnerAgeMax        Int    @default(35)
+  partnerHeightMin     String @default("")
+  partnerHeightMax     String @default("")
+  partnerReligion      String @default("")
+  partnerCaste         String @default("")
+  partnerEducation     String @default("")
+  partnerOccupation    String @default("")
+  partnerIncome        String @default("")
+  partnerCity          String @default("")
+  partnerManglik       String @default("")
+  partnerMaritalStatus String @default("")
+  partnerMotherTongue  String @default("")
+  partnerDiet          String @default("")
+  partnerExpectation   String @default("")
+
+  // v3.2 — extended partner preferences (new compatibility axes)
+  partnerSmoking      String @default("")
+  partnerDrinking     String @default("")
+  partnerFamilyType   String @default("")
+  partnerFamilyValues String @default("")
+  partnerLocations    String @default("") // CSV of preferred cities
+  partnerRelocate     String @default("") // "yes" | "no" | "open"
+  partnerChildren     String @default("") // "have" | "dontwant" | "wantsome" | "open"
+
+  bioDataTemplate  String  @default("royal-rajasthani")
+  bioDataGenerated Boolean @default(false)
+
+  phoneNumber    String @default("")
+  alternatePhone String @default("")
+  linkedIn       String @default("")
+  contactEmail   String @default("")
+
+  bioDataPublic  Boolean @default(false)
+  phonePublic    Boolean @default(false)
+  linkedInPublic Boolean @default(false)
+  emailPublic    Boolean @default(false)
+  photosPublic   Boolean @default(true)
+
+  idVerified        Boolean @default(false)
+  incomeVerified    Boolean @default(false)
+  educationVerified Boolean @default(false)
+  photoVerified     Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  accessRequests BioDataAccessRequest[] @relation("AccessOwner")
+  sentRequests   BioDataAccessRequest[] @relation("AccessRequester")
+
+  @@index([religion, caste])
+  @@index([workingCity])
+  @@index([education])
+  @@index([annualIncome])
+  @@index([manglik])
+}
+
+model BioDataAccessRequest {
+  id          String             @id @default(uuid())
+  ownerId     String
+  owner       MatrimonialProfile @relation("AccessOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  requesterId String
+  requester   MatrimonialProfile @relation("AccessRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  accessType  String
+  status      String             @default("pending")
+  message     String             @default("")
+  grantedAt   DateTime?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@unique([ownerId, requesterId, accessType])
+  @@index([ownerId, status])
+  @@index([requesterId])
+}
+
+// ─── Vibe Check ──────────────────────────────────────
+model VibeCheck {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mood      String
+  energy    Int      @default(3)
+  topics    String   @default("[]")
+  intent    String   @default("")
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, active])
+  @@index([mood])
+}
+
+// ─── User Activity Tracking (behavioral analytics) ──
+model UserActivity {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  action     String // view, like, pass, swipe, click, scroll, search, dwell, share, comment, match, unmatch, block, move
+  targetType String   @default("profile") // profile, feed, story, video, creativity, chat, notification
+  targetId   String?
+  metadata   String?  @default("{}") // JSON: duration_ms, scroll_depth, search_query, etc.
+  durationMs Int? // time spent on target (dwell time)
+  sessionId  String?
+  createdAt  DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([userId, action, targetType])
+  @@index([userId, action, createdAt])
+  @@index([targetType, targetId])
+  @@index([action, createdAt])
+  @@index([userId, targetType, createdAt])
+}
+
+// ─── v3.1 Tracking pipeline (Phase 1) ───────────────
+// Hot raw events live in Redis Streams; only aggregates land in Postgres.
+// All tracking tables key on uidHash (HMAC-SHA256 of userId) so an account
+// delete can break the join without a full table-rewrite.
+
+model ConsentEvent {
+  id        String   @id @default(uuid())
+  userId    String?
+  did       String // device id (cookie)
+  scope     String // 'analytics' | 'personalization' | 'marketing'
+  granted   Boolean
+  region    String? // 'IN' | 'EU' | 'US' | ...
+  source    String   @default("banner") // banner | settings | api
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([did])
+  @@index([userId, scope, createdAt])
+}
+
+model EventAggHourly {
+  uidHash String
+  evt     String
+  bucket  DateTime // truncated to hour, UTC
+  count   Int      @default(0)
+  durSum  Int      @default(0)
+  durP50  Int      @default(0)
+  durP95  Int      @default(0)
+  meta    Json     @default("{}")
+
+  @@id([uidHash, evt, bucket])
+  @@index([bucket])
+  @@index([uidHash, bucket])
+}
+
+model EventAggDaily {
+  uidHash     String
+  evt         String
+  day         DateTime // truncated to day, UTC
+  count       Int      @default(0)
+  durSum      Int      @default(0)
+  uniqTargets Int      @default(0) // HLL cardinality snapshot
+  meta        Json     @default("{}")
+
+  @@id([uidHash, evt, day])
+  @@index([day])
+  @@index([uidHash, day])
+}
+
+model FeatureSnapshot {
+  uidHash            String   @id
+  computedAt         DateTime @default(now())
+  chronotype         String? // morning | day | evening | night | mixed
+  replyPersonaP50Ms  Int?
+  replyPersonaP90Ms  Int?
+  responseRate       Float?
+  rageClickRate      Float?
+  deadClickRate      Float?
+  dwellToDecisionP50 Float?
+  swipeRightRatio    Float?
+  attentionProfile   String? // reader | scanner | voice-first | visual
+  interestVec        Bytes? // 32 × f16
+  vibeEmb            Bytes? // 64 × f16
+  behaviorEmb        Bytes? // 64 × f16
+  cityCenterLat      Float?
+  cityCenterLng      Float?
+  raw                Json     @default("{}")
+
+  @@index([computedAt])
+}
+
+model PairCompatCache {
+  aHash                 String
+  bHash                 String
+  computedAt            DateTime @default(now())
+  interestCos           Float    @default(0)
+  vibeCos               Float    @default(0)
+  behaviorCos           Float    @default(0)
+  magnetCos             Float    @default(0)
+  cityKm                Float    @default(0)
+  ageDelta              Int      @default(0)
+  intentMatch           Float    @default(0)
+  chronoOverlap         Float    @default(0)
+  cadenceOverlap        Float    @default(0)
+  priorInteractionScore Float    @default(0)
+  finalScore            Float    @default(0)
+  // v6 parallel score; populated by v6 PairCompatComputer behind ALGO_V6_PAIR_COMPAT_ENABLED.
+  v6Score               Float?
+  v6BreakdownJson       Json?    @default("{}")
+
+  @@id([aHash, bHash])
+  @@index([aHash, finalScore])
+  @@index([aHash, v6Score])
+  @@index([computedAt])
+}
+
+// ─── v6 — Total-state tracking ─────────────────────────
+// Produced by tracking-worker at session.end. Drives Phase 5 discoverPolicy
+// (window-shopping defence, zero-action recovery) and Phase 16 learner.
+model SessionSummary {
+  id                String   @id @default(uuid())
+  uidHash           String
+  sessionId         String
+  startedAt         DateTime
+  endedAt           DateTime
+  durationMs        Int
+  idleMs            Int      @default(0)
+  routesVisited     Json     @default("[]")
+  cardsViewed       Int      @default(0)
+  swipesLeft        Int      @default(0)
+  swipesRight       Int      @default(0)
+  msgsSent          Int      @default(0)
+  msgsRead          Int      @default(0)
+  zeroActionSession Boolean  @default(false)
+  windowShopping    Boolean  @default(false)
+  ghostedSelf       Boolean  @default(false)
+  meta              Json     @default("{}")
+  createdAt         DateTime @default(now())
+
+  @@unique([uidHash, sessionId])
+  @@index([uidHash, endedAt])
+  @@index([endedAt])
+  @@index([uidHash, zeroActionSession])
+  @@index([uidHash, windowShopping])
+}
+
+// ─── v6 — Element-level focus/dwell affinity ──────────
+// Hourly rollup of (uidHash, route, elementId) -> focusCount, dwellSumMs.
+// Consumed by Phase 5 feed personalisation by focusAffinityByKind.
+model FocusAffinityHourly {
+  uidHash    String
+  route      String
+  elementId  String
+  bucket     DateTime
+  focusCount Int      @default(0)
+  dwellSumMs Int      @default(0)
+
+  @@id([uidHash, route, elementId, bucket])
+  @@index([uidHash, bucket])
+  @@index([bucket])
+}
+
+// ─── v6 — Online user-learning weight profile ─────────
+// One row per (active user, surface). Updated incrementally on every
+// refresh / reopen. v6.5: split per surface so the bandit can carry
+// independent posteriors for `discover` vs `dtm` vs other surfaces.
+// See Phase 16 (Thompson-sampling bandit) for the update rules.
+model UserWeightProfile {
+  uidHash         String
+  surface         String   @default("discover")
+  weights         Json     @default("{}") // { interestsOverlap: 0.18, vibeAlignment: 0.15, ... }
+  noveltyBoost    Float    @default(0.0)
+  diversityBoost  Float    @default(0.0)
+  explorationRate Float    @default(0.05)
+  banditAlpha     Json     @default("{}")
+  banditBeta      Json     @default("{}")
+  lastUpdatedAt   DateTime @updatedAt
+  schemaVersion   Int      @default(1)
+
+  @@id([uidHash, surface])
+  @@index([lastUpdatedAt])
+  @@index([uidHash])
+}
+
+// ─── v6 — Miamo Move v3 archetype profile ─────────────
+// One row per user. Computed by KMeans (4 archetypes) on send/reply patterns.
+model UserMoveProfile {
+  uidHash         String   @id
+  archetype       String // wordsmith | voice_first | visual | fast_replier
+  archetypeProbs  Json     @default("{}") // soft cluster probabilities
+  avgMoveLenChars Int?
+  voiceShare      Float? // fraction of moves that are voice notes
+  mediaShare      Float? // fraction of moves that include media
+  p50ReplyMinutes Int?
+  lastComputedAt  DateTime @default(now())
+  schemaVersion   Int      @default(1)
+
+  @@index([archetype])
+  @@index([lastComputedAt])
+}
+
+// ─── v6.5 — Safety + match-state daily aggregate ─────
+// One row per (uidHash, surface, kind, day). Surfaces and kinds:
+//   surface ∈ 'discover' | 'matches' | 'messages' | 'profile' | 'dtm'
+//   kind    ∈ 'block' | 'report' | 'unmatch' | 'hold' | 'unhold'
+// Consumed by the v6.5 learner loop as hard-negative (block/report) or
+// neutral (hold/unhold) signals, separate from soft swipe regret.
+model SafetyAgg {
+  uidHash String
+  surface String
+  kind    String
+  day     DateTime // truncated to day, UTC
+  count   Int      @default(0)
+  meta    Json     @default("{}") // optional: { targets: { tHash: count, ...capped 64 } }
+
+  @@id([uidHash, surface, kind, day])
+  @@index([day])
+  @@index([uidHash, day])
+  @@index([uidHash, kind, day])
+}
+
+// ─── v6.5 — First-move reply outcomes ────────────────
+// One row per (aHash, bHash, sentAt). Reconciled twice a day by the
+// firstMoveOutcome worker by joining msg.send (firstMove=true) with
+// msg.read on the same pair within 24h. Used by Miamo Move v3 to train
+// `UserMoveProfile.byKind[kind].replied`.
+model FirstMoveOutcome {
+  aHash     String
+  bHash     String
+  sentAt    DateTime
+  kind      String // 'text' | 'voice' | 'media' | 'reaction'
+  replied   Boolean  @default(false)
+  replyMs   Int? // null until replied; ms between send and recipient's first read
+  archetype String? // recipient archetype at send time (cached)
+  meta      Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@id([aHash, bHash, sentAt])
+  @@index([aHash, sentAt])
+  @@index([bHash, sentAt])
+  @@index([sentAt, replied])
+}
+
+// ─── v6.6 — See-later pile (Discover + DTM) ─────────
+// One row per deferred item. `surface` discriminates the pile so the same
+// table serves Discover ("see this profile later") and DTM ("answer this
+// question later"). When the user resolves the deferral the row is updated
+// in place (resolvedAt + resolvedAction). Rows older than 30 days are
+// pruned by tracking-worker. Consumed by:
+//   - learnerLoop (deferral as soft-negative; resolution as attribution)
+//   - discoverPolicy (skipped pile UI, "view skipped profiles")
+//   - dtmV6 (defer-then-revise question reordering)
+model DeferredItem {
+  id             String    @id @default(uuid())
+  uidHash        String
+  surface        String // 'discover' | 'dtm'
+  targetId       String // tid for discover, qid for dtm
+  topic          String? // dtm only — the topic the qid belongs to
+  batchId        String? // optional analytics tag for the batch it came from
+  reason         String? // 'not_now' | 'thinking' | 'unsure' | 'other'
+  deferredAt     DateTime  @default(now())
+  viewedAt       DateTime? // first time the user opened it from the pile
+  resolvedAt     DateTime? // when the deferral was resolved
+  resolvedAction String? // 'like' | 'pass' | 'super_like' | 'see_later' | 'answered' | 'skipped'
+  meta           Json      @default("{}")
+
+  @@unique([uidHash, surface, targetId])
+  @@index([uidHash, surface, deferredAt])
+  @@index([uidHash, surface, resolvedAt])
+  @@index([deferredAt])
+}
+
+// ─── User Data (generic feature persistence) ────────
+model UserData {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // love_language_result, date_plan, date_idea_saved, compatibility_result, search_history, premium_interest
+  data      Json     @default("{}")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId, type])
+  @@index([userId, type, createdAt])
+}
+
+// ─── DTM Chat Messages (persistent) ─────────────────
+model DtmMessage {
+  id          String   @id @default(uuid())
+  senderId    String
+  sender      User     @relation("DtmSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipientId String
+  recipient   User     @relation("DtmRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  message     String
+  type        String   @default("text")
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([senderId, recipientId, createdAt])
+  @@index([recipientId, read])
+}
+
+// ─── v3.2 — Showcase (replaces Creativity) ──────────────
+model ShowcaseItem {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation("ShowcaseAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  category        String
+  type            String // link | image | text | voice
+  title           String   @db.VarChar(120)
+  body            String?  @db.VarChar(300)
+  url             String?
+  imageUrl        String?
+  ogImageCached   String?
+  voiceUrl        String?
+  voiceDurationMs Int?
+  bytes           Int      @default(0)
+  pinned          Boolean  @default(false)
+  moveCount       Int      @default(0)
+  matchCount      Int      @default(0)
+  visibility      String   @default("everyone") // everyone | matches | private
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId, pinned])
+  @@index([category, createdAt])
+}
+
+// ─── v3.2 — Access Control ──────────────────────────────
+model AccessRequest {
+  id         String    @id @default(uuid())
+  fromUserId String
+  fromUser   User      @relation("AccessRequestFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUserId   String
+  toUser     User      @relation("AccessRequestTo", fields: [toUserId], references: [id], onDelete: Cascade)
+  field      String // photos|phone|family|income|kundli|lastName|exactCity|socials|email
+  status     String    @default("pending") // pending|approved|denied|revoked|expired
+  message    String?   @db.VarChar(500)
+  createdAt  DateTime  @default(now())
+  decidedAt  DateTime?
+  expiresAt  DateTime?
+
+  @@unique([fromUserId, toUserId, field])
+  @@index([toUserId, status])
+  @@index([fromUserId, status])
+}
+
+// ─── v3.6.0 — Exposure Ledger (earned visibility) ───
+model ExposureLedger {
+  id         String   @id @default(uuid())
+  uidHash    String // HMAC-hashed userId
+  surface    String // 'discover' | 'dtm' | 'aiMatch'
+  deltaSlots Int // +N earned, -N spent
+  reason     String // 'sticky_like' | 'message_reply' | 'dtm_completed' | 'bio_expand' | 'view_long' | 'move_accepted' | 'rage_like_zero' | 'admin_grant' | 'top10_filled' | 'fairness_inject'
+  refId      String?
+  meta       Json?
+  createdAt  DateTime @default(now())
+
+  @@index([uidHash, surface, createdAt])
+  @@index([reason])
+  @@index([createdAt])
+}
+
+model ExposureCredit {
+  uidHash     String
+  surface     String
+  slotsEarned Int      @default(0)
+  slotsSpent  Int      @default(0)
+  lastTopUp   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@id([uidHash, surface])
+  @@index([surface, lastTopUp])
+}
+
+model WeeklyTopMatch {
+  id         String   @id @default(uuid())
+  uidHash    String
+  weekIso    String // e.g. "2026W26"
+  rank       Int // 1..10
+  targetHash String // candidate uidHash
+  computedAt DateTime @default(now())
+
+  @@unique([uidHash, weekIso, rank])
+  @@index([uidHash, weekIso])
+  @@index([weekIso])
+}
+
+model FamilyBriefShare {
+  id          String   @id @default(uuid())
+  userId      String
+  token       String   @unique // 22-char base64url, embedded in URL
+  format      String // 'pdf' | 'image' | 'text'
+  generatedAt DateTime @default(now())
+  expiresAt   DateTime // generatedAt + 7d
+  viewCount   Int      @default(0)
+  trackViews  Boolean  @default(false) // opt-in by user
+
+  @@index([userId, generatedAt])
+  @@index([expiresAt])
+  @@index([token])
+}

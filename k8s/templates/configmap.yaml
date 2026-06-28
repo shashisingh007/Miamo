@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: miamo-config
+  namespace: __NAMESPACE__
+  labels:
+    app: miamo
+    env: __ENV__
+data:
+  DATABASE_URL: "__DATABASE_URL__"
+  REDIS_URL: "__REDIS_URL__"
+  JWT_SECRET: "__JWT_SECRET__"
+  INTERNAL_SERVICE_KEY: "__INTERNAL_KEY__"
+  FRONTEND_URL: "http://__CLUSTER_HOST__:__LOCAL_WEB_PORT__"
+  NODE_ENV: "__NODE_ENV__"
+  AUTH_PORT: "__AUTH_PORT__"
+  USERS_PORT: "__USERS_PORT__"
+  SOCIAL_PORT: "__SOCIAL_PORT__"
+  MESSAGING_PORT: "__MESSAGING_PORT__"
+  CONTENT_PORT: "__CONTENT_PORT__"
+  NOTIFICATIONS_PORT: "__NOTIFICATIONS_PORT__"
+  GATEWAY_PORT: "__GATEWAY_PORT__"
+  WEB_PORT: "__WEB_PORT__"

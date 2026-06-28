@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'v*']
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    name: Tests & Type-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install root deps
+        run: npm ci
+
+      - name: Install shared deps
+        run: cd services/shared && npm install --no-audit --no-fund
+
+      - name: Run shared tests (vitest)
+        run: npm test -- --reporter=verbose
+
+  typecheck:
+    name: TypeScript check (per service)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [auth, users, social, messaging, content, notifications, gateway]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install shared deps (resolved by services via relative path)
+        run: cd services/shared && npm install --no-audit --no-fund
+
+      - name: Install service deps
+        run: cd services/${{ matrix.service }} && npm install --no-audit --no-fund
+
+      - name: tsc --noEmit
+        run: cd services/${{ matrix.service }} && npx tsc --noEmit

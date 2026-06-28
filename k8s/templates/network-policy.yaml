@@ -1,0 +1,67 @@
+# ═══ Network Policy — Microservice Isolation ═══
+# Only allows traffic between miamo pods within the namespace
+# External traffic only enters through gateway and web NodePorts
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: miamo-default-deny
+  namespace: __NAMESPACE__
+spec:
+  podSelector:
+    matchLabels:
+      app: miamo
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from within the miamo namespace
+    - from:
+        - podSelector:
+            matchLabels:
+              app: miamo
+  egress:
+    # Allow traffic to within the miamo namespace
+    - to:
+        - podSelector:
+            matchLabels:
+              app: miamo
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+---
+# Gateway accepts external traffic
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: miamo-gateway-ingress
+  namespace: __NAMESPACE__
+spec:
+  podSelector:
+    matchLabels:
+      app: miamo
+      service: gateway
+  policyTypes:
+    - Ingress
+  ingress:
+    - {}
+---
+# Web accepts external traffic
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: miamo-web-ingress
+  namespace: __NAMESPACE__
+spec:
+  podSelector:
+    matchLabels:
+      app: miamo
+      service: web
+  policyTypes:
+    - Ingress
+  ingress:
+    - {}
