@@ -1,0 +1,18 @@
+# ═══ PodDisruptionBudget Template ═══
+# Ensures at least 1 pod is always available during voluntary disruptions
+# (node drains, upgrades, etc.)
+# Placeholders: __SVC_NAME__, __NAMESPACE__
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: __SVC_NAME__-pdb
+  namespace: __NAMESPACE__
+  labels:
+    app: miamo
+    service: __SVC_NAME__
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: miamo
+      service: __SVC_NAME__

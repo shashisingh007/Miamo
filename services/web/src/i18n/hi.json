@@ -1,0 +1,37 @@
+{
+  "nav.discover": "खोजें",
+  "nav.matches": "मैच",
+  "nav.messages": "संदेश",
+  "nav.dtm": "डीटीएम",
+  "nav.profile": "प्रोफ़ाइल",
+  "nav.settings": "सेटिंग्स",
+
+  "common.save": "सहेजें",
+  "common.cancel": "रद्द करें",
+  "common.delete": "हटाएँ",
+  "common.confirm": "पुष्टि करें",
+  "common.back": "वापस",
+  "common.next": "आगे",
+  "common.done": "हो गया",
+  "common.loading": "लोड हो रहा है…",
+  "common.retry": "पुनः प्रयास करें",
+
+  "settings.language": "भाषा",
+  "settings.language.description": "ऐप के लिए भाषा चुनें",
+  "settings.notifications": "सूचनाएँ",
+  "settings.privacy": "गोपनीयता",
+  "settings.appearance": "रूप",
+  "settings.preferences": "प्राथमिकताएँ",
+
+  "onboarding.welcome": "मियामो में आपका स्वागत है",
+  "onboarding.getStarted": "शुरू करें",
+  "onboarding.skip": "छोड़ें",
+
+  "match.newMatch": "नया मैच!",
+  "match.sendMove": "मूव भेजें",
+  "match.keepBrowsing": "देखते रहें",
+
+  "auth.login": "लॉग इन",
+  "auth.signup": "साइन अप",
+  "auth.logout": "लॉग आउट"
+}

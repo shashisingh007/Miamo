@@ -1,0 +1,43 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: miamo-migrate
+  namespace: __NAMESPACE__
+  labels:
+    app: miamo
+    service: migrate
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: miamo
+        service: migrate
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              until nc -z postgres.__NAMESPACE__.svc.cluster.local __POSTGRES_PORT__; do
+                echo "Waiting for postgres..."
+                sleep 2
+              done
+              echo "Postgres is ready"
+      containers:
+        - name: migrate
+          image: __IMAGE_PREFIX__miamo-migrate:__IMAGE_TAG__
+          imagePullPolicy: __PULL_POLICY__
+          envFrom:
+            - configMapRef:
+                name: miamo-config
+          resources:
+            requests:
+              memory: "64Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"

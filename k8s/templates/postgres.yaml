@@ -1,0 +1,87 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: __NAMESPACE__
+  labels:
+    app: miamo
+    service: postgres
+spec:
+  clusterIP: None
+  selector:
+    app: miamo
+    service: postgres
+  ports:
+    - port: __POSTGRES_PORT__
+      targetPort: __POSTGRES_PORT__
+      protocol: TCP
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: __NAMESPACE__
+  labels:
+    app: miamo
+    service: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: miamo
+      service: postgres
+  template:
+    metadata:
+      labels:
+        app: miamo
+        service: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: __POSTGRES_PORT__
+          env:
+            - name: POSTGRES_USER
+              value: "__DB_USER__"
+            - name: POSTGRES_PASSWORD
+              value: "__DB_PASS__"
+            - name: POSTGRES_DB
+              value: "__DB_NAME__"
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"
+          livenessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - __DB_USER__
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          readinessProbe:
+            exec:
+              command:
+                - pg_isready
+                - -U
+                - __DB_USER__
+            initialDelaySeconds: 5
+            periodSeconds: 5
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi

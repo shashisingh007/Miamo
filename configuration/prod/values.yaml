@@ -1,0 +1,71 @@
+# ═══════════════════════════════════════════════════════════════════
+# Miamo — Production Environment Configuration
+# ═══════════════════════════════════════════════════════════════════
+# Usage: bash scripts/start.sh prod
+# ═══════════════════════════════════════════════════════════════════
+
+# ─── Cluster ──────────────────────────────────────────────────────
+cluster_host: "127.0.0.1"
+namespace: "miamo-prod"
+env: "prod"
+
+# ─── Service Port (exposed by k8s Services — same for all) ───────
+service_port: 443
+
+# ─── Container Ports (internal, inside pods) ──────────────────────
+container_ports:
+  auth: 3201
+  users: 3202
+  social: 3203
+  messaging: 3204
+  content: 3205
+  notifications: 3206
+  gateway: 3200
+  web: 3100
+
+# ─── Local Ports (for port-forwarding to your machine) ───────────
+local_ports:
+  web: 3100
+  gateway: 3200
+
+# ─── NodePorts (host-accessible via minikube IP, 30000-32767) ─────
+node_ports:
+  gateway: 30082
+  web: 30445
+
+# ─── Docker Images ────────────────────────────────────────────────
+images:
+  registry: ""
+  tag: "latest"
+  pull_policy: "Always"
+
+# ─── Database ─────────────────────────────────────────────────────
+database:
+  host: "postgres"
+  port: 5432
+  name: "miamo"
+  user: "miamo"
+  password: "CHANGE-ME-IN-PRODUCTION"
+
+# ─── Redis ────────────────────────────────────────────────────────
+redis:
+  host: "redis"
+  port: 6379
+
+# ─── Secrets ──────────────────────────────────────────────────────
+secrets:
+  jwt_secret: "CHANGE-ME-IN-PRODUCTION"
+  internal_service_key: "CHANGE-ME-IN-PRODUCTION"
+
+# ─── Resources (per pod) ─────────────────────────────────────────
+resources:
+  requests_memory: "128Mi"
+  requests_cpu: "200m"
+  limits_memory: "512Mi"
+  limits_cpu: "1000m"
+
+# ─── Scaling ──────────────────────────────────────────────────────
+replicas: 3
+
+# ─── Node Environment ────────────────────────────────────────────
+node_env: "production"
