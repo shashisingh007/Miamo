@@ -1,0 +1,129 @@
+name: CI
+
+# G.17 CI/CD — fast feedback on every push / PR. Runs the fast test suite,
+# the full test suite, and the 11-package typecheck matrix. Additionally
+# builds the Next.js web bundle so we catch build-only regressions.
+#
+# On red: PR blocks. On main red: paged.
+
+on:
+  push:
+    branches: [main, 'v*']
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs for the same PR when a new commit arrives.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests (fast)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ['20']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install root deps
+        run: npm ci
+
+      - name: Install shared deps
+        run: cd services/shared && npm install --no-audit --no-fund
+
+      - name: Prisma generate (shared)
+        run: cd services/shared && npx prisma generate
+
+      - name: Fast test suite
+        run: npm test -- --reporter=verbose
+
+  test-full:
+    name: Tests (full)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install root deps
+        run: npm ci
+
+      - name: Install shared deps
+        run: cd services/shared && npm install --no-audit --no-fund
+
+      - name: Prisma generate (shared)
+        run: cd services/shared && npx prisma generate
+
+      - name: Full test suite
+        run: npm run test:full
+
+  typecheck:
+    name: TypeScript check (per service)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [auth, users, social, messaging, content, notifications, gateway]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install shared deps (resolved by services via relative path)
+        run: cd services/shared && npm install --no-audit --no-fund
+
+      - name: Prisma generate (shared)
+        run: cd services/shared && npx prisma generate
+
+      - name: Install service deps
+        run: cd services/${{ matrix.service }} && npm install --no-audit --no-fund
+
+      - name: tsc --noEmit
+        run: cd services/${{ matrix.service }} && npx tsc --noEmit
+
+  web-build:
+    name: Web build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install shared deps
+        run: cd services/shared && npm install --no-audit --no-fund
+
+      - name: Prisma generate (shared)
+        run: cd services/shared && npx prisma generate
+
+      - name: Install web deps
+        run: cd services/web && npm install --no-audit --no-fund
+
+      - name: Next.js build
+        run: cd services/web && npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'

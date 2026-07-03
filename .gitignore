@@ -1,0 +1,67 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.logs/
+logs/
+
+# Runtime
+.miamo-pids
+*.pid
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Testing
+coverage/
+
+# Prisma
+prisma/*.db
+
+# Docker volumes
+docker/volumes/
+
+# Misc
+*.bak
+*.tmp
+.turbo
+.miamo-prisma-ready
+
+# v3.6.1 cleanup: run-state directories created by scripts/start-services.sh
+logs/
+pids/
+
+# Local Prisma generation marker
+.miamo-prisma-ready
+
+# Local QA run outputs (regenerated on every run)
+scripts/qa-runs/*.report.json

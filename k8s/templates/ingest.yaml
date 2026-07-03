@@ -1,0 +1,97 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingest
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: ingest
+    tier: edge
+spec:
+  replicas: {{ .Values.ingest.replicas | default 2 }}
+  selector:
+    matchLabels:
+      app: ingest
+  template:
+    metadata:
+      labels:
+        app: ingest
+        tier: edge
+    spec:
+      containers:
+        - name: ingest
+          image: "{{ .Values.image.registry }}/miamo-ingest:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: 3260
+              name: http
+          env:
+            - name: PORT
+              value: "3260"
+            - name: REDIS_URL
+              value: "{{ .Values.redis.url }}"
+            - name: TRACKING_HASH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tracking-secrets
+                  key: hash-secret
+            - name: TRACKING_KILL
+              value: "{{ .Values.tracking.kill | default 0 }}"
+            - name: TRACKING_STREAM_MAXLEN
+              value: "{{ .Values.tracking.streamMaxLen | default 10000000 }}"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "256Mi"
+          readinessProbe:
+            httpGet:
+              path: /v1/track/healthz
+              port: 3260
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /v1/track/healthz
+              port: 3260
+            initialDelaySeconds: 10
+            periodSeconds: 15
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingest
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: ingest
+spec:
+  type: ClusterIP
+  selector:
+    app: ingest
+  ports:
+    - name: http
+      port: 3260
+      targetPort: 3260
+---
+# Standalone HPA for the edge ingest service — it scales with traffic spikes
+# independently of the rest of the platform.
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ingest
+  namespace: {{ .Values.namespace }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ingest
+  minReplicas: {{ .Values.ingest.minReplicas | default 2 }}
+  maxReplicas: {{ .Values.ingest.maxReplicas | default 10 }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
