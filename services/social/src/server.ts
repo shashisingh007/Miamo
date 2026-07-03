@@ -1,0 +1,3228 @@
+// ─── Miamo Social Service ────────────────────────────
+// Handles: Discover, Matches, AI-Match, Safety
+import express, { Request, Response, NextFunction } from 'express';
+import { LRUCache, MinHeap, BloomFilter, TTL, discoverCache, aiMatchCache, activityCache, profileCache } from '../../shared/cache';
+import { scoreForYou, scoreNew, scoreActive, scoreVerified, scoreSerious, scoreAiPicks, computeDeepCompatibility, computePersonalityArchetype, generateSmartMoves, computeFilterRelevanceBonus, type BehaviorVector, type VibeData, type MatchHistoryInsights, type CandidateUser, type UserProfile, type DeepCompatibilityInput, type SmartMoveInput, type CommStyleVector } from '../../shared/algorithms';
+import { classifyIntent, blendWeights, type DailyEventRow } from '../../shared/intent-classifier';
+import { buildNegativeProfile, negativePenalty, ageBucket, type NegativeEvent, type TraitSnapshot } from '../../shared/negative-signal-engine';
+import { diversify } from '../../shared/refresh-diversifier';
+import { loadPersonalizationCtx, applyPersonalization } from '../../shared/personalize';
+import { logger } from '../../shared/src/logger';
+import { errorHandler } from '../../shared/src/errorHandler';
+import { moveV2SuggestionsEmitted } from '../../shared/src/metrics';
+import { validate } from '../../shared/src/validate';
+import { clampInt, clampFloat } from '../../shared/src/coerce';
+import {
+  discoverLikeBodySchema,
+  discoverPassBodySchema,
+  discoverCommentBodySchema,
+  reportBodySchema,
+  safetyBlockBodySchema,
+  safetyUnblockBodySchema,
+  vibeCheckBodySchema,
+  passFeedbackBodySchema,
+  discoverMoveBodySchema,
+  matchActionBodySchema,
+  discoverFiltersBodySchema,
+  accessRequestCreateBodySchema,
+  accessRequestDecisionBodySchema,
+  ACCESS_FIELDS,
+} from '../../shared/src/schemas';
+import { idempotency } from '../../shared/src/idempotency';
+import { sanitize, sanitizeObject } from '../../shared/src/sanitize';
+import { awardMatchMilestones } from '../../shared/src/spotlight-ledger';
+
+// Awards Spotlight tier rewards for both halves of a fresh match.
+// Fire-and-forget — failures are logged but don't break the match flow.
+async function grantPairMatchMilestones(prismaClient: typeof prisma, userA: string, userB: string): Promise<void> {
+  try {
+    const [a, b] = await Promise.all([
+      prismaClient.match.count({ where: { active: true, OR: [{ user1Id: userA }, { user2Id: userA }] } }),
+      prismaClient.match.count({ where: { active: true, OR: [{ user1Id: userB }, { user2Id: userB }] } }),
+    ]);
+    await Promise.all([
+      awardMatchMilestones(prismaClient as any, userA, a).catch((e) => logger.warn('milestone A', e)),
+      awardMatchMilestones(prismaClient as any, userB, b).catch((e) => logger.warn('milestone B', e)),
+    ]);
+  } catch (e) { logger.warn('grantPairMatchMilestones failed', e); }
+}
+import { auditLog, trackActivity } from '../../shared/src/audit';
+import { hashUid } from '../../shared/src/track/hash';
+import { emitServerEvent } from '../../shared/src/track/serverEmit';
+import { distanceKm } from '../../shared/src/cities';
+import { PrismaSignalReader } from '../../shared/src/algo/signals';
+import { rankForYou } from '../../shared/src/algo/forYou';
+import { scoreAiPicksV4 } from '../../shared/src/algo/aiPicks';
+import { scoreNew as scoreNewV4 } from '../../shared/src/algo/new';
+import { scoreActive as scoreActiveV4 } from '../../shared/src/algo/active';
+import { scoreVerified as scoreVerifiedV4 } from '../../shared/src/algo/verified';
+import { scoreSerious as scoreSeriousV4 } from '../../shared/src/algo/serious';
+import { v4RankEnabled } from '../../shared/src/algo/flags';
+import { postImpressionPenalty } from '../../shared/src/algo/postImpressionRerank';
+import { env } from '../../shared/src/env';
+import { createPrisma, applyBaseMiddleware, createInternalAuthMiddleware, installHealthRoutes, installSentry } from '../../shared/src/service';
+import { getRecentPassedTargetIds } from '../../shared/src/discover-passfilter';
+import { fetchDiscoverSeed, isDiscoverSeedEnabled } from './discover-seed';
+import { scoreMultiObjective, MO_WEIGHTS } from '../../shared/src/algo/v8/multiObjective';
+import { fairnessRerank, type FairnessCandidate } from '../../shared/src/algo/v8/fairnessRerank';
+import { meetsDailyTop10Threshold } from '../../shared/src/algo/v8/exposureCredits';
+import { expDecay } from '../../shared/src/algo/math';
+import { isUserPremium } from '../../shared/src/premium';
+
+// ─── v3.6.0 v8 feature flag helpers (default OFF, additive only) ────
+function isV8DiscoverRankerEnabled(): boolean {
+  return process.env.ALGO_V8_DISCOVER_RANKER_ENABLED === '1';
+}
+function isV8FairnessRerankEnabled(): boolean {
+  return process.env.ALGO_V8_FAIRNESS_RERANK_ENABLED === '1';
+}
+function isWeeklyTopEnabled(): boolean {
+  return process.env.FEATURE_WEEKLY_TOP_ENABLED === '1';
+}
+function isWhyExplainerEnabled(): boolean {
+  return process.env.FEATURE_WHY_EXPLAINER_ENABLED === '1';
+}
+// v1.2 session 14 — Task 2: gate for the ranker consumer of
+// `Settings.manualIntentOverride`. When ON, and the user has set an
+// explicit override via PUT /api/v1/settings/intent-override (session 13
+// write endpoint), the ranker consumes the override in place of the
+// inferred class from `intentRightNow.ts`. Default-OFF ⇒ existing
+// behaviour is bit-identical.
+function isIntentVisibilityEnabled(): boolean {
+  return process.env.FEATURE_INTENT_VISIBILITY_ENABLED === '1';
+}
+
+const prisma = createPrisma(15);
+export const app = express();
+const PORT = parseInt(process.env.PORT || '3203', 10);
+
+applyBaseMiddleware(app, { jsonLimit: '10mb', serviceName: 'social' });
+// Sentry request handler — mounts after base middleware so requestId is in
+// scope but before any route so every request lifecycle is captured. No-op
+// when SENTRY_DSN is unset.
+const sentry = installSentry({ serviceName: 'social' });
+app.use(sentry.requestHandler);
+interface AuthRequest extends Request { userId?: string }
+
+// ─── Shared Constants ────────────────────────────────
+const ZODIAC_COMPAT: Record<string, string[]> = {
+  Aries:['Leo','Sagittarius','Gemini','Aquarius'], Taurus:['Virgo','Capricorn','Cancer','Pisces'],
+  Gemini:['Libra','Aquarius','Aries','Leo'], Cancer:['Scorpio','Pisces','Taurus','Virgo'],
+  Leo:['Aries','Sagittarius','Gemini','Libra'], Virgo:['Taurus','Capricorn','Cancer','Scorpio'],
+  Libra:['Gemini','Aquarius','Leo','Sagittarius'], Scorpio:['Cancer','Pisces','Virgo','Capricorn'],
+  Sagittarius:['Aries','Leo','Libra','Aquarius'], Capricorn:['Taurus','Virgo','Scorpio','Pisces'],
+  Aquarius:['Gemini','Libra','Aries','Sagittarius'], Pisces:['Cancer','Scorpio','Taurus','Capricorn'],
+};
+
+const authMiddleware = createInternalAuthMiddleware();
+
+// ─── User Behavior Vector Builder ───────────────────
+// Aggregates recent user actions into a weighted behavior profile for recommendations
+// Now powered by the UserActivityAnalyzer for comprehensive multi-signal analysis
+import { UserActivityAnalyzer, type RawActivity } from '../../shared/activity-analyzer';
+
+async function getUserBehaviorVector(userId: string): Promise<{
+  likedProfiles: Set<string>; passedProfiles: Set<string>; viewedProfiles: Map<string, number>;
+  preferredAge: { min: number; max: number } | null; preferredCities: string[];
+  preferredIntents: string[]; engagementLevel: number; interactionPatterns: Record<string, number>;
+}> {
+  const cacheKey = `behavior:${userId}`;
+  const cached = activityCache.get(cacheKey);
+  if (cached) return cached;
+
+  // Fetch last 500 activities (covers ~2 weeks of active usage)
+  const activities = await prisma.userActivity.findMany({
+    where: { userId, createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+    orderBy: { createdAt: 'desc' },
+    take: 500,
+  });
+
+  // Use the analyzer for comprehensive processing
+  const analyzer = new UserActivityAnalyzer(userId, activities as RawActivity[]);
+  const prefs = analyzer.buildPreferenceVector();
+  const engagement = analyzer.computeEngagementScore();
+
+  // Build interactionPatterns from raw data for backward compat
+  const patterns: Record<string, number> = {};
+  for (const a of activities) {
+    patterns[a.action] = (patterns[a.action] || 0) + 1;
+  }
+
+  const preferredCities = prefs.preferredCities.slice(0, 3).map(c => c.city);
+  const preferredIntents = prefs.preferredIntents.slice(0, 2).map(i => i.intent);
+  const preferredAge = prefs.preferredAge ? { min: prefs.preferredAge.min, max: prefs.preferredAge.max } : null;
+
+  const result = {
+    likedProfiles: prefs.likedProfiles,
+    passedProfiles: prefs.passedProfiles,
+    viewedProfiles: prefs.viewedProfiles,
+    preferredAge,
+    preferredCities,
+    preferredIntents,
+    engagementLevel: engagement.overall,
+    interactionPatterns: patterns,
+  };
+  activityCache.set(cacheKey, result, TTL.ACTIVITY_SUMMARY);
+  return result;
+}
+
+// ─── ML Engine — Real-Time Adaptive Learning ───────────────────
+import {
+  computeMLScore, learnFromSignals, detectSessionContext, detectPreferenceDrift,
+  initBanditState, updateBandit, getProfileArm,
+  serializeLearnedPrefs, deserializeLearnedPrefs,
+  serializeBanditState, deserializeBanditState,
+  type LearningSignal, type ProfileFeatureVector, type LearnedPreferences,
+  type SessionContext, type PreferenceDrift, type BanditState, type MLBreakdown,
+} from '../../shared/ml-engine';
+
+// ─── ML State Cache (per-user in-memory, persisted to DB periodically) ───
+const mlStateCache = new LRUCache(500);
+
+/** Load or initialize ML state for a user */
+async function getMLState(userId: string): Promise<{ prefs: LearnedPreferences; bandit: BanditState }> {
+  const cacheKey = `ml:${userId}`;
+  const cached = mlStateCache.get(cacheKey);
+  if (cached) return cached;
+
+  try {
+    // Load from UserData table
+    const [prefsRow, banditRow] = await Promise.all([
+      (prisma as any).userData.findFirst({ where: { userId, type: 'ml_preferences' }, orderBy: { updatedAt: 'desc' } }),
+      (prisma as any).userData.findFirst({ where: { userId, type: 'ml_bandit' }, orderBy: { updatedAt: 'desc' } }),
+    ]);
+    const prefs = prefsRow?.data ? deserializeLearnedPrefs(typeof prefsRow.data === 'string' ? prefsRow.data : JSON.stringify(prefsRow.data)) : null;
+    const bandit = banditRow?.data ? deserializeBanditState(typeof banditRow.data === 'string' ? banditRow.data : JSON.stringify(banditRow.data)) : null;
+    const state = { prefs: prefs || learnFromSignals(null, []), bandit: bandit || initBanditState() };
+    mlStateCache.set(cacheKey, state, TTL.ACTIVITY_SUMMARY);
+    return state;
+  } catch {
+    const state = { prefs: learnFromSignals(null, []), bandit: initBanditState() };
+    mlStateCache.set(cacheKey, state, TTL.ACTIVITY_SUMMARY);
+    return state;
+  }
+}
+
+/** Save ML state to database (called after significant learning events) */
+async function saveMLState(userId: string, prefs: LearnedPreferences, bandit: BanditState): Promise<void> {
+  const cacheKey = `ml:${userId}`;
+  mlStateCache.set(cacheKey, { prefs, bandit }, TTL.ACTIVITY_SUMMARY);
+
+  // Persist to DB (fire-and-forget for performance)
+  try {
+    const prefsJson = JSON.parse(serializeLearnedPrefs(prefs));
+    const banditJson = JSON.parse(serializeBanditState(bandit));
+    await Promise.all([
+      (prisma as any).userData.upsert({
+        where: { userId_type: { userId, type: 'ml_preferences' } },
+        update: { data: prefsJson, updatedAt: new Date() },
+        create: { userId, type: 'ml_preferences', data: prefsJson },
+      }).catch(() => {}),
+      (prisma as any).userData.upsert({
+        where: { userId_type: { userId, type: 'ml_bandit' } },
+        update: { data: banditJson, updatedAt: new Date() },
+        create: { userId, type: 'ml_bandit', data: banditJson },
+      }).catch(() => {}),
+    ]);
+  } catch {} // Non-critical — cache is source of truth for session
+}
+
+/** Convert a Prisma user profile to ML feature vector */
+function toFeatureVector(user: any): ProfileFeatureVector {
+  const profile = user?.profile || user;
+  return {
+    age: profile?.age,
+    city: profile?.city,
+    gender: profile?.gender,
+    interests: (user?.interests || []).map((i: any) => i.name || i),
+    intent: profile?.datingIntent || profile?.lookingFor,
+    profession: profile?.profession,
+    education: profile?.education,
+    religion: profile?.religion,
+    lifestyle: {
+      smoking: profile?.smoking,
+      drinking: profile?.drinking,
+      exercise: profile?.exercise,
+    },
+    verified: user?.verified,
+    profileScore: profile?.profileScore,
+    online: profile?.online,
+    photoCount: user?.photos?.length,
+    promptCount: user?.prompts?.length,
+  };
+}
+
+/** Build learning signals from recent activities (for initial ML model training) */
+async function buildLearningSignals(userId: string, limit = 200): Promise<LearningSignal[]> {
+  const activities = await prisma.userActivity.findMany({
+    where: { userId, action: { in: ['like', 'pass', 'super_like', 'match', 'unmatch', 'move', 'view'] }, targetType: 'profile' },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
+  });
+
+  const signals: LearningSignal[] = [];
+  // Batch-fetch target profiles
+  const targetIds = [...new Set(activities.map(a => a.targetId).filter(Boolean))] as string[];
+  const targets = targetIds.length > 0 ? await prisma.user.findMany({
+    where: { id: { in: targetIds } },
+    include: { profile: true, interests: true, photos: { select: { id: true } }, prompts: { select: { id: true } } },
+  }) : [];
+  const targetMap = new Map(targets.map(t => [t.id, t]));
+
+  for (const activity of activities) {
+    if (!activity.targetId) continue;
+    const target = targetMap.get(activity.targetId);
+    if (!target) continue;
+    signals.push({
+      userId,
+      action: activity.action as any,
+      targetUserId: activity.targetId,
+      targetFeatures: toFeatureVector(target),
+      dwellMs: activity.durationMs || undefined,
+      sessionId: activity.sessionId || undefined,
+      timestamp: new Date(activity.createdAt),
+    });
+  }
+  return signals;
+}
+
+/** Get session learning signals (current session only) */
+async function getSessionSignals(userId: string): Promise<LearningSignal[]> {
+  // Current session = last 30 minutes of activity
+  const sessionStart = new Date(Date.now() - 30 * 60 * 1000);
+  return buildLearningSignals(userId, 50).then(signals =>
+    signals.filter(s => s.timestamp >= sessionStart)
+  );
+}
+
+/** Teach the ML engine from a single action (called inline on like/pass/match) */
+async function mlLearnAction(userId: string, action: string, targetUser: any): Promise<void> {
+  try {
+    const { prefs, bandit } = await getMLState(userId);
+    const features = toFeatureVector(targetUser);
+    const signal: LearningSignal = {
+      userId, action: action as any, targetUserId: targetUser.id,
+      targetFeatures: features, timestamp: new Date(),
+    };
+    const updatedPrefs = learnFromSignals(prefs, [signal]);
+    const arm = getProfileArm(features);
+    const rewarded = ['like', 'super_like', 'match', 'move'].includes(action);
+    const updatedBandit = updateBandit(bandit, arm, rewarded);
+    await saveMLState(userId, updatedPrefs, updatedBandit);
+  } catch {} // Non-critical
+}
+
+// ─── Fetch User Comm Style (from messaging service or cached) ───
+// bug-hunt part2 fix #7 + #15 (docs/architecture/bug-hunt-2026-07-part2.md
+// #7, #30) — was hard-coded to localhost:3204, no fetch timeout, no
+// request-id, silent `catch {}`. If messaging wedged, this call hung the
+// social route for the full 60s Express timeout and never emitted an
+// observability signal. Now: env-driven URL, 2s AbortSignal timeout,
+// x-request-id forward when the caller passed one, warn-level log on any
+// failure so the Move-v2 accept-rate KPI can be traced back to a real cause.
+const MESSAGING_SERVICE_URL = process.env.MESSAGING_SERVICE_URL || 'http://localhost:3204';
+const CROSS_SERVICE_FETCH_TIMEOUT_MS = 2_000;
+async function getUserCommStyle(userId: string, requestId?: string): Promise<CommStyleVector | null> {
+  const cacheKey = `commstyle:${userId}`;
+  const cached = activityCache.get(cacheKey);
+  if (cached) return cached;
+  try {
+    const headers: Record<string, string> = {
+      'x-user-id': userId, 'x-internal-key': env.internalServiceKey,
+    };
+    if (requestId && typeof requestId === 'string' && requestId.length <= 128) {
+      headers['x-request-id'] = requestId;
+    }
+    const resp = await fetch(`${MESSAGING_SERVICE_URL}/api/v1/messages/comm-profile/${userId}`, {
+      headers,
+      signal: AbortSignal.timeout(CROSS_SERVICE_FETCH_TIMEOUT_MS),
+    });
+    if (resp.ok) {
+      const data: any = await resp.json();
+      if (data?.data) { activityCache.set(cacheKey, data.data, TTL.ACTIVITY_SUMMARY); return data.data; }
+    }
+  } catch (e) {
+    logger.warn('[social] messaging comm-profile fetch failed:', (e as Error).message);
+  }
+  return null;
+}
+
+// ─── Fetch User Behavioral Cluster + Temporal ───
+async function getUserAnalysis(userId: string): Promise<{ cluster: any; temporal: any } | null> {
+  const cacheKey = `analysis:${userId}`;
+  const cached = activityCache.get(cacheKey);
+  if (cached) return cached;
+  try {
+    const activities = await prisma.userActivity.findMany({
+      where: { userId, createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+      orderBy: { createdAt: 'desc' }, take: 300,
+    });
+    if (activities.length < 5) return null;
+    const analyzer = new UserActivityAnalyzer(userId, activities as RawActivity[]);
+    const result = { cluster: analyzer.determineBehavioralCluster(), temporal: analyzer.buildTemporalPattern() };
+    activityCache.set(cacheKey, result, TTL.ACTIVITY_SUMMARY);
+    return result;
+  } catch { return null; }
+}
+
+// ─── Fetch User's Last N Sent Messages (text only, for move generation) ───
+// bug-hunt part2 fix #7 + #15 — see getUserCommStyle above for the rationale.
+async function getUserLastMessages(userId: string, limit = 10, requestId?: string): Promise<string[]> {
+  try {
+    const headers: Record<string, string> = {
+      'x-user-id': userId, 'x-internal-key': env.internalServiceKey,
+    };
+    if (requestId && typeof requestId === 'string' && requestId.length <= 128) {
+      headers['x-request-id'] = requestId;
+    }
+    const resp = await fetch(`${MESSAGING_SERVICE_URL}/api/v1/messages/sent-texts/${userId}?limit=${limit}`, {
+      headers,
+      signal: AbortSignal.timeout(CROSS_SERVICE_FETCH_TIMEOUT_MS),
+    });
+    if (resp.ok) { const data: any = await resp.json(); return data?.data || []; }
+  } catch (e) {
+    logger.warn('[social] messaging sent-texts fetch failed:', (e as Error).message);
+  }
+  return [];
+}
+
+// ─── Fetch User's Last N Sent Miamo Moves (raw text, for style mirroring) ───
+// The user explicitly opted to send these moves; they're a stronger signal of
+// the writing voice they actually use when courting than chat replies.
+async function getUserLastMoves(userId: string, limit = 10): Promise<string[]> {
+  try {
+    const rows = await prisma.miamoMove.findMany({
+      where: { fromUserId: userId, message: { not: '' } },
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: { message: true },
+    });
+    return rows.map(r => r.message).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+installHealthRoutes(app, 'social', prisma);
+
+// ═══ DISCOVER ════════════════════════════════════════
+// ─── Activity Track Endpoint (receives from gateway) ──
+app.post('/api/v1/activity/track', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const { action, targetType, targetId, metadata, durationMs } = req.body;
+    if (!action || !targetType) return res.status(400).json({ error: { message: 'action and targetType required' } });
+    trackActivity(prisma, req.userId!, action, targetType, targetId, metadata, durationMs);
+    res.json({ data: { tracked: true } });
+  } catch { res.json({ data: { tracked: false } }); }
+});
+
+// ─── Full User Activity Analysis (for advanced features) ──
+app.get('/api/v1/activity/analysis', authMiddleware, async (req: AuthRequest, res: Response) => {
+  try {
+    const userId = req.userId!;
+    const activities = await prisma.userActivity.findMany({
+      where: { userId, createdAt: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } },
+      orderBy: { createdAt: 'desc' },
+      take: 1000,
+    });
+    const analyzer = new UserActivityAnalyzer(userId, activities as RawActivity[]);
+    const analysis = analyzer.analyze();
+    // Convert Sets/Maps to serializable form
+    res.json({
+      data: {
+        userId: analysis.userId,
+        analyzedAt: analysis.analyzedAt,
+        activityCount: analysis.activityCount,
+        engagement: analysis.engagement,
+        cluster: analysis.cluster,
+        temporal: analysis.temporal,
+        contentTaste: {
+          ...analysis.contentTaste,
+          contentTypePrefs: Object.fromEntries(analysis.contentTaste.contentTypePrefs),
+        },
+        responseProfile: {
+          ...analysis.responseProfile,
+          responseByHour: Object.fromEntries(analysis.responseProfile.responseByHour),
+        },
+      },
+    });
+  } catch (err) { res.status(500).json({ error: { message: 'Analysis failed' } }); }
+});
+
+app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { seriousOnly, verifiedOnly, minAge, maxAge, city, cursor,
+      gender, sexuality, lookingFor, smoking, drinking, exercise,
+      education, religion, zodiac, pets, children,
+      minHeight, maxHeight, activeToday, newHere, hasPhotos, aiPicks, distance,
+      diet, politics, languages, maritalStatus, incomeBand, willingToRelocate,
+    } = req.query;
+    const userId = req.userId!;
+    const blocks = await prisma.block.findMany({ where: { OR: [{ blockerId: userId }, { blockedId: userId }] } });
+    const blockedIds = blocks.map(b => b.blockerId === userId ? b.blockedId : b.blockerId);
+    blockedIds.push(userId);
+
+    // Also exclude users already liked/unmatched/reported by this user
+    const sentLikes = await prisma.like.findMany({ where: { fromUserId: userId }, select: { toUserId: true } });
+    sentLikes.forEach(l => { if (!blockedIds.includes(l.toUserId)) blockedIds.push(l.toUserId); });
+    try {
+      const myFeedback = await (prisma as any).matchFeedback.findMany({ where: { userId }, select: { targetUserId: true } });
+      (myFeedback as any[]).forEach((f: any) => { if (!blockedIds.includes(f.targetUserId)) blockedIds.push(f.targetUserId); });
+    } catch {}
+    // Exclude users who were reported by anyone (multiple reports = likely problematic)
+    const reportedUsers = await prisma.report.groupBy({ by: ['reportedId'], _count: true, having: { reportedId: { _count: { gte: 2 } } } });
+    reportedUsers.forEach((r: any) => { if (!blockedIds.includes(r.reportedId)) blockedIds.push(r.reportedId); });
+
+    // v3.5.1 hard-filter: drop profiles the user actively passed on within
+    // the last 30d from the candidate pool entirely (was a soft penalty,
+    // which led to the #1 user complaint: "you show me people I passed").
+    // Flag-gated via DISCOVER_PASS_HARDFILTER_ENABLED (default on).
+    const passedIds = await getRecentPassedTargetIds(prisma as any, userId);
+    for (const pid of passedIds) {
+      if (!blockedIds.includes(pid)) blockedIds.push(pid);
+    }
+
+    const where: any = { active: true, deactivated: false, id: { notIn: blockedIds }, privacySettings: { profileVisible: true } };
+    const profileWhere: any = {};
+    if (seriousOnly === 'true') profileWhere.seriousMode = true;
+    // bug-hunt fix #14 (docs/architecture/bug-hunt-2026-07.md #39, P2) —
+    // parseInt used to accept `"1e10"` (silently → 1), `"999"` (unrealistic),
+    // negative numbers, and NaN fallthrough. clampInt returns undefined for
+    // non-finite input so the filter is only applied when the value is real.
+    const minAgeI = clampInt(minAge, 18, 99);
+    const maxAgeI = clampInt(maxAge, 18, 99);
+    if (minAgeI !== undefined) profileWhere.age = { ...profileWhere.age, gte: minAgeI };
+    if (maxAgeI !== undefined) profileWhere.age = { ...profileWhere.age, lte: maxAgeI };
+    if (city) profileWhere.city = { contains: city as string, mode: 'insensitive' };
+
+    // ── Gender (comma-separated, e.g. "male,female") ──
+    if (gender) {
+      const genders = (gender as string).split(',').map(g => g.trim()).filter(Boolean);
+      if (genders.length === 1) profileWhere.gender = { equals: genders[0], mode: 'insensitive' };
+      else if (genders.length > 1) profileWhere.gender = { in: genders, mode: 'insensitive' };
+    }
+    // ── Sexuality (comma-separated) ──
+    if (sexuality) {
+      const vals = (sexuality as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.sexuality = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.sexuality = { in: vals, mode: 'insensitive' };
+    }
+    // ── Looking For (comma-separated) ──
+    if (lookingFor) {
+      const vals = (lookingFor as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.lookingFor = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.lookingFor = { in: vals, mode: 'insensitive' };
+    }
+    // ── Lifestyle filters: smoking, drinking, exercise ──
+    if (smoking) {
+      const vals = (smoking as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.smoking = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.smoking = { in: vals, mode: 'insensitive' };
+    }
+    if (drinking) {
+      const vals = (drinking as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.drinking = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.drinking = { in: vals, mode: 'insensitive' };
+    }
+    if (exercise) {
+      const vals = (exercise as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.exercise = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.exercise = { in: vals, mode: 'insensitive' };
+    }
+    // ── Education, Religion, Zodiac, Pets, Children ──
+    if (education) {
+      const vals = (education as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.education = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.education = { in: vals, mode: 'insensitive' };
+    }
+    if (religion) {
+      const vals = (religion as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length > 0) profileWhere.religion = { contains: vals[0], mode: 'insensitive' };
+    }
+    if (zodiac) {
+      const vals = (zodiac as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.zodiac = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.zodiac = { in: vals, mode: 'insensitive' };
+    }
+    if (pets) {
+      const vals = (pets as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.pets = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.pets = { in: vals, mode: 'insensitive' };
+    }
+    if (children) {
+      const vals = (children as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.children = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.children = { in: vals, mode: 'insensitive' };
+    }
+    // ── Diet / Politics / Languages (multi-select chips) ──
+    if (diet) {
+      const vals = (diet as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.diet = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.diet = { in: vals, mode: 'insensitive' };
+    }
+    if (politics) {
+      const vals = (politics as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.politicalViews = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.politicalViews = { in: vals, mode: 'insensitive' };
+    }
+    if (languages) {
+      // Languages is a comma-separated string column on Profile; match if any selected language appears.
+      const vals = (languages as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length > 0) profileWhere.languages = { contains: vals[0], mode: 'insensitive' };
+    }
+    // ── Matrimony fields (DTM) ──
+    if (maritalStatus) {
+      const vals = (maritalStatus as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.maritalStatus = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.maritalStatus = { in: vals, mode: 'insensitive' };
+    }
+    if (incomeBand) {
+      const vals = (incomeBand as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.incomeBand = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.incomeBand = { in: vals, mode: 'insensitive' };
+    }
+    if (willingToRelocate === 'true') profileWhere.willingToRelocate = true;
+    // ── Height range ──
+    if (minHeight) profileWhere.height = { ...profileWhere.height, gte: parseInt(minHeight as string) };
+    if (maxHeight) profileWhere.height = { ...profileWhere.height, lte: parseInt(maxHeight as string) };
+    // ── Active today (online or active within 24h) ──
+    if (activeToday === 'true') {
+      profileWhere.OR = [
+        { online: true },
+        { lastActive: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+      ];
+    }
+
+    if (Object.keys(profileWhere).length > 0) where.profile = profileWhere;
+    if (verifiedOnly === 'true') where.verified = true;
+    // ── New Here (joined within 7 days) ──
+    if (newHere === 'true') where.createdAt = { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
+    // ── Has photos ──
+    if (hasPhotos === 'true') where.photos = { some: {} };
+
+    // v6.7: paginate in batches of 10. The client requests a fresh batch
+    // every time the user has consumed the previous 10 cards, which forces
+    // each request to re-evaluate every signal (freshly-built behavior
+    // vector, ML state, drift, session context, compat cache, impression
+    // fatigue) so the very next 10 cards reflect what the user *just* did.
+    // We over-fetch (3x the page size) so MinHeap has room to rank.
+    const requestedLimit = Math.max(1, Math.min(50, parseInt((req.query.limit as string) || '10', 10) || 10));
+    const fetchPool = Math.max(30, requestedLimit * 3);
+    const users = await prisma.user.findMany({
+      where, include: { profile: true, photos: { orderBy: { position: 'asc' } }, prompts: { orderBy: { position: 'asc' } }, interests: true },
+      take: fetchPool, ...(cursor ? { cursor: { id: cursor as string }, skip: 1 } : {}),
+    });
+
+    const myProfile = await prisma.profile.findUnique({ where: { userId } });
+    const myInterests = await prisma.profileInterest.findMany({ where: { userId } });
+    const myInterestNames = myInterests.map(i => i.name);
+
+    // ── Distance filter (Haversine on cityLat/cityLng) ──
+    // Applies only when both ends have coords AND `distance` query param
+    // is a positive number. Without coords we silently skip — clients
+    // shouldn't see an empty pool just because a profile is missing geo.
+    // bug-hunt fix #15 (docs/architecture/bug-hunt-2026-07.md #40, P2) —
+    // parseFloat used to accept Infinity, negative, and NaN. Now clamped to
+    // [0, 20000] km (earth-antipode); anything unfriendly returns undefined
+    // and the filter is skipped, matching the prior graceful-degradation
+    // contract.
+    const distanceKmClamped = distance !== undefined ? clampFloat(distance, 0, 20000) : undefined;
+    const distanceKmLimit = distanceKmClamped ?? NaN;
+    const myLat = (myProfile as any)?.cityLat as number | null;
+    const myLng = (myProfile as any)?.cityLng as number | null;
+    if (Number.isFinite(distanceKmLimit) && distanceKmLimit > 0 && myLat != null && myLng != null) {
+      const within = users.filter((u) => {
+        const cLat = (u.profile as any)?.cityLat as number | null;
+        const cLng = (u.profile as any)?.cityLng as number | null;
+        if (cLat == null || cLng == null) return false;
+        return distanceKm(myLat, myLng, cLat, cLng) <= distanceKmLimit;
+      });
+      // Splice in place so the rest of the pipeline (which references `users`)
+      // sees the filtered pool. Keeping `users` as the same reference avoids
+      // a sweeping rename of all downstream usages.
+      users.length = 0;
+      users.push(...within);
+    }
+
+    // Get my active vibe for vibe-compatibility scoring
+    let myVibe: any = null;
+    try { myVibe = await prisma.vibeCheck.findFirst({ where: { userId, active: true }, orderBy: { createdAt: 'desc' } }); } catch {}
+
+    // Get active vibes from other users (for vibe scoring)
+    const activeVibeMap = new Map<string, any>();
+    try {
+      const activeVibes = await prisma.vibeCheck.findMany({
+        where: { active: true, userId: { in: users.map(u => u.id) }, createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+      });
+      activeVibes.forEach(v => activeVibeMap.set(v.userId, v));
+    } catch {}
+
+    // ── Behavioral intelligence: analyze user's past actions ──
+    const behavior = await getUserBehaviorVector(userId);
+
+    // ── ML Engine: Load learned preferences + session context + drift ──
+    const mlState = await getMLState(userId);
+    const sessionSignals = await getSessionSignals(userId);
+    const historicalLikeRate = behavior.interactionPatterns['like']
+      ? behavior.interactionPatterns['like'] / (behavior.interactionPatterns['like'] + (behavior.interactionPatterns['pass'] || 1))
+      : 0.3;
+    const sessionCtx = detectSessionContext(sessionSignals, historicalLikeRate, mlState.prefs);
+    const allSignals = await buildLearningSignals(userId, 200);
+    const drift = detectPreferenceDrift(allSignals);
+
+    // If ML model has no signals yet, bootstrap from activity history
+    if (mlState.prefs.signalCount === 0 && allSignals.length > 0) {
+      mlState.prefs = learnFromSignals(null, allSignals);
+      saveMLState(userId, mlState.prefs, mlState.bandit); // fire-and-forget
+    }
+
+    // ── v6.8: revealed-intent classifier + negative-signal engine + diversifier ──
+    // (1) Intent: read last 14d of EventAggDaily for this uidHash, classify
+    //     stated vs revealed. Drives weight blending and diversifier knobs.
+    // (2) Negative profile: pull last 90d of Block + Report + MatchFeedback
+    //     (unmatch/block/report) joined back to the offender's profile, build
+    //     a trait-penalty function applied per candidate.
+    // (3) Diversifier: replaces the raw MinHeap drain with a refresh-aware
+    //     ordering that prevents loops, varies per cursor page, and slots
+    //     "new" profiles based on the user's revealed novelty affinity.
+    let intentReport: ReturnType<typeof classifyIntent> = {
+      stated: 'unknown', revealed: 'exploring', weights: { serious: 0.34, dtm: 0.33, casual: 0.33 },
+      confidence: 0, mismatch: 0, signalCount: 0, dominantSignals: [],
+    };
+    let negProfile = buildNegativeProfile([]);
+    let noveltyAffinity = 0.5;
+    const prevShownIds = new Set<string>();
+    try {
+      const myHash = hashUid(userId);
+      const since14d = new Date(Date.now() - 14 * 86400000);
+      const dailyEvents = (await (prisma as any).eventAggDaily.findMany({
+        where: { uidHash: myHash, day: { gte: since14d } },
+        select: { evt: true, day: true, count: true, durSum: true },
+      }).catch(() => [])) as DailyEventRow[];
+
+      // Recent route navigations (last 14d) — reuse from UserActivity
+      // since route.navigate isn't always in the daily aggregate yet.
+      const recentRoutes = (await prisma.userActivity.findMany({
+        where: { userId, action: 'route', createdAt: { gte: since14d } },
+        select: { metadata: true, createdAt: true },
+        take: 200,
+      }).catch(() => [])).map((r: any) => ({
+        path: (r.metadata as any)?.path || '',
+        daysAgo: (Date.now() - new Date(r.createdAt).getTime()) / 86400000,
+      })).filter(r => r.path);
+
+      intentReport = classifyIntent({
+        statedIntent: (myProfile as any)?.datingIntent ?? null,
+        seriousMode: (myProfile as any)?.seriousMode ?? null,
+        dailyEvents,
+        recentRoutes,
+      });
+
+      // novelty affinity: ratio of likes/dwells on users joined in last 7d
+      // proxied by signal count of `card.dwell.long` over `discover.swipe`.
+      const longDwell = dailyEvents.filter(e => e.evt === 'card.dwell.long').reduce((s, e) => s + e.count, 0);
+      const totalSwipes = dailyEvents.filter(e => e.evt === 'discover.swipe').reduce((s, e) => s + e.count, 0);
+      noveltyAffinity = totalSwipes > 0 ? Math.min(1, longDwell / Math.max(1, totalSwipes)) : 0.5;
+
+      // Previously-acted-on in last 60min — no-repeat window. We exclude
+      // plain 'view' (which trackActivity writes for every scored candidate
+      // in the SAME request, so it would self-filter the entire pool) and
+      // only dedupe against actual user interactions (like/pass/match/swipe).
+      const recentViews = await prisma.userActivity.findMany({
+        where: { userId, action: { in: ['like', 'pass', 'match', 'swipe', 'super_like'] }, targetType: 'profile', createdAt: { gte: new Date(Date.now() - 3600_000) } },
+        select: { targetId: true },
+        take: 200,
+      }).catch(() => []);
+      recentViews.forEach((r: any) => r.targetId && prevShownIds.add(r.targetId));
+
+      // ── Negative events: Block + Report + MatchFeedback (last 90d) ──
+      const since90d = new Date(Date.now() - 90 * 86400000);
+      const myBlocks = await prisma.block.findMany({
+        where: { blockerId: userId, createdAt: { gte: since90d } },
+        select: { blockedId: true, reason: true, createdAt: true },
+      }).catch(() => []);
+      const myReports = await prisma.report.findMany({
+        where: { reporterId: userId, createdAt: { gte: since90d } },
+        select: { reportedId: true, reason: true, createdAt: true },
+      }).catch(() => []);
+      const myMfb = await (prisma as any).matchFeedback.findMany({
+        where: { userId, type: { in: ['unmatch', 'block', 'report', 'pass_reason'] }, createdAt: { gte: since90d } },
+        select: { targetUserId: true, type: true, reason: true, createdAt: true },
+      }).catch(() => []);
+
+      const offenderIds = new Set<string>();
+      myBlocks.forEach((b: any) => offenderIds.add(b.blockedId));
+      myReports.forEach((r: any) => offenderIds.add(r.reportedId));
+      myMfb.forEach((f: any) => f.targetUserId && offenderIds.add(f.targetUserId));
+
+      let traitsByUser = new Map<string, TraitSnapshot>();
+      if (offenderIds.size > 0) {
+        const offenderUsers = await prisma.user.findMany({
+          where: { id: { in: Array.from(offenderIds) } },
+          select: { id: true, verified: true, profile: { select: { city: true, age: true, smoking: true, drinking: true, religion: true, datingIntent: true, education: true } } },
+        }).catch(() => []);
+        for (const u of offenderUsers as any[]) {
+          traitsByUser.set(u.id, {
+            city: u.profile?.city ?? null,
+            ageBucket: ageBucket(u.profile?.age),
+            smoking: u.profile?.smoking ?? null,
+            drinking: u.profile?.drinking ?? null,
+            religion: u.profile?.religion ?? null,
+            datingIntent: u.profile?.datingIntent ?? null,
+            education: u.profile?.education ?? null,
+            verified: u.verified ?? null,
+          });
+        }
+      }
+
+      const negEvents: NegativeEvent[] = [];
+      const daysAgo = (d: Date) => (Date.now() - new Date(d).getTime()) / 86400000;
+      myBlocks.forEach((b: any) => {
+        const t = traitsByUser.get(b.blockedId);
+        if (t) negEvents.push({ kind: 'block', targetTraits: t, daysAgo: daysAgo(b.createdAt), reason: b.reason });
+      });
+      myReports.forEach((r: any) => {
+        const t = traitsByUser.get(r.reportedId);
+        if (t) negEvents.push({ kind: 'report', targetTraits: t, daysAgo: daysAgo(r.createdAt), reason: r.reason });
+      });
+      myMfb.forEach((f: any) => {
+        const t = traitsByUser.get(f.targetUserId);
+        if (!t) return;
+        const kind: NegativeEvent['kind'] = f.type === 'unmatch' ? 'unmatch' : f.type === 'pass_reason' ? 'pass_feedback' : (f.type as any);
+        negEvents.push({ kind, targetTraits: t, daysAgo: daysAgo(f.createdAt), reason: f.reason });
+      });
+      negProfile = buildNegativeProfile(negEvents);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[discover] intent/negative pipeline soft-failed:', (e as Error).message);
+    }
+
+    // Derive session mood from sessionCtx already computed.
+    const sessionMood: 'exploring' | 'selective' | 'rush' | 'normal' = (() => {
+      if (sessionCtx.isExploring) return 'exploring';
+      if (sessionCtx.trendingDown && sessionCtx.actionCount > 5) return 'selective';
+      if (sessionCtx.trendingUp && sessionCtx.actionCount > 10) return 'rush';
+      return 'normal';
+    })();
+
+    // ── Determine active algorithm from query params ──
+    type FilterAlgo = 'forYou' | 'new' | 'active' | 'verified' | 'serious' | 'aiPicks';
+    let activeAlgo: FilterAlgo = 'forYou';
+    if (aiPicks === 'true') activeAlgo = 'aiPicks';
+    else if (seriousOnly === 'true') activeAlgo = 'serious';
+    else if (verifiedOnly === 'true') activeAlgo = 'verified';
+    else if (newHere === 'true') activeAlgo = 'new';
+    else if (activeToday === 'true') activeAlgo = 'active';
+
+    // Weight blender — modulates legacy score by stated/revealed gap.
+    const blend = blendWeights(activeAlgo, intentReport.revealed, intentReport.confidence);
+
+    // ── For AI Picks: fetch match history insights ──
+    let matchHistoryInsights: MatchHistoryInsights = { avgMatchDuration: 0, commonTraitsInSuccessful: [], unmatchReasons: {} };
+    if (activeAlgo === 'aiPicks') {
+      try {
+        const pastMatches = await prisma.match.findMany({
+          where: { OR: [{ user1Id: userId }, { user2Id: userId }] },
+          include: { user1: { include: { profile: true, interests: true } }, user2: { include: { profile: true, interests: true } } },
+        });
+        const successfulTraits: Record<string, number> = {};
+        let totalDuration = 0, activeLongMatches = 0;
+        for (const m of pastMatches) {
+          const other = m.user1Id === userId ? m.user2 : m.user1;
+          const matchAge = Date.now() - new Date(m.createdAt).getTime();
+          if (m.active && matchAge > 7 * 24 * 60 * 60 * 1000) {
+            activeLongMatches++; totalDuration += matchAge;
+            other.interests?.forEach(i => { successfulTraits[i.name] = (successfulTraits[i.name] || 0) + 2; });
+            if (other.profile?.datingIntent) successfulTraits[`intent:${other.profile.datingIntent}`] = (successfulTraits[`intent:${other.profile.datingIntent}`] || 0) + 3;
+            if (other.profile?.city) successfulTraits[`city:${other.profile.city.toLowerCase()}`] = (successfulTraits[`city:${other.profile.city.toLowerCase()}`] || 0) + 2;
+          }
+        }
+        if (activeLongMatches > 0) matchHistoryInsights.avgMatchDuration = totalDuration / activeLongMatches;
+        matchHistoryInsights.commonTraitsInSuccessful = Object.entries(successfulTraits).sort((a, b) => b[1] - a[1]).slice(0, 10).map(e => e[0]);
+      } catch {}
+    }
+
+    // ── For Verified filter: compute interest popularity for rarity weighting ──
+    let interestPopularity: Map<string, number> | undefined;
+    if (activeAlgo === 'verified') {
+      interestPopularity = new Map();
+      for (const u of users) {
+        for (const i of u.interests) {
+          interestPopularity.set(i.name, (interestPopularity.get(i.name) || 0) + 1);
+        }
+      }
+    }
+
+    // ── Tracking compat cache lookup (v3.1) ──
+    // One query: pull precomputed pair scores for (me, candidates). The cache
+    // is written by services/tracking-worker/src/compat.ts every 15 min.
+    // Missing rows simply contribute 0 — the cache is a hint, not authority.
+    const compatBoost = new Map<string, number>(); // candidateId → 0..10
+    try {
+      const myHash = hashUid(userId);
+      const candHashes = users.map(u => hashUid(u.id));
+      const idByHash = new Map<string, string>();
+      users.forEach((u, i) => idByHash.set(candHashes[i], u.id));
+      const rows = (await prisma.$queryRawUnsafe(
+        `SELECT "bHash","finalScore" FROM "PairCompatCache"
+         WHERE "aHash" = $1 AND "bHash" = ANY($2::text[])`,
+        myHash, candHashes,
+      )) as Array<{ bHash: string; finalScore: number }>;
+      for (const r of rows) {
+        const candId = idByHash.get(r.bHash);
+        if (candId) compatBoost.set(candId, Math.max(0, Math.min(10, r.finalScore * 10)));
+      }
+    } catch { /* cache miss / table not present → silent fallback */ }
+
+    // ── v4 ranker (flag-gated; replaces legacy discoverScore when on) ──
+    // When ALGO_V4_RANK_ENABLED_DISCOVER=1, route the per-filter scoring
+    // through services/shared/src/algo/* using the SignalReader. The score
+    // returned is 0..100 and is used in place of discoverScore. compatBoost
+    // is bypassed when v4 is on (already folded into PairCompatCache reads).
+    let v4Scores: Map<string, number> | null = null;
+    if (v4RankEnabled('discover')) {
+      try {
+        const reader = new PrismaSignalReader(prisma);
+        const myHash = reader.hashOf(userId);
+        const candEntries = users.map((u) => ({
+          id: u.id,
+          intent: (u.profile as { datingIntent?: string } | null)?.datingIntent ?? null,
+          age: (u.profile as { age?: number } | null)?.age ?? null,
+          interests: u.interests.map((i) => i.name),
+          cityKm: null as number | null,
+        }));
+        const candHashes = candEntries.map((c) => reader.hashOf(c.id));
+        // v3.6.1 perf: prefetch every feature row in parallel instead of
+        // awaiting one per candidate inside the loop. The LRU inside
+        // `reader.features` collapses duplicates and warm cache hits return
+        // immediately, so this is strictly faster (≤1 DB round trip per
+        // unique miss, in parallel) than the previous serial-await pattern
+        // which was 30–60 sequential awaits per request.
+        const [me, candFeats, pairMap, priorMap, imprMap] = await Promise.all([
+          reader.features(myHash),
+          Promise.all(candHashes.map((h) => reader.features(h))),
+          reader.pairCompat(myHash, candHashes),
+          reader.priorTargets(myHash, candHashes, 14),
+          reader.targetImpressions(myHash, candHashes, 7),
+        ]);
+        v4Scores = new Map();
+        const myIntent = (myProfile as { datingIntent?: string } | null)?.datingIntent ?? null;
+        const myAge = (myProfile as { age?: number } | null)?.age ?? null;
+        const myInts = myInterestNames;
+        for (let i = 0; i < candEntries.length; i++) {
+          const c = candEntries[i];
+          const candFeat = candFeats[i];
+          const baseInputs = {
+            me, cand: candFeat,
+            myIntent, candIntent: c.intent,
+            myAge, candAge: c.age, cityKm: c.cityKm,
+            myInterests: myInts, candInterests: c.interests,
+            pair: pairMap.get(candHashes[i]),
+            priorCount: priorMap.get(candHashes[i]) || 0,
+            impressionsLast48h: 0,
+            consent: 'full' as const,
+          };
+          let s = 0;
+          const u = users[i];
+          const verified = u.verified === true;
+          switch (activeAlgo) {
+            case 'new':
+              s = scoreNewV4({ ...baseInputs, candCreatedAtMs: new Date(u.createdAt).getTime(), verified, completeness: 0.5 }).score;
+              break;
+            case 'active':
+              s = scoreActiveV4({ ...baseInputs, candLastHeartbeatMs: null }).score;
+              break;
+            case 'verified':
+              s = scoreVerifiedV4({ ...baseInputs, photoVerified: verified, phoneVerified: verified, idVerified: false }).score;
+              break;
+            case 'serious':
+              s = scoreSeriousV4({ ...baseInputs, dtmCompletes90d: 0, lovelangCompat: null, completeness: 0.5 }).score;
+              break;
+            case 'aiPicks':
+              s = scoreAiPicksV4({ ...baseInputs, subs: { cf: 50, active: 50, serious: 50, matchHistoryAffinity: 50, vibeMomentum: 50 } }).score;
+              break;
+            case 'forYou':
+            default: {
+              const r = await rankForYou(reader, userId, [c], 'full');
+              s = r[0]?.score ?? 0;
+              break;
+            }
+          }
+          v4Scores.set(c.id, s);
+        }
+        // Apply per-candidate impression-fatigue penalty (bandit-style).
+        if (v4Scores && imprMap.size > 0) {
+          for (let i = 0; i < candEntries.length; i++) {
+            const c = candEntries[i];
+            const skipped = imprMap.get(candHashes[i]) || 0;
+            if (skipped <= 0) continue;
+            const penalty = postImpressionPenalty(skipped, 6 * 3600, 12);
+            v4Scores.set(c.id, Math.max(0, (v4Scores.get(c.id) ?? 0) - penalty));
+          }
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[discover] v4 ranker failed, falling back to legacy:', (e as Error).message);
+        v4Scores = null;
+      }
+    }
+
+    // ── ALGORITHM DISPATCH ──
+    // Each discover filter tab uses a completely different scoring algorithm.
+    // The algorithm selection is driven by the "filter" query param from the client.
+    // All algorithms return a 0-100 score. We score the entire candidate pool
+    // (not just top-N) so the v6.8 diversifier can pull wildcards from the tail.
+    // See services/shared/algorithms.ts for full implementation of each scorer.
+    const scoredAll: Array<{ score: number; user: any; isNew: boolean; ageBucket?: string; city?: string }> = [];
+
+    for (const u of users) {
+      const { passwordHash, ...userData } = u;
+      const commonInterests = u.interests.filter(i => myInterestNames.includes(i.name)).map(i => i.name);
+
+      // Prepare vibe data for this candidate
+      const rawVibe = activeVibeMap.get(u.id);
+      const candidateVibe: VibeData | null = rawVibe ? {
+        mood: rawVibe.mood, intent: rawVibe.intent,
+        topics: rawVibe.topics ? JSON.parse(rawVibe.topics) : [],
+      } : null;
+      const myVibeData: VibeData | null = myVibe ? {
+        mood: myVibe.mood, intent: myVibe.intent,
+        topics: myVibe.topics ? JSON.parse(myVibe.topics) : [],
+      } : null;
+
+      // Cast profile for algorithm functions
+      const candidateUser: CandidateUser = {
+        id: u.id, verified: u.verified, createdAt: u.createdAt,
+        profile: u.profile as any, interests: u.interests, photos: u.photos, prompts: u.prompts,
+      };
+
+      // ── DISPATCH to the correct algorithm based on active filter ──
+      // Each algorithm emphasizes different signals:
+      //   forYou:   cosine similarity on learned preference vector
+      //   new:      exponential recency decay (fresh profiles first)
+      //   active:   responsiveness & engagement metrics
+      //   verified: rare-interest IDF weighting (verified pool only)
+      //   serious:  long-term compatibility (values, lifestyle, family goals)
+      //   aiPicks:  6-model ensemble with collaborative filtering
+      let discoverScore: number;
+      switch (activeAlgo) {
+        case 'new':
+          discoverScore = scoreNew(candidateUser, myInterestNames);
+          break;
+        case 'active':
+          discoverScore = scoreActive(myProfile as any, candidateUser, myInterestNames);
+          break;
+        case 'verified':
+          discoverScore = scoreVerified(myProfile as any, candidateUser, myInterestNames, interestPopularity);
+          break;
+        case 'serious':
+          discoverScore = scoreSerious(myProfile as any, candidateUser, myInterestNames);
+          break;
+        case 'aiPicks':
+          discoverScore = scoreAiPicks(myProfile as any, candidateUser, myInterestNames, behavior, matchHistoryInsights, myVibeData, candidateVibe);
+          break;
+        case 'forYou':
+        default:
+          discoverScore = scoreForYou(myProfile as any, candidateUser, myInterestNames, behavior, myVibeData, candidateVibe);
+          break;
+      }
+
+      // ── Algorithm-backed relevance bonus (behavioral preference ranking) ──
+      const filterBonus = computeFilterRelevanceBonus(
+        candidateUser.profile as any || {},
+        behavior,
+        { city: city as string || undefined, intent: lookingFor as string || undefined, ageMin: minAge ? parseInt(minAge as string) : undefined, ageMax: maxAge ? parseInt(maxAge as string) : undefined, serious: seriousOnly === 'true' },
+      );
+
+      // ── ML Engine Score: Adaptive learned preferences + session + drift + explore ──
+      const candidateFeatures = toFeatureVector(u);
+      const { mlScore, breakdown: mlBreakdown } = computeMLScore(candidateFeatures, mlState.prefs, sessionCtx, drift, mlState.bandit);
+
+      // ── v6.8: blend boost (intent-aware) + negative-trait penalty ──
+      // If revealed intent disagrees with the chosen filter, fold a small
+      // dose of an adjacent algorithm so the result reflects what the user
+      // *does*, not what the filter literally says. Capped at 35% influence.
+      let blendBoost = 0;
+      if (blend.seriousBlend > 0) {
+        const sScore = scoreSerious(myProfile as any, candidateUser, myInterestNames);
+        blendBoost += sScore * blend.seriousBlend;
+      }
+      if (blend.noveltyBlend > 0) {
+        const nScore = scoreNew(candidateUser, myInterestNames);
+        blendBoost += nScore * blend.noveltyBlend;
+      }
+      if (blend.activityBlend > 0) {
+        const aScore = scoreActive(myProfile as any, candidateUser, myInterestNames);
+        blendBoost += aScore * blend.activityBlend;
+      }
+      // Negative penalty from this user's prior block/report/unmatch traits.
+      const candTraits: TraitSnapshot = {
+        city: u.profile?.city ?? null,
+        ageBucket: ageBucket(u.profile?.age),
+        smoking: (u.profile as any)?.smoking ?? null,
+        drinking: (u.profile as any)?.drinking ?? null,
+        religion: (u.profile as any)?.religion ?? null,
+        datingIntent: (u.profile as any)?.datingIntent ?? null,
+        education: (u.profile as any)?.education ?? null,
+        verified: u.verified,
+      };
+      const { penalty: negPen } = negativePenalty(negProfile, candTraits);
+
+      const baseScore = v4Scores
+        ? (v4Scores.get(u.id) ?? discoverScore)
+        : (discoverScore * blend.primary + filterBonus + mlScore + (compatBoost.get(u.id) || 0));
+      const finalScore = Math.max(0, Math.min(100, baseScore + blendBoost - negPen));
+
+      // Track profile view activity
+      trackActivity(prisma, userId, 'view', 'profile', u.id, { city: u.profile?.city, age: u.profile?.age, intent: u.profile?.datingIntent });
+
+      const sevenDays = 7 * 86400000;
+      scoredAll.push({
+        score: finalScore,
+        user: { ...userData, commonInterests, discoverScore: finalScore, algorithm: activeAlgo, mlBoost: mlScore, negPenalty: negPen },
+        isNew: (Date.now() - new Date(u.createdAt).getTime()) < sevenDays,
+        ageBucket: ageBucket(u.profile?.age) || undefined,
+        city: u.profile?.city || undefined,
+      });
+    }
+
+    // ── v3.6.0 v8: multi-objective rescoring (flag-gated, additive) ──
+    // When ALGO_V8_DISCOVER_RANKER_ENABLED=1 we replace each candidate's
+    // final score with a 5-objective compose(relevance, earnedVisibility,
+    // fairnessFloor, recencyFreshness, intentFitRightNow). When OFF, this
+    // block is a no-op — existing diversifier sees the legacy scores.
+    // v1.2 session 14 — Task 2: adds `intentOverride` bit so callers/tests
+    // can distinguish inferred-vs-overridden intent in the meta payload.
+    let v8MoBlock: { applied: boolean; intentClass: string | null; intentOverride: boolean; top10Unlocked: boolean; isPremium: boolean } = { applied: false, intentClass: null, intentOverride: false, top10Unlocked: false, isPremium: false };
+    if (isV8DiscoverRankerEnabled() && scoredAll.length > 0) {
+      try {
+        const requesterHash = hashUid(userId);
+        // v3.6.0 — resolve requester premium once per request (60s cache).
+        // Drives Top-10 threshold scaling (premium → 30/1.5 = 20 credits).
+        const requesterIsPremium = await isUserPremium(prisma, userId);
+        // Sum the requester's last-24h exposure credits on the discover surface
+        // to decide whether the daily Top-10 stack is unlocked. Read-only here;
+        // the Top-10 surfacing itself happens in /api/v1/weekly-top.
+        let requesterTop10Unlocked = false;
+        try {
+          const since24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+          const rows = await prisma.exposureLedger.findMany({
+            where: { uidHash: requesterHash, surface: 'discover', createdAt: { gte: since24h } },
+            select: { deltaSlots: true },
+          });
+          const creditsLast24h = rows.reduce((s, r) => s + (r.deltaSlots || 0), 0);
+          requesterTop10Unlocked = meetsDailyTop10Threshold(creditsLast24h, requesterIsPremium);
+        } catch { /* best-effort; stays false on read failure */ }
+        const snap = await prisma.featureSnapshot.findUnique({ where: { uidHash: requesterHash } }).catch(() => null);
+        const raw = (snap?.raw as any) || {};
+        const nowMs = Date.now();
+        // Read intent + mood from FeatureSnapshot.raw if present and not stale.
+        let intentRightNow: { topClass: string; confidence: number } | null = null;
+        const ir = raw.intentRightNow;
+        if (ir && typeof ir === 'object' && typeof ir.topClass === 'string' && Number.isFinite(ir.computedAt) && Number.isFinite(ir.ttlMs)) {
+          if (ir.computedAt + ir.ttlMs > nowMs) intentRightNow = { topClass: String(ir.topClass), confidence: Number(ir.confidence ?? 0.5) };
+        }
+        // v1.2 session 14 — Task 2: consume Settings.manualIntentOverride.
+        // Session 13 shipped the write endpoint (PUT /settings/intent-override)
+        // and the column; here we finally consume it in the ranker. When the
+        // flag is ON *and* the user has an override set, we replace the
+        // inferred class with the override at full confidence. Flag OFF keeps
+        // legacy behaviour identical (hard constraint).
+        let intentOverrideApplied = false;
+        if (isIntentVisibilityEnabled()) {
+          try {
+            const s = await prisma.settings.findUnique({
+              where: { userId },
+              select: { manualIntentOverride: true } as any,
+            }).catch(() => null) as any;
+            const override: string | null = s?.manualIntentOverride ?? null;
+            if (override) {
+              intentRightNow = { topClass: override, confidence: 1 };
+              intentOverrideApplied = true;
+              // Observability — fire the event once per ranked /discover call
+              // when the override actually took effect. Growth reads this via
+              // the daily rollup to size how often users override the inferred
+              // class (a proxy for inference trust).
+              try {
+                emitServerEvent(prisma, req.userId!, 'intent.override_applied' as any, {
+                  override,
+                  inferred: (ir && typeof ir?.topClass === 'string') ? ir.topClass : null,
+                });
+              } catch { /* best-effort — never break the ranker on emit failure */ }
+            }
+          } catch { /* soft — no override on read failure */ }
+        }
+        // Exposure credits lookup per candidate (bulk read keyed by hash)
+        const candHashes = scoredAll.map((s) => hashUid(s.user.id));
+        const credits = await prisma.exposureCredit.findMany({ where: { uidHash: { in: candHashes }, surface: 'discover' } }).catch(() => [] as Array<{ uidHash: string; slotsEarned: number; slotsSpent: number }>);
+        const creditByHash = new Map<string, number>();
+        for (const c of credits) creditByHash.set(c.uidHash, Math.max(0, (c.slotsEarned || 0) - (c.slotsSpent || 0)));
+        const maxCredit = Math.max(1, ...Array.from(creditByHash.values()));
+
+        for (const s of scoredAll) {
+          const candHash = hashUid(s.user.id);
+          const relevance = Math.max(0, Math.min(1, (s.score || 0) / 100));
+          const earnedVisibilityBoost = Math.min(0.2, ((creditByHash.get(candHash) ?? 0) / maxCredit) * 0.2);
+          const fairnessFloor = 0.5; // conservative neutral baseline; the rerank step is the corrective primary
+          const lastActive = (s.user as any)?.profile?.lastActive ? new Date((s.user as any).profile.lastActive).getTime() : (s.user as any)?.lastActive ? new Date((s.user as any).lastActive).getTime() : null;
+          const staleHours = lastActive ? Math.max(0, (nowMs - lastActive) / 3_600_000) : 168;
+          const recencyFreshness = expDecay(staleHours, 168);
+          // Intent fit heuristic per spec: dampen mood-replies/review_existing,
+          // boost serious_search matches whose intent agrees, dampen distraction_browse on low-engagement.
+          let intentFit: number | null = null;
+          if (intentRightNow) {
+            const cls = intentRightNow.topClass;
+            const candIntent = String((s.user as any)?.profile?.datingIntent || '');
+            if (cls === 'reply_mood' || cls === 'review_existing') intentFit = 0.3;
+            else if (cls === 'serious_search') intentFit = candIntent === 'serious' || candIntent === 'long-term' ? 0.9 : 0.4;
+            else if (cls === 'distraction_browse') intentFit = relevance < 0.3 ? 0.2 : 0.5;
+            else intentFit = 0.5;
+          }
+          const score01 = scoreMultiObjective({
+            relevance,
+            earnedVisibilityBoost,
+            fairnessFloor,
+            recencyFreshness,
+            intentFitRightNow: intentFit,
+          });
+          s.score = Math.max(0, Math.min(100, score01 * 100));
+          (s.user as any).discoverScore = s.score;
+          (s.user as any).v8Score = score01;
+        }
+        v8MoBlock = { applied: true, intentClass: intentRightNow?.topClass ?? null, intentOverride: intentOverrideApplied, top10Unlocked: requesterTop10Unlocked, isPremium: requesterIsPremium };
+      } catch (err) {
+        logger.warn('v8 multi-objective rescoring failed; using legacy scores', err as any);
+      }
+    }
+
+    // ── v3.6.0 v8: Singh-Joachims fairness rerank (flag-gated) ──
+    let v8Fairness: { applied: boolean; reranked: number } = { applied: false, reranked: 0 };
+    if (isV8FairnessRerankEnabled() && scoredAll.length > 0) {
+      try {
+        scoredAll.sort((a, b) => b.score - a.score);
+        const topN = scoredAll.slice(0, 50);
+        // exposureCount: trailing-7d impressions per candidate via EventAggDaily card.impression.50
+        const candHashes = topN.map((s) => hashUid(s.user.id));
+        const sinceDay = new Date(Date.now() - 7 * 86400000);
+        const aggs = await prisma.eventAggDaily.findMany({
+          where: { uidHash: { in: candHashes }, evt: 'card.impression.50', day: { gte: sinceDay } },
+          select: { uidHash: true, count: true },
+        }).catch(() => [] as Array<{ uidHash: string; count: number }>);
+        const expoByHash = new Map<string, number>();
+        for (const r of aggs) expoByHash.set(r.uidHash, (expoByHash.get(r.uidHash) || 0) + (r.count || 0));
+        const fcands: FairnessCandidate[] = topN.map((s, i) => {
+          const candHash = candHashes[i];
+          const gRaw = String((s.user as any)?.profile?.gender || '').toLowerCase();
+          const gender: 'm' | 'f' | 'o' | null = gRaw === 'male' || gRaw === 'm' ? 'm'
+            : gRaw === 'female' || gRaw === 'f' ? 'f'
+              : gRaw ? 'o' : null;
+          return { targetHash: candHash, score: s.score, exposureCountLast7d: expoByHash.get(candHash) || 0, gender };
+        });
+        const reranked = fairnessRerank(fcands);
+        // Map reranked order back to scoredAll's top-50 slot.
+        const byHashToScored = new Map<string, typeof scoredAll[0]>();
+        for (let i = 0; i < topN.length; i++) byHashToScored.set(candHashes[i], topN[i]);
+        const newTop = reranked.map((fc) => byHashToScored.get(fc.targetHash)!).filter(Boolean);
+        const tail = scoredAll.slice(50);
+        scoredAll.length = 0;
+        for (const x of newTop) scoredAll.push(x);
+        for (const x of tail) scoredAll.push(x);
+        v8Fairness = { applied: true, reranked: newTop.length };
+      } catch (err) {
+        logger.warn('v8 fairness rerank failed; using legacy ordering', err as any);
+      }
+    }
+
+    // ── v6.8: refresh-aware diversifier ──
+    // Replaces the raw top-N drain. Inputs:
+    //  - prevShownIds (last 60min impressions) → no-repeat window
+    //  - noveltyAffinity → places fresh users top vs back per user taste
+    //  - sessionMood → 'exploring' adds wildcards, 'selective' suppresses
+    //  - refreshIndex (cursor depth) → varies the mix per page
+    //  - intent → DTM/serious skips wildcards
+    const refreshIndex = cursor ? 1 : 0; // simple: 0 for first batch, 1+ when paging via cursor
+    const div = diversify(
+      scoredAll.map(s => ({ user: { ...s.user }, score: s.score, isNew: s.isNew, ageBucket: s.ageBucket, city: s.city })),
+      {
+        refreshIndex,
+        prevShownIds,
+        noveltyAffinity,
+        sessionMood,
+        topN: requestedLimit,
+        intent: intentReport.revealed,
+      },
+    );
+    const result = div.ranked.map(r => r.user);
+    // Attach distance (km) to each candidate when both ends have coords.
+    if (myLat != null && myLng != null) {
+      for (const u of result as any[]) {
+        const cLat = u?.profile?.cityLat as number | null;
+        const cLng = u?.profile?.cityLng as number | null;
+        if (cLat != null && cLng != null) {
+          u._distanceKm = Math.round(distanceKm(myLat, myLng, cLat, cLng));
+        }
+      }
+    }
+    const dbCursor = users[users.length - 1]?.id ?? result[result.length - 1]?.id;
+    const meta: any = {
+      algorithm: activeAlgo,
+      intent: { stated: intentReport.stated, revealed: intentReport.revealed, mismatch: Number(intentReport.mismatch.toFixed(2)), confidence: Number(intentReport.confidence.toFixed(2)) },
+      diversifier: { reasoning: div.reasoning, injected: div.injected, sessionMood, noveltyAffinity: Number(noveltyAffinity.toFixed(2)) },
+      negativeSignals: { totalEvents: negProfile.totalEvents, hardBlockedTraits: Array.from(negProfile.hardBlockedTraits) },
+    };
+    // v1.2 session 14 — Task 2: surface intentOverride bit in the meta so
+    // web/QA can distinguish inferred-vs-overridden without a DB round-trip.
+    if (v8MoBlock.applied) meta.v8 = { multiObjective: true, intentClass: v8MoBlock.intentClass, intentOverride: v8MoBlock.intentOverride, top10Unlocked: v8MoBlock.top10Unlocked, isPremium: v8MoBlock.isPremium };
+    if (v8Fairness.applied) meta.v8 = { ...(meta.v8 || {}), fairnessRerank: true, reranked: v8Fairness.reranked };
+    // ─── v3.6.0 — emit `exposure.slot_filled` per slot ───
+    // One emit per returned candidate so the v8 exposure ledger sees the
+    // fairness/top10/premium slot fill in real time. Slot-type heuristic:
+    //   - top 10 slots when the requester unlocked top-10: 'top10'
+    //   - fairness rerank applied and slot is in the reranked head: 'fairness_inject'
+    //   - requester is premium boosted candidates: 'premium_boost'
+    //   - otherwise: 'organic'
+    if (v8MoBlock.applied || v8Fairness.applied) {
+      const top10Count = v8MoBlock.top10Unlocked ? 10 : 0;
+      const fairnessHead = v8Fairness.applied ? v8Fairness.reranked : 0;
+      const isPremium = v8MoBlock.isPremium;
+      for (let i = 0; i < result.length; i++) {
+        const u: any = result[i];
+        const targetHash = hashUid(u.id);
+        let slotType: 'organic' | 'fairness_inject' | 'top10' | 'premium_boost';
+        if (i < top10Count) slotType = 'top10';
+        else if (i < fairnessHead) slotType = 'fairness_inject';
+        else if (isPremium) slotType = 'premium_boost';
+        else slotType = 'organic';
+        emitServerEvent(prisma, req.userId!, 'exposure.slot_filled', {
+          surface: 'discover',
+          targetHash,
+          slotType,
+        }, u.id);
+      }
+    }
+    // ─── G.18 Task 1b — discover-seed fallback (flag-gated) ───
+    // When the natural candidate pool returned < 5 items AND
+    // FEATURE_DISCOVER_SEED_ENABLED=1, top up from the seed pool ranked by
+    // profileHealth. Emits `discover.seeded_fallback` so the growth team
+    // can measure how often day-1 users see the safety net.
+    let seededFallback = { applied: false, added: 0 };
+    if (result.length < 5 && isDiscoverSeedEnabled()) {
+      try {
+        const already = new Set<string>(result.map((u: any) => u.id));
+        for (const bid of blockedIds) already.add(bid);
+        const seeds = await fetchDiscoverSeed(prisma as any, {
+          count: Math.max(0, 20 - result.length),
+          excludeIds: Array.from(already),
+          preferCity: (myProfile as any)?.city ?? null,
+        });
+        if (seeds.length > 0) {
+          for (const s of seeds) {
+            if (already.has(s.id)) continue;
+            (result as any[]).push({ ...s, discoverScore: 50, algorithm: 'seed-fallback' });
+            already.add(s.id);
+            if (result.length >= 20) break;
+          }
+          seededFallback = { applied: true, added: seeds.length };
+          meta.seed = seededFallback;
+          emitServerEvent(prisma, req.userId!, 'discover.seeded_fallback' as any, {
+            naturalCount: result.length - seeds.length,
+            seededCount: seeds.length,
+            preferCity: (myProfile as any)?.city ?? null,
+          });
+        }
+      } catch (err) {
+        logger.warn('discover-seed fallback failed (soft)', err as any);
+      }
+    }
+    res.json({
+      data: result,
+      cursor: dbCursor,
+      batchSize: result.length,
+      meta,
+    });
+  } catch (e) { next(e); }
+});
+
+// ─── v3.6.0 — Weekly Top-10 (read-only, flag-gated) ───
+// Returns the requester's current weekIso WeeklyTopMatch rows, joined with
+// User + Profile. When FEATURE_WEEKLY_TOP_ENABLED != '1' returns 404.
+function currentWeekIso(d: Date = new Date()): string {
+  // ISO-8601 week number: Thursday-based.
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+  const weekNum = Math.ceil((((t.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+  return `${t.getUTCFullYear()}W${String(weekNum).padStart(2, '0')}`;
+}
+
+// Phase F — next ISO-week boundary in UTC. The Weekly Top 10 refreshes at
+// the boundary between ISO weeks (Monday 00:00 UTC). This helper returns
+// the next boundary so the client can render a live countdown without
+// duplicating the ISO-8601 math on both sides. Verified in tests to sit
+// exactly at the Monday-00:00-UTC moment.
+export function nextWeekRefreshAt(now: Date = new Date()): Date {
+  const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  // getUTCDay() returns 0 (Sun) .. 6 (Sat). ISO week starts on Monday.
+  // Days until next Monday: (8 - dayOfWeek) % 7 or 7 when already Monday.
+  const dow = d.getUTCDay(); // 0..6
+  const daysUntilNextMonday = ((8 - dow) % 7) || 7;
+  d.setUTCDate(d.getUTCDate() + daysUntilNextMonday);
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+}
+
+app.get('/api/v1/weekly-top', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!isWeeklyTopEnabled()) { res.status(404).json({ error: { message: 'Not found', code: 'NOT_FOUND' } }); return; }
+  try {
+    const userId = req.userId!;
+    const uidHash = hashUid(userId);
+    const weekIso = currentWeekIso();
+    const rows = await prisma.weeklyTopMatch.findMany({
+      where: { uidHash, weekIso },
+      orderBy: { rank: 'asc' },
+    });
+    // Phase F — nextRefreshAt / secondsUntilRefresh drive the live-countdown
+    // pill on the client. The refresh boundary is the next Monday 00:00 UTC
+    // per ISO-8601. Computed on the server so client + server agree even if
+    // the user's device clock is skewed.
+    const nextRefreshAt = nextWeekRefreshAt();
+    const secondsUntilRefresh = Math.max(0, Math.floor((nextRefreshAt.getTime() - Date.now()) / 1000));
+    if (!rows.length) { res.json({ data: [], weekIso, generatedAt: null, nextRefreshAt: nextRefreshAt.toISOString(), secondsUntilRefresh }); return; }
+    // Resolve targetHash → User. Tracking hashes are HMAC of userId, so we
+    // need to scan users and match by hash. We do this once per request,
+    // bounded by the page count (≤10).
+    const allUsers = await prisma.user.findMany({
+      select: { id: true, username: true, displayName: true, verified: true, profile: { select: { age: true, city: true, datingIntent: true, gender: true, bio: true } }, photos: { take: 1, orderBy: { position: 'asc' } } },
+      take: 5000,
+    });
+    const hashToUser = new Map<string, typeof allUsers[number]>();
+    for (const u of allUsers) hashToUser.set(hashUid(u.id), u);
+    const data = rows.map((r) => ({ rank: r.rank, computedAt: r.computedAt, user: hashToUser.get(r.targetHash) || null }));
+    res.json({ data, weekIso, generatedAt: rows[0]?.computedAt ?? null, nextRefreshAt: nextRefreshAt.toISOString(), secondsUntilRefresh });
+  } catch (e) { next(e); }
+});
+
+// ─── v3.6.0 — Why-am-I-seeing-this explainer (flag-gated) ───
+// Returns the top contributing ingredients for the requester's view of a
+// target candidate. Returns 404 when FEATURE_WHY_EXPLAINER_ENABLED != '1'.
+app.get('/api/v1/discover/:targetId/why', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  if (!isWhyExplainerEnabled()) { res.status(404).json({ error: { message: 'Not found', code: 'NOT_FOUND' } }); return; }
+  try {
+    const userId = req.userId!;
+    const { targetId } = req.params;
+    if (!targetId || typeof targetId !== 'string' || targetId.length > 64) { res.status(400).json({ error: { message: 'targetId required', code: 'VALIDATION_ERROR' } }); return; }
+    // Build a synthetic explain using the v8 multi-objective weights so the
+    // user gets a stable narrative even when no per-candidate Explain row
+    // has been cached. We read FeatureSnapshot for intent + ExposureCredit
+    // for the target to make the numbers honest.
+    const requesterHash = hashUid(userId);
+    const targetHash = hashUid(targetId);
+    const [snap, credit, candUser] = await Promise.all([
+      prisma.featureSnapshot.findUnique({ where: { uidHash: requesterHash } }).catch(() => null),
+      prisma.exposureCredit.findUnique({ where: { uidHash_surface: { uidHash: targetHash, surface: 'discover' } } }).catch(() => null),
+      prisma.user.findUnique({ where: { id: targetId }, include: { profile: true } }).catch(() => null),
+    ]);
+    const raw = (snap?.raw as any) || {};
+    const ir = raw.intentRightNow;
+    const intentClass = ir && typeof ir.topClass === 'string' ? String(ir.topClass) : null;
+    const nowMs = Date.now();
+    // Components 0..1
+    const relevance = 0.6; // baseline; the cached forYouV6 explain would be more precise
+    const earned = Math.min(0.2, ((credit?.slotsEarned ?? 0) - (credit?.slotsSpent ?? 0)) / 20 * 0.2);
+    const lastActive = candUser?.profile?.lastActive ? new Date(candUser.profile.lastActive).getTime() : nowMs;
+    const staleHours = Math.max(0, (nowMs - lastActive) / 3_600_000);
+    const recency = expDecay(staleHours, 168);
+    const fairness = 0.5;
+    const intentFit = intentClass ? 0.5 : 0.5;
+    const ingredients: Array<{ key: string; label: string; contribution: number }> = [
+      { key: 'relevance', label: 'Profile match strength', contribution: relevance * (MO_WEIGHTS as any).relevance },
+      { key: 'recencyFreshness', label: 'How recently they were active', contribution: recency * (MO_WEIGHTS as any).recencyFreshness },
+      { key: 'earnedVisibility', label: 'Earned exposure credits', contribution: earned * (MO_WEIGHTS as any).earnedVisibility },
+      { key: 'fairnessFloor', label: 'Fairness floor', contribution: fairness * (MO_WEIGHTS as any).fairness },
+      { key: 'intentFitRightNow', label: 'Matches what you are looking for right now', contribution: intentFit * (MO_WEIGHTS as any).intentFitRightNow },
+    ];
+    ingredients.sort((a, b) => b.contribution - a.contribution);
+    const top3 = ingredients.slice(0, 3);
+    const total = top3.reduce((acc, r) => acc + r.contribution, 0);
+    const stars = top3.map((r) => {
+      const ratio = total > 0 ? r.contribution / total : 0;
+      const starCount = ratio > 0.5 ? 3 : ratio > 0.25 ? 2 : 1;
+      return { key: r.key, label: r.label, contribution: Number(r.contribution.toFixed(4)), stars: starCount as 1 | 2 | 3 };
+    });
+    res.json({ stars, total: Number(total.toFixed(4)), weights: MO_WEIGHTS });
+  } catch (e) { next(e); }
+});
+
+app.post('/api/v1/discover/like', authMiddleware, idempotency(), validate({ body: discoverLikeBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { toUserId, targetType, targetId } = req.body;
+    const fromUserId = req.userId!;
+    if (toUserId === fromUserId) return res.status(400).json({ error: { message: 'Cannot like yourself', code: 'VALIDATION_ERROR' } });
+    const tType = targetType || 'profile';
+    const tId = targetId || null;
+    // Check for existing like first
+    const existing = await prisma.like.findFirst({
+      where: { fromUserId, toUserId, targetType: tType, targetId: tId },
+    });
+    const like = existing || await prisma.like.create({
+      data: { fromUserId, toUserId, targetType: tType, targetId: tId },
+    });
+
+    // ── MUTUAL LIKE DETECTION → AUTO-MATCH CREATION ──
+    // When User A likes User B, check if User B previously liked User A.
+    // If mutual, automatically create a Match, Chat, and Notifications for both.
+    // This is the core matching mechanic — no manual "accept" step needed.
+    const mutual = await prisma.like.findFirst({ where: { fromUserId: toUserId, toUserId: fromUserId } });
+    let match = null;
+    // G.18 Task 1c — is this the requester's first-ever match? Computed
+    // inside the $transaction so a concurrent second match can't both fire
+    // the confetti. Falls back to `false` if the txn returns null (existing
+    // match, race with idempotency, or DB error).
+    let isFirstMatch = false;
+    if (mutual) {
+      // Use transaction to prevent race condition (two likes arriving simultaneously)
+      const txnResult = await prisma.$transaction(async (tx) => {
+        const existingMatch = await tx.match.findFirst({ where: { OR: [{ user1Id: fromUserId, user2Id: toUserId }, { user1Id: toUserId, user2Id: fromUserId }] } });
+        if (existingMatch) return { match: existingMatch, firstMatch: false };
+        // G.18 Task 1c — count the requester's prior matches *inside* the
+        // txn so the (0 → 1) transition is atomic with the flag flip. A
+        // concurrent second like arriving 20ms later reads matchCount = 1
+        // and gets firstMatch = false, the correct answer.
+        const priorMatchCount = await tx.match.count({ where: { active: true, OR: [{ user1Id: fromUserId }, { user2Id: fromUserId }] } });
+        const newMatch = await tx.match.create({ data: { user1Id: fromUserId, user2Id: toUserId } });
+        await tx.chat.create({ data: { matchId: newMatch.id, user1Id: fromUserId, user2Id: toUserId } });
+        await tx.notification.create({ data: { userId: toUserId, type: 'match', title: 'New Match! 🎉', body: 'You have a new match! Start chatting now.' } });
+        await tx.notification.create({ data: { userId: fromUserId, type: 'match', title: 'New Match! 🎉', body: 'You have a new match! Start chatting now.' } });
+        // First match iff the requester had zero prior matches AND their
+        // Settings row still reports hasSeenFirstMatch=false. The upsert
+        // flips the flag inside the same txn so a concurrent 2nd match
+        // cannot also observe firstMatch=true.
+        let firstMatch = false;
+        if (priorMatchCount === 0) {
+          const existingSettings = await tx.settings.findUnique({ where: { userId: fromUserId }, select: { hasSeenFirstMatch: true } });
+          if (!existingSettings || existingSettings.hasSeenFirstMatch === false) {
+            firstMatch = true;
+            await tx.settings.upsert({
+              where: { userId: fromUserId },
+              update: { hasSeenFirstMatch: true },
+              create: { userId: fromUserId, hasSeenFirstMatch: true },
+            });
+          }
+        }
+        return { match: newMatch, firstMatch };
+      }).catch(() => null);
+      match = txnResult?.match ?? null;
+      isFirstMatch = !!txnResult?.firstMatch;
+      if (match) {
+        trackActivity(prisma, fromUserId, 'match', 'profile', toUserId);
+        trackActivity(prisma, toUserId, 'match', 'profile', fromUserId);
+      }
+    }
+    trackActivity(prisma, fromUserId, 'like', 'profile', toUserId, { targetType: tType });
+
+    // ── ML: Learn from this like (real-time) ──
+    prisma.user.findUnique({ where: { id: toUserId }, include: { profile: true, interests: true, photos: { select: { id: true } }, prompts: { select: { id: true } } } })
+      .then(target => { if (target) mlLearnAction(fromUserId, 'like', target); }).catch(() => {});
+
+    res.json({ data: { like, match, isMutual: !!mutual, isFirstMatch } });
+  } catch (e) { next(e); }
+});
+
+app.post('/api/v1/discover/comment', authMiddleware, validate({ body: discoverCommentBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { toUserId, message: rawMessage, type, targetType, targetId } = req.body;
+    const message = rawMessage ? sanitize(rawMessage) : '';
+    const fromUserId = req.userId!;
+    const existing = await prisma.matchRequest.findUnique({ where: { fromUserId_toUserId: { fromUserId, toUserId } } });
+    if (existing) {
+      // Update existing request instead of rejecting
+      const updated = await prisma.matchRequest.update({
+        where: { id: existing.id },
+        data: { message: message || existing.message, type: type || existing.type, targetType: targetType || existing.targetType, targetId: targetId || existing.targetId },
+      });
+      return res.json({ data: updated });
+    }
+
+    const request = await prisma.matchRequest.create({
+      data: { fromUserId, toUserId, type: type || 'comment', message: message || '', targetType: targetType || 'profile', targetId: targetId || null, status: 'pending' },
+    });
+    await prisma.notification.create({ data: { userId: toUserId, type: 'like', title: 'New thought received 💭', body: message || 'Someone sent you a thoughtful comment!' } });
+    res.json({ data: request });
+  } catch (e) { next(e); }
+});
+
+app.post('/api/v1/discover/pass', authMiddleware, idempotency(), validate({ body: discoverPassBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    // Schema canonical field is `toUserId`; accept legacy `userId` as alias.
+    const { toUserId, userId: legacyUserId } = req.body;
+    const passedUserId = toUserId || legacyUserId;
+    if (passedUserId) {
+      // Record feedback so this user doesn't appear again
+      try {
+        await (prisma as any).matchFeedback.create({ data: { userId, targetUserId: passedUserId, action: 'pass' } });
+      } catch {} // Ignore if already exists or table doesn't exist
+      trackActivity(prisma, userId, 'pass', 'profile', passedUserId);
+
+      // ── ML: Learn from this pass (real-time) ──
+      prisma.user.findUnique({ where: { id: passedUserId }, include: { profile: true, interests: true, photos: { select: { id: true } }, prompts: { select: { id: true } } } })
+        .then(target => { if (target) mlLearnAction(userId, 'pass', target); }).catch(() => {});
+    }
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
+
+// ─── Pass Feedback (with reason) ──────────────────────
+app.post('/api/v1/discover/pass-feedback', authMiddleware, idempotency(), validate({ body: passFeedbackBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const { toUserId, userId: legacyUserId, reason, details } = req.body;
+    const passedUserId = toUserId || legacyUserId;
+    if (!passedUserId || !reason) return res.status(400).json({ error: { message: 'toUserId and reason required' } });
+    // Store structured feedback in MatchFeedback for algorithm learning
+    try {
+      await prisma.$executeRaw`INSERT INTO "MatchFeedback" (id, "userId", "targetUserId", type, reason, details, "createdAt") VALUES (gen_random_uuid(), ${userId}, ${passedUserId}, 'pass_reason', ${reason}, ${details || ''}, NOW())`;
+    } catch {} // Ignore duplicates
+    // Also learn from this for ML with reason context
+    trackActivity(prisma, userId, 'pass_feedback', 'profile', passedUserId, { reason, details });
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
+
+// ─── Super Like ───────────────────────────────────────
+// bug-hunt fix #7 (docs/architecture/bug-hunt-2026-07.md #8, P1) — the mutual-
+// like fast path was 5 sequential writes with no tx (matchRequest + notif +
+// findFirst + match + updateMany). Two users superliking each other at the
+// same instant could produce two Match rows for the same pair. Now: the
+// entire mutual-detect + match-create + status-flip runs inside a
+// `$transaction()` with a `match.findFirst` guard.
+app.post('/api/v1/discover/:userId/superlike', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const targetId = req.params.userId;
+    if (userId === targetId) return res.status(400).json({ error: { message: 'Cannot superlike yourself', code: 'INVALID_TARGET' } });
+    const outcome = await prisma.$transaction(async (tx) => {
+      const request = await tx.matchRequest.create({ data: { fromUserId: userId, toUserId: targetId, type: 'SUPER_LIKE', status: 'PENDING' } });
+      await tx.notification.create({ data: { userId: targetId, type: 'super_like', title: 'You got a Super Like! ⭐', body: 'Someone super liked your profile — they really stand out!' } });
+      const existing = await tx.matchRequest.findFirst({ where: { fromUserId: targetId, toUserId: userId, status: 'PENDING' } });
+      if (!existing) return { matched: false as const, request };
+      // Guard against a race where the pair already matched via another flow.
+      const existingMatch = await tx.match.findFirst({
+        where: { OR: [{ user1Id: userId, user2Id: targetId }, { user1Id: targetId, user2Id: userId }] },
+      });
+      if (!existingMatch) {
+        await tx.match.create({ data: { user1Id: userId, user2Id: targetId } });
+      }
+      await tx.matchRequest.updateMany({ where: { id: { in: [request.id, existing.id] } }, data: { status: 'MATCHED' } });
+      return { matched: true as const, request };
+    });
+    if (outcome.matched) grantPairMatchMilestones(prisma, userId, targetId);
+    return res.json({ data: { matched: outcome.matched, matchRequest: outcome.request } });
+  } catch (e) { next(e); }
+});
+
+// ─── Send Miamo Move (stored in DB for algorithm analysis) ───
+app.post('/api/v1/discover/move', authMiddleware, idempotency(), validate({ body: discoverMoveBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { toUserId, message: rawMoveMsg, targetType, targetId } = req.body;
+    const message = rawMoveMsg ? sanitize(rawMoveMsg) : '';
+    const fromUserId = req.userId!;
+    if (!toUserId) return res.status(400).json({ error: { message: 'toUserId is required' } });
+    const existing = await (prisma as any).miamoMove.findFirst({
+      where: { fromUserId, toUserId, targetType: targetType || 'profile', targetId: targetId || null },
+    });
+    if (existing) return res.status(409).json({ error: { message: 'Move already sent' } });
+    const move = await (prisma as any).miamoMove.create({
+      data: { fromUserId, toUserId, message: message || '', targetType: targetType || 'profile', targetId: targetId || null, status: 'pending' },
+    });
+    // Also create a like
+    try { await prisma.like.create({ data: { fromUserId, toUserId, targetType: targetType || 'profile', targetId: targetId || null } }); } catch {}
+    // Check for mutual like
+    const mutual = await prisma.like.findFirst({ where: { fromUserId: toUserId, toUserId: fromUserId } });
+    let match = null;
+    if (mutual) {
+      // Use transaction to prevent race condition
+      match = await prisma.$transaction(async (tx) => {
+        const existingMatch = await tx.match.findFirst({ where: { OR: [{ user1Id: fromUserId, user2Id: toUserId }, { user1Id: toUserId, user2Id: fromUserId }] } });
+        if (existingMatch) return existingMatch;
+        const newMatch = await tx.match.create({ data: { user1Id: fromUserId, user2Id: toUserId } });
+        await tx.chat.create({ data: { matchId: newMatch.id, user1Id: fromUserId, user2Id: toUserId } });
+        await tx.notification.create({ data: { userId: toUserId, type: 'match', title: 'New Match! 🎉', body: 'You have a new match! Start chatting now.' } });
+        await tx.notification.create({ data: { userId: fromUserId, type: 'match', title: 'New Match! 🎉', body: 'You have a new match! Start chatting now.' } });
+        return newMatch;
+      }).catch(() => null);
+    } else {
+      await prisma.notification.create({ data: { userId: toUserId, type: 'like', title: '💫 New Miamo Move!', body: message ? `Someone sent: "${message.substring(0,50)}"` : 'Someone made a move on your profile!' } });
+    }
+    // ── ML: Learn from move (strong signal of interest) ──
+    prisma.user.findUnique({ where: { id: toUserId }, include: { profile: true, interests: true, photos: { select: { id: true } }, prompts: { select: { id: true } } } })
+      .then(target => { if (target) mlLearnAction(fromUserId, 'move', target); }).catch(() => {});
+
+    res.json({ data: { move, match, isMutual: !!mutual } });
+  } catch (e) { next(e); }
+});
+
+// ─── Get received moves ───
+app.get('/api/v1/discover/moves/received', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const moves = await (prisma as any).miamoMove.findMany({
+      where: { toUserId: req.userId!, status: 'pending' },
+      include: { fromUser: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ data: moves });
+  } catch (e) { next(e); }
+});
+
+// ─── Accept/reject move ───
+app.post('/api/v1/discover/moves/:id/accept', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    // Security: verify the move is addressed to this user
+    const move = await (prisma as any).miamoMove.findUnique({ where: { id: req.params.id } });
+    if (!move) return res.status(404).json({ error: { message: 'Move not found' } });
+    if (move.toUserId !== userId) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
+    const updated = await (prisma as any).miamoMove.update({ where: { id: req.params.id }, data: { status: 'accepted' } });
+    res.json({ data: updated });
+  } catch (e) { next(e); }
+});
+app.post('/api/v1/discover/moves/:id/reject', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    // Security: verify the move is addressed to this user
+    const move = await (prisma as any).miamoMove.findUnique({ where: { id: req.params.id } });
+    if (!move) return res.status(404).json({ error: { message: 'Move not found' } });
+    if (move.toUserId !== userId) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
+    const updated = await (prisma as any).miamoMove.update({ where: { id: req.params.id }, data: { status: 'rejected' } });
+    res.json({ data: updated });
+  } catch (e) { next(e); }
+});
+
+// ─── Discover filters (persist) ───
+// ─── Smart Move Suggestions (standalone endpoint for Miamo Move modal) ───
+app.get('/api/v1/discover/move-suggestions/:targetId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const targetId = req.params.targetId;
+
+    const [target, myProfile, myInterestsRaw, myMsgs, myMoves] = await Promise.all([
+      prisma.user.findUnique({ where: { id: targetId }, include: { profile: true, interests: true, prompts: true } }),
+      prisma.profile.findUnique({ where: { userId } }),
+      prisma.profileInterest.findMany({ where: { userId } }),
+      getUserLastMessages(userId, 10),
+      getUserLastMoves(userId, 10),
+    ]);
+    if (!target) return res.status(404).json({ error: { message: 'User not found' } });
+
+    const myInterests = myInterestsRaw.map(i => i.name);
+    const targetInterests = (target.interests || []).map((i: any) => i.name);
+    const common = myInterests.filter(i => targetInterests.includes(i));
+
+    // Extract target's recent topics
+    const targetActivities = await prisma.userActivity.findMany({
+      where: { userId: targetId, action: { in: ['like', 'content_engage', 'view'] }, createdAt: { gte: new Date(Date.now() - 14 * 86400000) } },
+      take: 50, orderBy: { createdAt: 'desc' },
+    });
+    const topicCounts: Record<string, number> = {};
+    for (const a of targetActivities) {
+      try { const meta = JSON.parse(a.metadata || '{}'); if (meta.category) topicCounts[meta.category] = (topicCounts[meta.category] || 0) + 1; } catch {}
+    }
+    const targetRecentTopics = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t]) => t);
+
+    const smartInput: SmartMoveInput = {
+      myLastMessages: [...myMoves, ...myMsgs].slice(0, 20),
+      myProfile: myProfile ? { city: myProfile.city, profession: myProfile.profession, bio: myProfile.bio } : null,
+      myInterests,
+      targetProfile: target.profile ? { city: target.profile.city, profession: target.profile.profession, bio: target.profile.bio, age: target.profile.age } : null,
+      targetInterests,
+      targetPrompts: (target.prompts || []).map((p: any) => ({ question: p.question || '', answer: p.answer || '' })),
+      commonInterests: common,
+      targetRecentTopics,
+    };
+
+    const suggestions = generateSmartMoves(smartInput);
+    // Phase C.3 — Prometheus counter, labelled by composer source.
+    // The v1 path is the only one wired in v1.0; v2 will fire from the
+    // content service once FEATURE_MOVE_V2_ENABLED ramps on.
+    try { moveV2SuggestionsEmitted.inc({ source: 'v1' }); } catch { /* metrics never block */ }
+    res.json({ data: suggestions });
+  } catch (e) { next(e); }
+});
+
+app.get('/api/v1/discover/filters', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const filter = await (prisma as any).discoverFilter.findUnique({ where: { userId: req.userId! } });
+    res.json({ data: filter || {} });
+  } catch (e) { next(e); }
+});
+app.put('/api/v1/discover/filters', authMiddleware, validate({ body: discoverFiltersBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    // Map API-facing names (singular, UX-friendly) → Prisma column names on
+    // DiscoverFilter. Anything not in this map is silently dropped so we can
+    // never inject arbitrary fields into Prisma. `seriousMode` lives on
+    // Settings, not here, so it is intentionally excluded.
+    const FIELD_MAP: Record<string, string> = {
+      minAge: 'minAge', maxAge: 'maxAge', minHeight: 'minHeight', maxHeight: 'maxHeight',
+      distance: 'distance', city: 'city', lookingFor: 'lookingFor',
+      smoking: 'smoking', drinking: 'drinking', exercise: 'exercise',
+      education: 'education', religion: 'religion', zodiac: 'zodiac',
+      pets: 'pets', children: 'children',
+      activeToday: 'activeToday', newHere: 'newHere', hasPhotos: 'hasPhotos',
+      gender: 'genders', genders: 'genders',
+      sexuality: 'sexualities', sexualities: 'sexualities',
+      verifiedOnly: 'verified', verified: 'verified',
+    };
+    const data: Record<string, any> = {};
+    for (const [k, v] of Object.entries(req.body)) {
+      const col = FIELD_MAP[k];
+      if (!col) continue;
+      if (typeof v === 'string') data[col] = sanitize(v);
+      else if (Array.isArray(v)) data[col] = v.map(item => typeof item === 'string' ? sanitize(item) : '').filter(Boolean).join(',');
+      else if (typeof v === 'number' || typeof v === 'boolean') data[col] = v;
+    }
+    const filter = await (prisma as any).discoverFilter.upsert({
+      where: { userId },
+      create: { userId, ...data },
+      update: data,
+    });
+    res.json({ data: filter });
+  } catch (e) { next(e); }
+});
+
+// ═══ MATCHES ═════════════════════════════════════════
+app.get('/api/v1/matches', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const { q, filter } = req.query;
+    const matches = await prisma.match.findMany({
+      where: { OR: [{ user1Id: userId }, { user2Id: userId }], active: true },
+      include: {
+        user1: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } }, interests: true } },
+        user2: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } }, interests: true } },
+        chat: { include: { messages: { take: 1, orderBy: { createdAt: 'desc' } } } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    // Check which matches are held by the current user
+    const otherUserIds = matches.map(m => m.user1Id === userId ? m.user2Id : m.user1Id);
+    const heldRequests = await prisma.matchRequest.findMany({
+      where: { fromUserId: { in: otherUserIds }, toUserId: userId, status: 'held' },
+      select: { fromUserId: true },
+    });
+    const heldUserIds = new Set(heldRequests.map(r => r.fromUserId));
+
+    let result = matches.map(m => {
+      const isUser1 = m.user1Id === userId;
+      const otherUser = isUser1 ? m.user2 : m.user1;
+      const { passwordHash, ...other } = otherUser;
+      return {
+        id: m.id,
+        matchedUser: other,
+        chatId: m.chat?.id,
+        lastMessage: m.chat?.messages[0],
+        createdAt: m.createdAt,
+        isFavorite: isUser1 ? (m as any).favorite1 : (m as any).favorite2,
+        isPinned: isUser1 ? (m as any).pinned1 : (m as any).pinned2,
+        isNew: (Date.now() - new Date(m.createdAt).getTime()) < 7 * 24 * 60 * 60 * 1000,
+        isHeld: heldUserIds.has(otherUser.id),
+      };
+    });
+    // By default, exclude held matches from the list (they show in On Hold tab)
+    const includeHeld = req.query.includeHeld === 'true';
+    if (!includeHeld) {
+      result = result.filter(m => !m.isHeld);
+    }
+    // Search by name, username, miamoId
+    if (q && typeof q === 'string' && q.trim()) {
+      const search = q.toLowerCase().trim();
+      result = result.filter(m => {
+        const u = m.matchedUser as any;
+        return (u.displayName || '').toLowerCase().includes(search) ||
+               (u.username || '').toLowerCase().includes(search) ||
+               (u.miamoId || '').toLowerCase().includes(search);
+      });
+    }
+    if (filter === 'new') result = result.filter(m => m.isNew);
+    else if (filter === 'active') result = result.filter(m => (m.matchedUser as any).profile?.online);
+    else if (filter === 'favorites') result = result.filter(m => m.isFavorite);
+    else if (filter === 'serious') result = result.filter(m => (m.matchedUser as any).profile?.seriousMode);
+
+    // v6.8 personalization overlay on matches list: pinned/favorite still
+    // win, but among the rest we sort by intent-aware compatibility minus
+    // negative-trait penalties (e.g. matched users sharing traits with
+    // people the user has previously blocked sink to the bottom).
+    let pCtx: any = null;
+    let pMeta: any = null;
+    try {
+      pCtx = await loadPersonalizationCtx(prisma, userId, { surface: 'matches', prevWindowMin: 1440 });
+      const items = result.map((m: any) => {
+        const u = m.matchedUser;
+        const recencyMs = Date.now() - new Date(m.createdAt).getTime();
+        const recencyScore = Math.max(0, 100 - recencyMs / (86400_000)); // ~1pt/day decay
+        const lastMsgBoost = m.lastMessage ? 10 : 0;
+        const onlineBoost = u.profile?.online ? 5 : 0;
+        return {
+          id: m.id,
+          baseScore: recencyScore + lastMsgBoost + onlineBoost,
+          isNew: m.isNew,
+          city: u.profile?.city,
+          ageBucket: u.profile?.age ? (u.profile.age < 26 ? '22-25' : u.profile.age < 31 ? '26-30' : u.profile.age < 36 ? '31-35' : '36+') : undefined,
+          traits: { city: u.profile?.city, datingIntent: u.profile?.datingIntent, religion: u.profile?.religion, smoking: u.profile?.smoking, drinking: u.profile?.drinking, education: u.profile?.education, verified: u.verified },
+          _match: m,
+        };
+      });
+      const { ranked, diversifier } = applyPersonalization(pCtx, items, { topN: items.length });
+      const byId = new Map(items.map((it: any) => [it.id, it._match]));
+      const personalized = ranked.map((it: any) => byId.get(it.id)).filter(Boolean) as any[];
+      // pinned + favorite always win; personalized order otherwise.
+      const pinned = personalized.filter((m: any) => m.isPinned);
+      const fav = personalized.filter((m: any) => !m.isPinned && m.isFavorite);
+      const rest = personalized.filter((m: any) => !m.isPinned && !m.isFavorite);
+      result = [...pinned, ...fav, ...rest];
+      pMeta = { intent: { stated: pCtx.intent.stated, revealed: pCtx.intent.revealed, mismatch: pCtx.intent.mismatch, confidence: pCtx.intent.confidence }, diversifier: { mood: pCtx.sessionMood, novelty: pCtx.noveltyAffinity, reasoning: diversifier.reasoning }, negativeSignals: { totalEvents: pCtx.negProfile.totalEvents, hardBlocked: Array.from(pCtx.negProfile.hardBlockedTraits) } };
+    } catch (e) {
+      // Graceful fallback to legacy sort
+      result.sort((a, b) => {
+        if (a.isPinned && !b.isPinned) return -1;
+        if (!a.isPinned && b.isPinned) return 1;
+        if (a.isFavorite && !b.isFavorite) return -1;
+        if (!a.isFavorite && b.isFavorite) return 1;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+    }
+    res.json({ data: result, meta: pMeta || undefined });
+  } catch (e) { next(e); }
+});
+
+// bug-hunt fix #3 (docs/architecture/bug-hunt-2026-07.md #4) — favorite +
+// pin toggles now read + toggle inside a `$transaction()` so two devices
+// tapping the star simultaneously converge on a deterministic final state
+// instead of stomping each other.
+app.post('/api/v1/matches/:id/favorite', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const isFavorite = await prisma.$transaction(async (tx) => {
+      const match = await tx.match.findUnique({ where: { id: req.params.id } });
+      if (!match) return null;
+      if (match.user1Id !== userId && match.user2Id !== userId) return 'forbidden' as const;
+      const isUser1 = match.user1Id === userId;
+      const currentFav = isUser1 ? (match as any).favorite1 : (match as any).favorite2;
+      await tx.match.update({
+        where: { id: req.params.id },
+        data: isUser1 ? { favorite1: !currentFav } : { favorite2: !currentFav } as any,
+      });
+      return !currentFav;
+    });
+    if (isFavorite === null) return res.status(404).json({ error: { message: 'Match not found' } });
+    if (isFavorite === 'forbidden') return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
+    res.json({ data: { isFavorite } });
+  } catch (e) { next(e); }
+});
+
+app.post('/api/v1/matches/:id/pin', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const isPinned = await prisma.$transaction(async (tx) => {
+      const match = await tx.match.findUnique({ where: { id: req.params.id } });
+      if (!match) return null;
+      if (match.user1Id !== userId && match.user2Id !== userId) return 'forbidden' as const;
+      const isUser1 = match.user1Id === userId;
+      const currentPin = isUser1 ? (match as any).pinned1 : (match as any).pinned2;
+      await tx.match.update({
+        where: { id: req.params.id },
+        data: isUser1 ? { pinned1: !currentPin } : { pinned2: !currentPin } as any,
+      });
+      return !currentPin;
+    });
+    if (isPinned === null) return res.status(404).json({ error: { message: 'Match not found' } });
+    if (isPinned === 'forbidden') return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
+    res.json({ data: { isPinned } });
+  } catch (e) { next(e); }
+});
+
+app.post('/api/v1/matches/:id/report', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const { reason: rawReason, details: rawDetails } = req.body;
+    const reason = sanitize(rawReason || '');
+    const details = sanitize(rawDetails || '');
+    const match = await prisma.match.findUnique({ where: { id: req.params.id } });
+    if (!match) return res.status(404).json({ error: { message: 'Match not found' } });
+    // Security: verify user is a member of this match before reporting
+    if (match.user1Id !== userId && match.user2Id !== userId) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
+    const targetUserId = match.user1Id === userId ? match.user2Id : match.user1Id;
+    try {
+      await prisma.$executeRaw`INSERT INTO "MatchFeedback" (id, "matchId", "userId", "targetUserId", type, reason, details, "createdAt") VALUES (gen_random_uuid(), ${match.id}, ${userId}, ${targetUserId}, 'report', ${reason || 'other'}, ${details || ''}, NOW())`;
+    } catch {}
+    await prisma.report.create({
+      data: { reporterId: userId, reportedId: targetUserId, reason: reason || 'other', details: details || '', targetType: 'match', targetId: match.id, status: 'pending' },
+    });
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
+
+app.get('/api/v1/matches/requests', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const requests = await prisma.matchRequest.findMany({
+      where: { toUserId: req.userId!, status: 'pending' },
+      include: { fromUser: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ data: requests.map(r => { const { passwordHash, ...user } = r.fromUser; return { ...r, fromUser: user }; }) });
+  } catch (e) { next(e); }
+});
+
+app.get('/api/v1/matches/requests/sent', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const requests = await prisma.matchRequest.findMany({
+      where: { fromUserId: req.userId! },
+      include: { toUser: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json({ data: requests.map(r => { const { passwordHash, ...user } = r.toUser; return { ...r, toUser: user }; }) });
+  } catch (e) { next(e); }
+});
+
+// bug-hunt fix #6 (docs/architecture/bug-hunt-2026-07.md #7, P1) — accept
+// used to do 4 sequential writes (update request, create match, create chat,
+// create notification) with no transaction. Crash mid-sequence produced
+// half-matches (match row but no chat, so the messages tab was silent).
+// Now wrapped in `$transaction()` so accept is atomic.
+app.post('/api/v1/matches/requests/:id/accept', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    // Security: verify the request is addressed to this user before accepting
+    const existing = await prisma.matchRequest.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: { message: 'Request not found' } });
+    if (existing.toUserId !== userId) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
+    const { match, request } = await prisma.$transaction(async (tx) => {
+      const req2 = await tx.matchRequest.update({ where: { id: req.params.id }, data: { status: 'accepted' } });
+      const newMatch = await tx.match.create({ data: { user1Id: req2.fromUserId, user2Id: req2.toUserId } });
+      await tx.chat.create({ data: { matchId: newMatch.id, user1Id: req2.fromUserId, user2Id: req2.toUserId } });
+      await tx.notification.create({ data: { userId: req2.fromUserId, type: 'match', title: 'Match accepted! 🎉', body: 'Your thoughtful comment was accepted! You can now chat.' } });
+      return { match: newMatch, request: req2 };
+    });
+    grantPairMatchMilestones(prisma, request.fromUserId, request.toUserId);
+    res.json({ data: { match, request } });
+  } catch (e) { next(e); }
+});
+
+app.post('/api/v1/matches/requests/:id/reject', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    // Security: verify the request is addressed to this user before rejecting
+    const existing = await prisma.matchRequest.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: { message: 'Request not found' } });
+    if (existing.toUserId !== userId) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
+    const request = await prisma.matchRequest.update({ where: { id: req.params.id }, data: { status: 'rejected' } });
+    res.json({ data: request });
+  } catch (e) { next(e); }
+});
+
+app.delete('/api/v1/matches/:id', authMiddleware, idempotency(), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const { reason: rawReason, details: rawDetails } = req.body || {};
+    const reason = rawReason ? sanitize(rawReason) : undefined;
+    const details = rawDetails ? sanitize(rawDetails) : '';
+    const match = await prisma.match.findUnique({ where: { id: req.params.id } });
+    if (!match) return res.status(404).json({ error: { message: 'Match not found' } });
+    // Security: verify user is a member of this match before unmatching
+    if (match.user1Id !== userId && match.user2Id !== userId) return res.status(403).json({ error: { message: 'Access denied', code: 'FORBIDDEN' } });
+    const targetUserId = match.user1Id === userId ? match.user2Id : match.user1Id;
+    if (reason) {
+      try {
+        await prisma.$executeRaw`INSERT INTO "MatchFeedback" (id, "matchId", "userId", "targetUserId", type, reason, details, "createdAt") VALUES (gen_random_uuid(), ${match.id}, ${userId}, ${targetUserId}, 'unmatch', ${reason}, ${details || ''}, NOW())`;
+      } catch {}
+    }
+    await prisma.match.update({ where: { id: req.params.id }, data: { active: false } });
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
+
+// Unmatch by other userId (for messages page).
+// bug-hunt part2 fix #11 (docs/architecture/bug-hunt-2026-07-part2.md #17) —
+// previous implementation had two independent writes (audit-log insert +
+// match deactivation). A crash between them could leave the match
+// deactivated with no reason captured. Now both run inside a single
+// `$transaction()` so unmatch is all-or-nothing (mirrors the by-user block
+// path fixed in first-half #4).
+app.delete('/api/v1/matches/by-user/:userId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const targetUserId = req.params.userId;
+    if (userId === targetUserId) return res.status(400).json({ error: { message: 'Cannot unmatch yourself', code: 'INVALID_TARGET' } });
+    const { reason: rawReason, details: rawDetails } = req.body || {};
+    const reason = rawReason ? sanitize(rawReason) : undefined;
+    const details = rawDetails ? sanitize(rawDetails) : '';
+    const found = await prisma.$transaction(async (tx) => {
+      const match = await tx.match.findFirst({
+        where: { active: true, OR: [{ user1Id: userId, user2Id: targetUserId }, { user1Id: targetUserId, user2Id: userId }] },
+      });
+      if (!match) return null;
+      if (reason) {
+        try {
+          await tx.$executeRaw`INSERT INTO "MatchFeedback" (id, "matchId", "userId", "targetUserId", type, reason, details, "createdAt") VALUES (gen_random_uuid(), ${match.id}, ${userId}, ${targetUserId}, 'unmatch', ${reason}, ${details || ''}, NOW())`;
+        } catch (e) {
+          logger.warn('[unmatch] audit insert failed:', (e as Error).message);
+        }
+      }
+      await tx.match.update({ where: { id: match.id }, data: { active: false } });
+      return match;
+    });
+    if (!found) return res.status(404).json({ error: { message: 'Match not found' } });
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
+
+// Report by other userId (for messages page)
+app.post('/api/v1/matches/by-user/:userId/report', authMiddleware, idempotency(), validate({ body: matchActionBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const targetUserId = req.params.userId;
+    if (userId === targetUserId) return res.status(400).json({ error: { message: 'Cannot report yourself', code: 'INVALID_TARGET' } });
+    const { reason: rawRptReason, details: rawRptDetails } = req.body || {};
+    const reason = rawRptReason ? sanitize(rawRptReason) : undefined;
+    const details = rawRptDetails ? sanitize(rawRptDetails) : '';
+    const match = await prisma.match.findFirst({
+      where: { OR: [{ user1Id: userId, user2Id: targetUserId }, { user1Id: targetUserId, user2Id: userId }] },
+    });
+    if (match && reason) {
+      try {
+        await prisma.$executeRaw`INSERT INTO "MatchFeedback" (id, "matchId", "userId", "targetUserId", type, reason, details, "createdAt") VALUES (gen_random_uuid(), ${match.id}, ${userId}, ${targetUserId}, 'report', ${reason}, ${details || ''}, NOW())`;
+      } catch {}
+    }
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
+
+// Block with feedback (for messages/matches pages).
+// bug-hunt fix #4 (docs/architecture/bug-hunt-2026-07.md #5) — the previous
+// implementation had three independent writes (feedback insert, block upsert,
+// match deactivation). A crash between them could leave the block half-
+// applied. Now all three run inside a single `$transaction()`, so we either
+// block-and-deactivate or do neither.
+app.post('/api/v1/matches/by-user/:userId/block', authMiddleware, idempotency(), validate({ body: matchActionBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const targetUserId = req.params.userId;
+    if (userId === targetUserId) return res.status(400).json({ error: { message: 'Cannot block yourself', code: 'INVALID_TARGET' } });
+    const { reason: rawBlkReason, details: rawBlkDetails } = req.body || {};
+    const reason = rawBlkReason ? sanitize(rawBlkReason) : undefined;
+    const details = rawBlkDetails ? sanitize(rawBlkDetails) : '';
+
+    await prisma.$transaction(async (tx) => {
+      const match = await tx.match.findFirst({
+        where: { OR: [{ user1Id: userId, user2Id: targetUserId }, { user1Id: targetUserId, user2Id: userId }] },
+      });
+      if (match && reason) {
+        try {
+          await tx.$executeRaw`INSERT INTO "MatchFeedback" (id, "matchId", "userId", "targetUserId", type, reason, details, "createdAt") VALUES (gen_random_uuid(), ${match.id}, ${userId}, ${targetUserId}, 'block', ${reason}, ${details || ''}, NOW())`;
+        } catch {}
+      }
+      await tx.block.upsert({
+        where: { blockerId_blockedId: { blockerId: userId, blockedId: targetUserId } },
+        create: { blockerId: userId, blockedId: targetUserId },
+        update: {},
+      });
+      if (match) await tx.match.update({ where: { id: match.id }, data: { active: false } });
+    });
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
+
+// ═══ VIBE CHECK ══════════════════════════════════════
+// Save a new vibe check
+app.post('/api/v1/vibe-check', authMiddleware, validate({ body: vibeCheckBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const { mood: rawMood, energy, topics: rawTopics, intent: rawIntent } = req.body;
+    const mood = sanitize(rawMood || '');
+    const intent = rawIntent ? sanitize(rawIntent) : '';
+    const topics = Array.isArray(rawTopics) ? rawTopics.map((t: string) => sanitize(t)) : [];
+    if (!mood) return res.status(400).json({ error: { message: 'Mood is required', code: 'VALIDATION_ERROR' } });
+    // Deactivate previous active vibes
+    await prisma.vibeCheck.updateMany({ where: { userId, active: true }, data: { active: false } });
+    // Create new vibe
+    const vibe = await prisma.vibeCheck.create({
+      data: { userId, mood, energy: energy || 3, topics: JSON.stringify(topics || []), intent: intent || '', active: true },
+    });
+    res.json({ data: { ...vibe, topics: topics || [] } });
+  } catch (e) { next(e); }
+});
+
+// Get vibe history
+app.get('/api/v1/vibe-check', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const vibes = await prisma.vibeCheck.findMany({ where: { userId }, orderBy: { createdAt: 'desc' }, take: 20 });
+    const parsed = vibes.map(v => ({ ...v, topics: JSON.parse(v.topics || '[]') }));
+    res.json({ data: parsed });
+  } catch (e) { next(e); }
+});
+
+// Get latest active vibe
+app.get('/api/v1/vibe-check/latest', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const vibe = await prisma.vibeCheck.findFirst({ where: { userId, active: true }, orderBy: { createdAt: 'desc' } });
+    if (vibe) {
+      res.json({ data: { ...vibe, topics: JSON.parse(vibe.topics || '[]') } });
+    } else {
+      res.json({ data: null });
+    }
+  } catch (e) { next(e); }
+});
+
+// Get vibe-compatible users (users with active vibes that match yours)
+app.get('/api/v1/vibe-check/matches', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const myVibe = await prisma.vibeCheck.findFirst({ where: { userId, active: true }, orderBy: { createdAt: 'desc' } });
+    if (!myVibe) return res.json({ data: [] });
+    const myTopics: string[] = JSON.parse(myVibe.topics || '[]');
+
+    // Get all active vibes from other users (set within last 24h)
+    const recentVibes = await prisma.vibeCheck.findMany({
+      where: { active: true, userId: { not: userId }, createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+      include: { user: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } }, interests: true } } },
+    });
+
+    const blocks = await prisma.block.findMany({ where: { OR: [{ blockerId: userId }, { blockedId: userId }] } });
+    const blockedIds = new Set(blocks.map(b => b.blockerId === userId ? b.blockedId : b.blockerId));
+
+    const scored = recentVibes
+      .filter(v => !blockedIds.has(v.userId))
+      .map(v => {
+        let score = 0;
+        const theirTopics: string[] = JSON.parse(v.topics || '[]');
+        // Mood match
+        if (v.mood === myVibe.mood) score += 30;
+        // Energy proximity
+        const energyDiff = Math.abs(v.energy - myVibe.energy);
+        score += Math.max(0, 20 - energyDiff * 5);
+        // Topic overlap
+        const topicOverlap = myTopics.filter(t => theirTopics.includes(t)).length;
+        score += Math.min(topicOverlap * 10, 30);
+        // Intent match
+        if (v.intent === myVibe.intent) score += 20;
+
+        const { passwordHash, ...userData } = v.user as any;
+        return { user: userData, vibeScore: Math.min(score, 100), mood: v.mood, energy: v.energy, topics: theirTopics, intent: v.intent };
+      })
+      .sort((a, b) => b.vibeScore - a.vibeScore)
+      .slice(0, 20);
+
+    res.json({ data: scored });
+  } catch (e) { next(e); }
+});
+
+// ═══ AI MATCH ════════════════════════════════════════
+app.get('/api/v1/ai-match/suggestions', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+
+    // Check cache first
+    const cacheKey = `ai-match:${userId}`;
+    const cached = aiMatchCache.get(cacheKey);
+    if (cached) return res.json({ data: cached });
+
+    // ── v4 AI Match short-circuit (flag-gated) ──
+    // When ALGO_V4_RANK_ENABLED_AIMATCH=1, rank a smaller candidate pool with
+    // scoreAiPicksV4 (no explore noise) and return up to 20 with breakdown.
+    // Falls through to legacy on any error.
+    if (v4RankEnabled('aiMatch')) {
+      try {
+        const myProfileV4 = await prisma.profile.findUnique({ where: { userId } });
+        const myInterestsV4 = await prisma.profileInterest.findMany({ where: { userId } });
+        const myInterestNamesV4 = myInterestsV4.map((i) => i.name);
+        const blocksV4 = await prisma.block.findMany({ where: { OR: [{ blockerId: userId }, { blockedId: userId }] } });
+        const blockedIdsV4 = blocksV4.map((b) => (b.blockerId === userId ? b.blockedId : b.blockerId));
+        blockedIdsV4.push(userId);
+        const sentLikesV4 = await prisma.like.findMany({ where: { fromUserId: userId }, select: { toUserId: true } });
+        sentLikesV4.forEach((l) => { if (!blockedIdsV4.includes(l.toUserId)) blockedIdsV4.push(l.toUserId); });
+
+        const candUsersV4 = await prisma.user.findMany({
+          where: { id: { notIn: blockedIdsV4 }, active: true, deactivated: false, privacySettings: { profileVisible: true } },
+          include: { profile: true, interests: true, photos: { take: 3, orderBy: { position: 'asc' }, select: { url: true } } },
+          take: 100,
+        });
+
+        const reader = new PrismaSignalReader(prisma);
+        const myHash = reader.hashOf(userId);
+        const me = await reader.features(myHash);
+        const candHashes = candUsersV4.map((u) => reader.hashOf(u.id));
+        const pairMap = await reader.pairCompat(myHash, candHashes);
+        const priorMap = await reader.priorTargets(myHash, candHashes, 14);
+        const myIntentV4 = (myProfileV4 as { datingIntent?: string } | null)?.datingIntent ?? null;
+        const myAgeV4 = (myProfileV4 as { age?: number } | null)?.age ?? null;
+
+        const scored: Array<{ user: any; aiScore: number; explain: any }> = [];
+        for (let i = 0; i < candUsersV4.length; i++) {
+          const u = candUsersV4[i];
+          const candFeat = await reader.features(candHashes[i]);
+          const { score, explain } = scoreAiPicksV4({
+            me, cand: candFeat,
+            myIntent: myIntentV4, candIntent: (u.profile as { datingIntent?: string } | null)?.datingIntent ?? null,
+            myAge: myAgeV4, candAge: (u.profile as { age?: number } | null)?.age ?? null, cityKm: null,
+            myInterests: myInterestNamesV4, candInterests: u.interests.map((i) => i.name),
+            pair: pairMap.get(candHashes[i]),
+            priorCount: priorMap.get(candHashes[i]) || 0,
+            impressionsLast48h: 0,
+            consent: 'full',
+            subs: { cf: 50, active: 50, serious: 50, matchHistoryAffinity: 50, vibeMomentum: 50 },
+            rand: () => 1,
+          });
+          const { passwordHash, ...userData } = u;
+          scored.push({ user: userData, aiScore: score, explain });
+        }
+        scored.sort((a, b) => b.aiScore - a.aiScore);
+        // If DailyMatchWorker has pre-computed today's hero pick, mark it.
+        let featuredHash: string | null = null;
+        try {
+          const dm = await reader.dailyMatch(myHash);
+          if (dm) featuredHash = dm.bHash;
+        } catch { /* ignore */ }
+        const v4Results = scored.slice(0, 20).map((s, idx) => {
+          const candHash = reader.hashOf(s.user.id);
+          const isFeatured = featuredHash !== null && candHash === featuredHash;
+          return {
+            user: s.user,
+            aiScore: s.aiScore,
+            algorithm: 'ai-picks-v4',
+            featured: isFeatured,
+            reasons: [],
+            concerns: [],
+            commonInterests: myInterestNamesV4.filter((n) => (s.user.interests || []).some((i: { name: string }) => i.name === n)),
+            explain: s.explain,
+            // Surface the featured row at the top regardless of order
+            _sortKey: isFeatured ? Number.POSITIVE_INFINITY : (s.aiScore - idx * 0.0001),
+          };
+        });
+        v4Results.sort((a, b) => b._sortKey - a._sortKey);
+        v4Results.forEach((r) => { delete (r as { _sortKey?: number })._sortKey; });
+        trackActivity(prisma, userId, 'view', 'ai-match', undefined, { resultCount: v4Results.length, algo: 'v4' });
+        aiMatchCache.set(cacheKey, v4Results, TTL.AI_MATCH);
+        return res.json({ data: v4Results });
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('[ai-match] v4 short-circuit failed, falling back to legacy:', (e as Error).message);
+      }
+    }
+
+    const myProfile = await prisma.profile.findUnique({ where: { userId } });
+    const myInterests = await prisma.profileInterest.findMany({ where: { userId } });
+    const myInterestNames = myInterests.map(i => i.name);
+
+    const blocks = await prisma.block.findMany({ where: { OR: [{ blockerId: userId }, { blockedId: userId }] } });
+    const blockedIds = blocks.map(b => b.blockerId === userId ? b.blockedId : b.blockerId);
+    blockedIds.push(userId);
+
+    // Also exclude already-liked users
+    const sentLikes = await prisma.like.findMany({ where: { fromUserId: userId }, select: { toUserId: true } });
+    sentLikes.forEach(l => { if (!blockedIds.includes(l.toUserId)) blockedIds.push(l.toUserId); });
+
+    // Fetch larger candidate pool (100 instead of 30)
+    const candidates = await prisma.user.findMany({
+      where: { id: { notIn: blockedIds }, active: true, deactivated: false, privacySettings: { profileVisible: true } },
+      include: { profile: true, interests: true, photos: { take: 3, orderBy: { position: 'asc' }, select: { url: true } }, prompts: { take: 3, select: { question: true, answer: true } } },
+      take: 100,
+    });
+
+    // Get my vibe for vibe-matching
+    let myVibe: any = null;
+    try { myVibe = await prisma.vibeCheck.findFirst({ where: { userId, active: true }, orderBy: { createdAt: 'desc' } }); } catch {}
+
+    // Get active vibes from candidates
+    const vibeMap = new Map<string, any>();
+    try {
+      const vibes = await prisma.vibeCheck.findMany({
+        where: { active: true, userId: { in: candidates.map(c => c.id) }, createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+      });
+      vibes.forEach(v => vibeMap.set(v.userId, v));
+    } catch {}
+
+    // ── Deep behavioral analysis from UserActivity ──
+    const behavior = await getUserBehaviorVector(userId);
+
+    // ── Full match history analysis for collaborative filtering ──
+    let matchHistoryInsights: { avgMatchDuration: number; commonTraitsInSuccessful: string[]; unmatchReasons: Record<string, number> } = {
+      avgMatchDuration: 0, commonTraitsInSuccessful: [], unmatchReasons: {},
+    };
+    try {
+      // Analyze past matches — what made them successful?
+      const pastMatches = await prisma.match.findMany({
+        where: { OR: [{ user1Id: userId }, { user2Id: userId }] },
+        include: {
+          user1: { include: { profile: true, interests: true } },
+          user2: { include: { profile: true, interests: true } },
+          chat: { include: { messages: { select: { id: true, createdAt: true }, take: 1, orderBy: { createdAt: 'desc' } } } },
+        },
+      });
+      const successfulTraits: Record<string, number> = {};
+      let totalDuration = 0;
+      let activeLongMatches = 0;
+      for (const m of pastMatches) {
+        const other = m.user1Id === userId ? m.user2 : m.user1;
+        const msgCount = m.chat?.messages?.length || 0;
+        const matchAge = Date.now() - new Date(m.createdAt).getTime();
+        if (m.active && matchAge > 7 * 24 * 60 * 60 * 1000) {
+          // This is a successful long match — learn from it
+          activeLongMatches++;
+          totalDuration += matchAge;
+          other.interests?.forEach(i => {
+            successfulTraits[i.name] = (successfulTraits[i.name] || 0) + 2;
+          });
+          if (other.profile?.datingIntent) successfulTraits[`intent:${other.profile.datingIntent}`] = (successfulTraits[`intent:${other.profile.datingIntent}`] || 0) + 3;
+          if (other.profile?.city) successfulTraits[`city:${other.profile.city.toLowerCase()}`] = (successfulTraits[`city:${other.profile.city.toLowerCase()}`] || 0) + 2;
+        }
+      }
+      if (activeLongMatches > 0) matchHistoryInsights.avgMatchDuration = totalDuration / activeLongMatches;
+      matchHistoryInsights.commonTraitsInSuccessful = Object.entries(successfulTraits).sort((a, b) => b[1] - a[1]).slice(0, 10).map(e => e[0]);
+
+      // Analyze unmatch reasons + all feedback types
+      const feedback = await (prisma as any).matchFeedback.findMany({ where: { userId } });
+      for (const f of feedback || []) {
+        if ((f.type === 'unmatch' || f.type === 'pass_reason' || f.type === 'block') && f.reason) {
+          const key = f.type === 'unmatch' ? f.reason : `${f.type}:${f.reason}`;
+          matchHistoryInsights.unmatchReasons[key] = (matchHistoryInsights.unmatchReasons[key] || 0) + 1;
+        }
+      }
+    } catch {}
+
+    // Get feedback history for collaborative filtering
+    let feedbackPenalties = new Map<string, number>();
+    try {
+      const myFeedback = await (prisma as any).matchFeedback.findMany({
+        where: { userId }, include: { targetUser: { include: { profile: true } } },
+      });
+      if (myFeedback.length > 0) {
+        // Analyze pass reasons to learn preferences
+        const passReasonProfiles = myFeedback.filter((f: any) => f.type === 'pass_reason').map((f: any) => ({ profile: f.targetUser?.profile, reason: f.reason })).filter((x: any) => x.profile);
+        const unmatchedProfiles = myFeedback.filter((f: any) => f.type === 'unmatch').map((f: any) => f.targetUser?.profile).filter(Boolean);
+        const blockedProfiles = myFeedback.filter((f: any) => f.type === 'block').map((f: any) => f.targetUser?.profile).filter(Boolean);
+
+        // Count pass reasons to understand what user dislikes
+        const passReasonCounts: Record<string, number> = {};
+        passReasonProfiles.forEach((p: any) => { passReasonCounts[p.reason] = (passReasonCounts[p.reason] || 0) + 1; });
+
+        candidates.forEach(c => {
+          if (!c.profile) return;
+          let penalty = 0;
+
+          // Penalty from unmatched profiles (similar traits = likely incompatible)
+          unmatchedProfiles.forEach((up: any) => {
+            if (up.datingIntent === c.profile!.datingIntent && up.datingIntent !== myProfile?.datingIntent) penalty += 2;
+            if (Math.abs(up.age - c.profile!.age) <= 2) penalty += 1;
+          });
+
+          // Heavier penalty from blocked profiles (strong negative signal)
+          blockedProfiles.forEach((bp: any) => {
+            if (bp.datingIntent === c.profile!.datingIntent && bp.datingIntent !== myProfile?.datingIntent) penalty += 4;
+            if (Math.abs(bp.age - c.profile!.age) <= 2) penalty += 2;
+            if (bp.city && bp.city === c.profile!.city) penalty += 1;
+          });
+
+          // Pass reason penalties (learn what user explicitly dislikes)
+          passReasonProfiles.forEach((pr: any) => {
+            const p = pr.profile;
+            const reason = pr.reason;
+            if (reason === 'too-far' && p.city === c.profile!.city && p.city !== myProfile?.city) penalty += 3;
+            if (reason === 'different-goals' && p.datingIntent === c.profile!.datingIntent && p.datingIntent !== myProfile?.datingIntent) penalty += 4;
+            if (reason === 'not-attractive' && Math.abs(p.age - c.profile!.age) <= 2 && p.gender === c.profile!.gender) penalty += 1;
+            if (reason === 'no-effort' && !c.profile!.bio && (!c.photos || c.photos.length <= 1)) penalty += 3;
+          });
+
+          if (penalty > 0) feedbackPenalties.set(c.id, Math.min(penalty, 25));
+        });
+      }
+    } catch {}
+
+    // ── Score candidates using algorithm engine + MinHeap for O(n log k) top-20 ──
+    const topK = new MinHeap<any>(20);
+
+    for (const c of candidates) {
+      const cInterests = c.interests.map(i => i.name);
+      const common = cInterests.filter(i => myInterestNames.includes(i));
+
+      // Prepare vibe data
+      const rawVibe = vibeMap.get(c.id);
+      const candidateVibeData: VibeData | null = rawVibe ? { mood: rawVibe.mood, intent: rawVibe.intent, topics: rawVibe.topics ? JSON.parse(rawVibe.topics) : [] } : null;
+      const myVibeData: VibeData | null = myVibe ? { mood: myVibe.mood, intent: myVibe.intent, topics: myVibe.topics ? JSON.parse(myVibe.topics) : [] } : null;
+
+      // Use scoreAiPicks from algorithm engine (enhanced with all signals)
+      const candidateUser: CandidateUser = {
+        id: c.id, verified: c.verified, createdAt: c.createdAt,
+        profile: c.profile as any, interests: c.interests, photos: c.photos as any[], prompts: c.prompts as any[],
+      };
+
+      const penalty = feedbackPenalties.get(c.id) || 0;
+      const score = scoreAiPicks(
+        myProfile as any, candidateUser, myInterestNames,
+        behavior, matchHistoryInsights as MatchHistoryInsights,
+        myVibeData, candidateVibeData, penalty,
+      );
+
+      // ── Generate explanations (reasons & concerns) ──
+      const reasons: string[] = [];
+      const concerns: string[] = [];
+      if (common.length >= 3) reasons.push(`${common.length} shared interests including ${common.slice(0, 2).join(' & ')}`);
+      else if (common.length > 0) reasons.push(`You both love ${common[0]}`);
+      if (myProfile && c.profile) {
+        if (myProfile.datingIntent === c.profile.datingIntent) reasons.push('Aligned dating goals');
+        else concerns.push('Different relationship goals');
+        if (myProfile.city?.toLowerCase() === c.profile.city?.toLowerCase()) reasons.push(`Both in ${c.profile.city}`);
+        const ageDiff = Math.abs(myProfile.age - c.profile.age);
+        if (ageDiff <= 2) reasons.push('Very similar age');
+        else if (ageDiff > 8) concerns.push('Notable age difference');
+        if ((myProfile as any).religion && (c.profile as any).religion && (myProfile as any).religion === (c.profile as any).religion) reasons.push('Shared beliefs');
+        if (myProfile.seriousMode && c.profile.seriousMode) reasons.push('Both in Serious Mode');
+        if (c.profile.online) reasons.push('Currently online');
+        if (c.profile.profileScore >= 80) reasons.push('Detailed, authentic profile');
+      }
+      if (c.verified) reasons.push('Verified');
+      if (candidateVibeData && myVibeData && candidateVibeData.mood === myVibeData.mood) reasons.push('Matching vibes right now');
+
+      // ── Smart Icebreakers ──
+      const icebreakers: string[] = [];
+      if (common.length > 0) icebreakers.push(`I noticed you love ${common[0]} too! What's your favorite part?`);
+      if (c.prompts[0]) icebreakers.push(`Your answer to "${c.prompts[0].question}" really resonated — tell me more!`);
+      if (c.profile?.profession) icebreakers.push(`${c.profile.profession} sounds fascinating! What drew you to it?`);
+      if (c.profile?.city && myProfile?.city === c.profile.city) icebreakers.push(`Fellow ${c.profile.city} person! What's your favorite hidden gem?`);
+      if (icebreakers.length === 0) icebreakers.push('Your profile really caught my eye — what are you passionate about?');
+
+      // ── Date Ideas based on shared interests ──
+      const dateIdeas = ['Walk and talk in a beautiful spot'];
+      if (common.includes('Coffee') || common.includes('Foodie')) dateIdeas.unshift('Coffee shop exploration date');
+      if (common.includes('Hiking') || common.includes('Outdoors')) dateIdeas.unshift('Scenic trail hike together');
+      if (common.includes('Cooking')) dateIdeas.unshift('Cooking class for two');
+      if (common.includes('Art') || common.includes('Museums')) dateIdeas.unshift('Gallery or museum visit');
+      if (common.includes('Music')) dateIdeas.unshift('Live music night');
+
+      const { passwordHash, ...userData } = c;
+      topK.push(score, {
+        user: userData, aiScore: score, algorithm: 'ai-picks-ensemble-v2',
+        reasons: reasons.slice(0, 4), concerns: concerns.slice(0, 2),
+        commonInterests: common, suggestedIcebreaker: icebreakers[0],
+        suggestedComment: icebreakers[1] || icebreakers[0],
+        suggestedDateIdea: dateIdeas[0],
+        profileTip: score < 40 ? 'Complete more of your profile to get better matches' : score >= 75 ? 'Excellent compatibility!' : 'Your profile is looking great!',
+      });
+    }
+
+    // Extract top 20 via MinHeap drain (sorted by score desc)
+    const finalResults = topK.drain();
+
+    // Track AI match view activity
+    trackActivity(prisma, userId, 'view', 'ai-match', undefined, { resultCount: finalResults.length });
+
+    // Cache for 5 minutes
+    aiMatchCache.set(cacheKey, finalResults, TTL.AI_MATCH);
+
+    res.json({ data: finalResults });
+  } catch (e) { next(e); }
+});
+
+app.get('/api/v1/ai-match/score/:targetId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const myInterests = await prisma.profileInterest.findMany({ where: { userId } });
+    const myInterestNames = myInterests.map(i => i.name);
+    const myProfile = await prisma.profile.findUnique({ where: { userId } });
+    const target = await prisma.user.findUnique({
+      where: { id: req.params.targetId },
+      include: { profile: true, interests: true, photos: { orderBy: { position: 'asc' } }, prompts: { orderBy: { position: 'asc' } } },
+    });
+    if (!target) return res.status(404).json({ error: { message: 'User not found' } });
+
+    const cProfile = target.profile;
+    const cInterests = target.interests.map(i => i.name);
+    const common = cInterests.filter(i => myInterestNames.includes(i));
+
+    // ── Compute detailed compatibility ──
+    let score = 0;
+    const breakdown: Record<string, number> = {};
+
+    const interestScore = Math.min(common.length * 5, 25);
+    score += interestScore; breakdown.interests = interestScore;
+
+    if (myProfile && cProfile) {
+      if (myProfile.datingIntent === cProfile.datingIntent) { score += 20; breakdown.datingIntent = 20; }
+      else if (myProfile.seriousMode === cProfile.seriousMode) { score += 10; breakdown.datingIntent = 10; }
+      else { breakdown.datingIntent = 0; }
+
+      if (myProfile.city?.toLowerCase() === cProfile.city?.toLowerCase()) { score += 10; breakdown.location = 10; }
+      else { breakdown.location = 0; }
+
+      const ageDiff = Math.abs(myProfile.age - cProfile.age);
+      if (ageDiff <= 3) { score += 10; breakdown.age = 10; }
+      else if (ageDiff <= 7) { score += 5; breakdown.age = 5; }
+      else { breakdown.age = 0; }
+
+      let lifestyleScore = 0;
+      if ((myProfile as any).smoking === (cProfile as any).smoking) lifestyleScore += 5;
+      if ((myProfile as any).drinking === (cProfile as any).drinking) lifestyleScore += 5;
+      if ((myProfile as any).exercise === (cProfile as any).exercise) lifestyleScore += 5;
+      score += lifestyleScore; breakdown.lifestyle = lifestyleScore;
+
+      let valuesScore = 0;
+      if ((myProfile as any).children && (cProfile as any).children && (myProfile as any).children === (cProfile as any).children) valuesScore += 5;
+      if ((myProfile as any).religion && (cProfile as any).religion && (myProfile as any).religion === (cProfile as any).religion) valuesScore += 5;
+      score += valuesScore; breakdown.values = valuesScore;
+
+      if (cProfile.profileScore >= 80) { score += 10; breakdown.profileQuality = 10; }
+      else if (cProfile.profileScore >= 60) { score += 5; breakdown.profileQuality = 5; }
+      else { breakdown.profileQuality = 0; }
+
+      if (target.verified) { score += 5; breakdown.verification = 5; }
+      else { breakdown.verification = 0; }
+
+      if (cProfile.online) { score += 10; breakdown.activity = 10; }
+      else if (cProfile.lastActive && (Date.now() - new Date(cProfile.lastActive).getTime()) < 86400000) { score += 5; breakdown.activity = 5; }
+      else { breakdown.activity = 0; }
+
+      if ((myProfile as any).zodiac && (cProfile as any).zodiac && ZODIAC_COMPAT[(myProfile as any).zodiac]?.includes((cProfile as any).zodiac)) {
+        score += 5; breakdown.zodiac = 5;
+      } else { breakdown.zodiac = 0; }
+    }
+
+    // ── Feedback-based penalty (Meta-style collaborative filtering) ──
+    // Check if user previously unmatched/reported people with similar traits
+    try {
+      const myFeedback = await (prisma as any).matchFeedback.findMany({
+        where: { userId },
+        include: { targetUser: { include: { profile: true, interests: true } } },
+      });
+      if (myFeedback.length > 0 && cProfile) {
+        let penalty = 0;
+        const unmatchReasons: Record<string, number> = {};
+        myFeedback.forEach((f: any) => {
+          unmatchReasons[f.reason] = (unmatchReasons[f.reason] || 0) + 1;
+          const tProfile = f.targetUser?.profile;
+          if (!tProfile) return;
+          // Penalize if target shares traits with previously-unmatched users
+          if (f.type === 'unmatch') {
+            if (tProfile.datingIntent === cProfile.datingIntent && tProfile.datingIntent !== myProfile?.datingIntent) penalty += 3;
+            if (Math.abs(tProfile.age - cProfile.age) <= 2) penalty += 2;
+            if (tProfile.city?.toLowerCase() === cProfile.city?.toLowerCase() && f.reason === 'too-far') penalty += 3;
+            if (f.reason === 'different-goals' && tProfile.lookingFor === (cProfile as any).lookingFor) penalty += 4;
+            if (f.reason === 'bad-conversation' || f.reason === 'no-response') penalty += 1; // mild — not about the new person
+          }
+          if (f.type === 'report') {
+            // Heavier penalty: avoid recommending similar-profile users to reported ones
+            if (tProfile.city?.toLowerCase() === cProfile.city?.toLowerCase()) penalty += 2;
+            if (Math.abs(tProfile.age - cProfile.age) <= 3) penalty += 2;
+          }
+        });
+        // Also, if THIS specific target user was reported by ANYONE, lower score
+        const targetReports = await prisma.report.count({ where: { reportedId: req.params.targetId, status: { not: 'dismissed' } } });
+        if (targetReports > 0) penalty += targetReports * 5;
+
+        // Cap penalty at 30 to avoid zeroing out otherwise good matches
+        penalty = Math.min(penalty, 30);
+        score = Math.max(0, score - penalty);
+        breakdown.feedbackPenalty = -penalty;
+      }
+    } catch {} // graceful — if MatchFeedback table not ready, skip
+
+    score = Math.min(score, 100);
+
+    // ── Why This Match (3 reasons) ──
+    const whyPoints: { text: string; weight: number }[] = [];
+    if (common.length >= 3) {
+      whyPoints.push({ text: `You both love ${common.slice(0,3).join(', ')} — ${common.length} interests in common`, weight: common.length * 3 });
+    } else if (common.length > 0) {
+      whyPoints.push({ text: `A shared passion for ${common[0]} could spark something special`, weight: 8 });
+    }
+    if (myProfile && cProfile) {
+      if (myProfile.datingIntent === cProfile.datingIntent) {
+        whyPoints.push({ text: `Both looking for ${cProfile.datingIntent?.toLowerCase()} — aligned intentions`, weight: 15 });
+      }
+      if (myProfile.city?.toLowerCase() === cProfile.city?.toLowerCase()) {
+        whyPoints.push({ text: `Both in ${cProfile.city} — easy to meet up`, weight: 10 });
+      }
+      const ageDiff2 = Math.abs(myProfile.age - cProfile.age);
+      if (ageDiff2 <= 3) whyPoints.push({ text: 'Similar life stage and shared perspectives', weight: 8 });
+      const lm: string[] = [];
+      if ((myProfile as any).smoking === (cProfile as any).smoking) lm.push('smoking habits');
+      if ((myProfile as any).drinking === (cProfile as any).drinking) lm.push('drinking preferences');
+      if ((myProfile as any).exercise === (cProfile as any).exercise) lm.push('fitness levels');
+      if (lm.length >= 2) whyPoints.push({ text: `Compatible lifestyles — matching ${lm.join(' and ')}`, weight: lm.length * 4 });
+      if ((myProfile as any).children && (cProfile as any).children && (myProfile as any).children === (cProfile as any).children) {
+        whyPoints.push({ text: 'Aligned views on family and children', weight: 10 });
+      }
+      if (cProfile.profileScore >= 85) whyPoints.push({ text: `Well-crafted profile (${cProfile.profileScore}% complete) shows authenticity`, weight: 6 });
+      if (target.prompts?.length >= 2) whyPoints.push({ text: 'Thoughtful prompt answers reveal personality depth', weight: 5 });
+    }
+    whyPoints.sort((a, b) => b.weight - a.weight);
+    const whyThisMatch = whyPoints.slice(0, 3).map(p => p.text);
+    while (whyThisMatch.length < 3) {
+      const fillers = ['Shared values and depth', 'Compatible communication styles', 'Similar relationship intent'];
+      whyThisMatch.push(fillers[whyThisMatch.length] || fillers[0]);
+    }
+
+    // ── Move Recommendations (5 smart suggestions using algorithm) ──
+    const [myMsgs, myCommStyle, targetAnalysis, myAnalysis, myMoves] = await Promise.all([
+      getUserLastMessages(userId, 10),
+      getUserCommStyle(userId),
+      getUserAnalysis(req.params.targetId),
+      getUserAnalysis(userId),
+      getUserLastMoves(userId, 10),
+    ]);
+
+    // Extract target's recent topics from their activity
+    const targetActivities = await prisma.userActivity.findMany({
+      where: { userId: req.params.targetId, action: { in: ['like', 'content_engage', 'view'] }, createdAt: { gte: new Date(Date.now() - 14 * 86400000) } },
+      take: 50, orderBy: { createdAt: 'desc' },
+    });
+    const topicCounts: Record<string, number> = {};
+    for (const a of targetActivities) {
+      try { const meta = JSON.parse(a.metadata || '{}'); if (meta.category) topicCounts[meta.category] = (topicCounts[meta.category] || 0) + 1; } catch {}
+    }
+    const targetRecentTopics = Object.entries(topicCounts).sort((a, b) => b[1] - a[1]).slice(0, 3).map(([t]) => t);
+
+    const smartInput: SmartMoveInput = {
+      myLastMessages: [...myMoves, ...myMsgs].slice(0, 20),
+      myProfile: myProfile ? { city: myProfile.city, profession: myProfile.profession, bio: myProfile.bio } : null,
+      myInterests: myInterestNames,
+      targetProfile: cProfile ? { city: cProfile.city, profession: cProfile.profession, bio: cProfile.bio, age: cProfile.age } : null,
+      targetInterests: cInterests,
+      targetPrompts: (target.prompts || []).map((p: any) => ({ question: p.question || '', answer: p.answer || '' })),
+      commonInterests: common,
+      targetRecentTopics,
+    };
+
+    const moveRecs = generateSmartMoves(smartInput).map((m, i) => ({
+      text: m.text, type: m.reasoning.split(' ')[0].toLowerCase(), confidence: m.matchBackProbability,
+    }));
+
+    // ── Deep Compatibility computation ──
+    const targetCommStyle = await getUserCommStyle(req.params.targetId);
+    const behavior = await getUserBehaviorVector(userId);
+    const deepInput: DeepCompatibilityInput = {
+      myProfile: myProfile as any, myInterests: myInterestNames, myCommStyle: myCommStyle, myCluster: myAnalysis?.cluster || null,
+      myTemporal: myAnalysis?.temporal || null, candidateProfile: cProfile as any, candidateInterests: cInterests,
+      candidateCommStyle: targetCommStyle, candidateCluster: targetAnalysis?.cluster || null,
+      candidateTemporal: targetAnalysis?.temporal || null, behavior,
+      myVibe: null, candidateVibe: null,
+    };
+    const deepCompat = computeDeepCompatibility(deepInput);
+
+    res.json({ data: { score, commonInterests: common, breakdown, whyThisMatch, moveRecommendations: moveRecs.slice(0, 5), deepCompatibility: deepCompat } });
+  } catch (e) { next(e); }
+});
+
+// ─── Why This Match (lightweight alias) ──────────────
+app.get('/api/v1/ai-match/why/:targetId', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  // Proxy to the full score endpoint — just returns the whyThisMatch portion
+  try {
+    const fakeRes = { status: () => fakeRes, json: (d: any) => d } as any;
+    // Re-use score logic inline for efficiency
+    const userId = req.userId!;
+    const myInterests = await prisma.profileInterest.findMany({ where: { userId } });
+    const myInterestNames = myInterests.map(i => i.name);
+    const myProfile = await prisma.profile.findUnique({ where: { userId } });
+    const target = await prisma.user.findUnique({
+      where: { id: req.params.targetId },
+      include: { profile: true, interests: true, prompts: { orderBy: { position: 'asc' } } },
+    });
+    if (!target) return res.status(404).json({ error: { message: 'User not found' } });
+    const cProfile = target.profile;
+    const cInterests = target.interests.map(i => i.name);
+    const common = cInterests.filter(i => myInterestNames.includes(i));
+    const whyPoints: { text: string; weight: number }[] = [];
+    if (common.length >= 3) whyPoints.push({ text: `You both love ${common.slice(0,3).join(', ')} — ${common.length} interests in common`, weight: common.length * 3 });
+    else if (common.length > 0) whyPoints.push({ text: `A shared passion for ${common[0]} could spark something special`, weight: 8 });
+    if (myProfile && cProfile) {
+      if (myProfile.datingIntent === cProfile.datingIntent) whyPoints.push({ text: `Both looking for ${cProfile.datingIntent?.toLowerCase()} — aligned intentions`, weight: 15 });
+      if (myProfile.city?.toLowerCase() === cProfile.city?.toLowerCase()) whyPoints.push({ text: `Both in ${cProfile.city} — easy to meet up`, weight: 10 });
+    }
+    whyPoints.sort((a, b) => b.weight - a.weight);
+    const reasons = whyPoints.slice(0, 3).map(p => p.text);
+    while (reasons.length < 3) reasons.push(['Shared values and depth', 'Compatible communication styles', 'Similar relationship intent'][reasons.length] || 'Compatible profiles');
+    res.json({ data: { reasons } });
+  } catch (e) { next(e); }
+});
+
+// ═══ SAFETY ══════════════════════════════════════════
+app.post('/api/v1/safety/report', authMiddleware, idempotency(), validate({ body: reportBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { reportedId, reason: rawReason, details: rawDetails, targetType, targetId } = req.body;
+    const reason = sanitize(rawReason || '');
+    const details = sanitize(rawDetails || '');
+    // If no reportedId provided, use a general/system report
+    const actualReportedId = reportedId || req.userId!;
+    const report = await prisma.report.create({
+      data: { reporterId: req.userId!, reportedId: actualReportedId, reason: reason || 'general', details: details || '', targetType: targetType || 'user', targetId: targetId || null, status: 'pending' },
+    });
+    auditLog(prisma, req.userId!, 'safety_report', { reportedId: actualReportedId, reason, targetType });
+    res.json({ data: report });
+  } catch (e) { next(e); }
+});
+
+// bug-hunt fix #5 (docs/architecture/bug-hunt-2026-07.md #6, P1) — safety
+// block previously read `req.body.blockedId` without Zod (a bogus body 500'd
+// on the audit-log path) and ran three separate writes with no transaction.
+// Now: Zod-validated body + `$transaction()` wrap for block+deleteMany+
+// updateMany. The bidirectional-invisibility invariant (launch-audit §11)
+// now holds even under a mid-sequence crash.
+app.post('/api/v1/safety/block', authMiddleware, idempotency(), validate({ body: safetyBlockBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { blockedId, reason: rawBlockReason, details: rawBlockDetails, evidence: rawEvidence } = req.body;
+    const reason = sanitize(rawBlockReason || '');
+    const details = sanitize(rawBlockDetails || '');
+    const evidence = sanitize(rawEvidence || '');
+    const userId = req.userId!;
+    if (userId === blockedId) return res.status(400).json({ error: { message: 'Cannot block yourself', code: 'INVALID_TARGET' } });
+    const block = await prisma.$transaction(async (tx) => {
+      const created = await tx.block.create({ data: { blockerId: userId, blockedId, reason, details, evidence } });
+      await tx.matchRequest.deleteMany({ where: { OR: [{ fromUserId: userId, toUserId: blockedId }, { fromUserId: blockedId, toUserId: userId }] } });
+      await tx.match.updateMany({ where: { OR: [{ user1Id: userId, user2Id: blockedId }, { user1Id: blockedId, user2Id: userId }] }, data: { active: false } });
+      return created;
+    });
+    auditLog(prisma, userId, 'safety_block', { blockedId, reason });
+    res.json({ data: block });
+  } catch (e) { next(e); }
+});
+
+app.post('/api/v1/safety/unblock', authMiddleware, validate({ body: safetyUnblockBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    await prisma.block.deleteMany({ where: { blockerId: req.userId!, blockedId: req.body.blockedId } });
+    auditLog(prisma, req.userId!, 'safety_unblock', { blockedId: req.body.blockedId });
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
+
+app.get('/api/v1/safety/reports', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const reports = await prisma.report.findMany({ where: { reporterId: req.userId! }, orderBy: { createdAt: 'desc' } });
+    res.json({ data: reports });
+  } catch (e) { next(e); }
+});
+
+app.get('/api/v1/safety/tips', authMiddleware, async (_req: AuthRequest, res: Response) => {
+  res.json({
+    data: [
+      { title: 'Verify your profile', description: 'Add a verified badge to build trust with your matches.' },
+      { title: 'Meet in public places', description: 'For first dates, always choose a public location.' },
+      { title: 'Tell someone your plans', description: 'Let a friend know where you\'re going and who you\'re meeting.' },
+      { title: 'Trust your instincts', description: 'If something feels off, don\'t hesitate to leave or report.' },
+      { title: 'Don\'t share personal info early', description: 'Keep your address and financial details private until you build trust.' },
+      { title: 'Use Miamo video call first', description: 'Video-chat before meeting in person to verify identity.' },
+    ],
+  });
+});
+
+// ═══ INCOMING LIKES (people who liked you, pending your decision) ═══
+app.get('/api/v1/matches/incoming', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    // Get all likes TO this user
+    const incomingLikes = await prisma.like.findMany({
+      where: { toUserId: userId },
+      include: { fromUser: { include: { profile: true, photos: { orderBy: { position: 'asc' } }, interests: true, prompts: { orderBy: { position: 'asc' } } } } },
+      orderBy: { createdAt: 'desc' },
+    });
+    // Exclude users where:
+    // 1. A match already exists (mutual)
+    // 2. User already liked them back
+    // 3. User blocked them
+    // 4. User has "held" them (stored in MatchRequest with status 'held')
+    const existingMatches = await prisma.match.findMany({
+      where: { OR: [{ user1Id: userId }, { user2Id: userId }] },
+    });
+    const matchedUserIds = new Set(existingMatches.map(m => m.user1Id === userId ? m.user2Id : m.user1Id));
+
+    const myLikes = await prisma.like.findMany({ where: { fromUserId: userId }, select: { toUserId: true } });
+    const likedBackIds = new Set(myLikes.map(l => l.toUserId));
+
+    const blocks = await prisma.block.findMany({ where: { OR: [{ blockerId: userId }, { blockedId: userId }] } });
+    const blockedIds = new Set(blocks.map(b => b.blockerId === userId ? b.blockedId : b.blockerId));
+
+    // Get held users
+    const heldRequests = await prisma.matchRequest.findMany({
+      where: { toUserId: userId, status: 'held' }, select: { fromUserId: true },
+    });
+    const heldIds = new Set(heldRequests.map(h => h.fromUserId));
+
+    // Get hidden users
+    const hiddenRequests = await prisma.matchRequest.findMany({
+      where: { toUserId: userId, status: 'hidden' }, select: { fromUserId: true },
+    });
+    const hiddenIds = new Set(hiddenRequests.map(h => h.fromUserId));
+
+    const { showHeld, showHidden } = req.query;
+    
+    let filtered = incomingLikes.filter(like => {
+      if (matchedUserIds.has(like.fromUserId)) return false;
+      if (likedBackIds.has(like.fromUserId)) return false;
+      if (blockedIds.has(like.fromUserId)) return false;
+      if (!showHeld && heldIds.has(like.fromUserId)) return false;
+      if (!showHidden && hiddenIds.has(like.fromUserId)) return false;
+      return true;
+    });
+
+    // Deduplicate by fromUserId (keep latest)
+    const seen = new Set<string>();
+    filtered = filtered.filter(l => { if (seen.has(l.fromUserId)) return false; seen.add(l.fromUserId); return true; });
+
+    // Also get the held and hidden counts
+    const heldCount = heldIds.size;
+    const hiddenCount = hiddenIds.size;
+
+    // Also include any MatchRequests (comments/moves) that are pending
+    const pendingRequests = await prisma.matchRequest.findMany({
+      where: { toUserId: userId, status: 'pending' },
+      include: { fromUser: { include: { profile: true, photos: { orderBy: { position: 'asc' } }, interests: true, prompts: { orderBy: { position: 'asc' } } } } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const data = filtered.map(like => {
+      const { passwordHash, ...userData } = like.fromUser;
+      const request = pendingRequests.find(r => r.fromUserId === like.fromUserId);
+      return {
+        id: like.id,
+        type: request ? (request.type === 'comment' ? 'move' : request.type) : 'like',
+        message: request?.message || null,
+        targetType: like.targetType,
+        targetId: like.targetId,
+        user: userData,
+        requestId: request?.id || null,
+        createdAt: like.createdAt,
+        isHeld: heldIds.has(like.fromUserId),
+      };
+    });
+
+    // Also add requests that don't have a corresponding like
+    pendingRequests.forEach(req => {
+      if (!data.find(d => d.user.id === req.fromUserId) && !matchedUserIds.has(req.fromUserId) && !blockedIds.has(req.fromUserId)) {
+        const { passwordHash, ...userData } = req.fromUser;
+        data.push({
+          id: req.id,
+          type: req.type === 'comment' ? 'move' : req.type,
+          message: req.message || null,
+          targetType: req.targetType,
+          targetId: req.targetId,
+          user: userData,
+          requestId: req.id,
+          createdAt: req.createdAt,
+          isHeld: false,
+        });
+      }
+    });
+
+    // Include held MatchRequests when showHeld=true (they may not have a Like record)
+    if (showHeld) {
+      const heldRequestsFull = await prisma.matchRequest.findMany({
+        where: { toUserId: userId, status: 'held' },
+        include: { fromUser: { include: { profile: true, photos: { orderBy: { position: 'asc' } }, interests: true, prompts: { orderBy: { position: 'asc' } } } } },
+        orderBy: { createdAt: 'desc' },
+      });
+      heldRequestsFull.forEach(req => {
+        // Only exclude blocked users — held items bypass match/like-back filters
+        if (!data.find(d => d.user.id === req.fromUserId) && !blockedIds.has(req.fromUserId)) {
+          const { passwordHash, ...userData } = req.fromUser;
+          data.push({
+            id: req.id,
+            type: req.type === 'comment' ? 'move' : req.type,
+            message: req.message || null,
+            targetType: req.targetType || 'profile',
+            targetId: req.targetId || null,
+            user: userData,
+            requestId: req.id,
+            createdAt: req.createdAt,
+            isHeld: true,
+          });
+        }
+      });
+    }
+
+    res.json({ data, meta: { total: data.length, heldCount, hiddenCount } });
+  } catch (e) { next(e); }
+});
+
+// ═══ MATCH BACK (accept an incoming like / create mutual match) ═══
+app.post('/api/v1/matches/incoming/:userId/match-back', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const myId = req.userId!;
+    const targetUserId = req.params.userId;
+
+    // Verify they liked us
+    const theirLike = await prisma.like.findFirst({ where: { fromUserId: targetUserId, toUserId: myId } });
+    if (!theirLike) return res.status(404).json({ error: { message: 'No incoming like from this user' } });
+
+    // Create our like back (if not exists)
+    try {
+      await prisma.like.create({ data: { fromUserId: myId, toUserId: targetUserId, targetType: 'profile' } });
+    } catch {} // already exists is fine
+
+    // Create match (if not exists)
+    let match = await prisma.match.findFirst({ where: { OR: [{ user1Id: myId, user2Id: targetUserId }, { user1Id: targetUserId, user2Id: myId }] } });
+    if (!match) {
+      match = await prisma.match.create({ data: { user1Id: targetUserId, user2Id: myId } });
+      await prisma.chat.create({ data: { matchId: match.id, user1Id: targetUserId, user2Id: myId } });
+      grantPairMatchMilestones(prisma, myId, targetUserId);
+    }
+
+    // Accept any pending requests from this user
+    await prisma.matchRequest.updateMany({
+      where: { fromUserId: targetUserId, toUserId: myId, status: { in: ['pending', 'held'] } },
+      data: { status: 'accepted' },
+    });
+
+    // Notify them
+    await prisma.notification.create({
+      data: { userId: targetUserId, type: 'match', title: 'It\'s a Match! 🎉', body: 'Someone matched back with you! Start chatting now.' },
+    });
+
+    const chat = await prisma.chat.findFirst({ where: { matchId: match.id } });
+    res.json({ data: { match, chatId: chat?.id, success: true } });
+  } catch (e) { next(e); }
+});
+
+// ═══ MATCH BACK with Miamo Move (accept + send a move message) ═══
+app.post('/api/v1/matches/incoming/:userId/match-move', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const myId = req.userId!;
+    const targetUserId = req.params.userId;
+    const { message: rawMatchMoveMsg } = req.body;
+    const message = rawMatchMoveMsg ? sanitize(rawMatchMoveMsg) : '';
+
+    // Match back first
+    try { await prisma.like.create({ data: { fromUserId: myId, toUserId: targetUserId, targetType: 'profile' } }); } catch {}
+    
+    let match = await prisma.match.findFirst({ where: { OR: [{ user1Id: myId, user2Id: targetUserId }, { user1Id: targetUserId, user2Id: myId }] } });
+    if (!match) {
+      match = await prisma.match.create({ data: { user1Id: targetUserId, user2Id: myId } });
+      await prisma.chat.create({ data: { matchId: match.id, user1Id: targetUserId, user2Id: myId } });
+      grantPairMatchMilestones(prisma, myId, targetUserId);
+    }
+    await prisma.matchRequest.updateMany({
+      where: { fromUserId: targetUserId, toUserId: myId, status: { in: ['pending', 'held'] } },
+      data: { status: 'accepted' },
+    });
+
+    // Send the first message in chat if message provided
+    const chat = await prisma.chat.findFirst({ where: { matchId: match.id } });
+    if (chat && message) {
+      await prisma.message.create({ data: { chatId: chat.id, senderId: myId, content: message, type: 'text' } });
+    }
+
+    await prisma.notification.create({
+      data: { userId: targetUserId, type: 'match', title: 'It\'s a Match! 🎉💫', body: message ? `They matched with a move: "${message.substring(0,50)}"` : 'Someone matched back with style!' },
+    });
+
+    res.json({ data: { match, chatId: chat?.id, success: true } });
+  } catch (e) { next(e); }
+});
+
+// ═══ HOLD FOR NOW (park an incoming like for later) ═══
+app.post('/api/v1/matches/incoming/:userId/hold', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const myId = req.userId!;
+    const targetUserId = req.params.userId;
+    // Upsert a MatchRequest to track the "held" status
+    const existing = await prisma.matchRequest.findUnique({ where: { fromUserId_toUserId: { fromUserId: targetUserId, toUserId: myId } } });
+    if (existing) {
+      await prisma.matchRequest.update({ where: { id: existing.id }, data: { status: 'held' } });
+    } else {
+      await prisma.matchRequest.create({ data: { fromUserId: targetUserId, toUserId: myId, type: 'like', status: 'held' } });
+    }
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
+
+// ═══ RESUME (un-hold an incoming like — move back to pending/incoming) ═══
+app.post('/api/v1/matches/incoming/:userId/resume', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const myId = req.userId!;
+    const targetUserId = req.params.userId;
+    const existing = await prisma.matchRequest.findUnique({ where: { fromUserId_toUserId: { fromUserId: targetUserId, toUserId: myId } } });
+    if (existing && existing.status === 'held') {
+      await prisma.matchRequest.update({ where: { id: existing.id }, data: { status: 'pending' } });
+    }
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
+
+// ═══ HIDE (dismiss an incoming like) ═══
+app.post('/api/v1/matches/incoming/:userId/hide', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const myId = req.userId!;
+    const targetUserId = req.params.userId;
+    const existing = await prisma.matchRequest.findUnique({ where: { fromUserId_toUserId: { fromUserId: targetUserId, toUserId: myId } } });
+    if (existing) {
+      await prisma.matchRequest.update({ where: { id: existing.id }, data: { status: 'hidden' } });
+    } else {
+      await prisma.matchRequest.create({ data: { fromUserId: targetUserId, toUserId: myId, type: 'like', status: 'hidden' } });
+    }
+    res.json({ data: { success: true } });
+  } catch (e) { next(e); }
+});
+
+// ═══ Get AI-suggested openers for an incoming match ═══
+app.get('/api/v1/matches/incoming/:userId/suggestions', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const myId = req.userId!;
+    const targetUserId = req.params.userId;
+    const myInterests = await prisma.profileInterest.findMany({ where: { userId: myId } });
+    const myInterestNames = myInterests.map(i => i.name);
+    const target = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      include: { profile: true, interests: true, prompts: { take: 3 } },
+    });
+    if (!target) return res.status(404).json({ error: { message: 'User not found' } });
+
+    const theirInterests = target.interests.map(i => i.name);
+    const common = theirInterests.filter(i => myInterestNames.includes(i));
+
+    const suggestions: string[] = [];
+    if (common.length > 0) {
+      suggestions.push(`I noticed we both love ${common[0]}! What got you into it? 💫`);
+      if (common.length > 1) suggestions.push(`${common.length} things in common already — ${common.slice(0,2).join(' and ')}. This could be something special!`);
+    }
+    if (target.prompts?.[0]) {
+      suggestions.push(`Loved your answer to "${target.prompts[0].question}" — tell me more!`);
+    }
+    if (target.profile?.profession) {
+      suggestions.push(`${target.profile.profession} sounds fascinating! I'd love to hear what drew you to it.`);
+    }
+    if (target.profile?.city) {
+      suggestions.push(`Fellow ${target.profile.city} person! Got a hidden gem spot you'd recommend? ✨`);
+    }
+    suggestions.push("Hey! Your profile really caught my eye. What's something that made you smile today?");
+    suggestions.push("I have a feeling we'd get along — let's find out! What are you passionate about right now?");
+
+    res.json({ data: suggestions.slice(0, 5) });
+  } catch (e) { next(e); }
+});
+
+// ─── v3.2 ACCESS CONTROL ────────────────────────────────────
+// Field-level access requests with full lifecycle.
+// Spam controls: 5 max pending outbound/user, 3 max pending per (field,target),
+// 7-day cooldown after denial for same (from,to,field).
+const ACCESS_MAX_OUTBOUND_PENDING = 5;
+const ACCESS_MAX_PER_FIELD_TARGET = 3;
+const ACCESS_DENY_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+const ACCESS_DEFAULT_EXPIRY_MS = 30 * 24 * 60 * 60 * 1000;
+
+app.post('/api/v1/access/requests', authMiddleware, validate({ body: accessRequestCreateBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const { toUserId, field, message } = req.body as { toUserId: string; field: string; message?: string };
+    if (toUserId === req.userId) return res.status(400).json({ error: { message: 'Cannot request access from yourself', code: 'INVALID_TARGET' } });
+
+    // Cooldown check for previous denial
+    const lastDenied = await prisma.accessRequest.findFirst({
+      where: { fromUserId: req.userId!, toUserId, field, status: 'denied' },
+      orderBy: { decidedAt: 'desc' },
+    });
+    if (lastDenied?.decidedAt && Date.now() - lastDenied.decidedAt.getTime() < ACCESS_DENY_COOLDOWN_MS) {
+      return res.status(429).json({ error: { message: 'Please wait 7 days before re-requesting', code: 'ACCESS_COOLDOWN', statusCode: 429 } });
+    }
+
+    const [outboundPending, perFieldPending] = await Promise.all([
+      prisma.accessRequest.count({ where: { fromUserId: req.userId!, status: 'pending' } }),
+      prisma.accessRequest.count({ where: { toUserId, field, status: 'pending' } }),
+    ]);
+    if (outboundPending >= ACCESS_MAX_OUTBOUND_PENDING) return res.status(429).json({ error: { message: 'Too many pending requests', code: 'ACCESS_QUOTA_OUTBOUND', statusCode: 429 } });
+    if (perFieldPending >= ACCESS_MAX_PER_FIELD_TARGET) return res.status(429).json({ error: { message: 'Too many requests for this field', code: 'ACCESS_QUOTA_FIELD', statusCode: 429 } });
+
+    const request = await prisma.accessRequest.upsert({
+      where: { fromUserId_toUserId_field: { fromUserId: req.userId!, toUserId, field } },
+      update: { status: 'pending', message: message ? sanitize(message) : null, createdAt: new Date(), decidedAt: null, expiresAt: null },
+      create: { fromUserId: req.userId!, toUserId, field, message: message ? sanitize(message) : null, status: 'pending' },
+    });
+    auditLog(prisma, req.userId!, 'access_request_create', { id: request.id, toUserId, field });
+    res.status(201).json({ data: request });
+  } catch (e) { next(e); }
+});
+
+app.get('/api/v1/access/requests/inbox', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const requests = await prisma.accessRequest.findMany({
+      where: { toUserId: req.userId!, status: 'pending' },
+      orderBy: { createdAt: 'desc' }, take: 100,
+    });
+    res.json({ data: requests });
+  } catch (e) { next(e); }
+});
+
+app.get('/api/v1/access/requests/outbox', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const requests = await prisma.accessRequest.findMany({
+      where: { fromUserId: req.userId! },
+      orderBy: { createdAt: 'desc' }, take: 100,
+    });
+    res.json({ data: requests });
+  } catch (e) { next(e); }
+});
+
+app.post('/api/v1/access/requests/:id/approve', authMiddleware, validate({ body: accessRequestDecisionBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const existing = await prisma.accessRequest.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.toUserId !== req.userId) return res.status(404).json({ error: { message: 'Not found', code: 'NOT_FOUND' } });
+    if (existing.status !== 'pending') return res.status(409).json({ error: { message: 'Already decided', code: 'ACCESS_ALREADY_DECIDED' } });
+    const updated = await prisma.accessRequest.update({
+      where: { id: req.params.id },
+      data: { status: 'approved', decidedAt: new Date(), expiresAt: new Date(Date.now() + ACCESS_DEFAULT_EXPIRY_MS) },
+    });
+    auditLog(prisma, req.userId!, 'access_request_approve', { id: req.params.id, field: existing.field });
+    res.json({ data: updated });
+  } catch (e) { next(e); }
+});
+
+app.post('/api/v1/access/requests/:id/deny', authMiddleware, validate({ body: accessRequestDecisionBodySchema }), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const existing = await prisma.accessRequest.findUnique({ where: { id: req.params.id } });
+    if (!existing || existing.toUserId !== req.userId) return res.status(404).json({ error: { message: 'Not found', code: 'NOT_FOUND' } });
+    if (existing.status !== 'pending') return res.status(409).json({ error: { message: 'Already decided', code: 'ACCESS_ALREADY_DECIDED' } });
+    const updated = await prisma.accessRequest.update({
+      where: { id: req.params.id },
+      data: { status: 'denied', decidedAt: new Date() },
+    });
+    auditLog(prisma, req.userId!, 'access_request_deny', { id: req.params.id, field: existing.field });
+    res.json({ data: updated });
+  } catch (e) { next(e); }
+});
+
+app.delete('/api/v1/access/requests/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const existing = await prisma.accessRequest.findUnique({ where: { id: req.params.id } });
+    if (!existing) return res.status(404).json({ error: { message: 'Not found', code: 'NOT_FOUND' } });
+    // Owner can revoke their grant; sender can withdraw their request.
+    const isGrantOwner = existing.toUserId === req.userId && existing.status === 'approved';
+    const isSender = existing.fromUserId === req.userId;
+    if (!isGrantOwner && !isSender) return res.status(403).json({ error: { message: 'Forbidden', code: 'FORBIDDEN' } });
+    const updated = await prisma.accessRequest.update({
+      where: { id: req.params.id },
+      data: { status: 'revoked', decidedAt: new Date() },
+    });
+    auditLog(prisma, req.userId!, 'access_request_revoke', { id: req.params.id, field: existing.field });
+    res.json({ data: updated });
+  } catch (e) { next(e); }
+});
+
+// Error Handler
+// Sentry's error handler reports the error before Miamo's handler converts
+// it to the v3.0 envelope. No-op when SENTRY_DSN is unset.
+app.use(sentry.errorHandler);
+app.use(errorHandler);
+
+if (process.env.NODE_ENV !== 'test') {
+  const server = app.listen(PORT, '0.0.0.0', () => { logger.info(`Miamo Social Service on port ${PORT}`); });
+
+  // Graceful shutdown — close HTTP then disconnect Prisma pool
+  const shutdown = async (signal: string) => {
+    logger.info(`${signal} received — shutting down social service...`);
+    server.close(async () => {
+      await prisma.$disconnect();
+      logger.info('Social service stopped cleanly');
+      process.exit(0);
+    });
+    setTimeout(() => { process.exit(1); }, 10000);
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
+}

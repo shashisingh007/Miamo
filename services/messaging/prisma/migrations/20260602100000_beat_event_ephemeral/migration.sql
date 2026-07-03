@@ -1,0 +1,5 @@
+-- Ephemeral viewing fields for BeatEvent (Snapchat-style)
+ALTER TABLE "BeatEvent" ADD COLUMN IF NOT EXISTS "viewCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "BeatEvent" ADD COLUMN IF NOT EXISTS "firstViewedAt" TIMESTAMP(3);
+ALTER TABLE "BeatEvent" ADD COLUMN IF NOT EXISTS "mediaSaved" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "BeatEvent" ADD COLUMN IF NOT EXISTS "mediaCleared" BOOLEAN NOT NULL DEFAULT false;

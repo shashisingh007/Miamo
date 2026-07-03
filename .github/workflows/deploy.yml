@@ -1,0 +1,136 @@
+name: Deploy
+
+# G.17 CI/CD — image build + registry push on merge to main.
+#
+# Behaviour:
+#   * Always builds the 11 Docker images so a build regression fails
+#     the merge, even without registry credentials.
+#   * Only pushes to ECR when both `ECR_REGISTRY` and `ECR_ENABLED`
+#     secrets are set. Missing either → the "Push to ECR" step is
+#     skipped, workflow still exits green (so we get build coverage
+#     before the founder wires AWS credentials).
+#
+# Cross-refs:
+#   docs/DEVOPS.md §CI/CD
+#   docs/architecture/dr-runbook.md §4 (rollback path — same images)
+#   scripts/rollback.sh (consumes the tags this workflow pushes)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag_override:
+        description: 'Optional image tag override (defaults to git SHA short)'
+        required: false
+        default: ''
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-push:
+    name: Build + push images
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write   # required for AWS OIDC role assumption when we wire it
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - name: gateway
+            context: .
+            dockerfile: docker/gateway.Dockerfile
+          - name: auth
+            context: .
+            dockerfile: docker/auth.Dockerfile
+          - name: users
+            context: .
+            dockerfile: docker/users.Dockerfile
+          - name: social
+            context: .
+            dockerfile: docker/social.Dockerfile
+          - name: messaging
+            context: .
+            dockerfile: docker/messaging.Dockerfile
+          - name: content
+            context: .
+            dockerfile: docker/content.Dockerfile
+          - name: notifications
+            context: .
+            dockerfile: docker/notifications.Dockerfile
+          - name: ingest
+            context: .
+            dockerfile: docker/ingest.Dockerfile
+          - name: tracking-worker
+            context: .
+            dockerfile: docker/tracking-worker.Dockerfile
+          - name: web
+            context: .
+            dockerfile: docker/web.Dockerfile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute image tag
+        id: tag
+        run: |
+          if [ -n "${{ inputs.tag_override }}" ]; then
+            echo "tag=${{ inputs.tag_override }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=$(echo ${{ github.sha }} | cut -c1-12)" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Configure AWS credentials for ECR (skipped if missing)
+        if: ${{ secrets.ECR_ENABLED == 'true' }}
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+
+      - name: Login to Amazon ECR (skipped if missing)
+        if: ${{ secrets.ECR_ENABLED == 'true' }}
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build image (miamo-${{ matrix.image.name }})
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.dockerfile }}
+          push: false
+          tags: |
+            miamo-${{ matrix.image.name }}:${{ steps.tag.outputs.tag }}
+            miamo-${{ matrix.image.name }}:latest
+          cache-from: type=gha,scope=miamo-${{ matrix.image.name }}
+          cache-to: type=gha,mode=max,scope=miamo-${{ matrix.image.name }}
+
+      - name: Push image to ECR (skipped if missing)
+        if: ${{ secrets.ECR_ENABLED == 'true' && secrets.ECR_REGISTRY != '' }}
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.image.context }}
+          file: ${{ matrix.image.dockerfile }}
+          push: true
+          tags: |
+            ${{ secrets.ECR_REGISTRY }}/miamo-${{ matrix.image.name }}:${{ steps.tag.outputs.tag }}
+            ${{ secrets.ECR_REGISTRY }}/miamo-${{ matrix.image.name }}:latest
+          cache-from: type=gha,scope=miamo-${{ matrix.image.name }}
+          cache-to: type=gha,mode=max,scope=miamo-${{ matrix.image.name }}
+
+  notify:
+    name: Announce deploy
+    needs: [build-and-push]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Report status
+        run: |
+          echo "Deploy job status: ${{ needs.build-and-push.result }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Ref: ${{ github.ref }}"

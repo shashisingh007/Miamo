@@ -1,0 +1,142 @@
+name: Release
+
+# G.17 CI/CD — the "shipping to prod" gate. Triggers on any tag matching
+# `v*` (v1.0.0, v1.0.1, v1.2.3-rc1). Runs the full test suite + E2E +
+# smoke + load-test suite before letting the release proceed.
+#
+# What happens on tag:
+#   1. Full test suite (npm test:full)
+#   2. Web build (Next.js production)
+#   3. Playwright E2E (chromium, webkit) — the founder must have
+#      committed to running `npx playwright install` on CI runners
+#   4. Smoke tests (scripts/qa-runs/phase-16-smoke.py) against a
+#      local docker-compose stack — nice to have; gated on
+#      `SMOKE_TEST_ENABLED` secret because it requires a running stack
+#   5. Load-test scripts — gated on `LOAD_TEST_ENABLED` secret;
+#      docs/DEVOPS.md §CI/CD explains how to enable
+#   6. Create a GitHub Release with the changelog delta.
+#
+# Any red step fails the release. The maintainer manually re-runs the
+# workflow after fixing.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release'
+        required: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  full-test:
+    name: Full test suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: cd services/shared && npm install --no-audit --no-fund
+      - run: cd services/shared && npx prisma generate
+      - run: npm run test:full
+      - run: npm run typecheck
+
+  web-build:
+    name: Web production build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [full-test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: cd services/shared && npm install --no-audit --no-fund
+      - run: cd services/shared && npx prisma generate
+      - run: cd services/web && npm install --no-audit --no-fund
+      - run: cd services/web && npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'
+
+  e2e:
+    name: Playwright E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [full-test]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium webkit
+      - name: Run Playwright specs
+        run: npm run test:e2e -- --project=chromium --project=webkit
+        env:
+          PLAYWRIGHT_HTML_REPORT: playwright-report
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+  smoke:
+    name: Smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: [full-test]
+    if: ${{ secrets.SMOKE_TEST_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: pip install requests
+      - run: python3 scripts/qa-runs/phase-16-smoke.py
+
+  load:
+    name: Load tests (k6)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [full-test]
+    if: ${{ secrets.LOAD_TEST_ENABLED == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+      - run: bash scripts/load/run.sh discover
+      - run: bash scripts/load/run.sh matches
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [full-test, web-build, e2e]
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Create release with generated notes
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          fail_on_unmatched_files: false

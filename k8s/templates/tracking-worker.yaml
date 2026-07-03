@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tracking-worker
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: tracking-worker
+    tier: worker
+spec:
+  # The rollup consumer can run multiple replicas safely (it uses XREADGROUP
+  # with a consumer group). The feature/compat loops are idempotent so dupes
+  # at the boundary are harmless.
+  replicas: {{ .Values.trackingWorker.replicas | default 1 }}
+  selector:
+    matchLabels:
+      app: tracking-worker
+  template:
+    metadata:
+      labels:
+        app: tracking-worker
+        tier: worker
+    spec:
+      containers:
+        - name: tracking-worker
+          image: "{{ .Values.image.registry }}/miamo-tracking-worker:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - containerPort: 3261
+              name: http
+          env:
+            - name: PORT
+              value: "3261"
+            - name: REDIS_URL
+              value: "{{ .Values.redis.url }}"
+            - name: DATABASE_URL
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: url
+            - name: TRACKING_HASH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: tracking-secrets
+                  key: hash-secret
+            - name: TRACKING_KILL
+              value: "{{ .Values.tracking.kill | default 0 }}"
+          resources:
+            requests:
+              cpu: "150m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "768Mi"
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 3261
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3261
+            initialDelaySeconds: 15
+            periodSeconds: 30
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tracking-worker
+  namespace: {{ .Values.namespace }}
+  labels:
+    app: tracking-worker
+spec:
+  type: ClusterIP
+  selector:
+    app: tracking-worker
+  ports:
+    - name: http
+      port: 3261
+      targetPort: 3261

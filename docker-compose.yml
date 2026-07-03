@@ -1,0 +1,265 @@
+# ─── Miamo Docker Compose — Local Development ────────
+# Usage: docker compose up -d
+# Data: Persists in named volumes (postgres_data, redis_data)
+# All data survives container restarts and rebuilds.
+
+# Note: compose-spec no longer requires a `version` key — removed in v3.6.1 cleanup.
+
+# ─── v3.6 Feature Flag Anchor ──────────────────────────
+# Default OFF (matches the runtime code default). Override per-deployment via
+# the host .env or `FOO=1 docker compose up`. Referenced by individual service
+# environment blocks via `<<: *v8-flags`.
+x-v8-flags: &v8-flags
+  # social v8 ranking + fairness
+  ALGO_V8_DISCOVER_RANKER_ENABLED: ${ALGO_V8_DISCOVER_RANKER_ENABLED:-0}
+  ALGO_V8_FAIRNESS_RERANK_ENABLED: ${ALGO_V8_FAIRNESS_RERANK_ENABLED:-0}
+  FEATURE_WEEKLY_TOP_ENABLED: ${FEATURE_WEEKLY_TOP_ENABLED:-0}
+  FEATURE_WHY_EXPLAINER_ENABLED: ${FEATURE_WHY_EXPLAINER_ENABLED:-0}
+  # content
+  FEATURE_MOVE_V2_ENABLED: ${FEATURE_MOVE_V2_ENABLED:-0}
+  FEATURE_FAMILY_BRIEF_ENABLED: ${FEATURE_FAMILY_BRIEF_ENABLED:-0}
+  FEATURE_DTM_MASK_ENABLED: ${FEATURE_DTM_MASK_ENABLED:-0}
+  # messaging
+  FEATURE_ANTI_GHOST_ENABLED: ${FEATURE_ANTI_GHOST_ENABLED:-0}
+  # users
+  FEATURE_VOICE_FINGERPRINT_ENABLED: ${FEATURE_VOICE_FINGERPRINT_ENABLED:-0}
+  # tracking-worker loops
+  INTENT_INFERENCE_ENABLED: ${INTENT_INFERENCE_ENABLED:-0}
+  EXPOSURE_SCHEDULER_ENABLED: ${EXPOSURE_SCHEDULER_ENABLED:-0}
+  STABLE_MATCH_ENABLED: ${STABLE_MATCH_ENABLED:-0}
+  FAIRNESS_AUDIT_ENABLED: ${FAIRNESS_AUDIT_ENABLED:-0}
+
+services:
+  # ─── Database (Persistent) ─────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: miamo-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-miamo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required — copy .env.example to .env}
+      POSTGRES_DB: ${POSTGRES_DB:-miamo}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U miamo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ─── Cache (Persistent) ────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: miamo-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+
+  # ─── Database Migration ─────────────────────────────
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/migrate.Dockerfile
+    container_name: miamo-migrate
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-miamo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-miamo}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ─── Gateway ───────────────────────────────────────
+  gateway:
+    build:
+      context: .
+      dockerfile: docker/gateway.Dockerfile
+    container_name: miamo-gateway
+    ports:
+      - "3200:3200"
+    environment: &common-env
+      DATABASE_URL: postgresql://${POSTGRES_USER:-miamo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-miamo}?schema=public
+      JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required (generate with openssl rand -hex 64)}"
+      INTERNAL_SERVICE_KEY: "${INTERNAL_SERVICE_KEY:?INTERNAL_SERVICE_KEY is required (generate with openssl rand -hex 32)}"
+      NODE_ENV: ${NODE_ENV:-production}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3100}
+      REDIS_URL: redis://redis:6379
+      AUTH_SERVICE_URL: http://auth:3201
+      USER_SERVICE_URL: http://users:3202
+      SOCIAL_SERVICE_URL: http://social:3203
+      MESSAGING_SERVICE_URL: http://messaging:3204
+      CONTENT_SERVICE_URL: http://content:3205
+      NOTIFICATION_SERVICE_URL: http://notifications:3206
+      INGEST_SERVICE_URL: http://ingest:3260
+      # ─── Verification / OAuth / OTP (v6.9 + signup phase) ────
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      APPLE_CLIENT_ID: ${APPLE_CLIENT_ID:-}
+      OTP_PROVIDER_EMAIL: ${OTP_PROVIDER_EMAIL:-}
+      OTP_PROVIDER_SMS: ${OTP_PROVIDER_SMS:-}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+      AUTO_APPROVE_VERIFY: ${AUTO_APPROVE_VERIFY:-}
+      ALLOW_DEV_OTP_PEEK: ${ALLOW_DEV_OTP_PEEK:-}
+      DEVICE_FP_SALT: ${DEVICE_FP_SALT:-}
+    depends_on:
+      - auth
+      - users
+      - social
+      - messaging
+      - content
+      - notifications
+    restart: unless-stopped
+
+  # ─── Microservices ─────────────────────────────────
+  auth:
+    build: { context: ., dockerfile: docker/auth.Dockerfile }
+    container_name: miamo-auth
+    environment:
+      <<: *common-env
+      PORT: "3201"
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  users:
+    build: { context: ., dockerfile: docker/users.Dockerfile }
+    container_name: miamo-users
+    environment:
+      <<: [*common-env, *v8-flags]
+      PORT: "3202"
+      # users-owned flag
+      FEATURE_VOICE_FINGERPRINT_ENABLED: ${FEATURE_VOICE_FINGERPRINT_ENABLED:-0}
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  social:
+    build: { context: ., dockerfile: docker/social.Dockerfile }
+    container_name: miamo-social
+    environment:
+      <<: [*common-env, *v8-flags]
+      PORT: "3203"
+      # social-owned flags
+      ALGO_V8_DISCOVER_RANKER_ENABLED: ${ALGO_V8_DISCOVER_RANKER_ENABLED:-0}
+      ALGO_V8_FAIRNESS_RERANK_ENABLED: ${ALGO_V8_FAIRNESS_RERANK_ENABLED:-0}
+      FEATURE_WEEKLY_TOP_ENABLED: ${FEATURE_WEEKLY_TOP_ENABLED:-0}
+      FEATURE_WHY_EXPLAINER_ENABLED: ${FEATURE_WHY_EXPLAINER_ENABLED:-0}
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  messaging:
+    build: { context: ., dockerfile: docker/messaging.Dockerfile }
+    container_name: miamo-messaging
+    environment:
+      <<: [*common-env, *v8-flags]
+      PORT: "3204"
+      # messaging-owned flag
+      FEATURE_ANTI_GHOST_ENABLED: ${FEATURE_ANTI_GHOST_ENABLED:-0}
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  content:
+    build: { context: ., dockerfile: docker/content.Dockerfile }
+    container_name: miamo-content
+    environment:
+      <<: [*common-env, *v8-flags]
+      PORT: "3205"
+      # content-owned flags
+      FEATURE_MOVE_V2_ENABLED: ${FEATURE_MOVE_V2_ENABLED:-0}
+      FEATURE_FAMILY_BRIEF_ENABLED: ${FEATURE_FAMILY_BRIEF_ENABLED:-0}
+      FEATURE_DTM_MASK_ENABLED: ${FEATURE_DTM_MASK_ENABLED:-0}
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  notifications:
+    build: { context: ., dockerfile: docker/notifications.Dockerfile }
+    container_name: miamo-notifications
+    environment:
+      <<: *common-env
+      PORT: "3206"
+    depends_on:
+      postgres: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  # ─── Tracking Pipeline (v3.1+, gated by v3.6 flags) ─────────
+  # `ingest` is the wire-side write target for the web SDK (POST /api/v1/track).
+  # Stateless, fronted by gateway, writes to Redis Streams only — no Postgres.
+  ingest:
+    build: { context: ., dockerfile: docker/ingest.Dockerfile }
+    container_name: miamo-ingest
+    ports:
+      - "3260:3260"
+    environment:
+      <<: *common-env
+      PORT: "3260"
+      TRACKING_HASH_SECRET: ${TRACKING_HASH_SECRET:-dev-only-tracking-hash-secret-change-me}
+      TRACKING_STREAM_KEY: ${TRACKING_STREAM_KEY:-miamo:events:v1}
+    depends_on:
+      redis: { condition: service_healthy }
+    restart: unless-stopped
+
+  # `tracking-worker` is the consumer side: pulls from Redis Stream, persists
+  # aggregates to Postgres, runs the v3.6 worker loops (intent, exposure
+  # scheduler, stable-match, fairness audit) — each gated by its own flag.
+  tracking-worker:
+    build: { context: ., dockerfile: docker/tracking-worker.Dockerfile }
+    container_name: miamo-tracking-worker
+    ports:
+      - "3261:3261"
+    environment:
+      <<: [*common-env, *v8-flags]
+      PORT: "3261"
+      TRACKING_HASH_SECRET: ${TRACKING_HASH_SECRET:-dev-only-tracking-hash-secret-change-me}
+      TRACKING_STREAM_KEY: ${TRACKING_STREAM_KEY:-miamo:events:v1}
+      # tracking-worker loop flags (defaults off; flip via .env)
+      INTENT_INFERENCE_ENABLED: ${INTENT_INFERENCE_ENABLED:-0}
+      EXPOSURE_SCHEDULER_ENABLED: ${EXPOSURE_SCHEDULER_ENABLED:-0}
+      STABLE_MATCH_ENABLED: ${STABLE_MATCH_ENABLED:-0}
+      FAIRNESS_AUDIT_ENABLED: ${FAIRNESS_AUDIT_ENABLED:-0}
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      migrate: { condition: service_completed_successfully }
+    restart: unless-stopped
+
+  # ─── Web Frontend ──────────────────────────────────
+  web:
+    build: { context: ., dockerfile: docker/web.Dockerfile }
+    container_name: miamo-web
+    ports:
+      - "3100:3100"
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:3200
+      PORT: "3100"
+    depends_on:
+      - gateway
+    restart: unless-stopped
+
+# ─── Persistent Volumes ─────────────────────────────
+# Data persists across container restarts, stops, and rebuilds
+volumes:
+  postgres_data:
+    driver: local
+    name: miamo_postgres_data
+  redis_data:
+    driver: local
+    name: miamo_redis_data

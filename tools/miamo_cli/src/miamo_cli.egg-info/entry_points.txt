@@ -1,0 +1,2 @@
+[console_scripts]
+miamo = miamo_cli.cli:main

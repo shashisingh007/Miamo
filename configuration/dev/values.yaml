@@ -1,0 +1,74 @@
+# ═══════════════════════════════════════════════════════════════════
+# Miamo — Development Environment Configuration
+# ═══════════════════════════════════════════════════════════════════
+# Single source of truth. Change values here → propagates everywhere.
+# Usage: bash scripts/start.sh dev
+# ═══════════════════════════════════════════════════════════════════
+
+# ─── Cluster ──────────────────────────────────────────────────────
+# Change this IP/hostname when deploying to a real cluster or remote machine
+cluster_host: "localhost"
+namespace: "miamo"
+env: "dev"
+
+# ─── Service Port (exposed by k8s Services — same for all) ───────
+service_port: 443
+
+# ─── Container Ports (internal, inside pods) ──────────────────────
+container_ports:
+  auth: 3201
+  users: 3202
+  social: 3203
+  messaging: 3204
+  content: 3205
+  notifications: 3206
+  gateway: 3200
+  web: 3100
+
+# ─── Local Ports (for port-forwarding to your machine) ───────────
+# These are the ports you open in your browser: http://127.0.0.1:<port>
+local_ports:
+  web: 3100
+  gateway: 3200
+
+# ─── NodePorts (host-accessible via minikube IP, 30000-32767) ─────
+node_ports:
+  gateway: 30080
+  web: 30443
+
+# ─── Docker Images ────────────────────────────────────────────────
+images:
+  registry: ""
+  tag: "latest"
+  pull_policy: "IfNotPresent"
+
+# ─── Database ─────────────────────────────────────────────────────
+database:
+  host: "postgres"
+  port: 5432
+  name: "miamo"
+  user: "miamo"
+  password: "miamo"
+
+# ─── Redis ────────────────────────────────────────────────────────
+redis:
+  host: "redis"
+  port: 6379
+
+# ─── Secrets ──────────────────────────────────────────────────────
+secrets:
+  jwt_secret: "miamo-jwt-secret-dev-2026"
+  internal_service_key: "miamo-internal-key-dev-2026"
+
+# ─── Resources (per pod) ─────────────────────────────────────────
+resources:
+  requests_memory: "32Mi"
+  requests_cpu: "50m"
+  limits_memory: "128Mi"
+  limits_cpu: "250m"
+
+# ─── Scaling ──────────────────────────────────────────────────────
+replicas: 1
+
+# ─── Node Environment ────────────────────────────────────────────
+node_env: "development"
