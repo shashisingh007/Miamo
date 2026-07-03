@@ -1,0 +1,70 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.{ts,mjs,js}"],
+      "project": ["scripts/**/*.{ts,mjs,js}"],
+      "ignore": ["**/node_modules/**", "**/dist/**", "**/.next/**"]
+    },
+    "services/shared": {
+      "entry": [
+        "src/index.ts",
+        "src/**/*.test.ts",
+        "src/**/__tests__/**/*.ts",
+        "prisma/seed.{ts,js}"
+      ],
+      "project": ["src/**/*.ts", "!src/**/*.d.ts"]
+    },
+    "services/auth": {
+      "entry": ["src/index.ts", "src/server.ts", "src/**/*.test.ts", "src/**/__tests__/**/*.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "services/content": {
+      "entry": ["src/index.ts", "src/server.ts", "src/**/*.test.ts", "src/**/__tests__/**/*.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "services/gateway": {
+      "entry": ["src/index.ts", "src/server.ts", "src/**/*.test.ts", "src/**/__tests__/**/*.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "services/ingest": {
+      "entry": ["src/index.ts", "src/server.ts", "src/**/*.test.ts", "src/**/__tests__/**/*.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "services/messaging": {
+      "entry": ["src/index.ts", "src/server.ts", "src/**/*.test.ts", "src/**/__tests__/**/*.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "services/notifications": {
+      "entry": ["src/index.ts", "src/server.ts", "src/**/*.test.ts", "src/**/__tests__/**/*.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "services/social": {
+      "entry": ["src/index.ts", "src/server.ts", "src/**/*.test.ts", "src/**/__tests__/**/*.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "services/tracking-worker": {
+      "entry": ["src/index.ts", "src/**/*.test.ts", "src/**/__tests__/**/*.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "services/users": {
+      "entry": ["src/index.ts", "src/server.ts", "src/**/*.test.ts", "src/**/__tests__/**/*.ts"],
+      "project": ["src/**/*.ts"]
+    },
+    "services/web": {
+      "entry": [
+        "src/app/**/page.tsx",
+        "src/app/**/layout.tsx",
+        "src/app/**/loading.tsx",
+        "src/app/**/error.tsx",
+        "src/app/**/not-found.tsx",
+        "src/app/**/route.ts",
+        "src/middleware.ts",
+        "next.config.{js,mjs,ts}",
+        "tailwind.config.{js,ts}",
+        "src/**/*.test.{ts,tsx}"
+      ],
+      "project": ["src/**/*.{ts,tsx}"]
+    }
+  }
+}

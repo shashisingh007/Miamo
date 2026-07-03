@@ -1,0 +1,78 @@
+name: Mobile CI
+
+on:
+  push:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile.yml'
+  pull_request:
+    paths:
+      - 'mobile/**'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Typecheck + lint + Jest (unit + component + parity)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install deps
+        run: npm install --legacy-peer-deps
+      - name: TypeScript
+        run: npm run typecheck
+      - name: ESLint
+        run: npm run lint
+        continue-on-error: true
+      - name: Jest unit tests
+        run: npm run test:unit
+      - name: Jest component tests
+        run: npm run test:component
+      - name: Feature-parity regression gate
+        run: npm run test:parity
+
+  contract:
+    name: Contract tests against sandbox backend
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' }}
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install deps
+        run: npm install --legacy-peer-deps
+      - name: Contract tests
+        env:
+          MIAMO_API_URL: ${{ secrets.SANDBOX_API_URL }}
+          RUN_CONTRACT_TESTS: '1'
+        run: npm run test:contract
+
+  eas-preview:
+    name: EAS Build — preview channel (manual trigger)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref_name == 'main' }}
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install EAS CLI + deps
+        run: |
+          npm install -g eas-cli
+          npm install --legacy-peer-deps
+      - name: EAS Build (preview)
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas build --profile preview --platform all --non-interactive --no-wait

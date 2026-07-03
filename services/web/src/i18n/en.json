@@ -1,0 +1,37 @@
+{
+  "nav.discover": "Discover",
+  "nav.matches": "Matches",
+  "nav.messages": "Messages",
+  "nav.dtm": "DTM",
+  "nav.profile": "Profile",
+  "nav.settings": "Settings",
+
+  "common.save": "Save",
+  "common.cancel": "Cancel",
+  "common.delete": "Delete",
+  "common.confirm": "Confirm",
+  "common.back": "Back",
+  "common.next": "Next",
+  "common.done": "Done",
+  "common.loading": "Loading…",
+  "common.retry": "Try again",
+
+  "settings.language": "Language",
+  "settings.language.description": "Choose the language for the app",
+  "settings.notifications": "Notifications",
+  "settings.privacy": "Privacy",
+  "settings.appearance": "Appearance",
+  "settings.preferences": "Preferences",
+
+  "onboarding.welcome": "Welcome to Miamo",
+  "onboarding.getStarted": "Get started",
+  "onboarding.skip": "Skip",
+
+  "match.newMatch": "New match!",
+  "match.sendMove": "Send a Move",
+  "match.keepBrowsing": "Keep browsing",
+
+  "auth.login": "Log in",
+  "auth.signup": "Sign up",
+  "auth.logout": "Log out"
+}
