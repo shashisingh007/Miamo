@@ -84,7 +84,7 @@ jobs:
           fi
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Configure AWS credentials for ECR (skipped if missing)
         if: ${{ secrets.ECR_ENABLED == 'true' }}
