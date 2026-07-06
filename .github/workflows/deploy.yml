@@ -99,7 +99,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build image (miamo-${{ matrix.image.name }})
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.image.context }}
           file: ${{ matrix.image.dockerfile }}
@@ -112,7 +112,7 @@ jobs:
 
       - name: Push image to ECR (skipped if missing)
         if: ${{ secrets.ECR_ENABLED == 'true' && secrets.ECR_REGISTRY != '' }}
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: ${{ matrix.image.context }}
           file: ${{ matrix.image.dockerfile }}
