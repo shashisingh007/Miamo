@@ -41,7 +41,10 @@ export function emitServerEvent<E extends V6EventName>(
 ): void {
   const v = validateV6Payload(eventName, payload);
   if (!v.ok) {
-    logger.warn(`[serverEmit] dropped ${eventName}: ${v.error}`);
+    // Explicit cast — with `strict: false` in the prod Docker build TS
+    // stops narrowing discriminated unions after `!v.ok`, but we know from
+    // the ValidationResult type that this branch has `.error`.
+    logger.warn(`[serverEmit] dropped ${eventName}: ${(v as { error: string }).error}`);
     return;
   }
   prisma.userActivity.create({

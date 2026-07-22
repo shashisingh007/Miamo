@@ -35,9 +35,9 @@ This directory contains the first-cut legal + compliance documents for Miamo's p
 
 ## Point of contact
 
-- Legal correspondence: legal@miamo.app (mailbox to be provisioned).
-- Privacy correspondence: privacy@miamo.app.
-- IP correspondence: ip@miamo.app.
+- Legal correspondence: legal@miamo.in (mailbox to be provisioned).
+- Privacy correspondence: privacy@miamo.in.
+- IP correspondence: ip@miamo.in.
 
 All addresses to be provisioned at launch.
 

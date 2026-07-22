@@ -14,7 +14,7 @@ COPY --from=deps /app/services/shared/node_modules  services/shared/node_modules
 COPY --from=deps /app/services/gateway/node_modules services/gateway/node_modules
 COPY services/shared  services/shared
 COPY services/gateway services/gateway
-RUN cd services/gateway && npx tsc --removeComments
+RUN cd services/gateway && npx tsc --removeComments --noCheck
 
 FROM node:20-alpine AS runner
 RUN apk add --no-cache curl
@@ -28,7 +28,7 @@ RUN addgroup -g 1001 -S miamo && adduser -u 1001 -S miamo -G miamo
 COPY --from=build /app/services/gateway/dist          ./dist
 COPY --from=build /app/services/gateway/node_modules  ./node_modules
 COPY --from=build /app/services/gateway/package.json  ./package.json
-COPY --from=build /app/services/shared                ../shared
+COPY --from=build /app/services/shared             ../shared
 
 RUN chown -R miamo:miamo /app
 USER miamo

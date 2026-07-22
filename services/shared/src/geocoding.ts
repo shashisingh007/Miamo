@@ -35,7 +35,7 @@ export interface Geocoded {
 }
 
 const NOMINATIM_BASE = process.env.NOMINATIM_BASE_URL || 'https://nominatim.openstreetmap.org';
-const USER_AGENT = process.env.NOMINATIM_USER_AGENT || 'Miamo-DatingApp/1.0 (contact@miamo.app)';
+const USER_AGENT = process.env.NOMINATIM_USER_AGENT || 'Miamo-DatingApp/1.0 (contact@miamo.in)';
 const CACHE_PREFIX = 'geocode:v1:';
 const CACHE_TTL_SECS = 30 * 24 * 60 * 60; // 30 days
 const RATE_LIMIT_MS = 1100; // 1 req/sec with 100ms buffer

@@ -141,7 +141,7 @@ export function VoiceFingerprint({
       ctx.textAlign = 'center';
       ctx.fillStyle = '#9E8B7C';
       ctx.font = '28px sans-serif';
-      ctx.fillText('only i can see this  /  miamo.app', 540, 1840);
+      ctx.fillText('only i can see this  /  miamo.in', 540, 1840);
 
       canvas.toBlob((b) => resolve(b), 'image/png', 0.95);
     });

@@ -289,7 +289,7 @@ model Settings {
   // intent class (bypassing intentRightNow.ts). Enum values match
   // `IntentClass` in shared/src/algo/v8/intentRightNow.ts. Nullable so
   // "clear override" is a distinct state from "explicitly set to null".
-  manualIntentOverride      String? @default(null)
+  manualIntentOverride      String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

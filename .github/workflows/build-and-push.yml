@@ -1,0 +1,112 @@
+name: Build & push images
+
+# Trigger:
+#   - Push to main (auto-publish `:v1` + `:sha-<short>`)
+#   - Manual dispatch (pick any tag)
+#
+# What it does:
+#   1. Detects which service Dockerfiles changed
+#   2. Builds each changed image (native linux/amd64, no QEMU — ~5 min vs Mac's 30 min)
+#   3. Pushes to ghcr.io/${{ github.repository_owner }}/miamo-<svc>
+#
+# What it does NOT do:
+#   - Deploy to prod. Deploy is still manual: `bash scripts/miamo-deploy-ghcr.sh v1`
+#     (keeps a human in the loop for the ~90s pull+recreate on EC2).
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/**'
+      - 'docker/**'
+      - 'docker-compose.yml'
+      - '.github/workflows/build-and-push.yml'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag (default: v1)'
+        default: 'v1'
+        required: false
+      services:
+        description: 'Comma-separated services to build (default: all)'
+        default: 'all'
+        required: false
+
+concurrency:
+  group: ghcr-build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}/miamo
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - migrate
+          - gateway
+          - auth
+          - users
+          - social
+          - messaging
+          - content
+          - notifications
+          - ingest
+          - tracking-worker
+          - web
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tag
+        id: tag
+        run: |
+          TAG="${{ github.event.inputs.tag || 'v1' }}"
+          SHA=$(echo "${{ github.sha }}" | cut -c1-7)
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "sha=$SHA" >> $GITHUB_OUTPUT
+
+      # Filter: skip services not listed in the manual `services` input
+      - name: Skip check
+        id: skip
+        run: |
+          FILTER="${{ github.event.inputs.services || 'all' }}"
+          if [ "$FILTER" = "all" ]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          elif echo ",$FILTER," | grep -q ",${{ matrix.service }},"; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build & push ${{ matrix.service }}
+        if: steps.skip.outputs.skip != 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/${{ matrix.service }}.Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:${{ steps.tag.outputs.tag }}
+            ${{ env.IMAGE_PREFIX }}-${{ matrix.service }}:sha-${{ steps.tag.outputs.sha }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}

@@ -13,7 +13,8 @@ import { AuthOptions } from '@/components/AuthOptions';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/stores';
 
-type Stage = 'identifier' | 'verify' | 'details' | 'done';
+type Stage = 'identifier' | 'verify' | 'details' | 'done' | 'password-details';
+type SignupMode = 'otp' | 'password';
 
 function isEmail(s: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s.trim());
@@ -27,6 +28,7 @@ export default function RegisterPage() {
   const { setAuth } = useAuthStore();
 
   const [stage, setStage] = useState<Stage>('identifier');
+  const [signupMode, setSignupMode] = useState<SignupMode>('otp');
   const [idMode, setIdMode] = useState<'phone' | 'email'>('phone');
   const [identifier, setIdentifier] = useState('+91');
   const [signupToken, setSignupToken] = useState('');
@@ -58,6 +60,18 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
     const id = identifier.trim();
+    // Password-mode: requires email (not phone), and jumps straight to the
+    // details form. Skips the OTP round-trip until we have a real SMS/email
+    // provider wired.
+    if (signupMode === 'password') {
+      if (!isEmail(id)) {
+        setError('Password sign-up needs an email address');
+        return;
+      }
+      setSentTo(id);
+      setStage('password-details');
+      return;
+    }
     if (!isEmail(id) && !isPhone(id)) {
       setError('Enter a valid email or phone in +E.164 format (e.g. +919876543210)');
       return;
@@ -72,6 +86,25 @@ export default function RegisterPage() {
       setStage('verify');
     } catch (err: any) {
       setError(err.message || 'Could not send code');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function completePasswordSignup(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+    if (displayName.trim().length < 2) { setError('Display name too short'); return; }
+    if (strength < 4) { setError('Choose a stronger password (8+ chars, mix of upper/lower/number/special)'); return; }
+    if (password !== confirm) { setError('Passwords do not match'); return; }
+    setBusy(true);
+    try {
+      const r = await api.register({ email: identifier.trim(), password, displayName });
+      setAuth(r.data.user, r.data.accessToken, r.data.refreshToken);
+      setStage('done');
+      router.push('/onboarding');
+    } catch (err: any) {
+      setError(err.message || 'Could not create account');
     } finally {
       setBusy(false);
     }
@@ -140,18 +173,23 @@ export default function RegisterPage() {
             {stage === 'identifier' && 'Create account'}
             {stage === 'verify' && 'Verify it’s you'}
             {stage === 'details' && 'Almost there'}
+            {stage === 'password-details' && 'Almost there'}
             {stage === 'done' && 'Welcome'}
           </p>
           <h1 className="font-brand font-semibold text-[40px] leading-[1.05] text-text-primary mb-2">
             {stage === 'identifier' && (<>Begin <span className="italic text-rose">something real</span>.</>)}
             {stage === 'verify' && (<>Enter the <span className="italic text-rose">6-digit code</span>.</>)}
             {stage === 'details' && (<>Set your <span className="italic text-rose">password</span>.</>)}
+            {stage === 'password-details' && (<>Set your <span className="italic text-rose">password</span>.</>)}
             {stage === 'done' && (<>Welcome.</>)}
           </h1>
           <p className="text-[15px] text-text-secondary">
-            {stage === 'identifier' && 'We’ll send a one-time code to verify it’s really you.'}
+            {stage === 'identifier' && (signupMode === 'password'
+              ? 'Sign up with email and a password. No code needed.'
+              : 'We’ll send a one-time code to verify it’s really you.')}
             {stage === 'verify' && `We sent a code to ${sentTo}.`}
             {stage === 'details' && 'Choose a name and a strong password.'}
+            {stage === 'password-details' && `Creating an account for ${sentTo}.`}
           </p>
         </div>
 
@@ -172,6 +210,23 @@ export default function RegisterPage() {
             <div className="flex gap-2 p-1 bg-bg-soft rounded-xl">
               <button
                 type="button"
+                onClick={() => setSignupMode('otp')}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${signupMode === 'otp' ? 'bg-white shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
+              >
+                With OTP
+              </button>
+              <button
+                type="button"
+                onClick={() => { setSignupMode('password'); setIdMode('email'); setIdentifier(''); }}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${signupMode === 'password' ? 'bg-white shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
+              >
+                Email + password
+              </button>
+            </div>
+            {signupMode === 'otp' && (
+            <div className="flex gap-2 p-1 bg-bg-soft rounded-xl">
+              <button
+                type="button"
                 onClick={() => { setIdMode('phone'); setIdentifier('+91'); }}
                 className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${idMode === 'phone' ? 'bg-white shadow-sm text-text-primary' : 'text-text-secondary hover:text-text-primary'}`}
               >
@@ -185,7 +240,8 @@ export default function RegisterPage() {
                 Email
               </button>
             </div>
-            {idMode === 'phone' ? (
+            )}
+            {signupMode === 'otp' && idMode === 'phone' ? (
               <div>
                 <label className="block text-sm font-medium text-text-primary mb-1.5">Phone number</label>
                 <PhoneInput value={identifier} onChange={setIdentifier} />
@@ -202,7 +258,9 @@ export default function RegisterPage() {
               />
             )}
             <Button type="submit" disabled={busy} className="w-full" size="lg">
-              {busy ? 'Sending code…' : 'Send code'}
+              {busy
+                ? (signupMode === 'password' ? 'Continuing…' : 'Sending code…')
+                : (signupMode === 'password' ? 'Continue' : 'Send code')}
             </Button>
           </form>
         )}
@@ -229,10 +287,12 @@ export default function RegisterPage() {
           </div>
         )}
 
-        {stage === 'details' && (
-          <form onSubmit={completeSignup} className="space-y-4">
+        {(stage === 'details' || stage === 'password-details') && (
+          <form onSubmit={stage === 'password-details' ? completePasswordSignup : completeSignup} className="space-y-4">
             <div className="text-sm text-text-secondary flex items-center gap-2">
-              <Check className="w-4 h-4 text-rose" /> Verified: <span className="font-medium text-text-primary">{sentTo}</span>
+              <Check className="w-4 h-4 text-rose" />
+              {stage === 'password-details' ? 'Signing up:' : 'Verified:'}{' '}
+              <span className="font-medium text-text-primary">{sentTo}</span>
             </div>
             <Input
               value={displayName}

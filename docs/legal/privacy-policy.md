@@ -5,7 +5,7 @@
 **Effective date:** to be set on public launch.
 **Data controller:** Miamo (Indian private limited company, incorporation details to be finalised).
 **Data protection officer:** to be appointed and named here (DPDP §10 obligation).
-**Contact:** privacy@miamo.app.
+**Contact:** privacy@miamo.in.
 
 ---
 
@@ -77,13 +77,13 @@ We aggressively minimise how long data lives in identified form.
 
 ## 6. Your rights under DPDP
 
-You can exercise these rights from **Settings → Privacy** in-app, or by writing to privacy@miamo.app.
+You can exercise these rights from **Settings → Privacy** in-app, or by writing to privacy@miamo.in.
 
 ### 6.1 Right of access (DPDP §11)
 You can request a copy of the personal data we hold about you. Use **Settings → Export My Data**; you receive a signed JSON archive within 30 days. This feature is live today.
 
 ### 6.2 Right to correction (DPDP §12)
-You can edit your profile data at any time from **Settings → Profile**. For fields you cannot edit yourself (e.g. account age, verified email), write to privacy@miamo.app.
+You can edit your profile data at any time from **Settings → Profile**. For fields you cannot edit yourself (e.g. account age, verified email), write to privacy@miamo.in.
 
 ### 6.3 Right to erasure (DPDP §12)
 You can delete your account from **Settings → Delete Account**. On confirmation, we purge you from 14 primary tables and every associated cold-store aggregate within 30 days. Reference: `services/tracking-worker/src/forget.ts` (right-to-be-forgotten implementation).
@@ -102,7 +102,7 @@ You have the right to understand automated decision-making that materially affec
 Reference: `services/web/src/app/(main)/discover/**` and profile Trust Score components.
 
 ### 6.7 Right to human review
-Any automated decision that suspends or terminates your account can be appealed within 30 days to appeals@miamo.app. A human reviews within 72 hours.
+Any automated decision that suspends or terminates your account can be appealed within 30 days to appeals@miamo.in. A human reviews within 72 hours.
 
 ## 7. Consent management
 
@@ -179,9 +179,9 @@ Material changes are announced by email + in-app 30 days before they take effect
 
 ## 16. Contact and grievance officer
 
-- **Privacy team:** privacy@miamo.app
+- **Privacy team:** privacy@miamo.in
 - **Grievance officer (DPDP §13):** to be appointed and named here. All grievances acknowledged within 48 hours and resolved within 30 days.
 
 ---
 
-_Contact: privacy@miamo.app · Postal: to be finalised on incorporation._
+_Contact: privacy@miamo.in · Postal: to be finalised on incorporation._

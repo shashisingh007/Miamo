@@ -130,7 +130,7 @@ Per DPDP §7 and §8:
 | Right | DPDP § | Implementation |
 |---|---|---|
 | Access | §11 | Settings → Export My Data → JSON zip (30 days) |
-| Correction | §12 | Settings → Profile (self-serve) or email privacy@miamo.app |
+| Correction | §12 | Settings → Profile (self-serve) or email privacy@miamo.in |
 | Erasure | §12 | Settings → Delete Account → 14-table purge within 30 days |
 | Portability | §11 | Same as Access — JSON zip |
 | Objection | §12 | Settings → Privacy — four consent toggles, all can be withdrawn |
@@ -160,4 +160,4 @@ Once all six checkboxes are signed, we cut the effective date and file per statu
 
 ---
 
-_Contact for this DPIA: privacy@miamo.app._
+_Contact for this DPIA: privacy@miamo.in._

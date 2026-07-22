@@ -5,6 +5,13 @@
 
 # Note: compose-spec no longer requires a `version` key — removed in v3.6.1 cleanup.
 
+# ─── Image tag (bumped per release) ──────────────────
+# All Miamo service images are prebuilt on developer's Mac and pushed to
+# GitHub Container Registry via `scripts/miamo-build-push.sh`. On EC2:
+#   docker compose pull && docker compose up -d
+# No `build:` on EC2 = t3.micro fits comfortably (was OOM'ing on t3.small).
+# Override via `MIAMO_IMAGE_TAG=v1.2.3 docker compose up -d` for pinned rollbacks.
+
 # ─── v3.6 Feature Flag Anchor ──────────────────────────
 # Default OFF (matches the runtime code default). Override per-deployment via
 # the host .env or `FOO=1 docker compose up`. Referenced by individual service
@@ -67,9 +74,7 @@ services:
 
   # ─── Database Migration ─────────────────────────────
   migrate:
-    build:
-      context: .
-      dockerfile: docker/migrate.Dockerfile
+    image: ghcr.io/shashisingh007/miamo-migrate:${MIAMO_IMAGE_TAG:-v1}
     container_name: miamo-migrate
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-miamo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-miamo}?schema=public
@@ -79,16 +84,18 @@ services:
 
   # ─── Gateway ───────────────────────────────────────
   gateway:
-    build:
-      context: .
-      dockerfile: docker/gateway.Dockerfile
+    image: ghcr.io/shashisingh007/miamo-gateway:${MIAMO_IMAGE_TAG:-v1}
     container_name: miamo-gateway
     ports:
       - "3200:3200"
     environment: &common-env
       DATABASE_URL: postgresql://${POSTGRES_USER:-miamo}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-miamo}?schema=public
       JWT_SECRET: "${JWT_SECRET:?JWT_SECRET is required (generate with openssl rand -hex 64)}"
+      JWT_REFRESH_SECRET: "${JWT_REFRESH_SECRET:?JWT_REFRESH_SECRET is required (generate with openssl rand -hex 64)}"
       INTERNAL_SERVICE_KEY: "${INTERNAL_SERVICE_KEY:?INTERNAL_SERVICE_KEY is required (generate with openssl rand -hex 32)}"
+      ENCRYPTION_KEY: "${ENCRYPTION_KEY:?ENCRYPTION_KEY is required (generate with openssl rand -hex 32)}"
+      ENCRYPTION_SALT: "${ENCRYPTION_SALT:?ENCRYPTION_SALT is required (generate with openssl rand -hex 32)}"
+      TRACKING_HASH_SECRET: "${TRACKING_HASH_SECRET:?TRACKING_HASH_SECRET is required (generate with openssl rand -hex 32)}"
       NODE_ENV: ${NODE_ENV:-production}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3100}
       REDIS_URL: redis://redis:6379
@@ -122,7 +129,7 @@ services:
 
   # ─── Microservices ─────────────────────────────────
   auth:
-    build: { context: ., dockerfile: docker/auth.Dockerfile }
+    image: ghcr.io/shashisingh007/miamo-auth:${MIAMO_IMAGE_TAG:-v1}
     container_name: miamo-auth
     environment:
       <<: *common-env
@@ -133,7 +140,7 @@ services:
     restart: unless-stopped
 
   users:
-    build: { context: ., dockerfile: docker/users.Dockerfile }
+    image: ghcr.io/shashisingh007/miamo-users:${MIAMO_IMAGE_TAG:-v1}
     container_name: miamo-users
     environment:
       <<: [*common-env, *v8-flags]
@@ -146,7 +153,7 @@ services:
     restart: unless-stopped
 
   social:
-    build: { context: ., dockerfile: docker/social.Dockerfile }
+    image: ghcr.io/shashisingh007/miamo-social:${MIAMO_IMAGE_TAG:-v1}
     container_name: miamo-social
     environment:
       <<: [*common-env, *v8-flags]
@@ -162,7 +169,7 @@ services:
     restart: unless-stopped
 
   messaging:
-    build: { context: ., dockerfile: docker/messaging.Dockerfile }
+    image: ghcr.io/shashisingh007/miamo-messaging:${MIAMO_IMAGE_TAG:-v1}
     container_name: miamo-messaging
     environment:
       <<: [*common-env, *v8-flags]
@@ -175,7 +182,7 @@ services:
     restart: unless-stopped
 
   content:
-    build: { context: ., dockerfile: docker/content.Dockerfile }
+    image: ghcr.io/shashisingh007/miamo-content:${MIAMO_IMAGE_TAG:-v1}
     container_name: miamo-content
     environment:
       <<: [*common-env, *v8-flags]
@@ -190,7 +197,7 @@ services:
     restart: unless-stopped
 
   notifications:
-    build: { context: ., dockerfile: docker/notifications.Dockerfile }
+    image: ghcr.io/shashisingh007/miamo-notifications:${MIAMO_IMAGE_TAG:-v1}
     container_name: miamo-notifications
     environment:
       <<: *common-env
@@ -204,7 +211,7 @@ services:
   # `ingest` is the wire-side write target for the web SDK (POST /api/v1/track).
   # Stateless, fronted by gateway, writes to Redis Streams only — no Postgres.
   ingest:
-    build: { context: ., dockerfile: docker/ingest.Dockerfile }
+    image: ghcr.io/shashisingh007/miamo-ingest:${MIAMO_IMAGE_TAG:-v1}
     container_name: miamo-ingest
     ports:
       - "3260:3260"
@@ -221,7 +228,7 @@ services:
   # aggregates to Postgres, runs the v3.6 worker loops (intent, exposure
   # scheduler, stable-match, fairness audit) — each gated by its own flag.
   tracking-worker:
-    build: { context: ., dockerfile: docker/tracking-worker.Dockerfile }
+    image: ghcr.io/shashisingh007/miamo-tracking-worker:${MIAMO_IMAGE_TAG:-v1}
     container_name: miamo-tracking-worker
     ports:
       - "3261:3261"
@@ -243,14 +250,37 @@ services:
 
   # ─── Web Frontend ──────────────────────────────────
   web:
-    build: { context: ., dockerfile: docker/web.Dockerfile }
+    image: ghcr.io/shashisingh007/miamo-web:${MIAMO_IMAGE_TAG:-v1}
     container_name: miamo-web
-    ports:
-      - "3100:3100"
+    # NOTE: no host port mapping — traffic reaches web via the `nginx` reverse
+    # proxy on port 80. Internal port 3100 is still exposed to other containers
+    # on the docker network.
+    expose:
+      - "3100"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3200
+      NEXT_PUBLIC_API_URL: https://api.${MIAMO_DOMAIN:-miamo.in}
       PORT: "3100"
     depends_on:
+      - gateway
+    restart: unless-stopped
+
+  # ─── Reverse proxy (nginx) ────────────────────────
+  # Routes:
+  #   miamo.in          -> web:3100      (Next.js)
+  #   www.miamo.in      -> web:3100
+  #   api.miamo.in      -> gateway:3200  (API gateway)
+  #
+  # Cloudflare terminates TLS at the edge and forwards HTTP:80 to this proxy.
+  # Origin runs plain HTTP (Cloudflare "Flexible" SSL mode).
+  nginx:
+    image: nginx:alpine
+    container_name: miamo-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - web
       - gateway
     restart: unless-stopped
 

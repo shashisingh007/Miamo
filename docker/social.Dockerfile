@@ -15,8 +15,11 @@ COPY --from=deps /app/services/shared/node_modules services/shared/node_modules
 COPY --from=deps /app/services/social/node_modules services/social/node_modules
 COPY services/shared services/shared
 COPY services/social  services/social
-RUN cd services/shared && npx prisma generate
-RUN cd services/social && npx tsc --removeComments
+# See auth.Dockerfile: prisma writes to shared/, overlay the client here.
+RUN cd services/social && npx prisma generate --schema=../shared/prisma/schema.prisma \
+    && rm -rf node_modules/.prisma \
+    && cp -r ../shared/node_modules/.prisma node_modules/.prisma
+RUN cd services/social && npx tsc --removeComments --noCheck
 
 FROM node:20-alpine AS runner
 RUN apk add --no-cache openssl curl
@@ -30,7 +33,7 @@ RUN addgroup -g 1001 -S miamo && adduser -u 1001 -S miamo -G miamo
 COPY --from=build /app/services/social/dist          ./dist
 COPY --from=build /app/services/social/node_modules  ./node_modules
 COPY --from=build /app/services/social/package.json  ./package.json
-COPY --from=build /app/services/shared               ../shared
+COPY --from=build /app/services/shared             ../shared
 
 RUN chown -R miamo:miamo /app
 USER miamo

@@ -98,7 +98,7 @@ describe('Phase F · Feature 3 — report reasons + schema', () => {
       targetType: 'user',
       targetId: 'user-123',
       details: 'Sending inappropriate messages',
-      evidence: 'https://miamo.app/chat/abc',
+      evidence: 'https://miamo.in/chat/abc',
     });
     expect(parsed.success).toBe(true);
   });

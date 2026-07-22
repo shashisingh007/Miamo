@@ -34,7 +34,7 @@ describe('renderWelcome', () => {
 
 describe('renderMatchAlert', () => {
   it('renders both parties and the chat URL', () => {
-    const r = renderMatchAlert({ recipientName: 'Rohan', matchedName: 'Priya', chatUrl: 'https://miamo.app/matches/42' });
+    const r = renderMatchAlert({ recipientName: 'Rohan', matchedName: 'Priya', chatUrl: 'https://miamo.in/matches/42' });
     expect(r.subject).toMatch(/match/i);
     expect(r.html).toMatch(/Rohan/);
     expect(r.html).toMatch(/Priya/);
@@ -52,7 +52,7 @@ describe('renderMatchAlert', () => {
 
 describe('renderMessageSummary', () => {
   it('renders the unread count and inbox URL', () => {
-    const r = renderMessageSummary({ recipientName: 'Rohan', unreadCount: 3, inboxUrl: 'https://miamo.app/messages' });
+    const r = renderMessageSummary({ recipientName: 'Rohan', unreadCount: 3, inboxUrl: 'https://miamo.in/messages' });
     expect(r.subject).toMatch(/3/);
     expect(r.html).toMatch(/3 unread messages/);
     expect(r.text).toMatch(/3 unread messages/);

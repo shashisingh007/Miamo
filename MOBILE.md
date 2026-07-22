@@ -88,8 +88,8 @@ eas build --profile production --platform all
 Each build runs ~10-15 min in Expo's cloud. When done you get a download URL for the `.ipa` / `.apk` / `.aab`. The free EAS tier gives you 30 builds/month — plenty for pre-launch.
 
 Config lives in [mobile/eas.json](mobile/eas.json). Environment variables per profile:
-- development / preview → `EXPO_PUBLIC_API_URL=https://sandbox.miamo.app`
-- production → `EXPO_PUBLIC_API_URL=https://api.miamo.app`
+- development / preview → `EXPO_PUBLIC_API_URL=https://sandbox.miamo.in`
+- production → `EXPO_PUBLIC_API_URL=https://api.miamo.in`
 
 ---
 

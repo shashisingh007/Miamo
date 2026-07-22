@@ -62,6 +62,21 @@ app.get('/api/v1/users', authMiddleware, async (req: AuthRequest, res: Response,
   } catch (e) { next(e); }
 });
 
+// /users/me must match BEFORE the /:id catch-all — otherwise "me" is treated
+// as a UUID and the lookup returns 404. Clients hydrating from a JWT expect
+// this endpoint to resolve to the current user.
+app.get('/api/v1/users/me', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      include: { profile: true, photos: { orderBy: { position: 'asc' } }, prompts: { orderBy: { position: 'asc' } }, interests: true },
+    });
+    if (!user) return res.status(404).json({ error: { message: 'User not found' } });
+    const { passwordHash, ...rest } = user;
+    res.json({ data: rest });
+  } catch (e) { next(e); }
+});
+
 app.get('/api/v1/users/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const user = await prisma.user.findUnique({

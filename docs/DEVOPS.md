@@ -268,9 +268,9 @@ The web app expects `NEXT_PUBLIC_API_URL=http://localhost:3200`. The dev server 
 
 | Namespace | Cluster | DNS suffix | Replicas (per svc) | DB host |
 |-----------|---------|------------|--------------------|---------|
-| `miamo-dev` | shared k8s | `dev.miamo.app` | 1 | `postgres.miamo-dev.svc.cluster.local` |
-| `miamo-staging` | shared k8s | `staging.miamo.app` | 2 | `postgres.miamo-staging.svc.cluster.local` |
-| `miamo-prod` | dedicated k8s | `miamo.app` | 3 (min) → 10 (max) | `postgres.miamo-prod.svc.cluster.local` |
+| `miamo-dev` | shared k8s | `dev.miamo.in` | 1 | `postgres.miamo-dev.svc.cluster.local` |
+| `miamo-staging` | shared k8s | `staging.miamo.in` | 2 | `postgres.miamo-staging.svc.cluster.local` |
+| `miamo-prod` | dedicated k8s | `miamo.in` | 3 (min) → 10 (max) | `postgres.miamo-prod.svc.cluster.local` |
 
 Namespace isolation is enforced by `NetworkPolicy` (default-deny + allow-list) and by separate `Secret` and `ConfigMap` objects per namespace. There are no cross-namespace references.
 
@@ -303,23 +303,23 @@ A typical `values.yaml` looks like:
 
 ```yaml
 hostnames:
-  api: api.miamo.app
-  web: app.miamo.app
+  api: api.miamo.in
+  web: app.miamo.in
 ingress:
   className: nginx
   tls:
-    - hosts: [api.miamo.app, app.miamo.app]
+    - hosts: [api.miamo.in, app.miamo.in]
       secretName: miamo-prod-tls
 features:
   ALGO_V8_DISCOVER_RANKER_ENABLED: "1"
   FEATURE_FAMILY_BRIEF_ENABLED: "1"
   STABLE_MATCH_ENABLED: "1"
 providers:
-  sendgrid: {fromAddress: noreply@miamo.app, region: us-east-1}
+  sendgrid: {fromAddress: noreply@miamo.in, region: us-east-1}
   twilio:   {region: in-south-1}
 ```
 
-The dev and staging values mostly mirror prod with the flags flipped off and the hostnames swapped to `dev.miamo.app` / `staging.miamo.app`.
+The dev and staging values mostly mirror prod with the flags flipped off and the hostnames swapped to `dev.miamo.in` / `staging.miamo.in`.
 
 ---
 
@@ -783,7 +783,7 @@ This means a healthy prod deploy of `messaging` (target 5 replicas) goes 5 → 6
      kubectl -n miamo-prod rollout status deployment/$svc --timeout=10m
    done
    ```
-5. **Smoke check**: hit `https://api.miamo.app/health` (gateway) and `https://app.miamo.app/` (web). Check Grafana dashboard 1 (gateway) for spike in 5xx rate. Check Grafana dashboard 5 (tracking) for the events-per-second graph staying flat.
+5. **Smoke check**: hit `https://api.miamo.in/health` (gateway) and `https://app.miamo.in/` (web). Check Grafana dashboard 1 (gateway) for spike in 5xx rate. Check Grafana dashboard 5 (tracking) for the events-per-second graph staying flat.
 6. **Tag the release as deployed**: `git tag v3.6.0-prod-deployed && git push --tags`.
 
 If the migrate step fails inside `start.sh`, **stop**. The script will refuse to proceed to deployments. Investigate the migration manually:
@@ -892,15 +892,15 @@ kubectl -n miamo-prod port-forward svc/postgres 5432:5432
 
 | Service | Port (local) | Container port | NodePort (prod) | Public DNS |
 |---------|--------------|----------------|------------------|------------|
-| web | 3100 | 3100 | 30100 | `app.miamo.app` |
-| gateway | 3200 | 3200 | 30200 | `api.miamo.app` |
+| web | 3100 | 3100 | 30100 | `app.miamo.in` |
+| gateway | 3200 | 3200 | 30200 | `api.miamo.in` |
 | auth | 3201 | 3201 | – (internal) | – |
 | users | 3202 | 3202 | – (internal) | – |
 | social | 3203 | 3203 | – (internal) | – |
 | messaging | 3204 | 3204 | – (internal) | – |
 | content | 3205 | 3205 | – (internal) | – |
 | notifications | 3206 | 3206 | – (internal) | – |
-| ingest | 3260 | 3260 | 30260 | `t.miamo.app` |
+| ingest | 3260 | 3260 | 30260 | `t.miamo.in` |
 | tracking-worker | 3261 | 3261 | – (no traffic) | – |
 | postgres | 5432 | 5432 | – | – |
 | redis | 6379 | 6379 | – | – |
@@ -1214,7 +1214,7 @@ The shared package is copied **first** so that npm-install layers cache across s
 
 ### Image registry
 
-In dev, images are kept in the local Docker daemon (`PULL_POLICY=Never` in `k8s_env_config()`). In staging and prod, images are pushed to a private registry (`registry.miamo.app/miamo-<svc>:<tag>`). Tags follow the release version (`v3.6.0`) plus a sliding `latest` for non-release commits.
+In dev, images are kept in the local Docker daemon (`PULL_POLICY=Never` in `k8s_env_config()`). In staging and prod, images are pushed to a private registry (`registry.miamo.in/miamo-<svc>:<tag>`). Tags follow the release version (`v3.6.0`) plus a sliding `latest` for non-release commits.
 
 ### Build commands
 
@@ -1225,16 +1225,16 @@ docker compose build --parallel
 # Build & push for staging
 export MIAMO_IMAGE_TAG=v3.6.0-rc.1
 for svc in gateway auth users social messaging content notifications ingest tracking-worker web; do
-  docker build -t registry.miamo.app/miamo-$svc:$MIAMO_IMAGE_TAG \
+  docker build -t registry.miamo.in/miamo-$svc:$MIAMO_IMAGE_TAG \
     -f docker/$svc.Dockerfile .
-  docker push registry.miamo.app/miamo-$svc:$MIAMO_IMAGE_TAG
+  docker push registry.miamo.in/miamo-$svc:$MIAMO_IMAGE_TAG
 done
 
 # Promote staging build → prod (re-tag, no rebuild)
 for svc in gateway auth users social messaging content notifications ingest tracking-worker web; do
-  docker pull  registry.miamo.app/miamo-$svc:v3.6.0-rc.1
-  docker tag   registry.miamo.app/miamo-$svc:v3.6.0-rc.1 registry.miamo.app/miamo-$svc:v3.6.0
-  docker push  registry.miamo.app/miamo-$svc:v3.6.0
+  docker pull  registry.miamo.in/miamo-$svc:v3.6.0-rc.1
+  docker tag   registry.miamo.in/miamo-$svc:v3.6.0-rc.1 registry.miamo.in/miamo-$svc:v3.6.0
+  docker push  registry.miamo.in/miamo-$svc:v3.6.0
 done
 ```
 

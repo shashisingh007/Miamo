@@ -32,7 +32,7 @@ export default function TermsPage() {
         or applicable law.
       </p>
       <p className="text-xs text-text-muted pt-4">
-        Questions? Reach the team at <a href="mailto:hello@miamo.app" className="text-rose">hello@miamo.app</a>.
+        Questions? Reach the team at <a href="mailto:hello@miamo.in" className="text-rose">hello@miamo.in</a>.
       </p>
     </LegalShell>
   );

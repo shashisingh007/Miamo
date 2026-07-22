@@ -47,6 +47,11 @@ export interface BaseMiddlewareOptions {
 }
 
 export function applyBaseMiddleware(app: Express, opts: BaseMiddlewareOptions = {}): void {
+  // Behind nginx (and Cloudflare in prod), so `req.ip` and X-Forwarded-For must
+  // come from the first proxy hop. Without this, express-rate-limit throws
+  // ValidationError on every request and IP-keyed limiters see nginx's IP for
+  // everyone.
+  app.set('trust proxy', 1);
   app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
   // requestId must run before metrics + logging so every log line has a trace id.
   app.use(requestId);

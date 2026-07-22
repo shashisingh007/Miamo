@@ -27,7 +27,7 @@ export default function PrivacyPage() {
       </p>
       <h2 className="text-lg font-semibold text-text-primary mt-6">Contact</h2>
       <p>
-        Privacy questions: <a href="mailto:privacy@miamo.app" className="text-rose">privacy@miamo.app</a>.
+        Privacy questions: <a href="mailto:privacy@miamo.in" className="text-rose">privacy@miamo.in</a>.
       </p>
     </LegalShell>
   );

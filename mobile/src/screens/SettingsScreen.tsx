@@ -267,19 +267,19 @@ export default function SettingsScreen() {
         <Text style={styles.section}>Help & legal</Text>
         <Pressable
           testID="settings-support"
-          onPress={() => openWeb('mailto:support@miamo.app')}
+          onPress={() => openWeb('mailto:support@miamo.in')}
           style={styles.linkRow}>
           <Text style={styles.link}>Contact support</Text>
         </Pressable>
         <Pressable
           testID="settings-tos"
-          onPress={() => openWeb('https://miamo.app/legal/terms')}
+          onPress={() => openWeb('https://miamo.in/legal/terms')}
           style={styles.linkRow}>
           <Text style={styles.link}>Terms of service</Text>
         </Pressable>
         <Pressable
           testID="settings-privacy-policy"
-          onPress={() => openWeb('https://miamo.app/legal/privacy')}
+          onPress={() => openWeb('https://miamo.in/legal/privacy')}
           style={styles.linkRow}>
           <Text style={styles.link}>Privacy policy</Text>
         </Pressable>

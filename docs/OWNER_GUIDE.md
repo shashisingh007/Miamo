@@ -498,7 +498,7 @@ Every event that reaches Postgres has the user ID replaced with an HMAC-SHA256 f
 uidHash = base64url(HMAC-SHA256(TRACKING_HASH_SECRET, userId))[:22]
 ```
 
-The hash is twenty-two characters of base64url — enough entropy to avoid collisions in a population of a billion users, short enough to keep index sizes manageable. The hash is deterministic given a fixed secret — two events from the same user produce the same hash. But the hash is not reversible. There is no way to go from `8s2A9k3LpQrXwY7zB4mNvE` back to `userId = uuid('priya@miamo.app')` without the secret.
+The hash is twenty-two characters of base64url — enough entropy to avoid collisions in a population of a billion users, short enough to keep index sizes manageable. The hash is deterministic given a fixed secret — two events from the same user produce the same hash. But the hash is not reversible. There is no way to go from `8s2A9k3LpQrXwY7zB4mNvE` back to `userId = uuid('priya@miamo.in')` without the secret.
 
 The secret is stored in the AWS Secrets Manager (or its equivalent in the deployed cloud), accessible only to the ingest service. The other services never see it. The DBA never sees it. The analytics engineer never sees it. The fingerprint, in the database, is opaque.
 

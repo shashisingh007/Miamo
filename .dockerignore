@@ -1,47 +1,70 @@
-# Node dependencies (will be installed in Docker)
+# ─── Node / build outputs ────────────────────────────
 **/node_modules
-
-# Build outputs
 **/.next
 **/dist
 **/build
+**/coverage
+**/.turbo
 
-# Git
+# ─── Git + IDE ───────────────────────────────────────
 .git
 .gitignore
-
-# IDE
+.github
 .vscode
 .idea
+.claude
 
-# OS
+# ─── OS junk ─────────────────────────────────────────
 .DS_Store
 **/.DS_Store
+Thumbs.db
 
-# Docker
+# ─── Docker / compose (context is repo root, but images
+# don't need the compose file baked in) ──────────────
 docker-compose.yml
+docker-compose*.yml
 
-# Tests
+# ─── Tests, docs, samples ────────────────────────────
 tests/
 **/*.test.ts
 **/*.spec.ts
-
-# Docs
+**/__tests__/
+docs/
 *.md
+CHANGELOG*
+LICENSE*
+README*
 
-# Kubernetes (not needed for web build)
+# ─── Infra (not needed inside any app image) ─────────
+terraform/
 k8s/
+kubernetes/
 
-# Scripts
+# ─── Deploy scripts + tooling ────────────────────────
 scripts/
+tools/
+.husky/
 
-# Other services (keep only what's needed)
+# ─── Mobile (Expo/RN — 580 MB, never in server images) ─
+mobile/
+
+# ─── Legacy / duplicate roots ────────────────────────
 api/
 packages/
+web/            # duplicate of services/web
 
-# Root web folder (duplicate of services/web)
-web/
-
-# Misc
+# ─── Secrets + logs + local state ────────────────────
 *.log
-.env*
+.env
+.env.*
+!.env.example
+.terraform/
+*.tfstate*
+*.tfplan
+.expo/
+**/.expo/
+
+# ─── Assets served at runtime, but not needed for build
+# (Next.js public/ is intentionally NOT ignored) ────
+assets/
+!services/web/public/

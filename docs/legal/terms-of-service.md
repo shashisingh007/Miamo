@@ -4,7 +4,7 @@
 
 **Effective date:** to be set on public launch.
 **Governing entity:** Miamo (Indian private limited company, incorporation details to be finalised).
-**Contact:** legal@miamo.app (mailbox to be provisioned at launch).
+**Contact:** legal@miamo.in (mailbox to be provisioned at launch).
 
 ---
 
@@ -70,7 +70,7 @@ Escalation ladder: warning → temporary suspension (up to 30 days) → permanen
 - **Currency.** Prices are shown in Indian Rupees (INR). USD pricing may appear if we launch internationally.
 - **Spotlight minutes.** The Service uses an in-app currency called "Spotlight minutes". Minutes are earned by activity or purchased via Razorpay. Purchased minutes are non-refundable except (a) within 24 hours of purchase, provided the minutes have not been spent, or (b) where required by applicable law.
 - **Subscription tiers** (if offered): billed monthly or annually per the tier's disclosed schedule. You may cancel at any time; access continues until the end of the current billing period.
-- **Chargebacks.** Filing a chargeback without first contacting us at billing@miamo.app is a breach and may result in account termination.
+- **Chargebacks.** Filing a chargeback without first contacting us at billing@miamo.in is a breach and may result in account termination.
 
 ## 7. Age verification
 
@@ -96,7 +96,7 @@ Violations are addressed through the escalation ladder in §5. In addition:
 - **Temporary suspension.** Account locked for a defined period. Data preserved.
 - **Permanent ban.** Account removed. Associated content deleted (subject to legal-hold obligations). No refunds on any balance.
 
-Users may appeal any moderation action within 30 days via appeals@miamo.app. Appeals are reviewed within 72 hours. Overturned decisions restore content and any confiscated balance.
+Users may appeal any moderation action within 30 days via appeals@miamo.in. Appeals are reviewed within 72 hours. Overturned decisions restore content and any confiscated balance.
 
 ## 10. Termination
 
@@ -137,4 +137,4 @@ We may amend these Terms from time to time. Material changes will be notified to
 
 ---
 
-_Contact: legal@miamo.app · Postal: to be finalised on incorporation._
+_Contact: legal@miamo.in · Postal: to be finalised on incorporation._

@@ -33,8 +33,14 @@ export class ColdStore {
   constructor(private prisma: PrismaClient) {}
 
   start(): void {
-    // Run once at startup (out of band), then on the interval.
-    void this.tick();
+    // Run once at startup (out of band), then on the interval. Both must
+    // swallow errors — otherwise a boot-time DB blip becomes an unhandled
+    // rejection and Node 20 kills the whole tracking-worker process, taking
+    // 17 unrelated loops down with it.
+    this.tick().catch((e) => {
+      // eslint-disable-next-line no-console
+      console.warn('[coldstore] startup tick error:', (e as Error).message);
+    });
     this.timer = setInterval(() => {
       this.tick().catch((e) => {
         // eslint-disable-next-line no-console
@@ -58,8 +64,11 @@ export class ColdStore {
     const daily = await this.dumpAndPrune(
       'EventAggDaily', 'day', cutoff, path.join(DIR, `${stamp}-daily.ndjson.gz`),
     );
+    // ConsentEvent's timestamp column is `createdAt` (see schema.prisma model
+    // ConsentEvent). The previous `'ts'` name matched EventAgg* but doesn't
+    // exist here — it caused `column "ts" does not exist` at every tick.
     const consent = await this.dumpAndPrune(
-      'ConsentEvent', 'ts', cutoff, path.join(DIR, `${stamp}-consent.ndjson.gz`),
+      'ConsentEvent', 'createdAt', cutoff, path.join(DIR, `${stamp}-consent.ndjson.gz`),
     );
     return { hourly, daily, consent };
   }

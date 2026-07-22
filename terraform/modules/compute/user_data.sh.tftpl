@@ -1,0 +1,125 @@
+#!/bin/bash
+# Miamo EC2 bootstrap — cloud-init on Amazon Linux 2023
+# Idempotent-ish: guarded by /var/lib/miamo/bootstrapped marker file.
+#
+# Order matters: the docker-data EBS volume MUST be mounted at
+# /var/lib/docker BEFORE dockerd is started, otherwise docker will create
+# its state directory on the root volume and Postgres data won't persist
+# across instance replacement.
+set -euo pipefail
+exec > >(tee -a /var/log/miamo-bootstrap.log) 2>&1
+
+MARKER=/var/lib/miamo/bootstrapped
+if [[ -f "$MARKER" ]]; then echo "already bootstrapped"; exit 0; fi
+mkdir -p /var/lib/miamo /opt/miamo
+
+# ---- base packages (no docker yet) ----
+dnf update -y
+dnf install -y docker git jq amazon-ssm-agent util-linux e2fsprogs awscli
+systemctl enable --now amazon-ssm-agent
+
+# ---- wait for + prepare the docker data volume ----
+# On Nitro instances /dev/sdf is exposed as /dev/nvme1n1 (or a similar
+# nvme*n1). We prefer the by-id symlink AWS installs which is deterministic.
+DATA_DEV=""
+echo "waiting for docker data EBS volume..."
+for i in $(seq 1 60); do
+  # Try the AWS Nitro symlink first (stable), then fall back to /dev/sdf.
+  if [[ -e /dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol* ]]; then
+    # Multiple volumes may match — root is nvme0n1, data is the other one.
+    for cand in /dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_vol*; do
+      # skip partitions and the root
+      resolved=$(readlink -f "$cand")
+      case "$resolved" in
+        *n1) : ;;   # whole disks only, no partitions
+        *)    continue ;;
+      esac
+      if [[ "$resolved" != "/dev/nvme0n1" ]]; then
+        DATA_DEV="$resolved"
+        break
+      fi
+    done
+  fi
+  if [[ -z "$DATA_DEV" && -e /dev/sdf ]]; then DATA_DEV=/dev/sdf; fi
+  if [[ -n "$DATA_DEV" ]]; then break; fi
+  sleep 2
+done
+
+if [[ -z "$DATA_DEV" ]]; then
+  echo "FATAL: docker data volume never appeared" >&2
+  exit 1
+fi
+echo "docker data volume: $DATA_DEV"
+
+# Format ext4 only if the volume is blank.
+if ! blkid "$DATA_DEV" >/dev/null 2>&1; then
+  echo "formatting $DATA_DEV as ext4 (fresh volume)"
+  mkfs.ext4 -L miamo-docker "$DATA_DEV"
+else
+  echo "$DATA_DEV already has a filesystem — preserving data"
+fi
+
+mkdir -p /var/lib/docker
+
+# fstab entry (by UUID is the durable form; nvme device names can move).
+UUID=$(blkid -s UUID -o value "$DATA_DEV")
+if ! grep -q "$UUID" /etc/fstab; then
+  echo "UUID=$UUID /var/lib/docker ext4 defaults,nofail 0 2" >> /etc/fstab
+fi
+mount -a
+# Sanity-check the mount landed.
+mountpoint -q /var/lib/docker || { echo "FATAL: /var/lib/docker not mounted"; exit 1; }
+
+# ---- now start docker (data dir is the mounted EBS) ----
+systemctl enable --now docker
+usermod -aG docker ec2-user
+
+# ---- docker compose v2 plugin ----
+DOCKER_CONFIG=/usr/local/lib/docker
+mkdir -p $DOCKER_CONFIG/cli-plugins
+curl -sSL "https://github.com/docker/compose/releases/latest/download/compose-linux-x86_64" \
+  -o $DOCKER_CONFIG/cli-plugins/docker-compose
+chmod +x $DOCKER_CONFIG/cli-plugins/docker-compose
+
+# ---- clone repo ----
+git clone -b "${app_repo_branch}" "${app_repo_url}" /opt/miamo/app
+cd /opt/miamo/app
+
+# ---- pull secrets from SSM Parameter Store into .env ----
+region=$(curl -s http://169.254.169.254/latest/meta-data/placement/region)
+fetch() { aws ssm get-parameter --region "$region" --with-decryption --name "$1" --query 'Parameter.Value' --output text; }
+
+JWT_SECRET=$(fetch "${jwt_param_name}")
+INTERNAL_SERVICE_KEY=$(fetch "${internal_param_name}")
+ENCRYPTION_KEY=$(fetch "${encryption_param_name}")
+TRACKING_HASH_SECRET=$(fetch "${tracking_param_name}")
+POSTGRES_PASSWORD=$(fetch "${postgres_param_name}")
+
+# Postgres + Redis run in the same docker compose network — reach them by
+# service name. DATABASE_URL points at `postgres:5432`, REDIS_URL at
+# `redis:6379`. No RDS / ElastiCache in this stack.
+cat > /opt/miamo/app/.env <<EOF
+NODE_ENV=production
+POSTGRES_USER=miamo
+POSTGRES_DB=miamo
+POSTGRES_PASSWORD=$${POSTGRES_PASSWORD}
+DATABASE_URL=postgresql://miamo:$${POSTGRES_PASSWORD}@postgres:5432/miamo?schema=public
+REDIS_URL=redis://redis:6379
+JWT_SECRET=$${JWT_SECRET}
+INTERNAL_SERVICE_KEY=$${INTERNAL_SERVICE_KEY}
+ENCRYPTION_KEY=$${ENCRYPTION_KEY}
+TRACKING_HASH_SECRET=$${TRACKING_HASH_SECRET}
+S3_UPLOADS_BUCKET=${uploads_bucket_name}
+AWS_REGION=$${region}
+FRONTEND_URL=https://${domain_name}
+EOF
+chown ec2-user:ec2-user /opt/miamo/app/.env
+chmod 600 /opt/miamo/app/.env
+
+# ---- bring the stack up ----
+cd /opt/miamo/app
+docker compose pull || true
+docker compose up -d
+
+touch "$MARKER"
+echo "bootstrap complete at $(date -u)"

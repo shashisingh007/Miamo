@@ -1234,7 +1234,7 @@ sequenceDiagram
     S3-->>CO: signed URL (1h TTL)
   end
 
-  CO-->>GW: 200 {token, url:'https://miamo.app/fb/{token}', expiresAt, artifactUrl:signed-S3-url}
+  CO-->>GW: 200 {token, url:'https://miamo.in/fb/{token}', expiresAt, artifactUrl:signed-S3-url}
   GW-->>Web: 200
 
   Web->>Web: render preview pane with image + url + expiry
@@ -1247,7 +1247,7 @@ sequenceDiagram
   rect rgb(245, 245, 250)
     Note over Mom: 1 hour later
     Mom->>WA: tap the URL
-    WA->>GW: GET https://miamo.app/fb/{token}<br/>(no auth — public route)
+    WA->>GW: GET https://miamo.in/fb/{token}<br/>(no auth — public route)
     Note over GW: no requireAuth on /api/v1/dtm/family-brief/:token<br/>rate-limit by IP
     GW->>CO: GET /api/v1/dtm/family-brief/{token}
     CO->>PG: FamilyBriefShare.findUnique({token})
@@ -1338,7 +1338,7 @@ sequenceDiagram
 
   Web->>GW: GET /api/v1/users/me/voice-fingerprint.png<br/>(query: ?w=1080&h=1920)
   GW->>US: GET .../voice-fingerprint.png
-  US->>US: render 1080x1920 PNG canvas server-side<br/>(no message content, just archetype + stats + footer "miamo.app")
+  US->>US: render 1080x1920 PNG canvas server-side<br/>(no message content, just archetype + stats + footer "miamo.in")
   US-->>GW: 200 signed-URL (5min expiry, never cached server-side)
   GW-->>Web: 200 signed-URL
 
@@ -1359,7 +1359,7 @@ sequenceDiagram
 
 #### Technical narrative
 
-The Voice Fingerprint reveal is gated by the user's actual messaging behaviour: the trigger fires when `senderVoice.messageCount >= 50 && User.flags.voiceFingerprintShown !== true`. The hint is server-emitted (an SSE event the gateway pushes to Priya's connected tab) rather than client-polled — so the moment she crosses 50, the bottom-sheet hint appears even if she's idle. The fingerprint endpoint (`GET /api/v1/users/me/voice-fingerprint`) reads from a 24h-cached `UserMoveProfile.senderVoiceV8` blob; on cache miss, it s2s-calls the messaging service for her last 50 sent texts (decrypted in-flight), runs `senderVoice.extract()` (12 features, deterministic), caches the result, and returns the public-safe subset (archetype, median length, emoji rate, top emoji, lowercase-i rate, top-3 phrases). The PNG variant (`.png`) renders server-side via a canvas library, returns a signed-URL with 5-min expiry, is **never cached server-side** (privacy — the image is regenerated on each request), and contains zero message content (just the archetype + statistical summary + a footer "Get your fingerprint at miamo.app"). The Insta Story share uses the `instagram-stories://` intent which the iOS / Android system handles natively. The "Delete my voice fingerprint" path in Settings → Privacy nulls the cache and resets the flag — privacy-by-design at every layer.
+The Voice Fingerprint reveal is gated by the user's actual messaging behaviour: the trigger fires when `senderVoice.messageCount >= 50 && User.flags.voiceFingerprintShown !== true`. The hint is server-emitted (an SSE event the gateway pushes to Priya's connected tab) rather than client-polled — so the moment she crosses 50, the bottom-sheet hint appears even if she's idle. The fingerprint endpoint (`GET /api/v1/users/me/voice-fingerprint`) reads from a 24h-cached `UserMoveProfile.senderVoiceV8` blob; on cache miss, it s2s-calls the messaging service for her last 50 sent texts (decrypted in-flight), runs `senderVoice.extract()` (12 features, deterministic), caches the result, and returns the public-safe subset (archetype, median length, emoji rate, top emoji, lowercase-i rate, top-3 phrases). The PNG variant (`.png`) renders server-side via a canvas library, returns a signed-URL with 5-min expiry, is **never cached server-side** (privacy — the image is regenerated on each request), and contains zero message content (just the archetype + statistical summary + a footer "Get your fingerprint at miamo.in"). The Insta Story share uses the `instagram-stories://` intent which the iOS / Android system handles natively. The "Delete my voice fingerprint" path in Settings → Privacy nulls the cache and resets the flag — privacy-by-design at every layer.
 
 ---
 
@@ -1367,7 +1367,7 @@ The Voice Fingerprint reveal is gated by the user's actual messaging behaviour: 
 
 ### What Priya feels
 
-She doesn't see this either. She makes one HTTP request. The gateway handles the rest: rate limiting, JWT verify, helmet, sanitize, proxy, response. From her point of view there's just `api.miamo.app`. From the inside, there are seven downstream services and a complicated routing table.
+She doesn't see this either. She makes one HTTP request. The gateway handles the rest: rate limiting, JWT verify, helmet, sanitize, proxy, response. From her point of view there's just `api.miamo.in`. From the inside, there are seven downstream services and a complicated routing table.
 
 ### How it works
 

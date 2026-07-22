@@ -757,7 +757,9 @@ app.get('/api/v1/auth/me', authMiddleware, async (req: AuthRequest, res: Respons
 // "If an account exists, we sent a reset link." semantics. The rate-limiter
 // is mounted now so the route doesn't get forgotten when the real send-email
 // implementation lands.
-app.post('/api/v1/auth/password-reset', passwordResetLimiter, idempotency(), validate({ body: forgotPasswordBodySchema }), async (req: Request, res: Response, next: NextFunction) => {
+// Two paths accepted: /password-reset (canonical) and /forgot-password (what the
+// web client + gateway rate-limiter use). Same handler.
+app.post(['/api/v1/auth/password-reset', '/api/v1/auth/forgot-password'], passwordResetLimiter, idempotency(), validate({ body: forgotPasswordBodySchema }), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const email = sanitize(String(req.body?.email || '')).toLowerCase();
     // Do not leak account existence; always return 200.

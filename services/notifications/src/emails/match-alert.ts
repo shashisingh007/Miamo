@@ -15,7 +15,7 @@ export interface MatchAlertData {
 export function renderMatchAlert(data: MatchAlertData): RenderedEmail {
   const you = escapeHtml(data.recipientName || 'there');
   const them = escapeHtml(data.matchedName || 'someone new');
-  const url = data.chatUrl || 'https://miamo.app/matches';
+  const url = data.chatUrl || 'https://miamo.in/matches';
   const subject = `It's a match — say hi to ${data.matchedName || 'someone new'}`;
 
   const avatar = data.matchedAvatarUrl

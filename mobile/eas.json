@@ -8,11 +8,11 @@
     "preview": {
       "distribution": "internal",
       "channel": "preview",
-      "env": { "EXPO_PUBLIC_API_URL": "https://sandbox.miamo.app" }
+      "env": { "EXPO_PUBLIC_API_URL": "https://sandbox.miamo.in" }
     },
     "production": {
       "channel": "production",
-      "env": { "EXPO_PUBLIC_API_URL": "https://api.miamo.app" },
+      "env": { "EXPO_PUBLIC_API_URL": "https://api.miamo.in" },
       "autoIncrement": true
     }
   },
