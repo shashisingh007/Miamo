@@ -94,11 +94,23 @@ def _validate_service(name: Optional[str]) -> None:
 @click.argument("service", required=False)
 @click.option("--skip-deps", is_flag=True, help="(local only) Skip npm install")
 @click.option("--skip-prisma", is_flag=True, help="(local only) Skip prisma migrate deploy")
+@click.option(
+    "--sequential/--parallel",
+    default=True,
+    help="(docker only) Build services one at a time — safe on t3.small / 2 GB. Default: sequential.",
+)
+@click.option(
+    "--skip-build",
+    is_flag=True,
+    help="(docker only) Skip `docker compose build` entirely — images already exist.",
+)
 def start(
     mode_or_service: Optional[str],
     service: Optional[str],
     skip_deps: bool,
     skip_prisma: bool,
+    sequential: bool,
+    skip_build: bool,
 ) -> None:
     """Start Miamo — pick a mode (local | docker | k8s) and optional service.
 
@@ -107,7 +119,9 @@ def start(
       miamo start                    # local: all 7 services + web
       miamo start local              # same as above
       miamo start local gateway      # only the gateway service (local)
-      miamo start docker             # docker compose up
+      miamo start docker             # docker: sequential build + up -d (safe for 2 GB hosts)
+      miamo start docker --parallel  # docker: parallel build (needs 8 GB+ host)
+      miamo start docker --skip-build# docker: just `up -d` (images pre-built)
       miamo start k8s                # kubectl apply -f k8s/
       miamo start gateway            # shorthand: local, only gateway
     """
@@ -128,7 +142,7 @@ def start(
         if svc:
             _docker_start_service(svc)
             return
-        docker_mode.up.callback()
+        docker_mode.up.callback(sequential=sequential, skip_build=skip_build)
         return
 
     if mode == "k8s":

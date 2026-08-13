@@ -748,10 +748,10 @@ export default function SettingsPage() {
           </SettingRow>
           {/* click-matrix.md §5 rank 1: Email us, Share feedback wired to mailto:. */}
           <SettingRow icon={Mail} label="Contact support" description="We reply within 24h">
-           <a href="mailto:support@miamo.app?subject=Miamo%20support%20request"><Button variant="ghost" size="sm" aria-label="Email support at support@miamo.app">Email us</Button></a>
+           <a href="mailto:support@miamo.in?subject=Miamo%20support%20request"><Button variant="ghost" size="sm" aria-label="Email support at support@miamo.in">Email us</Button></a>
           </SettingRow>
           <SettingRow icon={MessageSquare} label="Send feedback" description="Tell us what could be better">
-           <a href="mailto:feedback@miamo.app?subject=Miamo%20feedback"><Button variant="ghost" size="sm" aria-label="Send feedback by email">Share</Button></a>
+           <a href="mailto:feedback@miamo.in?subject=Miamo%20feedback"><Button variant="ghost" size="sm" aria-label="Send feedback by email">Share</Button></a>
           </SettingRow>
           {/* What's new + Rate Miamo removed for v1 launch — no changelog
               destination and no App Store / Play Store URL yet. Both come

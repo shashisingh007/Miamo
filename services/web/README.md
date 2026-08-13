@@ -144,7 +144,7 @@ pnpm install
 pnpm dev          # 3100
 
 open http://localhost:3100
-# Demo login: demo@miamo.app / demo1234
+# Demo login: demo@miamo.in / demo1234
 ```
 
 ---

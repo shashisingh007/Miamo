@@ -275,7 +275,12 @@ function requireAuth(req: express.Request, res: express.Response, next: express.
 // Designed to be cheap: only invoked on a small allowlist of gated routes.
 interface CompletionCacheEntry { result: { score: number; missing: string[]; threshold: number; dtm: boolean }; expiresAt: number }
 const completionCache = new Map<string, CompletionCacheEntry>();
-const COMPLETION_TTL_MS = 60_000;
+// Cache completion score per user for a short window so we don't hammer the
+// users service on every request in a click-storm. TTL was 60s but that made
+// "you finished onboarding but the app still says you're locked" a real UX
+// bug for a full minute. 5s is a compromise: still deduplicates rapid checks,
+// but stale by at most 5s after a profile save.
+const COMPLETION_TTL_MS = 5_000;
 
 async function requireOnboarded(req: express.Request, res: express.Response, next: express.NextFunction) {
   const userId = req.headers['x-user-id'] as string | undefined;

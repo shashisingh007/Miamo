@@ -130,6 +130,11 @@ export default function DiscoverPage() {
  if (f.newHere) p.newHere = 'true';
  if (f.verified) p.verifiedOnly = 'true';
  if (f.hasPhotos) p.hasPhotos = 'true';
+ // Previously omitted — server reads these on /discover
+ if (f.datingIntent) p.datingIntent = f.datingIntent;
+ if (f.hasBio) p.hasBio = 'true';
+ if (f.hasPrompts) p.hasPrompts = 'true';
+ if (f.photoVerified) p.photoVerified = 'true';
  if (quick === 'serious') p.seriousOnly = 'true';
  if (quick === 'nearby') p.activeToday = 'true';
  if (quick === 'new') p.newHere = 'true';

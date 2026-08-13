@@ -20,7 +20,7 @@
 - [ ] Fill: name, subtitle, primary/secondary category (Social Networking + Lifestyle)
 - [ ] Age rating declared: **17+** (dating apps are 17+ on iOS)
 - [ ] Content rights: "Does not contain, show, or access third-party content"
-- [ ] Contact info: support email `support@miamo.app`, marketing URL `https://miamo.app`, privacy URL `https://miamo.app/legal/privacy`
+- [ ] Contact info: support email `support@miamo.in`, marketing URL `https://miamo.in`, privacy URL `https://miamo.in/legal/privacy`
 
 ### 1.3 — Google Play Console — $25 one-time
 - [ ] Sign up at https://play.google.com/console
@@ -75,19 +75,19 @@ Content: real Miamo screens showing Discover, Match Success, Chat, DTM, Creativi
 ## §3 — Metadata + legal (from web app)
 
 ### 3.1 — Privacy policy URL
-- [ ] `https://miamo.app/legal/privacy` returns HTTP 200 with counsel-approved text
+- [ ] `https://miamo.in/legal/privacy` returns HTTP 200 with counsel-approved text
 - [ ] Text based on [docs/legal/privacy-policy.md](docs/legal/privacy-policy.md) — counsel-reviewed before submission
 
 ### 3.2 — Terms of Service URL
-- [ ] `https://miamo.app/legal/terms` returns HTTP 200 with counsel-approved text
+- [ ] `https://miamo.in/legal/terms` returns HTTP 200 with counsel-approved text
 - [ ] Text based on [docs/legal/terms-of-service.md](docs/legal/terms-of-service.md)
 
 ### 3.3 — Support URL
-- [ ] `https://miamo.app/support` or a plain email `support@miamo.app` monitored inbox
+- [ ] `https://miamo.in/support` or a plain email `support@miamo.in` monitored inbox
 
 ### 3.4 — Delete-account URL (App Store requirement)
 - [ ] Documented path: Settings → Delete Account (typed-confirm gate, 14-table $transaction — already shipped)
-- [ ] Also expose a web page `https://miamo.app/legal/delete-account` explaining the process (Google's requirement since 2024)
+- [ ] Also expose a web page `https://miamo.in/legal/delete-account` explaining the process (Google's requirement since 2024)
 
 ---
 
@@ -131,7 +131,7 @@ Install on your iPhone + one Android phone. Run:
 - [ ] Encryption declaration: "No, my app doesn't use encryption beyond standard HTTPS" (unless you added something)
 - [ ] IDFA declaration: "No, my app does not use the Advertising Identifier" (Miamo doesn't)
 - [ ] Sign in with Apple: required since Miamo offers Google OAuth → **must also implement Apple Sign-In or App Review will reject.** [services/auth/src/server.ts](services/auth/src/server.ts) already has the `/auth/apple` route stub — needs Apple Sign-In key ($99/yr membership included).
-- [ ] App Review Information: demo account credentials (create a test user in prod with `email: reviewer@miamo.app`, password stored in Notes → paste in App Review Info)
+- [ ] App Review Information: demo account credentials (create a test user in prod with `email: reviewer@miamo.in`, password stored in Notes → paste in App Review Info)
 
 ### 5.2 — Play Store (Google) Data Safety
 Miamo collects/shares:

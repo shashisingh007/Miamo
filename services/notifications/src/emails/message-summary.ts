@@ -16,7 +16,7 @@ export function renderMessageSummary(data: MessageSummaryData): RenderedEmail {
   const you = escapeHtml(data.recipientName || 'there');
   const n = Math.max(0, Math.min(data.unreadCount ?? 0, 9999));
   const senders = (data.topSenders ?? []).slice(0, 3).map(s => escapeHtml(s));
-  const url = data.inboxUrl || 'https://miamo.app/messages';
+  const url = data.inboxUrl || 'https://miamo.in/messages';
 
   const subject = n === 1
     ? `1 unread message on Miamo`

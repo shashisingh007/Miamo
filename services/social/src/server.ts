@@ -456,6 +456,8 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
       education, religion, zodiac, pets, children,
       minHeight, maxHeight, activeToday, newHere, hasPhotos, aiPicks, distance,
       diet, politics, languages, maritalStatus, incomeBand, willingToRelocate,
+      // v3.6 additions — previously omitted in buildParams and unread here
+      datingIntent, hasBio, hasPrompts, photoVerified,
     } = req.query;
     const userId = req.userId!;
     const blocks = await prisma.block.findMany({ where: { OR: [{ blockerId: userId }, { blockedId: userId }] } });
@@ -593,12 +595,24 @@ app.get('/api/v1/discover', authMiddleware, async (req: AuthRequest, res: Respon
       ];
     }
 
+    // ── Dating intent (comma-separated: casual, serious, friendship, marriage) ──
+    if (datingIntent) {
+      const vals = (datingIntent as string).split(',').map(s => s.trim()).filter(Boolean);
+      if (vals.length === 1) profileWhere.datingIntent = { equals: vals[0], mode: 'insensitive' };
+      else if (vals.length > 1) profileWhere.datingIntent = { in: vals, mode: 'insensitive' };
+    }
+    // ── Has bio (non-empty) ──
+    if (hasBio === 'true') profileWhere.bio = { not: '' };
     if (Object.keys(profileWhere).length > 0) where.profile = profileWhere;
     if (verifiedOnly === 'true') where.verified = true;
     // ── New Here (joined within 7 days) ──
     if (newHere === 'true') where.createdAt = { gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000) };
     // ── Has photos ──
     if (hasPhotos === 'true') where.photos = { some: {} };
+    // ── Photo verified: at least one photo with verified=true ──
+    if (photoVerified === 'true') where.photos = { some: { verified: true } };
+    // ── Has prompts (at least one prompt row) ──
+    if (hasPrompts === 'true') where.prompts = { some: {} };
 
     // v6.7: paginate in batches of 10. The client requests a fresh batch
     // every time the user has consumed the previous 10 cards, which forces
@@ -1773,6 +1787,12 @@ app.put('/api/v1/discover/filters', authMiddleware, validate({ body: discoverFil
       gender: 'genders', genders: 'genders',
       sexuality: 'sexualities', sexualities: 'sexualities',
       verifiedOnly: 'verified', verified: 'verified',
+      // v3.6 — keep the persisted filter in sync with runtime /discover
+      diet: 'diet', politics: 'politics', languages: 'languages',
+      maritalStatus: 'maritalStatus', incomeBand: 'incomeBand',
+      willingToRelocate: 'willingToRelocate',
+      datingIntent: 'datingIntent',
+      hasBio: 'hasBio', hasPrompts: 'hasPrompts', photoVerified: 'photoVerified',
     };
     const data: Record<string, any> = {};
     for (const [k, v] of Object.entries(req.body)) {

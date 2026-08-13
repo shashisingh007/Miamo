@@ -88,13 +88,13 @@ describe('AwsRekognitionModerator', () => {
 describe('KeywordModerator', () => {
   it('approves a plain URL when the blocklist is empty', async () => {
     const mod = new KeywordModerator();
-    const d = await mod.moderateImage('https://cdn.miamo.app/user/abc.jpg');
+    const d = await mod.moderateImage('https://cdn.miamo.in/user/abc.jpg');
     expect(d.approved).toBe(true);
   });
 
   it('returns a stable shape on approval', async () => {
     const mod = new KeywordModerator();
-    const d = await mod.moderateImage('https://cdn.miamo.app/user/xyz.jpg');
+    const d = await mod.moderateImage('https://cdn.miamo.in/user/xyz.jpg');
     expect(d.categories).toEqual([]);
     expect(d.severity).toBe('none');
     expect(d.confidence).toBe(0);

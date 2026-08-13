@@ -62,6 +62,21 @@ app.get('/api/v1/users', authMiddleware, async (req: AuthRequest, res: Response,
   } catch (e) { next(e); }
 });
 
+// /users/me must match BEFORE the /:id catch-all — otherwise "me" is treated
+// as a UUID and the lookup returns 404. Clients hydrating from a JWT expect
+// this endpoint to resolve to the current user.
+app.get('/api/v1/users/me', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.userId },
+      include: { profile: true, photos: { orderBy: { position: 'asc' } }, prompts: { orderBy: { position: 'asc' } }, interests: true },
+    });
+    if (!user) return res.status(404).json({ error: { message: 'User not found' } });
+    const { passwordHash, ...rest } = user;
+    res.json({ data: rest });
+  } catch (e) { next(e); }
+});
+
 app.get('/api/v1/users/:id', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const user = await prisma.user.findUnique({
@@ -90,7 +105,12 @@ app.put('/api/v1/profiles/me', authMiddleware, validate({ body: updateProfileBod
     const sanitizedBody = sanitizeObject(req.body);
     const { age, gender, city, cityLat, cityLng, profession, bio, datingIntent, seriousMode, avatarGradient,
       height, sexuality, lookingFor, smoking, drinking, exercise, education,
-      religion, zodiac, languages, pets, children, politicalViews, diet } = sanitizedBody;
+      religion, zodiac, languages, pets, children, politicalViews, diet,
+      // v3.6 DTM fields — previously silently dropped
+      maritalStatus, willingToRelocate, familyInvolved, expectedTimeline,
+      familyBackground, educationLevel, educationInstitution, employer,
+      incomeBand, subCommunity, kundliUrl,
+    } = sanitizedBody;
     const data: any = {};
     if (age !== undefined) data.age = age;
     if (gender !== undefined) data.gender = gender;
@@ -111,11 +131,28 @@ app.put('/api/v1/profiles/me', authMiddleware, validate({ body: updateProfileBod
     if (education !== undefined) data.education = education;
     if (religion !== undefined) data.religion = religion;
     if (zodiac !== undefined) data.zodiac = zodiac;
-    if (languages !== undefined) data.languages = languages;
+    // Column is CSV `String`; accept both array and string, always write CSV.
+    if (languages !== undefined) {
+      data.languages = Array.isArray(languages)
+        ? languages.map((s: unknown) => String(s).trim()).filter(Boolean).join(',')
+        : String(languages);
+    }
     if (pets !== undefined) data.pets = pets;
     if (children !== undefined) data.children = children;
     if (politicalViews !== undefined) data.politicalViews = politicalViews;
     if (diet !== undefined) data.diet = diet;
+    // v3.6 DTM columns now saved (previously destructured-but-dropped)
+    if (maritalStatus !== undefined) data.maritalStatus = maritalStatus;
+    if (willingToRelocate !== undefined) data.willingToRelocate = willingToRelocate;
+    if (familyInvolved !== undefined) data.familyInvolved = familyInvolved;
+    if (expectedTimeline !== undefined) data.expectedTimeline = expectedTimeline;
+    if (familyBackground !== undefined) data.familyBackground = familyBackground;
+    if (educationLevel !== undefined) data.educationLevel = educationLevel;
+    if (educationInstitution !== undefined) data.educationInstitution = educationInstitution;
+    if (employer !== undefined) data.employer = employer;
+    if (incomeBand !== undefined) data.incomeBand = incomeBand;
+    if (subCommunity !== undefined) data.subCommunity = subCommunity;
+    if (kundliUrl !== undefined) data.kundliUrl = kundliUrl;
 
     const profile = await prisma.profile.update({ where: { userId: req.userId }, data });
 
@@ -177,17 +214,109 @@ app.put('/api/v1/profiles/me/interests', authMiddleware, validate({ body: profil
 });
 
 // ─── Photo Upload & Delete ───────────────────────────
+// POST /profiles/me/photos accepts a real URL string from the client. The
+// client obtains it either (a) via POST /profiles/me/photos/upload-url which
+// returns an S3 presigned PUT it uploads to, or (b) by passing any external
+// HTTPS URL (Cloudinary, Imgur, etc.). Backwards-compat: if body has no url,
+// we mint a placeholder path that matches the legacy behaviour.
+const HTTPS_URL_RE = /^https?:\/\/[^\s"<>]+$/i;
 app.post('/api/v1/profiles/me/photos', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId!;
-    // Count existing photos
     const existing = await prisma.profilePhoto.count({ where: { userId } });
-    if (existing >= 9) return res.status(400).json({ error: { message: 'Maximum 9 photos allowed' } });
-    // In production this would save to object storage; here we store a placeholder URL
+    if (existing >= 9) return res.status(400).json({ error: { message: 'Maximum 9 photos allowed', code: 'PHOTO_LIMIT' } });
+    const rawUrl = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
+    const url = rawUrl && HTTPS_URL_RE.test(rawUrl)
+      ? rawUrl
+      : `/uploads/photos/${userId}_${Date.now()}.jpg`;
     const photo = await prisma.profilePhoto.create({
-      data: { userId, url: `/uploads/photos/${userId}_${Date.now()}.jpg`, position: existing + 1 },
+      data: { userId, url, position: existing + 1 },
     });
+    // Recompute onboarding completion (photo count is a scored dimension)
+    recomputeAndPersistCompletion(prisma, userId).catch(() => {});
     res.json({ data: photo });
+  } catch (e) { next(e); }
+});
+
+// Reorder photos — client sends `{order: ['photoId1','photoId2',...]}` in the
+// new desired order. We atomically rewrite `position` for each.
+app.put('/api/v1/profiles/me/photos/reorder', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const order = Array.isArray(req.body?.order) ? req.body.order.filter((x: unknown) => typeof x === 'string') : [];
+    if (order.length === 0) return res.status(400).json({ error: { message: 'order[] required', code: 'MISSING_ORDER' } });
+    const owned = await prisma.profilePhoto.findMany({ where: { userId, id: { in: order } }, select: { id: true } });
+    const ownedIds = new Set(owned.map(p => p.id));
+    let pos = 1;
+    for (const id of order) {
+      if (!ownedIds.has(id)) continue;
+      await prisma.profilePhoto.update({ where: { id }, data: { position: pos++ } });
+    }
+    const photos = await prisma.profilePhoto.findMany({ where: { userId }, orderBy: { position: 'asc' } });
+    res.json({ data: photos });
+  } catch (e) { next(e); }
+});
+
+// Set avatar — accepts { url } (external) or { photoId } (an existing profile
+// photo, becomes position=1 which is the avatar slot in the UI).
+app.put('/api/v1/profiles/me/avatar', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const rawUrl = typeof req.body?.url === 'string' ? req.body.url.trim() : '';
+    const photoId = typeof req.body?.photoId === 'string' ? req.body.photoId : null;
+    if (photoId) {
+      // Move requested photo to position 1
+      const photo = await prisma.profilePhoto.findFirst({ where: { id: photoId, userId } });
+      if (!photo) return res.status(404).json({ error: { message: 'Photo not found', code: 'PHOTO_NOT_FOUND' } });
+      // Push all photos at position < current one back by one
+      await prisma.profilePhoto.updateMany({
+        where: { userId, position: { lt: photo.position } },
+        data: { position: { increment: 1 } },
+      });
+      await prisma.profilePhoto.update({ where: { id: photoId }, data: { position: 1 } });
+      return res.json({ data: { photoId, position: 1 } });
+    }
+    if (!rawUrl || !HTTPS_URL_RE.test(rawUrl)) {
+      return res.status(400).json({ error: { message: 'url or photoId required', code: 'MISSING_AVATAR' } });
+    }
+    // External URL avatar — creates a new profile photo at position 1
+    const existing = await prisma.profilePhoto.findMany({ where: { userId }, orderBy: { position: 'asc' } });
+    if (existing.length >= 9) return res.status(400).json({ error: { message: 'Maximum 9 photos allowed', code: 'PHOTO_LIMIT' } });
+    await prisma.profilePhoto.updateMany({ where: { userId }, data: { position: { increment: 1 } } });
+    const photo = await prisma.profilePhoto.create({ data: { userId, url: rawUrl, position: 1 } });
+    recomputeAndPersistCompletion(prisma, userId).catch(() => {});
+    res.json({ data: photo });
+  } catch (e) { next(e); }
+});
+
+// S3 presign for direct-browser upload — client PUTs the file to the returned
+// URL, then POSTs the final URL back to /profiles/me/photos.
+// Requires S3_UPLOADS_BUCKET (already provisioned by Terraform as
+// miamo-prod-uploads-<accountId>) and the EC2 instance profile grants
+// PutObject on that bucket path.
+app.post('/api/v1/profiles/me/photos/upload-url', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
+  try {
+    const userId = req.userId!;
+    const bucket = process.env.S3_UPLOADS_BUCKET;
+    if (!bucket) return res.status(503).json({ error: { message: 'Upload not configured (S3_UPLOADS_BUCKET unset)', code: 'UPLOAD_NOT_CONFIGURED' } });
+    const contentType = typeof req.body?.contentType === 'string' ? req.body.contentType : 'image/jpeg';
+    if (!/^image\/(jpe?g|png|webp|avif)$/i.test(contentType)) {
+      return res.status(400).json({ error: { message: 'contentType must be image/{jpg,png,webp,avif}', code: 'BAD_CONTENT_TYPE' } });
+    }
+    const ext = contentType.split('/')[1].replace('jpeg', 'jpg');
+    const key = `photos/${userId}/${Date.now()}.${ext}`;
+    // Lazy-load the AWS SDK v3 so services without S3 don't pay the import cost.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { getSignedUrl } = require('@aws-sdk/s3-request-presigner');
+    const region = process.env.AWS_REGION || 'ap-south-1';
+    const s3 = new S3Client({ region });
+    const uploadUrl = await getSignedUrl(s3, new PutObjectCommand({
+      Bucket: bucket, Key: key, ContentType: contentType,
+    }), { expiresIn: 300 }); // 5-min upload window
+    const publicUrl = `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
+    res.json({ data: { uploadUrl, publicUrl, key, expiresIn: 300 } });
   } catch (e) { next(e); }
 });
 
@@ -802,9 +931,14 @@ app.get('/api/v1/cities/nearest', async (req: Request, res: Response, next: Next
 // a 3s simulated review marks it approved; in prod, an admin reviews.
 app.post('/api/v1/profiles/me/verify/submit', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { kind, photoUrl } = req.body || {};
-    if (!kind || !photoUrl) return res.status(400).json({ error: { message: 'kind and photoUrl required' } });
-    if (!['selfie', 'id_document', 'video_liveness'].includes(kind)) return res.status(400).json({ error: { message: 'invalid kind' } });
+    // Accept both `kind` (canonical) and `type` (what most other codepaths use)
+    // to avoid the one-letter-off-400 that trips every client that isn't this
+    // exact handler's author.
+    const body = req.body || {};
+    const kind = body.kind ?? body.type;
+    const photoUrl = body.photoUrl ?? body.url;
+    if (!kind || !photoUrl) return res.status(400).json({ error: { message: 'kind (or type) and photoUrl required', code: 'MISSING_FIELDS' } });
+    if (!['selfie', 'id_document', 'video_liveness'].includes(kind)) return res.status(400).json({ error: { message: 'invalid kind (allowed: selfie, id_document, video_liveness)', code: 'INVALID_KIND' } });
     const sub = await prisma.verificationSubmission.create({
       data: { userId: req.userId!, kind, photoUrl: sanitize(String(photoUrl)), status: 'pending' },
     });

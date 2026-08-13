@@ -84,7 +84,7 @@ Next.js 14 App Router. The 26 routes under `(main)/`. The shared layout. Zustand
 **What you learn:** How the web app is structured. How telemetry is emitted from the browser. Where the 6 new v3.6.0 surfaces live.
 
 **Real-user scenario:**
-> Priya opens https://miamo.app on her iPhone. Next.js serves the marketing landing. She taps "Open app" → routes to `/(main)/discover`. The `(main)/layout.tsx` checks her JWT via `useAuthStore`, finds it valid, lets her through. She swipes. Each swipe-commit fires a `useTrackEngagementDepth(profileId)` and a `useTrackPolarity(profileId)` hook, which emits two tracking events to ingest. She taps the i-icon WhyCard. The `WhyCard` component calls `api.getDiscoverWhy(targetId)`, renders 3 stars. If the flag is OFF, `getDiscoverWhy` returns null on the 404 and the WhyCard hides itself.
+> Priya opens https://miamo.in on her iPhone. Next.js serves the marketing landing. She taps "Open app" → routes to `/(main)/discover`. The `(main)/layout.tsx` checks her JWT via `useAuthStore`, finds it valid, lets her through. She swipes. Each swipe-commit fires a `useTrackEngagementDepth(profileId)` and a `useTrackPolarity(profileId)` hook, which emits two tracking events to ingest. She taps the i-icon WhyCard. The `WhyCard` component calls `api.getDiscoverWhy(targetId)`, renders 3 stars. If the flag is OFF, `getDiscoverWhy` returns null on the 404 and the WhyCard hides itself.
 
 ---
 
