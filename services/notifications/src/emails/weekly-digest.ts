@@ -22,7 +22,7 @@ export interface WeeklyDigestData {
 export function renderWeeklyDigest(data: WeeklyDigestData): RenderedEmail {
   const you = escapeHtml(data.recipientName || 'there');
   const week = escapeHtml(data.weekLabel || 'this week');
-  const url = data.discoverUrl || 'https://miamo.app/discover';
+  const url = data.discoverUrl || 'https://miamo.in/discover';
   const picks = (data.picks ?? []).slice(0, 10);
 
   const subject = picks.length > 0

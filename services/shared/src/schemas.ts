@@ -94,11 +94,25 @@ export const updateProfileBodySchema = z
     education: optStr(120),
     religion: optStr(80),
     zodiac: optStr(40),
-    languages: optStrArray(20, 40),
+    // Column type is String (CSV). Accept BOTH array (legacy client) and
+    // string (raw CSV). The handler normalises to CSV before writing.
+    languages: z.union([z.array(z.string().max(40)).max(20), z.string().max(500)]).optional(),
     pets: optStr(120),
     children: optStr(40),
     politicalViews: optStr(40),
     diet: optStr(40),
+    // v3.6 DTM fields — schema.prisma has them, save handler must include them.
+    maritalStatus: optStr(40),
+    willingToRelocate: optBool,
+    familyInvolved: optBool,
+    expectedTimeline: optStr(40),
+    familyBackground: optStr(2000),
+    educationLevel: optStr(80),
+    educationInstitution: optStr(200),
+    employer: optStr(200),
+    incomeBand: optStr(40),
+    subCommunity: optStr(80),
+    kundliUrl: optStr(500),
   })
   // Permissive: server-side whitelist still filters fields; this just type-checks the known ones.
   .passthrough();

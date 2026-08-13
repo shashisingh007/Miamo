@@ -6,7 +6,7 @@
 
 ## TL;DR
 
-Miamo's web client has exactly one front door: the gateway at `localhost:3200` in dev, `https://api.miamo.app` in production. Every browser request hits that gateway, which verifies the JWT, attaches `x-user-id` + `x-internal-key` headers, applies a rate-limit bucket, and proxies to one of seven internal services. There are eight `server.ts` files (gateway plus seven backends — auth, users, social, messaging, content, notifications, ingest) implementing roughly 150 endpoints. Anything new from v3.6.0 (Move v2, Family Brief, Weekly Top-10, Why-explainer, Voice Fingerprint, anti-ghost ledger, DTM mood-mask) is behind a feature flag that defaults OFF. When a v3.6.0 flag is OFF the endpoint returns 404 — byte-identical to v3.5 behaviour. Internal service-to-service calls go direct (not through the gateway) and carry `X-Internal-Key: $INTERNAL_SERVICE_KEY`, which never appears in a browser request.
+Miamo's web client has exactly one front door: the gateway at `localhost:3200` in dev, `https://api.miamo.in` in production. Every browser request hits that gateway, which verifies the JWT, attaches `x-user-id` + `x-internal-key` headers, applies a rate-limit bucket, and proxies to one of seven internal services. There are eight `server.ts` files (gateway plus seven backends — auth, users, social, messaging, content, notifications, ingest) implementing roughly 150 endpoints. Anything new from v3.6.0 (Move v2, Family Brief, Weekly Top-10, Why-explainer, Voice Fingerprint, anti-ghost ledger, DTM mood-mask) is behind a feature flag that defaults OFF. When a v3.6.0 flag is OFF the endpoint returns 404 — byte-identical to v3.5 behaviour. Internal service-to-service calls go direct (not through the gateway) and carry `X-Internal-Key: $INTERNAL_SERVICE_KEY`, which never appears in a browser request.
 
 ---
 
@@ -35,8 +35,8 @@ Personas used in examples:
 
 | Environment | Base URL |
 |---|---|
-| Production | `https://api.miamo.app` |
-| Staging | `https://api.staging.miamo.app` |
+| Production | `https://api.miamo.in` |
+| Staging | `https://api.staging.miamo.in` |
 | Dev (local) | `http://localhost:3200` |
 
 All endpoints in this document are prefixed `/api/v1` unless explicitly noted. The ingest service at port 3260 uses a `/v1` prefix (no `/api`) because it is reached directly by the browser collector on a separate origin in production.
@@ -149,7 +149,7 @@ graph LR
   Worker --> Postgres
 ```
 
-The gateway is the only service exposed to the public internet. All other services bind to the Docker bridge in dev and to private VPC subnets in production. The ingest service is reached on a separate origin (`ingest.miamo.app`) to keep tracking traffic off the gateway's rate-limit budget.
+The gateway is the only service exposed to the public internet. All other services bind to the Docker bridge in dev and to private VPC subnets in production. The ingest service is reached on a separate origin (`ingest.miamo.in`) to keep tracking traffic off the gateway's rate-limit budget.
 
 ---
 
@@ -724,7 +724,7 @@ Cite: `services/users/src/server.ts:156`.
 curl -X POST $API/api/v1/profiles/me/photos \
   -H "Authorization: Bearer $JWT" \
   -H "Content-Type: application/json" \
-  -d '{"url":"https://cdn.miamo.app/u/priya/p1.jpg"}'
+  -d '{"url":"https://cdn.miamo.in/u/priya/p1.jpg"}'
 ```
 
 Cite: `services/users/src/server.ts:168`.
@@ -944,7 +944,7 @@ Cite: telemetry-only endpoint emitted from `voice_fingerprint.shared` validator 
 curl -X POST $API/api/v1/profiles/me/verify/submit \
   -H "Authorization: Bearer $JWT" \
   -H "Content-Type: application/json" \
-  -d '{"selfieUrl":"https://cdn.miamo.app/u/priya/verify1.jpg","posePromptId":"hand_cheek_up"}'
+  -d '{"selfieUrl":"https://cdn.miamo.in/u/priya/verify1.jpg","posePromptId":"hand_cheek_up"}'
 ```
 
 Cite: `services/users/src/server.ts:588`.
@@ -2375,7 +2375,7 @@ Cite: `services/content/src/server.ts:68`.
 curl -X POST $API/api/v1/feed \
   -H "Authorization: Bearer $JWT" \
   -H "Content-Type: application/json" \
-  -d '{"text":"current rotation","mediaUrls":["https://cdn.miamo.app/u/karan/books.jpg"]}'
+  -d '{"text":"current rotation","mediaUrls":["https://cdn.miamo.in/u/karan/books.jpg"]}'
 ```
 
 Cite: `services/content/src/server.ts:124`.
@@ -2531,7 +2531,7 @@ Cite: `services/content/src/server.ts:240`.
 curl -X POST $API/api/v1/stories \
   -H "Authorization: Bearer $JWT" \
   -H "Content-Type: application/json" \
-  -d '{"mediaUrl":"https://cdn.miamo.app/u/priya/coffee.jpg","caption":"morning fuel"}'
+  -d '{"mediaUrl":"https://cdn.miamo.in/u/priya/coffee.jpg","caption":"morning fuel"}'
 ```
 
 Cite: `services/content/src/server.ts:257`.
@@ -2711,7 +2711,7 @@ Cite: `services/content/src/server.ts:427`.
 curl -X POST $API/api/v1/videos \
   -H "Authorization: Bearer $JWT" \
   -H "Content-Type: application/json" \
-  -d '{"mediaUrl":"https://cdn.miamo.app/u/karan/run.mp4","caption":"5k done"}'
+  -d '{"mediaUrl":"https://cdn.miamo.in/u/karan/run.mp4","caption":"5k done"}'
 ```
 
 Cite: `services/content/src/server.ts:443`.
@@ -2868,7 +2868,7 @@ Cite: `services/content/src/server.ts:862`.
 curl -X POST $API/api/v1/creativity/items \
   -H "Authorization: Bearer $JWT" \
   -H "Content-Type: application/json" \
-  -d '{"mediaUrl":"https://cdn.miamo.app/u/karan/poem.mp4","caption":"verse 1","category":"poetry"}'
+  -d '{"mediaUrl":"https://cdn.miamo.in/u/karan/poem.mp4","caption":"verse 1","category":"poetry"}'
 ```
 
 Cite: `services/content/src/server.ts:886`.
@@ -4167,7 +4167,7 @@ Cite: telemetry-only — `voice_fingerprint.shared` event validator in `services
 
 ## Surface 17 — Tracking Ingest
 
-Source: `services/ingest/src/server.ts` (171 lines, port 3260). The ingest service does **not** sit behind the gateway in production — it is reached on a separate origin (`ingest.miamo.app`) to keep tracking traffic off the gateway's budget. In dev it can be reached via gateway at `/api/v1/track` which forwards to ingest (gateway/src/server.ts:492).
+Source: `services/ingest/src/server.ts` (171 lines, port 3260). The ingest service does **not** sit behind the gateway in production — it is reached on a separate origin (`ingest.miamo.in`) to keep tracking traffic off the gateway's budget. In dev it can be reached via gateway at `/api/v1/track` which forwards to ingest (gateway/src/server.ts:492).
 
 ### `POST /v1/track`
 

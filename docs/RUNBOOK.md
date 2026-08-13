@@ -205,7 +205,7 @@ kubectl set env deployment/social -n miamo DATABASE_URL="<correct-url>"
 
 ```bash
 # Synthetic check from outside the cluster (or your laptop):
-curl -sX POST https://api.miamo.app/v1/discover \
+curl -sX POST https://api.miamo.in/v1/discover \
   -H "Authorization: Bearer <staging-token>" \
   -H "Content-Type: application/json" -d '{}' \
   -w "\nHTTP %{http_code} in %{time_total}s\n"
@@ -521,7 +521,7 @@ kubectl exec -- printenv FEATURE_DTM_MASK_ENABLED
 kubectl exec -- printenv FEATURE_FAMILY_BRIEF_ENABLED
 
 # Step 2 — fetch a family-brief share URL as an outsider (no auth)
-curl -s "https://api.miamo.app/v1/family-brief/share/<token>" | jq '.profile | {name, phone, address}'
+curl -s "https://api.miamo.in/v1/family-brief/share/<token>" | jq '.profile | {name, phone, address}'
 # Expected: name="K", phone=null, address=null
 # Leak indicator: name="Karan Mehta", phone="+91...", address="Bangalore, KA"
 
@@ -564,14 +564,14 @@ redis-cli --scan --pattern "family-brief:share:*" | xargs -r redis-cli DEL
 
 ```bash
 # Re-fetch the same token (which is now revoked — should 404 / 410)
-curl -i "https://api.miamo.app/v1/family-brief/share/<token>"
+curl -i "https://api.miamo.in/v1/family-brief/share/<token>"
 # Expected: HTTP 410 Gone, or 404
 
 # Issue a new test share, verify it's masked
-curl -X POST "https://api.miamo.app/v1/family-brief/share" \
+curl -X POST "https://api.miamo.in/v1/family-brief/share" \
   -H "Authorization: Bearer <karan-token>" \
   -d '{"maskingLevel": "masked"}' | jq '.token' \
-  | xargs -I {} curl -s "https://api.miamo.app/v1/family-brief/share/{}" | jq '.profile.name'
+  | xargs -I {} curl -s "https://api.miamo.in/v1/family-brief/share/{}" | jq '.profile.name'
 # Expected: "K" (single initial)
 ```
 
@@ -1453,7 +1453,7 @@ kubectl get ingress -n miamo -o yaml | grep -iE "timeout|idle"
 # aws elbv2 describe-load-balancer-attributes --load-balancer-arn <arn> | grep idle_timeout
 
 # Step 3 — gateway keep-alive header
-curl -i -N "https://api.miamo.app/v1/stream" -H "Authorization: Bearer <token>" \
+curl -i -N "https://api.miamo.in/v1/stream" -H "Authorization: Bearer <token>" \
   -H "Accept: text/event-stream" | head -20
 # Look for: Connection: keep-alive
 ```
@@ -1495,7 +1495,7 @@ kubectl annotate ingress miamo-ingress -n miamo \
 
 ```bash
 # Open an SSE connection and verify it stays open for 2+ minutes
-timeout 130 curl -N "https://api.miamo.app/v1/stream" \
+timeout 130 curl -N "https://api.miamo.in/v1/stream" \
   -H "Authorization: Bearer <token>" \
   -H "Accept: text/event-stream" \
   | tee /tmp/sse.log &
@@ -2017,7 +2017,7 @@ kubectl get nodes -o wide
 
 ```bash
 # Issue a fresh token, verify it
-curl -X POST https://api.miamo.app/v1/auth/refresh \
+curl -X POST https://api.miamo.in/v1/auth/refresh \
   -H "Authorization: Bearer <existing-refresh-token>"
 # Expected: 200 with new access token
 

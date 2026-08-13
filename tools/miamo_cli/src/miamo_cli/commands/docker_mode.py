@@ -27,17 +27,91 @@ def docker_group() -> None:
 
 
 @docker_group.command()
-def up() -> None:
-    """docker compose up -d --build."""
+@click.option(
+    "--sequential/--parallel",
+    default=True,
+    help="Build one service at a time (default) — safe on low-RAM boxes like t3.small (2 GB). Use --parallel on 8 GB+.",
+)
+@click.option(
+    "--skip-build",
+    is_flag=True,
+    help="Skip `docker compose build` entirely — just `up -d`. Use when images are already built or pulled from a registry.",
+)
+def up(sequential: bool, skip_build: bool) -> None:
+    """docker compose up -d — with sequential build to avoid OOM on small boxes.
+
+    \b
+    Build order (sequential mode):
+      1. infra    : postgres, redis (needed by others)
+      2. backends : gateway, auth, users, social, messaging, content, notifications
+      3. workers  : ingest, tracking-worker
+      4. web      : Next.js (biggest — built last)
+      5. reverse  : nginx reverse proxy (if defined)
+
+    \b
+    Then `up -d` brings the whole stack up in one shot using the built images.
+    """
     try:
         _require_docker()
         load_env()
-        step("docker compose up -d --build…")
+
+        if not skip_build:
+            build_order = [
+                # Phase 1: infra images are pulled (postgres:16-alpine, redis:7-alpine) — no build needed
+                # Phase 2: backend services — small (~150 MB each) — build one at a time
+                ["gateway"],
+                ["auth"],
+                ["users"],
+                ["social"],
+                ["messaging"],
+                ["content"],
+                ["notifications"],
+                # Phase 3: workers
+                ["ingest"],
+                ["tracking-worker"],
+                # Phase 4: web (Next.js — heaviest, ~500 MB)
+                ["web"],
+                # Phase 5: migrate (one-shot)
+                ["migrate"],
+            ]
+
+            if sequential:
+                total = sum(len(g) for g in build_order)
+                step(f"building {total} services sequentially (safe for 2 GB RAM)…")
+                built = 0
+                for group in build_order:
+                    for svc in group:
+                        built += 1
+                        step(f"  [{built}/{total}] docker compose build {svc}")
+                        try:
+                            run(
+                                ["docker", "compose", "build", svc],
+                                cwd=ROOT,
+                                check=True,
+                            )
+                        except subprocess.CalledProcessError:
+                            die(
+                                f"docker compose build {svc}",
+                                f"check docker/{svc}.Dockerfile and try `miamo tail docker {svc}`",
+                            )
+                ok(f"built {total} services")
+            else:
+                step("docker compose build (all services in parallel)…")
+                try:
+                    run(["docker", "compose", "build"], cwd=ROOT, check=True)
+                    ok("built all services")
+                except subprocess.CalledProcessError:
+                    die(
+                        "docker compose build",
+                        "parallel build failed — try `--sequential` on low-RAM hosts",
+                    )
+
+        step("docker compose up -d…")
         try:
-            run(["docker", "compose", "up", "-d", "--build"], cwd=ROOT, check=True)
+            run(["docker", "compose", "up", "-d"], cwd=ROOT, check=True)
             ok("docker stack up")
         except subprocess.CalledProcessError:
-            die("docker compose up -d --build", "check docker-compose.yml and .env")
+            die("docker compose up -d", "check .env and `miamo status docker`")
     except KeyboardInterrupt:
         raise SystemExit(130)
 

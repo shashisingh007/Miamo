@@ -65,3 +65,13 @@ pids/
 
 # Local QA run outputs (regenerated on every run)
 scripts/qa-runs/*.report.json
+
+# Terraform
+terraform/.terraform/
+terraform/.terraform.lock.hcl.bak
+terraform/*.tfplan
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/crash.log
+terraform/crash.*.log
+mobile/.expo/

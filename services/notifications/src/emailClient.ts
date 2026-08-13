@@ -102,7 +102,7 @@ export class SesMailer implements EmailClient {
  */
 export function createEmailClient(env: NodeJS.ProcessEnv = process.env): EmailClient {
   const transport = (env.EMAIL_TRANSPORT ?? 'stub').toLowerCase();
-  const defaultFrom = env.EMAIL_FROM ?? 'Miamo <no-reply@miamo.app>';
+  const defaultFrom = env.EMAIL_FROM ?? 'Miamo <no-reply@miamo.in>';
   if (transport === 'resend' && env.RESEND_API_KEY) {
     try { return new ResendMailer({ apiKey: env.RESEND_API_KEY, defaultFrom }); } catch { return new LocalStubMailer(); }
   }

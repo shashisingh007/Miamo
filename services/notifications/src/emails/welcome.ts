@@ -11,7 +11,7 @@ export interface WelcomeData {
 
 export function renderWelcome(data: WelcomeData): RenderedEmail {
   const name = escapeHtml(data.displayName || 'there');
-  const url = data.discoverUrl || 'https://miamo.app/discover';
+  const url = data.discoverUrl || 'https://miamo.in/discover';
   const subject = `Welcome to Miamo, ${data.displayName || 'friend'}`;
   const body = `<h2 style="margin:0 0 12px;font-size:24px;color:#2B1F17;">Welcome, ${name}.</h2>
 <p style="margin:0 0 16px;line-height:1.6;font-size:15px;">

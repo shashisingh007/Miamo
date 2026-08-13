@@ -38,7 +38,7 @@ Build: `cd services/web && npm run build && npm run start`.
 
 ### 1.1 What Priya sees
 
-Priya opens `miamo.app` on her phone. She is taken to a brand-aligned landing
+Priya opens `miamo.in` on her phone. She is taken to a brand-aligned landing
 hero with "Sign in" and "Create account" CTAs. After logging in she lands on
 `/discover` and from then on every page she visits — Matches, Messages,
 Profile, Creativity, the Settings she opens at 2am — all share the same

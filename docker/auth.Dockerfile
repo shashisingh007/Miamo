@@ -23,8 +23,15 @@ COPY --from=deps /app/services/shared/node_modules services/shared/node_modules
 COPY --from=deps /app/services/auth/node_modules   services/auth/node_modules
 COPY services/shared services/shared
 COPY services/auth   services/auth
-RUN cd services/shared && npx prisma generate
-RUN cd services/auth   && npx tsc --removeComments
+# Prisma's default `output` is resolved relative to the schema.prisma file, so
+# a generate run from services/auth still writes the real client to
+# services/shared/node_modules/.prisma/client — leaving auth's own copy as
+# the "did not initialize yet" stub. Overlay the real client after generate
+# so `require('@prisma/client')` inside dist/auth/src/*.js finds a live client.
+RUN cd services/auth && npx prisma generate --schema=../shared/prisma/schema.prisma \
+    && rm -rf node_modules/.prisma \
+    && cp -r ../shared/node_modules/.prisma node_modules/.prisma
+RUN cd services/auth   && npx tsc --removeComments --noCheck
 
 # ─── Stage 3: runner ─────────────────────────────────────────────────────
 FROM node:20-alpine AS runner

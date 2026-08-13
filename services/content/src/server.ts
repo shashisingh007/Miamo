@@ -440,14 +440,26 @@ app.delete('/api/v1/stories/:id', authMiddleware, async (req: AuthRequest, res: 
 });
 
 // ═══ VIDEOS ══════════════════════════════════════════
+// Client sends BOTH ranking modes ("for you", "trending", "top") AND real
+// categories ("music", "dance", …) in the same `category=` param. Treat the
+// ranking modes as SORT hints; only real categories restrict WHERE.
+const VIDEO_RANKING_MODES = new Set(['for you','for-you','foryou','trending','top','all']);
 app.get('/api/v1/videos', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { category, cursor } = req.query;
+    const catRaw = typeof category === 'string' ? category.trim().toLowerCase() : '';
+    const isRankingMode = catRaw && VIDEO_RANKING_MODES.has(catRaw);
     const where: any = { visibility: 'everyone' };
-    if (category && category !== 'all') where.category = category;
+    if (catRaw && !isRankingMode) where.category = { equals: catRaw, mode: 'insensitive' };
+    let orderBy: any = { createdAt: 'desc' };
+    if (catRaw === 'trending' || catRaw === 'top') {
+      // No dedicated score column; approximate with reaction count desc,
+      // then recency. Prisma _count in orderBy is supported.
+      orderBy = [{ reactions: { _count: 'desc' } }, { createdAt: 'desc' }];
+    }
     const videos = await prisma.video.findMany({
       where, include: { author: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } }, reactions: true, _count: { select: { reactions: true, comments: true } } },
-      orderBy: { createdAt: 'desc' }, take: 20,
+      orderBy, take: 20,
       ...cursorOpt(cursor),
     });
     const userId = req.userId!;
@@ -877,16 +889,29 @@ app.get('/api/v1/creativity/items/:id/comments', authMiddleware, async (req: Aut
 
 app.get('/api/v1/creativity/items', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { category, sort, cursor, featured } = req.query;
+    const { category, sort, cursor, featured, q } = req.query;
     const where: any = { visibility: 'everyone' };
     if (category && category !== 'all') {
-      const cat = await prisma.creativityCategory.findUnique({ where: { name: category as string } });
+      // Case-insensitive category name lookup (seed data uses Title Case).
+      const cat = await prisma.creativityCategory.findFirst({
+        where: { name: { equals: String(category), mode: 'insensitive' } },
+      });
       if (cat) where.categoryId = cat.id;
     }
     if (featured === 'true') where.featured = true;
+    // Free-text search on title + content (previously silently ignored)
+    if (q && typeof q === 'string' && q.trim().length > 0) {
+      const term = q.trim().slice(0, 128);
+      where.OR = [
+        { title:   { contains: term, mode: 'insensitive' } },
+        { content: { contains: term, mode: 'insensitive' } },
+      ];
+    }
     let orderBy: any = { createdAt: 'desc' };
     if (sort === 'trending') orderBy = { trendScore: 'desc' };
     if (sort === 'views') orderBy = { views: 'desc' };
+    // "Top" = most-reacted-with, tie-broken by recency (previously fell through to recent).
+    if (sort === 'top') orderBy = [{ reactions: { _count: 'desc' } }, { createdAt: 'desc' }];
 
     const items = await prisma.creativityItem.findMany({
       where, include: { author: { include: { profile: true, photos: { take: 1, orderBy: { position: 'asc' } } } }, category: true, reactions: true, _count: { select: { reactions: true, comments: true, viewRecords: true } } },
@@ -1202,16 +1227,27 @@ app.get('/api/v1/matrimonial/profile', authMiddleware, async (req: AuthRequest, 
 app.put('/api/v1/matrimonial/profile', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const existing = await prisma.matrimonialProfile.findUnique({ where: { userId: req.userId! } });
-    const data = sanitizeObject(req.body);
+    const data = sanitizeObject(req.body) as Record<string, unknown>;
     // Remove fields that shouldn't be updated directly
     delete data.id; delete data.userId; delete data.createdAt; delete data.updatedAt;
     delete data.idVerified; delete data.incomeVerified; delete data.educationVerified; delete data.photoVerified;
+
+    // Coerce date strings — browser <input type="date"> sends "YYYY-MM-DD"
+    // which Prisma's DateTime column rejects (previously 500'd the whole PUT).
+    if (typeof data.dateOfBirth === 'string' && data.dateOfBirth) {
+      const d = new Date(data.dateOfBirth as string);
+      if (!Number.isNaN(d.getTime())) data.dateOfBirth = d;
+      else delete data.dateOfBirth;
+    }
+    // Also coerce empty strings on nullable columns → null (Prisma DateTime
+    // rejects empty string).
+    if (data.dateOfBirth === '') delete data.dateOfBirth;
 
     let profile;
     if (existing) {
       profile = await prisma.matrimonialProfile.update({ where: { userId: req.userId! }, data });
     } else {
-      profile = await prisma.matrimonialProfile.create({ data: { ...data, userId: req.userId! } });
+      profile = await prisma.matrimonialProfile.create({ data: { ...(data as any), userId: req.userId! } });
     }
     res.json({ data: profile });
   } catch (e) { next(e); }
@@ -1220,17 +1256,46 @@ app.put('/api/v1/matrimonial/profile', authMiddleware, async (req: AuthRequest, 
 // Browse matrimonial profiles with filters
 app.get('/api/v1/matrimonial/browse', authMiddleware, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    const { religion, caste, city, ageMin, ageMax, education, income, manglik, maritalStatus, diet, motherTongue, cursor } = req.query;
+    // Client sends both `minAge`/`maxAge` (Discover convention) and legacy
+    // `ageMin`/`ageMax`; accept either. Same for income (client sends
+    // `minIncome`/`maxIncome` as categorical bands).
+    const q = req.query as Record<string, string | undefined>;
+    const { religion, caste, city, education, manglik, maritalStatus, diet, motherTongue, cursor } = q;
+    const ageMin = q.ageMin ?? q.minAge;
+    const ageMax = q.ageMax ?? q.maxAge;
+    const minIncome = q.minIncome;
+    const maxIncome = q.maxIncome;
     const where: any = { userId: { not: req.userId! } };
-    if (religion) where.religion = { equals: religion as string, mode: 'insensitive' };
-    if (caste) where.caste = { equals: caste as string, mode: 'insensitive' };
-    if (city) where.workingCity = { contains: city as string, mode: 'insensitive' };
-    if (education) where.education = { contains: education as string, mode: 'insensitive' };
-    if (income) where.annualIncome = { not: '' };
-    if (manglik && manglik !== 'any') where.manglik = manglik as string;
-    if (maritalStatus) where.maritalStatus = maritalStatus as string;
-    if (diet) where.diet = diet as string;
-    if (motherTongue) where.motherTongue = { equals: motherTongue as string, mode: 'insensitive' };
+    if (religion) where.religion = { equals: religion, mode: 'insensitive' };
+    if (caste) where.caste = { equals: caste, mode: 'insensitive' };
+    if (city) where.workingCity = { contains: city, mode: 'insensitive' };
+    if (education) where.education = { contains: education, mode: 'insensitive' };
+    // annualIncome is stored as a categorical band string ("3-5 LPA", "10-25 LPA",
+    // etc.). Treat min/maxIncome as band boundaries; if either is set, restrict.
+    if (minIncome || maxIncome) {
+      const bands = ['0-3 LPA','3-5 LPA','5-10 LPA','10-15 LPA','15-25 LPA','25-50 LPA','50-100 LPA','100+ LPA'];
+      const minIdx = minIncome ? bands.findIndex(b => b.startsWith(String(minIncome).split('-')[0])) : 0;
+      const maxIdx = maxIncome ? bands.findIndex(b => b.startsWith(String(maxIncome).split('-')[0])) : bands.length - 1;
+      if (minIdx >= 0 || maxIdx >= 0) {
+        const chosen = bands.slice(Math.max(0, minIdx), Math.min(bands.length, (maxIdx >= 0 ? maxIdx : bands.length - 1) + 1));
+        if (chosen.length > 0) where.annualIncome = { in: chosen };
+      }
+    }
+    if (manglik && manglik !== 'any') where.manglik = manglik;
+    if (maritalStatus) where.maritalStatus = maritalStatus;
+    if (diet) where.diet = diet;
+    if (motherTongue) where.motherTongue = { equals: motherTongue, mode: 'insensitive' };
+    // Age range: MatrimonialProfile has no `age` col; filter via user.profile.age.
+    if (ageMin || ageMax) {
+      const min = ageMin ? parseInt(String(ageMin), 10) : undefined;
+      const max = ageMax ? parseInt(String(ageMax), 10) : undefined;
+      const ageWhere: Record<string, number> = {};
+      if (Number.isFinite(min) && (min as number) >= 18) ageWhere.gte = min as number;
+      if (Number.isFinite(max) && (max as number) <= 99) ageWhere.lte = max as number;
+      if (Object.keys(ageWhere).length > 0) {
+        where.user = { ...(where.user || {}), profile: { age: ageWhere } };
+      }
+    }
     // Require at least fullName or religion to be set (i.e. profile filled)
     where.fullName = { not: '' };
 

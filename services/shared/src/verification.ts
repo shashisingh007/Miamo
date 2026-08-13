@@ -58,11 +58,58 @@ function generateCode(): string {
 
 // ── Notification providers ──────────────────────────
 async function sendEmailDev(to: string, subject: string, body: string): Promise<void> {
-  logger.info(`[OTP-EMAIL] to=${to} subject="${subject}"\n${body}`);
+  logger.info(`[OTP-EMAIL:dev] to=${to} subject="${subject}"\n${body}`);
 }
 async function sendSmsDev(to: string, body: string): Promise<void> {
-  logger.info(`[OTP-SMS] to=${to} body="${body}"`);
+  logger.info(`[OTP-SMS:dev] to=${to} body="${body}"`);
 }
+
+// SMTP transport is lazily built on first use and cached — nodemailer is
+// only require()'d if OTP_PROVIDER_EMAIL=smtp, so the dev fast-path stays
+// zero-dep.
+let smtpTransport: unknown | null = null;
+async function getSmtpTransport(): Promise<unknown> {
+  if (smtpTransport) return smtpTransport;
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const nodemailer = require('nodemailer');
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || '587');
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  if (!host || !user || !pass) {
+    throw new Error('SMTP_HOST/SMTP_USER/SMTP_PASS must all be set when OTP_PROVIDER_EMAIL=smtp');
+  }
+  smtpTransport = nodemailer.createTransport({
+    host,
+    port,
+    secure: port === 465, // 465 = SMTPS, 587 = STARTTLS
+    auth: { user, pass },
+    // AWS SES rate: 1 msg/sec in sandbox. Serialise sends to stay under.
+    pool: true,
+    maxConnections: 1,
+    maxMessages: 100,
+  });
+  logger.info(`[OTP-EMAIL] SMTP transport ready (host=${host} port=${port})`);
+  return smtpTransport;
+}
+
+async function sendEmailSmtp(to: string, subject: string, body: string): Promise<void> {
+  const t = await getSmtpTransport() as { sendMail: (o: unknown) => Promise<{ messageId: string }> };
+  const from = process.env.SMTP_FROM || 'noreply@miamo.in';
+  const info = await t.sendMail({
+    from: `"Miamo" <${from}>`,
+    to,
+    subject,
+    text: body,
+    // Minimal HTML — Miamo brand colour on the code, safe for all clients.
+    html: `<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;font-size:14px;color:#1A1A1A;line-height:1.55">
+  <p>${body.split(String((body.match(/\d{6}/) || [''])[0])).join(String((body.match(/\d{6}/) || [''])[0])) /* keep code visible */}</p>
+  <p style="font-size:12px;color:#8B8680">This is an automated message from Miamo. Do not reply.</p>
+</div>`,
+  });
+  logger.info(`[OTP-EMAIL] sent to=${to} messageId=${info.messageId}`);
+}
+
 async function sendNotification(channel: OtpChannel, to: string, purpose: OtpPurpose, code: string): Promise<void> {
   const provider = channel === 'email'
     ? (process.env.OTP_PROVIDER_EMAIL || 'dev')
@@ -77,15 +124,27 @@ async function sendNotification(channel: OtpChannel, to: string, purpose: OtpPur
   };
   const subject = `Miamo: your code is ${code}`;
   const body = `Your Miamo code to ${purposeText[purpose]} is ${code}. It expires in 10 minutes. If you didn't request this, ignore this message.`;
-  if (provider === 'dev') {
-    if (channel === 'email') await sendEmailDev(to, subject, body);
-    else await sendSmsDev(to, body);
+
+  // Email providers
+  if (channel === 'email') {
+    if (provider === 'smtp') {
+      try {
+        await sendEmailSmtp(to, subject, body);
+        return;
+      } catch (e) {
+        // Never let a send failure leak the code to the client, but log it.
+        logger.error(`[OTP-EMAIL] SMTP send failed for ${to}: ${(e as Error).message}`);
+        throw new OtpError('OTP_SEND_FAILED', 'Could not send verification email. Please try again.', 502);
+      }
+    }
+    // dev fallback
+    await sendEmailDev(to, subject, body);
     return;
   }
-  // TODO(prod): wire SendGrid / Twilio here using process.env.SENDGRID_API_KEY etc.
-  logger.warn(`[OTP] provider=${provider} not wired; falling back to dev log`);
-  if (channel === 'email') await sendEmailDev(to, subject, body);
-  else await sendSmsDev(to, body);
+
+  // SMS providers — Twilio/MSG91 still TODO; log-only for now.
+  logger.warn(`[OTP-SMS] provider=${provider} not wired; falling back to dev log`);
+  await sendSmsDev(to, body);
 }
 
 // ── Issue ────────────────────────────────────────────
